@@ -41,6 +41,12 @@ def test_invalid_authority_rejects_without_silent_turn_mutation() -> None:
     assert result.accepted is False
     assert result.failure is not None
     assert result.failure.code == FailureCode.AUTHORITY_DENIED
+    assert result.authority.allowed is False
+    assert set(result.authority.denied_paths) == {
+        "turn.current_turn_id",
+        "turn.last_event_ref",
+    }
+    assert result.authority.reason == "writer attempted forbidden field writes"
     assert result.state.turn.current_turn_id == state.turn.current_turn_id
     assert result.state.turn.last_event_ref == state.turn.last_event_ref
     assert result.provenance.status == ProvenanceStatus.REJECTED

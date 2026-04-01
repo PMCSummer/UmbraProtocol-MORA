@@ -1,5 +1,7 @@
 from dataclasses import replace
 
+import pytest
+
 from substrate.contracts import (
     FailureCode,
     ProvenanceStatus,
@@ -61,3 +63,11 @@ def test_success_without_provenance_cannot_be_returned() -> None:
     assert result.accepted is True
     assert result.provenance is not None
     assert result.provenance.transition_id == result.state.runtime.last_transition_id
+
+
+def test_bypass_deep_mutation_of_failure_details_is_blocked() -> None:
+    result = execute_transition({"transition_kind": "BROKEN"}, create_empty_state())
+
+    assert result.failure is not None
+    with pytest.raises(TypeError):
+        result.failure.details["tamper"] = "x"

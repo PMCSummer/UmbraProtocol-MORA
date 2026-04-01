@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
+from types import MappingProxyType
 from typing import Mapping
 
 from substrate.contracts import FailureCode, FailureMarker
@@ -21,5 +22,5 @@ def build_failure_marker(
         message=message,
         transition_id=transition_id,
         created_at=created_at or datetime.now(tz=timezone.utc).isoformat(),
-        details=dict(details or {}),
+        details=MappingProxyType(dict(details or {})),
     )

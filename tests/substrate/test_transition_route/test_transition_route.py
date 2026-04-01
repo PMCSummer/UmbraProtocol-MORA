@@ -44,6 +44,10 @@ def test_valid_ingest_transition_produces_delta_and_provenance() -> None:
     assert "turn.current_turn_id" in result.delta.changed_fields
     assert result.provenance is not None
     assert result.provenance.status == ProvenanceStatus.APPLIED
+    assert result.provenance.writer == WriterIdentity.TRANSITION_ENGINE
+    assert result.provenance.cause_chain == ("external-event", "integration-test")
+    assert result.authority.reason == "writer authorized"
+    assert result.emitted_event.event_id == result.state.runtime.last_event_id
     assert result.state.runtime.last_transition_id == "tr-ingest-1"
 
 
@@ -58,3 +62,10 @@ def test_bypass_direct_mutation_is_impossible() -> None:
 
     with pytest.raises(AttributeError):
         state.trace.events.append("ev-illegal")
+
+
+def test_bypass_deep_mutation_of_event_payload_is_blocked() -> None:
+    state = _bootstrapped_state()
+
+    with pytest.raises(TypeError):
+        state.trace.events[-1].payload["tamper"] = "x"

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from types import MappingProxyType
 from typing import Any, Mapping
 
 from substrate.contracts import EventRecord, TransitionKind
@@ -17,6 +18,6 @@ def build_event_record(
         event_id=event_id,
         transition_id=transition_id,
         transition_kind=transition_kind,
-        payload=dict(payload),
+        payload=MappingProxyType(dict(payload)),
         created_at=created_at,
     )
