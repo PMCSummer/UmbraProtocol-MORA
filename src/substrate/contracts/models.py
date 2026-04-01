@@ -64,25 +64,27 @@ class EventRecord:
 
 
 @dataclass(frozen=True, slots=True)
-class ProvenanceRecord:
-    transition_id: str
-    writer: WriterIdentity
-    transition_kind: TransitionKind
-    event_id: str
-    cause_chain: tuple[str, ...]
-    authority: AuthorityDecision
-    status: ProvenanceStatus
-    recorded_at: str
-    failure_code: FailureCode | None = None
-
-
-@dataclass(frozen=True, slots=True)
 class StateDelta:
     changed_fields: tuple[str, ...]
     before_revision: int
     after_revision: int
     transition_id: str
     event_id: str
+
+
+@dataclass(frozen=True, slots=True)
+class ProvenanceRecord:
+    transition_id: str
+    writer: WriterIdentity
+    transition_kind: TransitionKind
+    event_id: str
+    cause_chain: tuple[str, ...]
+    attempted_paths: tuple[str, ...]
+    actual_delta: StateDelta
+    authority: AuthorityDecision
+    status: ProvenanceStatus
+    recorded_at: str
+    failure_code: FailureCode | None = None
 
 
 @dataclass(frozen=True, slots=True)

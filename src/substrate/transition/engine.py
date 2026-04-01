@@ -45,6 +45,7 @@ class _TransitionContext:
     transition_id: str = ""
     event_id: str = ""
     cause_chain: tuple[str, ...] = ()
+    attempted_paths: tuple[str, ...] = ()
 
 
 def execute_transition(request: Any, state: Any) -> TransitionResult:
@@ -139,6 +140,7 @@ def resolve_transition_kind(context: _TransitionContext) -> None:
 def check_authority_stage(context: _TransitionContext) -> None:
     writer = _resolve_writer(context)
     requested = writer_transition_paths(context.kind)
+    context.attempted_paths = tuple(sorted(requested))
     context.authority = check_authority(writer, requested)
     if context.failure is not None:
         return
@@ -245,12 +247,28 @@ def build_provenance_record_stage(context: _TransitionContext) -> None:
 
     status = ProvenanceStatus.APPLIED if context.accepted else ProvenanceStatus.REJECTED
     writer = _resolve_writer(context)
+    delta_to_persist = context.delta or StateDelta(
+        changed_fields=(),
+        before_revision=context.state_obj.runtime.revision,
+        after_revision=context.candidate_state.runtime.revision,
+        transition_id=context.transition_id,
+        event_id=context.event_id or _new_event_id(),
+    )
+    if "trace.transitions" not in delta_to_persist.changed_fields:
+        delta_to_persist = replace(
+            delta_to_persist,
+            changed_fields=delta_to_persist.changed_fields + ("trace.transitions",),
+        )
+    context.delta = delta_to_persist
+
     provenance = build_provenance_record(
         transition_id=context.transition_id,
         writer=writer,
         transition_kind=context.kind,
         event_id=context.event_id or _new_event_id(),
         cause_chain=context.cause_chain or ("direct",),
+        attempted_paths=context.attempted_paths,
+        actual_delta=delta_to_persist,
         authority=context.authority,
         status=status,
         failure=context.failure,
@@ -261,11 +279,6 @@ def build_provenance_record_stage(context: _TransitionContext) -> None:
         transitions=context.candidate_state.trace.transitions + (provenance,),
     )
     context.candidate_state = replace(context.candidate_state, trace=trace_with_provenance)
-    if context.delta is not None and "trace.transitions" not in context.delta.changed_fields:
-        context.delta = replace(
-            context.delta,
-            changed_fields=context.delta.changed_fields + ("trace.transitions",),
-        )
     context.provenance = provenance
 
 
@@ -292,6 +305,13 @@ def enforce_invariants(context: _TransitionContext) -> None:
             code=FailureCode.INVARIANT_VIOLATION,
             stage="enforce_invariants",
             message="eventless state changes are forbidden",
+        )
+    if context.provenance.actual_delta != context.delta:
+        _set_failure(
+            context,
+            code=FailureCode.INVARIANT_VIOLATION,
+            stage="enforce_invariants",
+            message="persisted provenance delta must match transition delta",
         )
     allowed_fields = allowed_changed_paths(
         transition_kind=context.kind,

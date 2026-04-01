@@ -1,7 +1,10 @@
 from dataclasses import FrozenInstanceError
+import inspect
 
 import pytest
 
+import substrate
+import substrate.transition as transition_api
 from substrate.contracts import ProvenanceStatus, TransitionKind, TransitionRequest, WriterIdentity
 from substrate.state import create_empty_state
 from substrate.transition import execute_transition
@@ -48,6 +51,10 @@ def test_valid_ingest_transition_produces_delta_and_provenance() -> None:
     assert result.provenance.cause_chain == ("external-event", "integration-test")
     assert result.authority.reason == "writer authorized"
     assert result.emitted_event.event_id == result.state.runtime.last_event_id
+    persisted = result.state.trace.transitions[-1]
+    assert persisted.attempted_paths == ("turn.current_turn_id", "turn.last_event_ref")
+    assert persisted.actual_delta == result.delta
+    assert "turn.current_turn_id" in persisted.actual_delta.changed_fields
     assert result.state.runtime.last_transition_id == "tr-ingest-1"
 
 
@@ -69,3 +76,11 @@ def test_bypass_deep_mutation_of_event_payload_is_blocked() -> None:
 
     with pytest.raises(TypeError):
         state.trace.events[-1].payload["tamper"] = "x"
+
+
+def test_public_operational_surface_has_single_write_seam() -> None:
+    assert transition_api.__all__ == ["execute_transition"]
+    exported_functions = [
+        name for name in substrate.__all__ if inspect.isfunction(getattr(substrate, name, None))
+    ]
+    assert set(exported_functions) == {"create_empty_state", "execute_transition"}

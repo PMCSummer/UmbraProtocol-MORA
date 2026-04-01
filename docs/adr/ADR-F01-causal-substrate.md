@@ -22,6 +22,12 @@ This is the only public route for meaningful runtime-state mutation.
 - Missing provenance is impossible in returned successful/rejected results.
 - Invalid transition contracts produce explicit rejection + failure marker (no silent fallback).
 - Runtime state is immutable-shaped (`frozen` dataclasses + tuple traces), so direct field mutation bypass is blocked.
+- Persisted provenance now stores explicit `attempted_paths` and persisted `actual_delta` for post-hoc reconstruction.
+
+## Explicit Environment Bound
+- F01 claims are scoped to trusted runtime usage and the public operational surface.
+- Python hostile-runtime techniques (object fabrication, monkey patching, reflective bypass) are out of scope for this phase and are not claimed as prevented.
+- Claim boundary: within public API usage, `execute_transition` is the canonical write seam for meaningful runtime-state mutation.
 
 ## Deferred By Design (Not F01)
 - Semantic interpretation (F02)
