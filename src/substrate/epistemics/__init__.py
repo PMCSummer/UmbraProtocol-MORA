@@ -1,0 +1,43 @@
+from substrate.epistemics.grounding import ground_epistemic_input
+from substrate.epistemics.models import (
+    AbstentionMarker,
+    ClaimPolarity,
+    ConfidenceLevel,
+    ConflictMarker,
+    ContestationMarker,
+    DownstreamAllowance,
+    EpistemicResult,
+    EpistemicStatus,
+    EpistemicUnit,
+    GroundingContext,
+    GroundingTelemetry,
+    InputMaterial,
+    ModalityClass,
+    SourceClass,
+    SourceMetadata,
+    SupportMarker,
+    UnknownMarker,
+)
+from substrate.epistemics.policy import evaluate_downstream_allowance
+
+__all__ = [
+    "AbstentionMarker",
+    "ClaimPolarity",
+    "ConfidenceLevel",
+    "ConflictMarker",
+    "ContestationMarker",
+    "DownstreamAllowance",
+    "EpistemicResult",
+    "EpistemicStatus",
+    "EpistemicUnit",
+    "GroundingContext",
+    "GroundingTelemetry",
+    "InputMaterial",
+    "ModalityClass",
+    "SourceClass",
+    "SourceMetadata",
+    "SupportMarker",
+    "UnknownMarker",
+    "evaluate_downstream_allowance",
+    "ground_epistemic_input",
+]
