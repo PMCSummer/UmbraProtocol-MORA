@@ -7,8 +7,10 @@ from substrate.lexicon import (
     LexicalEntryProposal,
     LexicalSenseHypothesis,
     LexicalSenseStatus,
+    LexicalUnknownClass,
     LexiconQueryContext,
     LexiconQueryRequest,
+    UnknownLexicalObservation,
     create_seed_lexicon_state,
     create_or_update_lexicon_state,
     create_empty_lexicon_state,
@@ -141,3 +143,38 @@ def test_only_unstable_senses_block_strong_usable_lexical_claim() -> None:
     assert result.downstream_gate == canonical
     assert result.downstream_gate.accepted is False
     assert "only_unstable_senses" in result.downstream_gate.restrictions
+
+
+def test_unknown_word_and_unknown_sense_in_context_have_distinct_gate_semantics() -> None:
+    seeded = create_seed_lexicon_state()
+    with_unknown = create_or_update_lexicon_state(
+        lexicon_state=seeded,
+        unknown_observations=(
+            UnknownLexicalObservation(
+                surface_form="qzxv",
+                occurrence_ref="occ-downstream-unknown",
+                provenance="test.downstream",
+            ),
+        ),
+    )
+    unknown_result = query_lexical_entries(
+        lexicon_state=with_unknown.updated_state,
+        queries=(LexiconQueryRequest(surface_form="qzxv", language_code="en"),),
+    )
+    unknown_record = unknown_result.query_records[0]
+    assert {state.unknown_class for state in unknown_record.unknown_states} == {
+        LexicalUnknownClass.UNKNOWN_WORD
+    }
+    assert "unknown_word" in unknown_result.downstream_gate.restrictions
+    assert unknown_result.downstream_gate.accepted is False
+
+    unknown_sense_result = query_lexical_entries(
+        lexicon_state=with_unknown.updated_state,
+        queries=(LexiconQueryRequest(surface_form="bank", language_code="en"),),
+    )
+    unknown_sense_record = unknown_sense_result.query_records[0]
+    assert {
+        state.unknown_class for state in unknown_sense_record.unknown_states
+    } == {LexicalUnknownClass.KNOWN_LEXEME_UNKNOWN_SENSE_IN_CONTEXT}
+    assert "known_lexeme_unknown_sense_in_context" in unknown_sense_result.downstream_gate.restrictions
+    assert unknown_sense_result.downstream_gate.accepted is False

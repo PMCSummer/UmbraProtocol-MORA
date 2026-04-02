@@ -1,6 +1,7 @@
 from substrate.lexicon import (
     LexicalCoarseSemanticType,
     LexicalEntryProposal,
+    LexicalUnknownClass,
     LexicalSenseHypothesis,
     LexiconQueryRequest,
     UnknownLexicalObservation,
@@ -32,6 +33,9 @@ def test_unknown_lexical_item_kept_as_unknown_not_forced_match() -> None:
     assert not record.matched_entry_ids
     assert record.unknown_item_ids
     assert "unknown_lexical_item" in record.ambiguity_reasons
+    assert {state.unknown_class for state in record.unknown_states} == {
+        LexicalUnknownClass.UNKNOWN_WORD
+    }
 
 
 def test_unknown_path_carries_partial_hint_but_no_strong_meaning_claim() -> None:

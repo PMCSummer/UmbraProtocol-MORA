@@ -8,6 +8,7 @@ from substrate.lexicon.models import (
     LexicalHypothesisUpdateResult,
     LexicalLearningGateDecision,
     LexicalSenseStatus,
+    LexicalUnknownClass,
     LexiconQueryRecord,
     LexiconGateDecision,
     LexiconQueryResult,
@@ -85,9 +86,6 @@ def build_lexicon_gate_decision(
     for entry in state.entries:
         if candidate_entry_ids is not None and entry.entry_id not in candidate_entry_ids:
             continue
-        if entry.entry_id in context_blocked_entry_ids:
-            rejected_entry_ids.append(entry.entry_id)
-            continue
         if _entry_version_incompatible(entry=entry, state=state):
             rejected_entry_ids.append(entry.entry_id)
             restrictions.append("entry_version_mismatch")
@@ -98,6 +96,9 @@ def build_lexicon_gate_decision(
         }:
             rejected_entry_ids.append(entry.entry_id)
             restrictions.append("conflicted_or_frozen_entry_present")
+            continue
+        if entry.entry_id in context_blocked_entry_ids:
+            rejected_entry_ids.append(entry.entry_id)
             continue
         stable_senses = tuple(
             sense for sense in entry.sense_records if sense.status == LexicalSenseStatus.STABLE
@@ -125,6 +126,32 @@ def build_lexicon_gate_decision(
     for record in query_records:
         if record.ambiguity_reasons:
             restrictions.append("query_ambiguity_present")
+        if record.hard_unknown_or_capped:
+            restrictions.append("query_record_hard_unknown_or_capped")
+        if not record.strong_lexical_claim_permitted:
+            restrictions.append("query_record_strong_claim_capped")
+            restrictions.append("no_strong_meaning_claim")
+        if record.dominant_unknown_class is not None:
+            restrictions.append(f"dominant_{record.dominant_unknown_class.value}")
+        if record.unknown_states:
+            restrictions.append("query_unknown_state_present")
+            restrictions.append("no_strong_meaning_claim")
+        for unknown_state in record.unknown_states:
+            if unknown_state.unknown_class == LexicalUnknownClass.UNKNOWN_WORD:
+                restrictions.append("unknown_word")
+            elif unknown_state.unknown_class == LexicalUnknownClass.PARTIAL_LEXICAL_HYPOTHESIS:
+                restrictions.append("partial_lexical_hypothesis")
+            elif unknown_state.unknown_class == LexicalUnknownClass.KNOWN_SYNTAX_UNKNOWN_LEXEME:
+                restrictions.append("known_syntax_unknown_lexeme")
+            elif (
+                unknown_state.unknown_class
+                == LexicalUnknownClass.KNOWN_LEXEME_UNKNOWN_SENSE_IN_CONTEXT
+            ):
+                restrictions.append("known_lexeme_unknown_sense_in_context")
+                for entry_id in unknown_state.entry_ids:
+                    if entry_id in accepted_entry_ids:
+                        accepted_entry_ids.remove(entry_id)
+                        rejected_entry_ids.append(entry_id)
         if "context_required_for_reference_profile" in record.ambiguity_reasons:
             restrictions.append("context_required_for_reference_profile")
         if "operator_scope_context_required" in record.ambiguity_reasons:

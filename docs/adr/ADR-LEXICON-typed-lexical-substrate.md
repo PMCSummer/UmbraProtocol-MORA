@@ -22,11 +22,22 @@ Accepted as a narrow build-mode substrate increment.
   - one entry may carry multiple senses
 - Enforces split-or-freeze behavior on ambiguous multi-target updates (no silent winner-take-all collapse).
 - Preserves provisional/conflict/unknown lexical states as first-class outputs.
+- Preserves a first-class typed lexical unknown taxonomy on query path:
+  - `unknown_word`
+  - `partial_lexical_hypothesis`
+  - `known_syntax_unknown_lexeme`
+  - `known_lexeme_unknown_sense_in_context`
+- Plain query no-match defaults to typed `unknown_word` unless a more specific unknown class is derivable.
+- Unknown taxonomy derivation uses explicit dominance precedence:
+  - `known_lexeme_unknown_sense_in_context` > `known_syntax_unknown_lexeme` > `partial_lexical_hypothesis` > `unknown_word`
+- Known-lexeme-unknown-sense-in-context is triggered only by unresolved stable-sense basis under available lexical/context cues, not by a raw multi-sense count alone.
+- Query records carry per-record unknown hardness semantics (`dominant_unknown_class`, `hard_unknown_or_capped`, `strong_lexical_claim_permitted`) so batched global acceptance cannot hide per-item lexical caps.
 - Stores composition and reference behavior hints for later phases.
 - Stores typed lexical examples linked to entries/senses as inspectable usage evidence.
 - Applies `reference_profile.requires_context` as a runtime query/gate restriction (`context_required_for_reference_profile`).
 - Applies operator scope-context restriction for underspecified operator-like entries (`operator_scope_context_required`).
 - Uses a single gate semantics path for query and canonical downstream gate decisions.
+- Enforces query/canonical gate parity for unknown-taxonomy cases (same accepted/restricted semantics).
 - Caps strong lexical claims when only non-stable senses remain (`only_unstable_senses`).
 - Uses example support as a minimal runtime evidence-quality cap for non-stable entries (`non_stable_entry_without_example_support`).
 - Supports episode-driven lexical acquisition:
@@ -70,5 +81,6 @@ Accepted as a narrow build-mode substrate increment.
 - Unknown lexical items remain unknown unless explicit typed evidence is added.
 - Episode-driven learning is minimal and rule-based (no parser, no WSD, no phrase semantics).
 - Optional lexical substrate usage by L03 is allowed but not required in this increment.
+- Syntax-known lexical gaps can be represented via typed lexical query context only; no parser/semantic integration is introduced here.
 - Contour-level proof that lexicon ablation degrades full L03 behavior is not closed here to avoid L03 phase creep.
 - Hostile/raw bypass outside typed seams is out of scope.

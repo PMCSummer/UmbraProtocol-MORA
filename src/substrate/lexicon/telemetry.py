@@ -34,6 +34,7 @@ def build_lexical_telemetry(
     conflicted_hypothesis_count: int = 0,
     frozen_hypothesis_count: int = 0,
     insufficient_episode_count: int = 0,
+    unknown_state_classes: tuple = (),
 ) -> LexicalTelemetry:
     provisional_count = sum(
         1 for entry in state.entries if entry.acquisition_state.status.value == "provisional"
@@ -60,6 +61,7 @@ def build_lexical_telemetry(
         downstream_gate=downstream_gate,
         attempted_paths=attempted_paths,
         causal_basis=causal_basis,
+        unknown_state_classes=unknown_state_classes,
         processed_episode_ids=processed_episode_ids,
         processed_hypothesis_ids=processed_hypothesis_ids,
         recorded_episode_count=recorded_episode_count,
@@ -110,6 +112,24 @@ def lexicon_result_snapshot(
                 "unknown_item_ids": record.unknown_item_ids,
                 "context_blocked_entry_ids": record.context_blocked_entry_ids,
                 "ambiguity_reasons": record.ambiguity_reasons,
+                "unknown_states": tuple(
+                    {
+                        "unknown_class": state.unknown_class.value,
+                        "query_form": state.query_form,
+                        "entry_ids": state.entry_ids,
+                        "hypothesis_ids": state.hypothesis_ids,
+                        "unknown_item_ids": state.unknown_item_ids,
+                        "reason": state.reason,
+                    }
+                    for state in record.unknown_states
+                ),
+                "dominant_unknown_class": (
+                    record.dominant_unknown_class.value
+                    if record.dominant_unknown_class is not None
+                    else None
+                ),
+                "hard_unknown_or_capped": record.hard_unknown_or_capped,
+                "strong_lexical_claim_permitted": record.strong_lexical_claim_permitted,
                 "no_final_meaning_resolution_performed": record.no_final_meaning_resolution_performed,
             }
             for record in result.query_records
@@ -250,6 +270,7 @@ def lexicon_result_snapshot(
                     "candidate_similarity_hints": item.candidate_similarity_hints,
                     "confidence": item.confidence,
                     "provenance": item.provenance,
+                    "unknown_class": item.unknown_class.value,
                 }
                 for item in state.unknown_items
             ),
@@ -391,6 +412,9 @@ def lexicon_result_snapshot(
             ),
             "attempted_paths": result.telemetry.attempted_paths,
             "causal_basis": result.telemetry.causal_basis,
+            "unknown_state_classes": tuple(
+                state_class.value for state_class in result.telemetry.unknown_state_classes
+            ),
             "processed_episode_ids": result.telemetry.processed_episode_ids,
             "processed_hypothesis_ids": result.telemetry.processed_hypothesis_ids,
             "recorded_episode_count": result.telemetry.recorded_episode_count,

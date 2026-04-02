@@ -36,12 +36,22 @@ direct_downstream:
 
 ## DOWNSTREAM CONTRACT
 - downstream receives typed lexical entries and candidate sense/reference/composition profiles.
+- downstream query records expose typed lexical unknown-state taxonomy (`unknown_states`), not only free-form reason strings.
+- downstream query records expose per-record unknown hardness semantics:
+  - `dominant_unknown_class`
+  - `hard_unknown_or_capped`
+  - `strong_lexical_claim_permitted`
 - lexical entry model is load-bearing and distinct from sense model:
   - entry identity (`entry_id`, canonical/lemma/aliases, entry status)
   - sense bundles (`sense_id`, sense status/confidence/evidence/conflict)
   - typed usage examples linked to entry and optionally to sense
 - downstream must treat output as lexical knowledge substrate only, not final lexical grounding or semantics.
 - unknown/provisional/conflict states are load-bearing and must remain inspectable.
+- lexical unknown states remain distinct and inspectable:
+  - `unknown_word`
+  - `partial_lexical_hypothesis`
+  - `known_syntax_unknown_lexeme`
+  - `known_lexeme_unknown_sense_in_context`
 
 ## SEAM OBLIGATIONS
 - preserve one-form-to-many-entry and one-form-to-many-sense ambiguity.
@@ -52,6 +62,15 @@ direct_downstream:
 - episode/hypothesis payload schema/lexicon/taxonomy mismatches must be blocked/frozen/capped at runtime (not telemetry-only markers).
 - ambiguous multi-match updates must use split-or-freeze discipline; no silent forced winner.
 - preserve unknown/provisional/conflict as first-class state.
+- unknown discipline must remain first-class across runtime/query/gate/snapshot:
+  - plain no-match defaults to typed `unknown_word` unless a more specific unknown class is present
+  - unknown word must not silently map to nearest known entry
+  - partial hypothesis must not be treated as stable lexical knowledge
+  - syntax-known lexical gap must be representable via typed query context (`syntax_known_lexical_gap_forms`)
+  - unknown taxonomy class selection uses explicit precedence:
+    `known_lexeme_unknown_sense_in_context` > `known_syntax_unknown_lexeme` > `partial_lexical_hypothesis` > `unknown_word`
+  - known lexeme unknown-sense-in-context requires unresolved stable-sense basis (not just `len(senses) > 1`)
+  - known lexeme with unresolved context-dependent sense must cap strong lexical claim
 - preserve entry != sense separation across update/query/snapshot/roundtrip.
 - no hidden top-1 lexical meaning collapse.
 - no referent resolution claim.
@@ -87,6 +106,7 @@ direct_downstream:
 - no-match count
 - compatibility markers
 - downstream gate outcome
+- unknown state classes emitted for the query path
 - attempted update/query paths
 - causal basis
 
@@ -100,6 +120,13 @@ direct_downstream:
 - role-hint load-bearing restriction (operator scope context requirement).
 - lexical example integrity (entry/sense link + roundtrip survival).
 - compatibility mismatch -> honest blocked/abstain path.
+- unknown taxonomy tests:
+  - unknown-word / partial-hypothesis / syntax-known-lexeme-gap / known-lexeme-unknown-sense are distinct runtime states
+  - unknown classes affect gate restrictions and accepted/rejected semantics
+  - query record per-item hardness is visible even when global batched gate is accepted
+  - query embedded gate and canonical gate remain semantically identical on unknown-taxonomy cases
+- unknown roundtrip tests:
+  - persist -> reconstruct -> continue preserves unknown/provisional/context-sensitive unknown behavior
 - F01-only persistence and roundtrip integrity, including persist -> reconstruct -> continue equivalence.
 - episode-learning tests:
   - single-episode provisional discipline
@@ -117,5 +144,6 @@ direct_downstream:
 - episode ledger exists but has no effect on promotion/conflict outcomes.
 - compatibility mismatch silently reused as compatible state.
 - context-dependent lexical reference treated as strong match without context.
+- unknown classes collapsed into generic ambiguity/no-match with no typed distinction.
 - downstream can treat lexical output as final grounding/proposition.
 - query/canonical gate divergence on accept/reject semantics.

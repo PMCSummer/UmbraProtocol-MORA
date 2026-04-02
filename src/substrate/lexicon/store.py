@@ -36,6 +36,8 @@ from substrate.lexicon.models import (
     LexicalSenseHypothesis,
     LexicalSenseRecord,
     LexicalSenseStatus,
+    LexicalUnknownClass,
+    LexicalUnknownState,
     LexicalUsageEpisode,
     LexiconBlockedUpdate,
     LexiconGateDecision,
@@ -95,6 +97,181 @@ ATTEMPTED_LEXICON_HYPOTHESIS_PATHS: tuple[str, ...] = (
     "lexicon.promote_or_freeze_hypothesis",
     "lexicon.learning_downstream_gate",
 )
+
+UNKNOWN_CLASS_PRECEDENCE: tuple[LexicalUnknownClass, ...] = (
+    LexicalUnknownClass.KNOWN_LEXEME_UNKNOWN_SENSE_IN_CONTEXT,
+    LexicalUnknownClass.KNOWN_SYNTAX_UNKNOWN_LEXEME,
+    LexicalUnknownClass.PARTIAL_LEXICAL_HYPOTHESIS,
+    LexicalUnknownClass.UNKNOWN_WORD,
+)
+
+UNKNOWN_CLASS_RANK: dict[LexicalUnknownClass, int] = {
+    unknown_class: index
+    for index, unknown_class in enumerate(UNKNOWN_CLASS_PRECEDENCE)
+}
+
+
+def _normalized_context_keys(context_keys: tuple[str, ...]) -> tuple[str, ...]:
+    return tuple(
+        dict.fromkeys(
+            normalized_key
+            for key in context_keys
+            if (normalized_key := _normalize(key))
+        )
+    )
+
+
+def _sense_cue_match_count(*, sense: LexicalSenseRecord, normalized_context_keys: tuple[str, ...]) -> int:
+    if not normalized_context_keys:
+        return 0
+    context_key_set = set(normalized_context_keys)
+    compatibility_keys = {
+        normalized_cue
+        for cue in sense.compatibility_cues
+        if (normalized_cue := _normalize(cue))
+    }
+    return len(context_key_set.intersection(compatibility_keys))
+
+
+def _sense_is_excluded_by_anti_cues(
+    *,
+    sense: LexicalSenseRecord,
+    normalized_context_keys: tuple[str, ...],
+) -> bool:
+    if not normalized_context_keys:
+        return False
+    context_key_set = set(normalized_context_keys)
+    anti_keys = {
+        normalized_cue
+        for cue in sense.anti_cues
+        if (normalized_cue := _normalize(cue))
+    }
+    return bool(context_key_set.intersection(anti_keys))
+
+
+def _entry_has_unresolved_sense_basis(
+    *,
+    entry: LexicalEntry,
+    normalized_context_keys: tuple[str, ...],
+) -> bool:
+    stable_senses = tuple(
+        sense
+        for sense in entry.sense_records
+        if sense.status == LexicalSenseStatus.STABLE
+    )
+    if len(stable_senses) < 2:
+        return False
+    if "sense_anchor" in normalized_context_keys:
+        return False
+
+    cue_supported_senses = tuple(
+        sense
+        for sense in stable_senses
+        if _sense_cue_match_count(sense=sense, normalized_context_keys=normalized_context_keys) > 0
+    )
+    if len(cue_supported_senses) == 1:
+        return False
+
+    anti_pruned_senses = tuple(
+        sense
+        for sense in stable_senses
+        if not _sense_is_excluded_by_anti_cues(
+            sense=sense,
+            normalized_context_keys=normalized_context_keys,
+        )
+    )
+    candidate_senses = anti_pruned_senses if anti_pruned_senses else stable_senses
+    if len(candidate_senses) < 2:
+        return False
+
+    ranked = sorted(
+        candidate_senses,
+        key=lambda sense: (sense.confidence, sense.evidence_count),
+        reverse=True,
+    )
+    top = ranked[0]
+    second = ranked[1]
+    if (
+        (top.confidence - second.confidence) >= 0.25
+        and (top.evidence_count - second.evidence_count) >= 2
+        and not top.conflict_markers
+    ):
+        return False
+
+    return True
+
+
+def _merge_unknown_states(
+    *,
+    unknown_states: tuple[LexicalUnknownState, ...],
+) -> tuple[tuple[LexicalUnknownState, ...], LexicalUnknownClass | None]:
+    if not unknown_states:
+        return (), None
+
+    by_class: dict[LexicalUnknownClass, LexicalUnknownState] = {}
+    for unknown_state in unknown_states:
+        existing = by_class.get(unknown_state.unknown_class)
+        if existing is None:
+            by_class[unknown_state.unknown_class] = unknown_state
+            continue
+        merged_reason = (
+            existing.reason
+            if existing.reason == unknown_state.reason or not unknown_state.reason
+            else f"{existing.reason}; {unknown_state.reason}"
+        )
+        by_class[unknown_state.unknown_class] = LexicalUnknownState(
+            unknown_class=unknown_state.unknown_class,
+            query_form=unknown_state.query_form,
+            entry_ids=tuple(dict.fromkeys(existing.entry_ids + unknown_state.entry_ids)),
+            hypothesis_ids=tuple(
+                dict.fromkeys(existing.hypothesis_ids + unknown_state.hypothesis_ids)
+            ),
+            unknown_item_ids=tuple(
+                dict.fromkeys(existing.unknown_item_ids + unknown_state.unknown_item_ids)
+            ),
+            reason=merged_reason,
+        )
+
+    ordered_classes = tuple(
+        sorted(
+            by_class.keys(),
+            key=lambda unknown_class: UNKNOWN_CLASS_RANK.get(
+                unknown_class,
+                len(UNKNOWN_CLASS_PRECEDENCE),
+            ),
+        )
+    )
+    merged_states = tuple(by_class[unknown_class] for unknown_class in ordered_classes)
+    dominant_unknown_class = ordered_classes[0] if ordered_classes else None
+    return merged_states, dominant_unknown_class
+
+
+def _entry_usable_for_strong_claim(
+    *,
+    entry: LexicalEntry,
+    state: LexiconState,
+    context_blocked_entry_ids: tuple[str, ...],
+) -> bool:
+    if entry.entry_id in context_blocked_entry_ids:
+        return False
+    if _entry_compatibility_markers(entry=entry, state=state):
+        return False
+    if entry.acquisition_state.status in {
+        LexicalAcquisitionStatus.CONFLICTED,
+        LexicalAcquisitionStatus.FROZEN,
+    }:
+        return False
+    stable_senses = tuple(
+        sense for sense in entry.sense_records if sense.status == LexicalSenseStatus.STABLE
+    )
+    if not stable_senses:
+        return False
+    if (
+        entry.acquisition_state.status != LexicalAcquisitionStatus.STABLE
+        and not entry.examples
+    ):
+        return False
+    return True
 
 
 def create_empty_lexicon_state(
@@ -323,6 +500,7 @@ def create_or_update_lexicon_state(
                 candidate_similarity_hints=observation.candidate_similarity_hints,
                 confidence=_clamp(observation.confidence),
                 provenance=observation.provenance or "lexicon.unknown_observation",
+                unknown_class=LexicalUnknownClass.UNKNOWN_WORD,
             )
         )
         update_events.append(
@@ -916,7 +1094,14 @@ def query_lexical_entries(
     ambiguity_reasons: list[str] = []
     queried_forms: list[str] = []
     matched_entry_ids_all: list[str] = []
+    unknown_state_classes_all: list[LexicalUnknownClass] = []
     no_match_count = 0
+    syntax_gap_forms = {
+        _normalize(form)
+        for form in context.syntax_known_lexical_gap_forms
+        if _normalize(form)
+    }
+    normalized_context_keys = _normalized_context_keys(context.context_keys)
 
     for query in normalized_queries:
         queried_forms.append(query.surface_form)
@@ -943,8 +1128,9 @@ def query_lexical_entries(
         context_blocked_entry_ids: list[str] = []
         reference_context_blocked = False
         operator_scope_blocked = False
+        unknown_states: list[LexicalUnknownState] = []
         for entry in matches:
-            if entry.reference_profile.requires_context and not context.context_keys:
+            if entry.reference_profile.requires_context and not normalized_context_keys:
                 context_blocked_entry_ids.append(entry.entry_id)
                 reference_context_blocked = True
                 continue
@@ -952,10 +1138,31 @@ def query_lexical_entries(
                 entry.composition_profile.behaves_as_operator
                 and entry.composition_profile.scope_sensitive
                 and entry.composition_profile.remains_underspecified
-                and "scope_anchor" not in context.context_keys
+                and "scope_anchor" not in normalized_context_keys
             ):
                 context_blocked_entry_ids.append(entry.entry_id)
                 operator_scope_blocked = True
+        unknown_sense_entries = tuple(
+            entry.entry_id
+            for entry in matches
+            if _entry_has_unresolved_sense_basis(
+                entry=entry,
+                normalized_context_keys=normalized_context_keys,
+            )
+        )
+        if unknown_sense_entries:
+            context_blocked_entry_ids.extend(unknown_sense_entries)
+            unknown_states.append(
+                LexicalUnknownState(
+                    unknown_class=LexicalUnknownClass.KNOWN_LEXEME_UNKNOWN_SENSE_IN_CONTEXT,
+                    query_form=query.surface_form,
+                    entry_ids=unknown_sense_entries,
+                    unknown_item_ids=unknown_ids,
+                    reason=(
+                        "known lexeme matched but stable sense remained unresolved under available lexical evidence"
+                    ),
+                )
+            )
         context_blocked_entry_ids_tuple = tuple(dict.fromkeys(context_blocked_entry_ids))
         local_ambiguity: list[str] = []
         if len(matches) > 1:
@@ -1004,6 +1211,78 @@ def query_lexical_entries(
             for hypothesis in learning_hypotheses
         ):
             local_ambiguity.append("learning_hypothesis_promotion_eligible")
+        if not matches and unknown_ids and not learning_hypotheses:
+            unknown_states.append(
+                LexicalUnknownState(
+                    unknown_class=LexicalUnknownClass.UNKNOWN_WORD,
+                    query_form=query.surface_form,
+                    unknown_item_ids=unknown_ids,
+                    reason="unknown lexical item observed and no lexical entry matched",
+                )
+            )
+        if not matches and learning_hypotheses:
+            unknown_states.append(
+                LexicalUnknownState(
+                    unknown_class=LexicalUnknownClass.PARTIAL_LEXICAL_HYPOTHESIS,
+                    query_form=query.surface_form,
+                    hypothesis_ids=tuple(
+                        hypothesis.hypothesis_id for hypothesis in learning_hypotheses
+                    ),
+                    unknown_item_ids=unknown_ids,
+                    reason=(
+                        "episode-backed lexical hypotheses exist but no stable lexical entry is available"
+                    ),
+                )
+            )
+        if not matches and normalized_form in syntax_gap_forms:
+            unknown_states.append(
+                LexicalUnknownState(
+                    unknown_class=LexicalUnknownClass.KNOWN_SYNTAX_UNKNOWN_LEXEME,
+                    query_form=query.surface_form,
+                    unknown_item_ids=unknown_ids,
+                    reason="syntax-marked lexical slot present but lexeme is unknown",
+                )
+            )
+        if not matches and not unknown_states:
+            unknown_states.append(
+                LexicalUnknownState(
+                    unknown_class=LexicalUnknownClass.UNKNOWN_WORD,
+                    query_form=query.surface_form,
+                    unknown_item_ids=unknown_ids,
+                    reason="no lexical entry or hypothesis matched the observed surface form",
+                )
+            )
+
+        merged_unknown_states, dominant_unknown_class = _merge_unknown_states(
+            unknown_states=tuple(unknown_states)
+        )
+        usable_strong_entry_ids = tuple(
+            entry.entry_id
+            for entry in matches
+            if _entry_usable_for_strong_claim(
+                entry=entry,
+                state=lexicon_state,
+                context_blocked_entry_ids=context_blocked_entry_ids_tuple,
+            )
+        )
+        hard_unknown_or_capped = bool(
+            dominant_unknown_class is not None
+            or context_blocked_entry_ids_tuple
+            or (matched_entry_ids and not usable_strong_entry_ids)
+        )
+        strong_lexical_claim_permitted = bool(
+            usable_strong_entry_ids
+            and dominant_unknown_class is None
+            and not context_blocked_entry_ids_tuple
+        )
+
+        if merged_unknown_states:
+            local_ambiguity.extend(
+                unknown_state.unknown_class.value for unknown_state in merged_unknown_states
+            )
+            unknown_state_classes_all.extend(
+                unknown_state.unknown_class for unknown_state in merged_unknown_states
+            )
 
         ambiguity_reasons.extend(local_ambiguity)
         matched_entry_ids_all.extend(matched_entry_ids)
@@ -1016,6 +1295,10 @@ def query_lexical_entries(
                 context_blocked_entry_ids=context_blocked_entry_ids_tuple,
                 ambiguity_reasons=tuple(dict.fromkeys(local_ambiguity)),
                 no_final_meaning_resolution_performed=True,
+                unknown_states=merged_unknown_states,
+                dominant_unknown_class=dominant_unknown_class,
+                hard_unknown_or_capped=hard_unknown_or_capped,
+                strong_lexical_claim_permitted=strong_lexical_claim_permitted,
             )
         )
 
@@ -1042,6 +1325,7 @@ def query_lexical_entries(
         attempted_paths=ATTEMPTED_LEXICON_QUERY_PATHS,
         downstream_gate=gate,
         causal_basis="typed lexical query over ambiguity-preserving lexicon substrate",
+        unknown_state_classes=tuple(dict.fromkeys(unknown_state_classes_all)),
     )
     abstain = not bool(records)
     abstain_reason = "no valid lexical queries provided" if abstain else None
@@ -1238,6 +1522,9 @@ def reconstruct_lexicon_state_from_snapshot(snapshot: dict[str, object]) -> Lexi
             candidate_similarity_hints=tuple(item.get("candidate_similarity_hints", ())),
             confidence=_clamp(float(item.get("confidence", 0.0))),
             provenance=str(item.get("provenance", "lexicon.reconstruct")),
+            unknown_class=LexicalUnknownClass(
+                str(item.get("unknown_class", LexicalUnknownClass.UNKNOWN_WORD.value))
+            ),
         )
         for item in unknown_payload
     )

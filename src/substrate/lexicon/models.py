@@ -76,6 +76,13 @@ class LexicalEpisodeStatus(str, Enum):
     BLOCKED = "blocked"
 
 
+class LexicalUnknownClass(str, Enum):
+    UNKNOWN_WORD = "unknown_word"
+    PARTIAL_LEXICAL_HYPOTHESIS = "partial_lexical_hypothesis"
+    KNOWN_SYNTAX_UNKNOWN_LEXEME = "known_syntax_unknown_lexeme"
+    KNOWN_LEXEME_UNKNOWN_SENSE_IN_CONTEXT = "known_lexeme_unknown_sense_in_context"
+
+
 class LexicalHypothesisStatus(str, Enum):
     PROVISIONAL = "provisional"
     PROMOTION_ELIGIBLE = "promotion_eligible"
@@ -204,6 +211,7 @@ class UnknownLexicalItem:
     candidate_similarity_hints: tuple[str, ...]
     confidence: float
     provenance: str
+    unknown_class: LexicalUnknownClass = LexicalUnknownClass.UNKNOWN_WORD
 
 
 @dataclass(frozen=True, slots=True)
@@ -373,6 +381,17 @@ class LexiconQueryContext:
     expected_lexicon_version: str = DEFAULT_LEXICON_VERSION
     expected_taxonomy_version: str = DEFAULT_LEXICON_TAXONOMY_VERSION
     context_keys: tuple[str, ...] = ()
+    syntax_known_lexical_gap_forms: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True, slots=True)
+class LexicalUnknownState:
+    unknown_class: LexicalUnknownClass
+    query_form: str
+    entry_ids: tuple[str, ...] = ()
+    hypothesis_ids: tuple[str, ...] = ()
+    unknown_item_ids: tuple[str, ...] = ()
+    reason: str = ""
 
 
 @dataclass(frozen=True, slots=True)
@@ -393,6 +412,10 @@ class LexiconQueryRecord:
     context_blocked_entry_ids: tuple[str, ...]
     ambiguity_reasons: tuple[str, ...]
     no_final_meaning_resolution_performed: bool
+    unknown_states: tuple[LexicalUnknownState, ...] = ()
+    dominant_unknown_class: LexicalUnknownClass | None = None
+    hard_unknown_or_capped: bool = False
+    strong_lexical_claim_permitted: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -434,6 +457,7 @@ class LexicalTelemetry:
     downstream_gate: LexiconGateDecision | LexicalLearningGateDecision
     attempted_paths: tuple[str, ...]
     causal_basis: str
+    unknown_state_classes: tuple[LexicalUnknownClass, ...] = ()
     processed_episode_ids: tuple[str, ...] = ()
     processed_hypothesis_ids: tuple[str, ...] = ()
     recorded_episode_count: int = 0
