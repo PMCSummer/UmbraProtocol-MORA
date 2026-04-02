@@ -67,6 +67,7 @@ def test_adversarial_regression_corpus_keeps_contestable_outputs(text: str, case
     elif case == "quoted_vs_current":
         assert len(result.bundle.mention_anchors) >= 2
         assert result.bundle.entity_candidates
+        assert any(anchor.inside_quote for anchor in result.bundle.mention_anchors)
     elif case == "unknown_word":
         assert result.bundle.unknown_states
     elif case == "common_vs_entity_like":
@@ -96,3 +97,26 @@ def test_entity_drift_risk_keeps_multiple_candidates_or_conflict() -> None:
 
     assert alpha_mentions
     assert any(len(candidates) > 1 for candidates in per_mention_candidates) or result.bundle.conflicts
+
+
+def test_quoted_mention_binding_stays_provisional_not_auto_merged() -> None:
+    context = LexicalDiscourseContext(
+        context_ref="ctx:quoted",
+        entity_bindings=(("alpha", "entity:alpha-main"),),
+    )
+    result = _l03_result(
+        '"alpha" alpha',
+        material_id="m-l03-reg-quoted-bind",
+        context=context,
+    )
+
+    quoted_mentions = [anchor for anchor in result.bundle.mention_anchors if anchor.inside_quote]
+    assert quoted_mentions
+    for quoted in quoted_mentions:
+        candidates = [
+            candidate
+            for candidate in result.bundle.entity_candidates
+            if candidate.mention_id == quoted.mention_id
+        ]
+        assert candidates
+        assert any(candidate.entity_type == "quoted_surface_mention" for candidate in candidates)

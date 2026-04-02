@@ -39,6 +39,8 @@ class MentionAnchor:
     surface_text: str
     normalized_text: str
     syntax_hypothesis_ref: str
+    supporting_syntax_hypothesis_refs: tuple[str, ...]
+    inside_quote: bool
     confidence: float
 
 
@@ -144,6 +146,7 @@ class LexicalGroundingBundle:
     unknown_states: tuple[GroundingUnknownState, ...]
     conflicts: tuple[GroundingConflict, ...]
     ambiguity_reasons: tuple[str, ...]
+    syntax_instability_present: bool
     no_final_resolution_performed: bool
     reason: str
 
@@ -171,6 +174,8 @@ class LexicalGroundingTelemetry:
     sense_candidate_count: int
     unknown_count: int
     conflict_count: int
+    syntax_hypothesis_count: int
+    syntax_instability_mention_count: int
     ambiguity_reasons: tuple[str, ...]
     discourse_context_keys_used: tuple[str, ...]
     attempted_grounding_paths: tuple[str, ...]

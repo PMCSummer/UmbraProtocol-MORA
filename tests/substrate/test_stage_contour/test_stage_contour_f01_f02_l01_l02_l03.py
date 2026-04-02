@@ -79,7 +79,9 @@ def test_stage_contour_f01_f02_l01_l02_l03_preserves_single_write_seam() -> None
     assert snapshot["bundle"]["lexeme_candidates"]
     assert snapshot["bundle"]["reference_hypotheses"]
     assert snapshot["bundle"]["deixis_candidates"] is not None
+    assert snapshot["bundle"]["syntax_instability_present"] in (True, False)
     assert snapshot["bundle"]["no_final_resolution_performed"] is True
+    assert snapshot["bundle"]["mention_anchors"][0]["supporting_syntax_hypothesis_refs"]
     assert snapshot["telemetry"]["attempted_grounding_paths"]
 
 

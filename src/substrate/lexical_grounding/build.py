@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import re
-from collections import defaultdict
 
 from substrate.contracts import (
     RuntimeState,
@@ -115,8 +114,7 @@ def build_lexical_grounding_hypotheses(
             reason="syntax hypothesis set is empty",
         )
 
-    primary_hypothesis = hypothesis_set.hypotheses[0]
-    mentions = _derive_mentions(primary_hypothesis, surface_ref=surface.epistemic_unit_ref if surface else None)
+    mentions = _derive_mentions(hypothesis_set, surface=surface)
     if not mentions:
         return _abstain_result(
             syntax_ref=hypothesis_set.source_surface_ref,
@@ -127,7 +125,13 @@ def build_lexical_grounding_hypotheses(
 
     context_entity_map = {key.lower(): ref for key, ref in context.entity_bindings}
     indexical_map = {key.lower(): ref for key, ref in context.indexical_bindings}
+    context_recent_refs = tuple(context.recent_mentions)
     discourse_context_keys_used: set[str] = set()
+    syntax_instability_present = any(
+        len(mention.supporting_syntax_hypothesis_refs) > 1 for mention in mentions
+    )
+    if hypothesis_set.ambiguity_present and len(hypothesis_set.hypotheses) > 1:
+        syntax_instability_present = True
 
     candidate_counter = 0
     reference_counter = 0
@@ -145,12 +149,8 @@ def build_lexical_grounding_hypotheses(
     ambiguity_reasons: list[str] = []
 
     prior_entity_refs: list[str] = []
-    mention_text_by_id: dict[str, str] = {}
-    entity_candidates_by_mention: dict[str, list[EntityCandidate]] = defaultdict(list)
-
     for mention in mentions:
         token_lower = mention.normalized_text.lower()
-        mention_text_by_id[mention.mention_id] = token_lower
         prior_entity_refs_before_mention = tuple(prior_entity_refs)
 
         candidate_counter, local_sense_candidates, local_unknown = _sense_candidates_for_mention(
@@ -196,7 +196,6 @@ def build_lexical_grounding_hypotheses(
             context_ref=context.context_ref,
         )
         entity_candidates.extend(local_entity_candidates)
-        entity_candidates_by_mention[mention.mention_id].extend(local_entity_candidates)
         for candidate in local_entity_candidates:
             lexeme_candidates.append(
                 LexemeCandidate(
@@ -220,6 +219,7 @@ def build_lexical_grounding_hypotheses(
             token_lower=token_lower,
             context_entity_map=context_entity_map,
             prior_entity_refs=prior_entity_refs_before_mention,
+            recent_context_refs=context_recent_refs,
             reference_counter=reference_counter,
             context_ref=context.context_ref,
         )
@@ -266,6 +266,12 @@ def build_lexical_grounding_hypotheses(
         ]
         if any(hypothesis.unresolved for hypothesis in refs_for_mention):
             ambiguity_reasons.append("reference unresolved")
+        if mention.inside_quote:
+            ambiguity_reasons.append("quoted_mention_not_auto_merged")
+
+    if syntax_instability_present:
+        ambiguity_reasons.append("unstable_across_syntax_hypotheses")
+        blocked_reasons.append("lexical grounding remains provisional due to syntax candidate instability")
 
     for hypothesis in reference_hypotheses:
         if hypothesis.reference_kind == ReferenceKind.DISCOURSE_LINK:
@@ -297,6 +303,7 @@ def build_lexical_grounding_hypotheses(
         unknown_states=tuple(unknown_states),
         conflicts=tuple(conflicts),
         ambiguity_reasons=tuple(dict.fromkeys(ambiguity_reasons)),
+        syntax_instability_present=syntax_instability_present,
         no_final_resolution_performed=True,
         reason="candidate lexical and referential grounding generated without final discourse acceptance",
     )
@@ -395,25 +402,62 @@ def _extract_optional_surface(
     raise TypeError("utterance_surface must be UtteranceSurface or UtteranceSurfaceResult when provided")
 
 
-def _derive_mentions(primary_hypothesis, *, surface_ref: str | None) -> tuple[MentionAnchor, ...]:
+def _derive_mentions(
+    hypothesis_set: SyntaxHypothesisSet,
+    *,
+    surface: UtteranceSurface | None,
+) -> tuple[MentionAnchor, ...]:
+    quote_spans = tuple(
+        (quote.raw_span.start, quote.raw_span.end)
+        for quote in surface.quotes
+    ) if surface else ()
+    mention_by_token: dict[str, dict[str, object]] = {}
+
+    for hypothesis in hypothesis_set.hypotheses:
+        for token_feature in hypothesis.token_features:
+            if token_feature.coarse_pos in {MorphPos.PUNCTUATION, MorphPos.QUOTE}:
+                continue
+            token_key = token_feature.token_id
+            entry = mention_by_token.get(token_key)
+            inside_quote = any(
+                token_feature.raw_span.start >= start and token_feature.raw_span.end <= end
+                for start, end in quote_spans
+            )
+            if entry is None:
+                mention_by_token[token_key] = {
+                    "token_id": token_feature.token_id,
+                    "raw_span": token_feature.raw_span,
+                    "surface_text": token_feature.raw_span.raw_text,
+                    "normalized_text": token_feature.raw_span.raw_text.strip(),
+                    "primary_ref": hypothesis.hypothesis_id,
+                    "support_refs": {hypothesis.hypothesis_id},
+                    "inside_quote": inside_quote,
+                    "confidence": token_feature.confidence,
+                }
+                continue
+            entry["support_refs"].add(hypothesis.hypothesis_id)
+            entry["inside_quote"] = bool(entry["inside_quote"]) or inside_quote
+            entry["confidence"] = max(float(entry["confidence"]), token_feature.confidence)
+
+    ordered_mentions = sorted(
+        mention_by_token.values(),
+        key=lambda item: (item["raw_span"].start, item["raw_span"].end, item["token_id"]),
+    )
     mention_anchors: list[MentionAnchor] = []
-    mention_index = 0
-    for token_feature in primary_hypothesis.token_features:
-        if token_feature.coarse_pos in {MorphPos.PUNCTUATION, MorphPos.QUOTE}:
-            continue
-        mention_index += 1
+    for mention_index, entry in enumerate(ordered_mentions, start=1):
         mention_anchors.append(
             MentionAnchor(
                 mention_id=f"mention-{mention_index}",
-                token_id=token_feature.token_id,
-                raw_span=token_feature.raw_span,
-                surface_text=token_feature.raw_span.raw_text,
-                normalized_text=token_feature.raw_span.raw_text.strip(),
-                syntax_hypothesis_ref=primary_hypothesis.hypothesis_id,
-                confidence=token_feature.confidence,
+                token_id=entry["token_id"],
+                raw_span=entry["raw_span"],
+                surface_text=entry["surface_text"],
+                normalized_text=entry["normalized_text"],
+                syntax_hypothesis_ref=entry["primary_ref"],
+                supporting_syntax_hypothesis_refs=tuple(sorted(entry["support_refs"])),
+                inside_quote=bool(entry["inside_quote"]),
+                confidence=float(entry["confidence"]),
             )
         )
-    _ = surface_ref
     return tuple(mention_anchors)
 
 
@@ -495,6 +539,7 @@ def _entity_candidates_for_mention(
     candidates: list[EntityCandidate] = []
 
     if token_lower in context_entity_map:
+        confidence = 0.62 if mention.inside_quote else 0.82
         candidate_counter += 1
         candidates.append(
             EntityCandidate(
@@ -503,11 +548,29 @@ def _entity_candidates_for_mention(
                 token_id=mention.token_id,
                 entity_ref=context_entity_map[token_lower],
                 entity_type="discourse_bound_entity",
-                confidence=0.82,
-                evidence="matched discourse context binding by normalized mention text",
+                confidence=confidence,
+                evidence=(
+                    "matched discourse context binding by normalized mention text"
+                    if not mention.inside_quote
+                    else "quoted mention matched discourse binding but kept provisional"
+                ),
                 discourse_context_ref=context_ref,
             )
         )
+        if mention.inside_quote:
+            candidate_counter += 1
+            candidates.append(
+                EntityCandidate(
+                    candidate_id=f"entity-{candidate_counter}",
+                    mention_id=mention.mention_id,
+                    token_id=mention.token_id,
+                    entity_ref=f"entity:quoted_surface::{token_lower}",
+                    entity_type="quoted_surface_mention",
+                    confidence=0.44,
+                    evidence="quoted mention retains local candidate to avoid forced discourse merge",
+                    discourse_context_ref=context_ref,
+                )
+            )
         return candidate_counter, candidates
 
     looks_capitalized = bool(mention.surface_text[:1]) and mention.surface_text[:1].isupper()
@@ -520,8 +583,12 @@ def _entity_candidates_for_mention(
                 token_id=mention.token_id,
                 entity_ref=f"entity:named::{mention.surface_text}",
                 entity_type="named_entity",
-                confidence=0.58,
-                evidence="surface capitalization supports possible named entity grounding",
+                confidence=0.52 if mention.inside_quote else 0.58,
+                evidence=(
+                    "surface capitalization supports possible named entity grounding"
+                    if not mention.inside_quote
+                    else "quoted capitalization supports provisional named-entity candidate"
+                ),
                 discourse_context_ref=context_ref,
             )
         )
@@ -534,7 +601,11 @@ def _entity_candidates_for_mention(
                 entity_ref=f"entity:common::{token_lower}",
                 entity_type="common_mention",
                 confidence=0.46,
-                evidence="capitalization alone is insufficient for final named-entity commitment",
+                evidence=(
+                    "capitalization alone is insufficient for final named-entity commitment"
+                    if not mention.inside_quote
+                    else "quoted capitalization is insufficient for final named-entity commitment"
+                ),
                 discourse_context_ref=context_ref,
             )
         )
@@ -562,6 +633,7 @@ def _reference_hypotheses_for_mention(
     token_lower: str,
     context_entity_map: dict[str, str],
     prior_entity_refs: tuple[str, ...],
+    recent_context_refs: tuple[str, ...],
     reference_counter: int,
     context_ref: str,
 ) -> tuple[int, list[ReferenceHypothesis], str | None]:
@@ -573,7 +645,12 @@ def _reference_hypotheses_for_mention(
         if token_lower in context_entity_map:
             candidate_refs.append(context_entity_map[token_lower])
         candidate_refs.extend(ref for ref in prior_entity_refs[-2:] if ref not in candidate_refs)
-        unresolved = len(candidate_refs) == 0
+        candidate_refs.extend(
+            ref
+            for ref in recent_context_refs[-2:]
+            if ref not in candidate_refs
+        )
+        unresolved = len(candidate_refs) != 1
         reference_counter += 1
         hypotheses.append(
             ReferenceHypothesis(
@@ -582,14 +659,26 @@ def _reference_hypotheses_for_mention(
                 token_id=mention.token_id,
                 reference_kind=ReferenceKind.PRONOUN,
                 candidate_ref_ids=tuple(candidate_refs),
-                confidence=0.6 if len(candidate_refs) == 1 else (0.45 if candidate_refs else 0.2),
+                confidence=(
+                    0.58
+                    if len(candidate_refs) == 1 and not mention.inside_quote
+                    else (0.41 if len(candidate_refs) > 1 else 0.2)
+                ),
                 unresolved=unresolved,
-                evidence="pronoun reference candidates from discourse binding and local antecedent window",
+                evidence=(
+                    "pronoun reference candidates from discourse binding and local antecedent window"
+                    if not mention.inside_quote
+                    else "quoted pronoun reference candidates retained as provisional"
+                ),
                 discourse_context_ref=context_ref,
             )
         )
         if unresolved:
-            blocked_reason = "pronoun reference unresolved due to missing discourse antecedent"
+            blocked_reason = (
+                "pronoun reference unresolved due to missing discourse antecedent"
+                if not candidate_refs
+                else "pronoun reference unresolved due to competing referent candidates"
+            )
         return reference_counter, hypotheses, blocked_reason
 
     if token_lower in context_entity_map:
@@ -701,6 +790,7 @@ def _abstain_result(
         unknown_states=(),
         conflicts=(),
         ambiguity_reasons=(reason,),
+        syntax_instability_present=False,
         no_final_resolution_performed=True,
         reason="lexical grounding abstained due to invalid or empty upstream contract",
     )

@@ -29,6 +29,8 @@ def evaluate_lexical_grounding_downstream_gate(
         restrictions.append("unknown_grounding_present")
     if bundle.conflicts:
         restrictions.append("grounding_conflict_present")
+    if bundle.syntax_instability_present:
+        restrictions.append("syntax_instability_present")
     if any(hypothesis.unresolved for hypothesis in bundle.reference_hypotheses):
         restrictions.append("unresolved_reference_present")
     if bundle.ambiguity_reasons:

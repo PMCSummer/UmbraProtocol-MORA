@@ -73,9 +73,11 @@ def test_roundtrip_payload_contains_load_bearing_lexical_reference_fields() -> N
     assert payload["bundle"]["deixis_candidates"]
     assert payload["bundle"]["unknown_states"] is not None
     assert payload["bundle"]["conflicts"] is not None
+    assert payload["bundle"]["syntax_instability_present"] in (True, False)
     assert payload["bundle"]["no_final_resolution_performed"] is True
     assert payload["telemetry"]["attempted_grounding_paths"]
     assert payload["telemetry"]["generated_candidate_ids"]
+    assert payload["telemetry"]["syntax_hypothesis_count"] >= 1
     assert payload["telemetry"]["downstream_gate"]["restrictions"] is not None
 
 
@@ -123,6 +125,7 @@ def test_persist_reconstruct_continue_preserves_artifacts_and_lineage() -> None:
     assert second_snapshot["bundle"]["unknown_states"]
     assert second_snapshot["bundle"]["reference_hypotheses"]
     assert second_snapshot["bundle"]["no_final_resolution_performed"] is True
+    assert second_snapshot["bundle"]["mention_anchors"][0]["supporting_syntax_hypothesis_refs"]
 
     serialized = json.loads(json.dumps(second_snapshot))
     assert serialized["bundle"]["mention_anchors"]

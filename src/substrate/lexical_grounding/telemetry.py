@@ -37,6 +37,12 @@ def build_lexical_grounding_telemetry(
         sense_candidate_count=len(bundle.sense_candidates),
         unknown_count=len(bundle.unknown_states),
         conflict_count=len(bundle.conflicts),
+        syntax_hypothesis_count=len(bundle.linked_hypothesis_ids),
+        syntax_instability_mention_count=sum(
+            1
+            for mention in bundle.mention_anchors
+            if len(mention.supporting_syntax_hypothesis_refs) > 1
+        ),
         ambiguity_reasons=bundle.ambiguity_reasons,
         discourse_context_keys_used=discourse_context_keys_used,
         attempted_grounding_paths=attempted_grounding_paths,
@@ -59,6 +65,7 @@ def lexical_grounding_result_snapshot(result: LexicalGroundingResult) -> dict[st
             "source_syntax_ref": bundle.source_syntax_ref,
             "source_surface_ref": bundle.source_surface_ref,
             "linked_hypothesis_ids": bundle.linked_hypothesis_ids,
+            "syntax_instability_present": bundle.syntax_instability_present,
             "no_final_resolution_performed": bundle.no_final_resolution_performed,
             "ambiguity_reasons": bundle.ambiguity_reasons,
             "mention_anchors": tuple(
@@ -70,6 +77,8 @@ def lexical_grounding_result_snapshot(result: LexicalGroundingResult) -> dict[st
                     "surface_text": mention.surface_text,
                     "normalized_text": mention.normalized_text,
                     "syntax_hypothesis_ref": mention.syntax_hypothesis_ref,
+                    "supporting_syntax_hypothesis_refs": mention.supporting_syntax_hypothesis_refs,
+                    "inside_quote": mention.inside_quote,
                     "confidence": mention.confidence,
                 }
                 for mention in bundle.mention_anchors
@@ -175,6 +184,8 @@ def lexical_grounding_result_snapshot(result: LexicalGroundingResult) -> dict[st
             "unknown_count": result.telemetry.unknown_count,
             "conflict_count": result.telemetry.conflict_count,
             "ambiguity_reasons": result.telemetry.ambiguity_reasons,
+            "syntax_hypothesis_count": result.telemetry.syntax_hypothesis_count,
+            "syntax_instability_mention_count": result.telemetry.syntax_instability_mention_count,
             "discourse_context_keys_used": result.telemetry.discourse_context_keys_used,
             "attempted_grounding_paths": result.telemetry.attempted_grounding_paths,
             "blocked_grounding_reasons": result.telemetry.blocked_grounding_reasons,
