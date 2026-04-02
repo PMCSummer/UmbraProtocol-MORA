@@ -183,6 +183,8 @@ def update_regulatory_preferences(
         conflict_index=conflict_index,
         frozen_updates=frozen_updates,
         schema_version=prior_state.schema_version,
+        taxonomy_version=prior_state.taxonomy_version,
+        measurement_version=prior_state.measurement_version,
         last_updated_step=prior_state.last_updated_step + context.step_delta,
     )
     gate = evaluate_preference_downstream_gate(next_state)
@@ -236,6 +238,24 @@ def validate_preference_inputs(
         return False, "preference_state must be PreferenceState", ()
     if not isinstance(context, PreferenceContext):
         return False, "context must be PreferenceContext", ()
+    if preference_state.schema_version != context.expected_schema_version:
+        return (
+            False,
+            "preference_state schema_version incompatible with current R03 contract",
+            (),
+        )
+    if preference_state.taxonomy_version != context.expected_taxonomy_version:
+        return (
+            False,
+            "preference_state taxonomy_version incompatible with current R02 affordance taxonomy",
+            (),
+        )
+    if preference_state.measurement_version != context.expected_measurement_version:
+        return (
+            False,
+            "preference_state measurement_version incompatible with current R01 signal scale",
+            (),
+        )
     if not isinstance(outcome_traces, (tuple, list)):
         return False, "outcome_traces must be tuple/list of OutcomeTrace", ()
     normalized: list[OutcomeTrace] = []
@@ -290,6 +310,18 @@ def _blocked_update_if_any(
     affordance_ids: set[str],
     context: PreferenceContext,
 ) -> BlockedPreferenceUpdate | None:
+    if abs(outcome.observed_short_term_delta) > context.max_abs_observed_delta or (
+        outcome.observed_long_term_delta is not None
+        and abs(outcome.observed_long_term_delta) > context.max_abs_observed_delta
+    ):
+        return BlockedPreferenceUpdate(
+            episode_id=outcome.episode_id,
+            option_class_id=outcome.option_class_id,
+            uncertainty=PreferenceUncertainty.INSUFFICIENT_EVIDENCE,
+            reason="observed regulatory delta outside expected measurement bounds",
+            frozen=True,
+            provenance=outcome.provenance or "r03.measurement_guard",
+        )
     if outcome.option_class_id not in available_options:
         return BlockedPreferenceUpdate(
             episode_id=outcome.episode_id,
@@ -670,6 +702,8 @@ def _abstain_result(
         conflict_index=prior_state.conflict_index,
         frozen_updates=prior_state.frozen_updates,
         schema_version=prior_state.schema_version,
+        taxonomy_version=prior_state.taxonomy_version,
+        measurement_version=prior_state.measurement_version,
         last_updated_step=prior_state.last_updated_step,
     )
     gate = evaluate_preference_downstream_gate(next_state)

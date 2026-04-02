@@ -121,6 +121,8 @@ class PreferenceState:
     conflict_index: tuple[str, ...]
     frozen_updates: tuple[BlockedPreferenceUpdate, ...]
     schema_version: str = "r03.preference.v1"
+    taxonomy_version: str = "r02.affordance.v1"
+    measurement_version: str = "r01.regulation.v1"
     last_updated_step: int = 0
 
 
@@ -134,6 +136,10 @@ class PreferenceContext:
     require_long_term_signal: bool = False
     freeze_on_mixed_causes: bool = True
     conflict_threshold: float = 0.2
+    max_abs_observed_delta: float = 1.0
+    expected_schema_version: str = "r03.preference.v1"
+    expected_taxonomy_version: str = "r02.affordance.v1"
+    expected_measurement_version: str = "r01.regulation.v1"
 
 
 @dataclass(frozen=True, slots=True)

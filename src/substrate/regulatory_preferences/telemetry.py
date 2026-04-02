@@ -54,6 +54,8 @@ def preference_result_snapshot(result: PreferenceUpdateResult) -> dict[str, obje
         "no_final_selection_performed": result.no_final_selection_performed,
         "preference_state": {
             "schema_version": state.schema_version,
+            "taxonomy_version": state.taxonomy_version,
+            "measurement_version": state.measurement_version,
             "last_updated_step": state.last_updated_step,
             "entries": tuple(
                 {
