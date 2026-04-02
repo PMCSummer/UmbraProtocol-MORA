@@ -18,6 +18,7 @@ Accepted for phase `L04` over implemented `F01`, `F02`, `L01`, `L02`, and `L03` 
 - Emits inspectable predicate frames, argument slots, negation markers, temporal markers, magnitude markers, and scope markers.
 - Keeps underspecified slots, unknowns, ambiguities, and conflicts as first-class outputs.
 - Preserves quotation sensitivity and upstream instability as explicit bounded markers.
+- Preserves an inspectable provenance bridge for upstream L03 lexical basis quality (`input_lexical_basis_classes`, fallback/missing/capped/no-strong markers) without expanding L04 semantic authority.
 - Exposes typed downstream restrictions instead of settled semantics.
 
 ## What L04 Does Not Claim
@@ -53,4 +54,5 @@ Accepted for phase `L04` over implemented `F01`, `F02`, `L01`, `L02`, and `L03` 
 - Dictum and modus remain separated by contract.
 - Implicature/pragmatic enrichment is out of scope for L04.
 - Unresolved lexical/reference/scope states are mandatory outputs when evidence is weak.
+- L04 lexical-basis bridge is telemetry/provenance-only and must not be used to perform lexical grounding or extra semantic closure inside L04.
 - Hostile bypass outside typed seam/gate is out of scope.

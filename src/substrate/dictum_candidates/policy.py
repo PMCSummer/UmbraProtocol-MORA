@@ -35,6 +35,14 @@ def evaluate_dictum_downstream_gate(
         restrictions.append("scope_ambiguity_present")
     if any(candidate.quotation_sensitive for candidate in bundle.dictum_candidates):
         restrictions.append("quotation_sensitive_content_present")
+    if bundle.fallback_basis_present:
+        restrictions.append("fallback_basis_present")
+    if bundle.lexicon_basis_missing_or_capped:
+        restrictions.append("lexicon_basis_missing_or_capped")
+    if bundle.no_strong_lexical_basis_from_upstream:
+        restrictions.append("no_strong_lexical_basis_from_upstream")
+    if bundle.lexicon_handoff_missing_upstream:
+        restrictions.append("lexicon_handoff_missing_upstream")
 
     for candidate in bundle.dictum_candidates:
         if candidate.confidence >= 0.2:

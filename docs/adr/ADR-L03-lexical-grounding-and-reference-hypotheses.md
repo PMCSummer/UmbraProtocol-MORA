@@ -5,7 +5,7 @@ Accepted for phase `L03` over closed `F01`, `F02`, `L01`, and `L02` contour.
 
 ## Canonical Seams
 - Canonical L03 seam:
-  - `build_lexical_grounding_hypotheses(syntax_hypothesis_result_or_set, utterance_surface=None, discourse_context=None) -> LexicalGroundingResult`
+  - `build_lexical_grounding_hypotheses(syntax_hypothesis_result_or_set, utterance_surface=None, discourse_context=None, lexicon_state=None, lexicon_query_context=None) -> LexicalGroundingResult`
 - Canonical downstream gate:
   - `evaluate_lexical_grounding_downstream_gate(lexical_grounding_result_or_bundle) -> LexicalGroundingGateDecision`
 - Canonical runtime write seam remains `F01.execute_transition(...)`
@@ -13,11 +13,15 @@ Accepted for phase `L03` over closed `F01`, `F02`, `L01`, and `L02` contour.
 
 ## What L03 Now Claims
 - Converts typed L02 syntax outputs into explicit lexical and referential candidate bundles.
+- Uses typed LEXICON query artifacts as primary lexical basis when provided.
+- Keeps heuristic lexical path only as explicit capped fallback when lexicon basis is unavailable/capped/unknown.
 - Preserves sense/entity/reference/deixis ambiguity as inspectable candidates, not hidden top-1 resolution.
 - Emits pronoun/indexical/discourse-link reference hypotheses with unresolved states when evidence is weak.
 - Emits first-class unknown and conflict states for lexical/reference grounding.
 - Keeps token/span traceability via mention anchors linked to L01/L02 anchors.
 - Exposes typed downstream gate with restrictions instead of accepted discourse facts.
+- Preserves lexical basis provenance per mention (`lexicon_backed` / `lexicon_capped_unknown` / `heuristic_fallback` / `no_usable_lexical_basis`) across snapshot/persistence.
+- When lexicon handoff is missing, emits explicit degraded bounded mode markers (`lexicon_handoff_missing`, `lexical_basis_degraded`, `no_strong_lexical_claim_without_lexicon`) and corresponding gate restrictions.
 
 ## What L03 Does Not Claim
 - No final lexical or referential resolution under high ambiguity.
@@ -41,6 +45,8 @@ Accepted for phase `L03` over closed `F01`, `F02`, `L01`, and `L02` contour.
 
 ## Explicit Bounds
 - L03 is typed candidate generation, not semantic commitment.
+- L03 lexicon integration is still bounded lexical grounding support, not WSD/semantic parsing.
+- Missing lexicon handoff is allowed only as explicit degraded bounded mode; it is not equivalent to normal lexicon-backed lexical grounding.
 - L03 is intentionally minimal and heuristic/rule-based; honesty of uncertainty is prioritized over forced completeness.
 - Unknown/conflict/unresolved outputs are mandatory and first-class.
 - Persistence is valid only through F01 transition seam.

@@ -8,7 +8,7 @@ direct_upstream:
 - F02 — Grounding / epistemic substrate (lineage metadata only)
 
 direct_downstream:
-- L03 — Lexical grounding and reference hypotheses (optional lexical knowledge source)
+- L03 — Lexical grounding and reference hypotheses (primary lexical basis when LEXICON artifact is provided)
 - L04 — Dictum candidate construction (indirectly via L03 outputs)
 
 ## Canonical Seams
@@ -47,6 +47,7 @@ direct_downstream:
   - typed usage examples linked to entry and optionally to sense
 - downstream must treat output as lexical knowledge substrate only, not final lexical grounding or semantics.
 - unknown/provisional/conflict states are load-bearing and must remain inspectable.
+- when L03 contour runs without a provided LEXICON artifact, this must be exposed as degraded lexical-basis mode upstream (`lexicon_handoff_missing` / `no_strong_lexical_claim_without_lexicon`), not silently normalized to normal lexical understanding.
 - lexical unknown states remain distinct and inspectable:
   - `unknown_word`
   - `partial_lexical_hypothesis`

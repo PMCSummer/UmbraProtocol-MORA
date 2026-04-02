@@ -63,6 +63,11 @@ def build_dictum_telemetry(
             )
         ),
         attempted_construction_paths=attempted_construction_paths,
+        input_lexical_basis_classes=bundle.input_lexical_basis_classes,
+        fallback_basis_present=bundle.fallback_basis_present,
+        lexicon_basis_missing_or_capped=bundle.lexicon_basis_missing_or_capped,
+        no_strong_lexical_basis_from_upstream=bundle.no_strong_lexical_basis_from_upstream,
+        lexicon_handoff_missing_upstream=bundle.lexicon_handoff_missing_upstream,
         downstream_gate=downstream_gate,
         causal_basis=causal_basis,
     )
@@ -85,6 +90,11 @@ def dictum_result_snapshot(result: DictumCandidateResult) -> dict[str, object]:
             "linked_lexical_candidate_ids": bundle.linked_lexical_candidate_ids,
             "blocked_candidate_reasons": bundle.blocked_candidate_reasons,
             "no_final_resolution_performed": bundle.no_final_resolution_performed,
+            "input_lexical_basis_classes": bundle.input_lexical_basis_classes,
+            "fallback_basis_present": bundle.fallback_basis_present,
+            "lexicon_basis_missing_or_capped": bundle.lexicon_basis_missing_or_capped,
+            "no_strong_lexical_basis_from_upstream": bundle.no_strong_lexical_basis_from_upstream,
+            "lexicon_handoff_missing_upstream": bundle.lexicon_handoff_missing_upstream,
             "reason": bundle.reason,
             "dictum_candidates": tuple(
                 {
@@ -230,6 +240,11 @@ def dictum_result_snapshot(result: DictumCandidateResult) -> dict[str, object]:
             "blocked_candidate_count": result.telemetry.blocked_candidate_count,
             "ambiguity_reasons": result.telemetry.ambiguity_reasons,
             "attempted_construction_paths": result.telemetry.attempted_construction_paths,
+            "input_lexical_basis_classes": result.telemetry.input_lexical_basis_classes,
+            "fallback_basis_present": result.telemetry.fallback_basis_present,
+            "lexicon_basis_missing_or_capped": result.telemetry.lexicon_basis_missing_or_capped,
+            "no_strong_lexical_basis_from_upstream": result.telemetry.no_strong_lexical_basis_from_upstream,
+            "lexicon_handoff_missing_upstream": result.telemetry.lexicon_handoff_missing_upstream,
             "downstream_gate": {
                 "accepted": result.telemetry.downstream_gate.accepted,
                 "restrictions": result.telemetry.downstream_gate.restrictions,

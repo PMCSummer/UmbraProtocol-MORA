@@ -9,6 +9,13 @@ from substrate.contracts import (
     TransitionResult,
     WriterIdentity,
 )
+from substrate.lexicon import (
+    LexicalSenseStatus,
+    LexiconQueryContext,
+    LexiconQueryRequest,
+    LexiconState,
+    query_lexical_entries,
+)
 from substrate.language_surface.models import UtteranceSurface, UtteranceSurfaceResult
 from substrate.lexical_grounding.models import (
     DeixisCandidate,
@@ -17,10 +24,12 @@ from substrate.lexical_grounding.models import (
     GroundingConflict,
     GroundingUnknownState,
     LexemeCandidate,
+    LexicalBasisClass,
     LexicalCandidateType,
     LexicalDiscourseContext,
     LexicalGroundingBundle,
     LexicalGroundingResult,
+    MentionLexicalBasis,
     MentionAnchor,
     ReferenceHypothesis,
     ReferenceKind,
@@ -86,7 +95,9 @@ DEIXIS_FORMS: dict[str, DeixisKind] = {
 ATTEMPTED_GROUNDING_PATHS: tuple[str, ...] = (
     "lexical_grounding.validate_typed_input",
     "lexical_grounding.mention_anchor_derivation",
+    "lexical_grounding.lexicon_query_primary_basis",
     "lexical_grounding.sense_candidate_generation",
+    "lexical_grounding.heuristic_fallback_overlay",
     "lexical_grounding.entity_candidate_generation",
     "lexical_grounding.reference_hypothesis_generation",
     "lexical_grounding.deixis_candidate_generation",
@@ -99,12 +110,18 @@ def build_lexical_grounding_hypotheses(
     syntax_hypothesis_result_or_set: SyntaxHypothesisResult | SyntaxHypothesisSet,
     utterance_surface: UtteranceSurface | UtteranceSurfaceResult | None = None,
     discourse_context: LexicalDiscourseContext | None = None,
+    lexicon_state: LexiconState | None = None,
+    lexicon_query_context: LexiconQueryContext | None = None,
 ) -> LexicalGroundingResult:
     hypothesis_set, syntax_lineage = _extract_syntax_input(syntax_hypothesis_result_or_set)
     surface = _extract_optional_surface(utterance_surface)
     context = discourse_context or LexicalDiscourseContext()
     if discourse_context is not None and not isinstance(discourse_context, LexicalDiscourseContext):
         raise TypeError("discourse_context must be LexicalDiscourseContext")
+    if lexicon_state is not None and not isinstance(lexicon_state, LexiconState):
+        raise TypeError("lexicon_state must be LexiconState when provided")
+    if lexicon_query_context is not None and not isinstance(lexicon_query_context, LexiconQueryContext):
+        raise TypeError("lexicon_query_context must be LexiconQueryContext when provided")
 
     if not hypothesis_set.hypotheses:
         return _abstain_result(
@@ -112,6 +129,7 @@ def build_lexical_grounding_hypotheses(
             surface_ref=surface.epistemic_unit_ref if surface else None,
             source_lineage=syntax_lineage,
             reason="syntax hypothesis set is empty",
+            lexicon_handoff_missing=lexicon_state is None,
         )
 
     mentions = _derive_mentions(hypothesis_set, surface=surface)
@@ -121,12 +139,19 @@ def build_lexical_grounding_hypotheses(
             surface_ref=surface.epistemic_unit_ref if surface else None,
             source_lineage=syntax_lineage,
             reason="no lexical mention anchors derived from syntax",
+            lexicon_handoff_missing=lexicon_state is None,
         )
 
     context_entity_map = {key.lower(): ref for key, ref in context.entity_bindings}
     indexical_map = {key.lower(): ref for key, ref in context.indexical_bindings}
     context_recent_refs = tuple(context.recent_mentions)
     discourse_context_keys_used: set[str] = set()
+    if context.entity_bindings:
+        discourse_context_keys_used.add("entity_bindings")
+    if context.indexical_bindings:
+        discourse_context_keys_used.add("indexical_bindings")
+    if context.recent_mentions:
+        discourse_context_keys_used.add("recent_mentions")
     syntax_instability_present = any(
         len(mention.supporting_syntax_hypothesis_refs) > 1 for mention in mentions
     )
@@ -138,6 +163,32 @@ def build_lexical_grounding_hypotheses(
     unknown_counter = 0
     conflict_counter = 0
 
+    lexicon_query_records_by_mention: dict[str, object] = {}
+    if lexicon_state is not None:
+        effective_query_context = (
+            lexicon_query_context
+            if lexicon_query_context is not None
+            else _derive_default_lexicon_query_context(context)
+        )
+        lexicon_queries = tuple(
+            LexiconQueryRequest(
+                surface_form=mention.normalized_text or mention.surface_text,
+                language_code=None,
+            )
+            for mention in mentions
+        )
+        lexicon_query_result = query_lexical_entries(
+            lexicon_state=lexicon_state,
+            queries=lexicon_queries,
+            context=effective_query_context,
+        )
+        if effective_query_context.context_keys:
+            discourse_context_keys_used.add("lexicon_context_keys")
+        if effective_query_context.syntax_known_lexical_gap_forms:
+            discourse_context_keys_used.add("lexicon_syntax_gap_hints")
+        for mention, record in zip(mentions, lexicon_query_result.query_records, strict=False):
+            lexicon_query_records_by_mention[mention.mention_id] = record
+    lexical_basis_records: list[MentionLexicalBasis] = []
     lexeme_candidates: list[LexemeCandidate] = []
     sense_candidates: list[SenseCandidate] = []
     entity_candidates: list[EntityCandidate] = []
@@ -153,11 +204,106 @@ def build_lexical_grounding_hypotheses(
         token_lower = mention.normalized_text.lower()
         prior_entity_refs_before_mention = tuple(prior_entity_refs)
 
-        candidate_counter, local_sense_candidates, local_unknown = _sense_candidates_for_mention(
-            mention=mention,
-            token_lower=token_lower,
-            candidate_counter=candidate_counter,
+        lexicon_record = lexicon_query_records_by_mention.get(mention.mention_id)
+        local_sense_candidates: list[SenseCandidate] = []
+        local_unknown: str | None = None
+        heuristic_fallback_reason: str | None = None
+        lexicon_unknown_classes: tuple[str, ...] = ()
+        lexicon_matched_entry_ids: tuple[str, ...] = ()
+        lexicon_matched_sense_ids: tuple[str, ...] = ()
+        lexicon_context_blocked_entry_ids: tuple[str, ...] = ()
+        lexicon_usable = False
+        lexicon_used = lexicon_record is not None
+        no_strong_lexical_claim_from_fallback = False
+        fallback_used = False
+
+        if lexicon_record is not None:
+            lexicon_unknown_classes = tuple(
+                state.unknown_class.value for state in lexicon_record.unknown_states
+            )
+            lexicon_matched_entry_ids = tuple(lexicon_record.matched_entry_ids)
+            lexicon_matched_sense_ids = tuple(lexicon_record.matched_sense_ids)
+            lexicon_context_blocked_entry_ids = tuple(lexicon_record.context_blocked_entry_ids)
+            if lexicon_record.strong_lexical_claim_permitted and lexicon_record.matched_entry_ids:
+                candidate_counter, local_sense_candidates = _lexicon_sense_candidates_for_mention(
+                    mention=mention,
+                    lexicon_state=lexicon_state,
+                    matched_entry_ids=lexicon_record.matched_entry_ids,
+                    candidate_counter=candidate_counter,
+                )
+                lexicon_usable = bool(local_sense_candidates)
+
+        if not local_sense_candidates:
+            fallback_used = True
+            no_strong_lexical_claim_from_fallback = True
+            if lexicon_record is not None:
+                dominant_class = (
+                    lexicon_record.dominant_unknown_class.value
+                    if lexicon_record.dominant_unknown_class is not None
+                    else "capped_or_unusable_lexicon_query"
+                )
+                heuristic_fallback_reason = f"lexicon_capped_or_unknown:{dominant_class}"
+                fallback_cap = 0.45
+            else:
+                heuristic_fallback_reason = "lexicon_not_provided"
+                fallback_cap = 0.5
+
+            candidate_counter, local_sense_candidates, local_unknown = _sense_candidates_for_mention(
+                mention=mention,
+                token_lower=token_lower,
+                candidate_counter=candidate_counter,
+                confidence_cap=fallback_cap,
+                fallback_reason=heuristic_fallback_reason,
+            )
+
+        if lexicon_record is not None and lexicon_usable:
+            basis_class = LexicalBasisClass.LEXICON_BACKED
+        elif lexicon_record is not None:
+            basis_class = LexicalBasisClass.LEXICON_CAPPED_UNKNOWN
+        elif fallback_used and local_sense_candidates:
+            basis_class = LexicalBasisClass.HEURISTIC_FALLBACK
+        else:
+            basis_class = LexicalBasisClass.NO_USABLE_LEXICAL_BASIS
+
+        lexical_basis_records.append(
+            MentionLexicalBasis(
+                mention_id=mention.mention_id,
+                token_id=mention.token_id,
+                basis_class=basis_class,
+                lexicon_used=lexicon_used,
+                lexicon_usable=lexicon_usable,
+                lexicon_unknown_classes=lexicon_unknown_classes,
+                lexicon_matched_entry_ids=lexicon_matched_entry_ids,
+                lexicon_matched_sense_ids=lexicon_matched_sense_ids,
+                lexicon_context_blocked_entry_ids=lexicon_context_blocked_entry_ids,
+                heuristic_fallback_used=fallback_used,
+                heuristic_fallback_reason=heuristic_fallback_reason,
+                no_strong_lexical_claim_from_fallback=no_strong_lexical_claim_from_fallback,
+            )
         )
+        if lexicon_record is not None and lexicon_record.unknown_states:
+            for unknown_state in lexicon_record.unknown_states:
+                unknown_counter += 1
+                unknown_states.append(
+                    GroundingUnknownState(
+                        unknown_id=f"unknown-{unknown_counter}",
+                        mention_id=mention.mention_id,
+                        token_id=mention.token_id,
+                        reason=(
+                            "lexicon unknown state: "
+                            f"{unknown_state.unknown_class.value}"
+                            + (f" ({unknown_state.reason})" if unknown_state.reason else "")
+                        ),
+                        confidence=0.2,
+                    )
+                )
+                ambiguity_reasons.append(f"lexicon_{unknown_state.unknown_class.value}")
+
+        if heuristic_fallback_reason is not None:
+            blocked_reasons.append(heuristic_fallback_reason)
+            ambiguity_reasons.append("heuristic_fallback_used")
+            if no_strong_lexical_claim_from_fallback:
+                ambiguity_reasons.append("no_strong_lexical_claim_from_fallback")
         sense_candidates.extend(local_sense_candidates)
         if local_unknown is not None:
             unknown_counter += 1
@@ -290,11 +436,46 @@ def build_lexical_grounding_hypotheses(
                 )
             )
 
+    lexicon_primary_used = any(basis.lexicon_used for basis in lexical_basis_records)
+    heuristic_fallback_used = any(
+        basis.heuristic_fallback_used for basis in lexical_basis_records
+    )
+    no_strong_lexical_claim_from_fallback = any(
+        basis.no_strong_lexical_claim_from_fallback for basis in lexical_basis_records
+    )
+    fallback_reasons = tuple(
+        dict.fromkeys(
+            basis.heuristic_fallback_reason
+            for basis in lexical_basis_records
+            if basis.heuristic_fallback_reason
+        )
+    )
+    no_usable_lexical_basis = any(
+        basis.basis_class == LexicalBasisClass.NO_USABLE_LEXICAL_BASIS
+        for basis in lexical_basis_records
+    )
+    lexicon_handoff_missing = lexicon_state is None
+    lexical_basis_degraded = lexicon_handoff_missing or any(
+        basis.basis_class
+        in {
+            LexicalBasisClass.LEXICON_CAPPED_UNKNOWN,
+            LexicalBasisClass.NO_USABLE_LEXICAL_BASIS,
+        }
+        for basis in lexical_basis_records
+    )
+    no_strong_lexical_claim_without_lexicon = lexicon_handoff_missing and heuristic_fallback_used
+    if lexicon_handoff_missing:
+        blocked_reasons.append("lexicon_handoff_missing")
+        ambiguity_reasons.append("lexicon_handoff_missing")
+    if no_strong_lexical_claim_without_lexicon:
+        ambiguity_reasons.append("no_strong_lexical_claim_without_lexicon")
+
     bundle = LexicalGroundingBundle(
         source_syntax_ref=hypothesis_set.source_surface_ref,
         source_surface_ref=surface.epistemic_unit_ref if surface else None,
         linked_hypothesis_ids=tuple(hypothesis.hypothesis_id for hypothesis in hypothesis_set.hypotheses),
         mention_anchors=mentions,
+        lexical_basis_records=tuple(lexical_basis_records),
         lexeme_candidates=tuple(lexeme_candidates),
         sense_candidates=tuple(sense_candidates),
         entity_candidates=tuple(entity_candidates),
@@ -304,8 +485,15 @@ def build_lexical_grounding_hypotheses(
         conflicts=tuple(conflicts),
         ambiguity_reasons=tuple(dict.fromkeys(ambiguity_reasons)),
         syntax_instability_present=syntax_instability_present,
+        lexicon_primary_used=lexicon_primary_used,
+        heuristic_fallback_used=heuristic_fallback_used,
+        no_strong_lexical_claim_from_fallback=no_strong_lexical_claim_from_fallback,
+        fallback_reasons=fallback_reasons,
         no_final_resolution_performed=True,
         reason="candidate lexical and referential grounding generated without final discourse acceptance",
+        lexicon_handoff_missing=lexicon_handoff_missing,
+        lexical_basis_degraded=lexical_basis_degraded,
+        no_strong_lexical_claim_without_lexicon=no_strong_lexical_claim_without_lexicon,
     )
     gate = evaluate_lexical_grounding_downstream_gate(bundle)
     source_lineage = tuple(
@@ -313,6 +501,18 @@ def build_lexical_grounding_hypotheses(
             (
                 *syntax_lineage,
                 bundle.source_syntax_ref,
+                *(
+                    (
+                        f"lexicon:{lexicon_state.schema_version}|{lexicon_state.lexicon_version}|{lexicon_state.taxonomy_version}",
+                    )
+                    if lexicon_state is not None
+                    else ()
+                ),
+                *(
+                    ("lexicon:handoff_missing",)
+                    if lexicon_handoff_missing
+                    else ()
+                ),
                 *(tuple(mention.surface_text for mention in mentions[:1]) if mentions else ()),
             )
         )
@@ -327,7 +527,13 @@ def build_lexical_grounding_hypotheses(
         causal_basis="L02 morphosyntax anchors transformed into lexical/reference candidate hypotheses",
     )
     confidence = _estimate_result_confidence(bundle)
-    partial_known = bool(bundle.unknown_states or bundle.conflicts or any(h.unresolved for h in bundle.reference_hypotheses))
+    partial_known = bool(
+        bundle.unknown_states
+        or bundle.conflicts
+        or any(h.unresolved for h in bundle.reference_hypotheses)
+        or lexicon_handoff_missing
+        or no_strong_lexical_claim_without_lexicon
+    )
     partial_known_reason = (
         "; ".join(bundle.ambiguity_reasons)
         if bundle.ambiguity_reasons
@@ -340,11 +546,17 @@ def build_lexical_grounding_hypotheses(
         bundle=bundle,
         telemetry=telemetry,
         confidence=confidence,
+        lexicon_primary_used=lexicon_primary_used,
+        heuristic_fallback_used=heuristic_fallback_used,
+        no_usable_lexical_basis=no_usable_lexical_basis,
         partial_known=partial_known,
         partial_known_reason=partial_known_reason,
         abstain=abstain,
         abstain_reason=abstain_reason,
         no_final_resolution_performed=True,
+        lexicon_handoff_missing=lexicon_handoff_missing,
+        lexical_basis_degraded=lexical_basis_degraded,
+        no_strong_lexical_claim_without_lexicon=no_strong_lexical_claim_without_lexicon,
     )
 
 
@@ -400,6 +612,65 @@ def _extract_optional_surface(
     if isinstance(utterance_surface, UtteranceSurfaceResult):
         return utterance_surface.surface
     raise TypeError("utterance_surface must be UtteranceSurface or UtteranceSurfaceResult when provided")
+
+
+def _derive_default_lexicon_query_context(
+    discourse_context: LexicalDiscourseContext,
+) -> LexiconQueryContext:
+    context_keys: list[str] = []
+    context_keys.extend(key.lower() for key, _ in discourse_context.entity_bindings)
+    context_keys.extend(key.lower() for key, _ in discourse_context.indexical_bindings)
+    if discourse_context.recent_mentions:
+        context_keys.append("recent_mentions_present")
+    return LexiconQueryContext(
+        source_lineage=("l03.lexicon_handoff",),
+        context_keys=tuple(dict.fromkeys(context_keys)),
+        syntax_known_lexical_gap_forms=(),
+    )
+
+
+def _lexicon_sense_candidates_for_mention(
+    *,
+    mention: MentionAnchor,
+    lexicon_state: LexiconState | None,
+    matched_entry_ids: tuple[str, ...],
+    candidate_counter: int,
+) -> tuple[int, list[SenseCandidate]]:
+    if lexicon_state is None:
+        return candidate_counter, []
+    entry_map = {entry.entry_id: entry for entry in lexicon_state.entries}
+    candidates: list[SenseCandidate] = []
+    for entry_id in matched_entry_ids:
+        entry = entry_map.get(entry_id)
+        if entry is None:
+            continue
+        stable_senses = tuple(
+            sense
+            for sense in entry.sense_records
+            if sense.status == LexicalSenseStatus.STABLE
+        )
+        chosen_senses = stable_senses if stable_senses else tuple(entry.sense_records)
+        for sense in chosen_senses:
+            candidate_counter += 1
+            confidence = max(
+                0.2,
+                min(
+                    0.95,
+                    round((float(sense.confidence) + float(entry.confidence)) / 2.0, 4),
+                ),
+            )
+            candidates.append(
+                SenseCandidate(
+                    candidate_id=f"sense-{candidate_counter}",
+                    mention_id=mention.mention_id,
+                    token_id=mention.token_id,
+                    sense_key=f"lexicon:{entry.entry_id}:{sense.sense_id}",
+                    confidence=confidence,
+                    entropy=0.22 if len(chosen_senses) == 1 else 0.46,
+                    evidence="lexicon-backed sense candidate from typed lexical entry",
+                )
+            )
+    return candidate_counter, candidates
 
 
 def _derive_mentions(
@@ -466,63 +737,85 @@ def _sense_candidates_for_mention(
     mention: MentionAnchor,
     token_lower: str,
     candidate_counter: int,
+    confidence_cap: float | None = None,
+    fallback_reason: str | None = None,
 ) -> tuple[int, list[SenseCandidate], str | None]:
     candidates: list[SenseCandidate] = []
     unknown_reason: str | None = None
     if token_lower in AMBIGUOUS_SENSES:
         first, second = AMBIGUOUS_SENSES[token_lower]
         candidate_counter += 1
+        first_confidence = 0.52 if confidence_cap is None else min(0.52, confidence_cap)
         candidates.append(
             SenseCandidate(
                 candidate_id=f"sense-{candidate_counter}",
                 mention_id=mention.mention_id,
                 token_id=mention.token_id,
                 sense_key=first,
-                confidence=0.52,
+                confidence=first_confidence,
                 entropy=0.91,
-                evidence="lexeme appears in predefined ambiguity bundle",
+                evidence=(
+                    "lexeme appears in predefined ambiguity bundle"
+                    if fallback_reason is None
+                    else f"heuristic_fallback:{fallback_reason}:predefined ambiguity bundle"
+                ),
             )
         )
         candidate_counter += 1
+        second_confidence = 0.48 if confidence_cap is None else min(0.48, confidence_cap)
         candidates.append(
             SenseCandidate(
                 candidate_id=f"sense-{candidate_counter}",
                 mention_id=mention.mention_id,
                 token_id=mention.token_id,
                 sense_key=second,
-                confidence=0.48,
+                confidence=second_confidence,
                 entropy=0.91,
-                evidence="lexeme appears in predefined ambiguity bundle",
+                evidence=(
+                    "lexeme appears in predefined ambiguity bundle"
+                    if fallback_reason is None
+                    else f"heuristic_fallback:{fallback_reason}:predefined ambiguity bundle"
+                ),
             )
         )
         return candidate_counter, candidates, None
 
     if _looks_unknown_lexeme(token_lower):
         candidate_counter += 1
+        unknown_confidence = 0.2 if confidence_cap is None else min(0.2, confidence_cap)
         candidates.append(
             SenseCandidate(
                 candidate_id=f"sense-{candidate_counter}",
                 mention_id=mention.mention_id,
                 token_id=mention.token_id,
                 sense_key="sense:unknown_lexeme",
-                confidence=0.2,
+                confidence=unknown_confidence,
                 entropy=0.99,
-                evidence="nonce or unsupported lexical form",
+                evidence=(
+                    "nonce or unsupported lexical form"
+                    if fallback_reason is None
+                    else f"heuristic_fallback:{fallback_reason}:nonce or unsupported lexical form"
+                ),
             )
         )
         unknown_reason = "unknown lexical item without stable sense grounding"
         return candidate_counter, candidates, unknown_reason
 
     candidate_counter += 1
+    surface_confidence = 0.74 if confidence_cap is None else min(0.74, confidence_cap)
     candidates.append(
         SenseCandidate(
             candidate_id=f"sense-{candidate_counter}",
             mention_id=mention.mention_id,
             token_id=mention.token_id,
             sense_key=f"sense:surface::{token_lower}",
-            confidence=0.74,
+            confidence=surface_confidence,
             entropy=0.24,
-            evidence="single shallow lexical reading from normalized form",
+            evidence=(
+                "single shallow lexical reading from normalized form"
+                if fallback_reason is None
+                else f"heuristic_fallback:{fallback_reason}:single shallow lexical reading from normalized form"
+            ),
         )
     )
     return candidate_counter, candidates, None
@@ -753,6 +1046,8 @@ def _estimate_result_confidence(bundle: LexicalGroundingBundle) -> float:
     score = sum(confidence_values) / len(confidence_values)
     score -= min(0.4, len(bundle.unknown_states) * 0.07)
     score -= min(0.25, len(bundle.conflicts) * 0.06)
+    if bundle.no_strong_lexical_claim_from_fallback:
+        score -= 0.12
     return max(0.1, min(0.95, round(score, 4)))
 
 
@@ -776,12 +1071,14 @@ def _abstain_result(
     surface_ref: str | None,
     source_lineage: tuple[str, ...],
     reason: str,
+    lexicon_handoff_missing: bool,
 ) -> LexicalGroundingResult:
     bundle = LexicalGroundingBundle(
         source_syntax_ref=syntax_ref,
         source_surface_ref=surface_ref,
         linked_hypothesis_ids=(),
         mention_anchors=(),
+        lexical_basis_records=(),
         lexeme_candidates=(),
         sense_candidates=(),
         entity_candidates=(),
@@ -791,8 +1088,15 @@ def _abstain_result(
         conflicts=(),
         ambiguity_reasons=(reason,),
         syntax_instability_present=False,
+        lexicon_primary_used=False,
+        heuristic_fallback_used=False,
+        no_strong_lexical_claim_from_fallback=False,
+        fallback_reasons=(),
         no_final_resolution_performed=True,
         reason="lexical grounding abstained due to invalid or empty upstream contract",
+        lexicon_handoff_missing=lexicon_handoff_missing,
+        lexical_basis_degraded=lexicon_handoff_missing,
+        no_strong_lexical_claim_without_lexicon=lexicon_handoff_missing,
     )
     gate = evaluate_lexical_grounding_downstream_gate(bundle)
     telemetry = build_lexical_grounding_telemetry(
@@ -808,9 +1112,15 @@ def _abstain_result(
         bundle=bundle,
         telemetry=telemetry,
         confidence=0.1,
+        lexicon_primary_used=False,
+        heuristic_fallback_used=False,
+        no_usable_lexical_basis=True,
         partial_known=True,
         partial_known_reason=reason,
         abstain=True,
         abstain_reason=reason,
         no_final_resolution_performed=True,
+        lexicon_handoff_missing=lexicon_handoff_missing,
+        lexical_basis_degraded=lexicon_handoff_missing,
+        no_strong_lexical_claim_without_lexicon=lexicon_handoff_missing,
     )

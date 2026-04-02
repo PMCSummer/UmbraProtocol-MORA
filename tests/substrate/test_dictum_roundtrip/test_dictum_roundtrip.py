@@ -16,6 +16,7 @@ from substrate.epistemics import (
 )
 from substrate.language_surface import build_utterance_surface
 from substrate.lexical_grounding import build_lexical_grounding_hypotheses
+from substrate.lexicon import create_seed_lexicon_state
 from substrate.morphosyntax import build_morphosyntax_candidate_space
 from substrate.state import create_empty_state
 from substrate.transition import execute_transition
@@ -38,7 +39,7 @@ def _bootstrapped_state():
     return boot.state
 
 
-def _dictum_result(text: str, material_id: str):
+def _dictum_result(text: str, material_id: str, *, with_lexicon: bool = False):
     epistemic = ground_epistemic_input(
         InputMaterial(material_id=material_id, content=text),
         SourceMetadata(
@@ -50,7 +51,11 @@ def _dictum_result(text: str, material_id: str):
     )
     surface = build_utterance_surface(epistemic.unit)
     syntax = build_morphosyntax_candidate_space(surface)
-    lexical = build_lexical_grounding_hypotheses(syntax, utterance_surface=surface)
+    lexical = build_lexical_grounding_hypotheses(
+        syntax,
+        utterance_surface=surface,
+        lexicon_state=create_seed_lexicon_state() if with_lexicon else None,
+    )
     return build_dictum_candidates(lexical, syntax, utterance_surface=surface)
 
 
@@ -67,6 +72,12 @@ def test_dictum_payload_keeps_load_bearing_fields() -> None:
     assert first["underspecified_slots"] is not None
     assert payload["telemetry"]["attempted_construction_paths"]
     assert payload["telemetry"]["magnitude_marker_count"] >= 0
+    assert "input_lexical_basis_classes" in payload["bundle"]
+    assert "lexicon_handoff_missing_upstream" in payload["bundle"]
+    assert "no_strong_lexical_basis_from_upstream" in payload["bundle"]
+    assert "input_lexical_basis_classes" in payload["telemetry"]
+    assert "lexicon_handoff_missing_upstream" in payload["telemetry"]
+    assert "no_strong_lexical_basis_from_upstream" in payload["telemetry"]
 
 
 def test_persist_reconstruct_continue_preserves_dictum_structure() -> None:
@@ -93,3 +104,24 @@ def test_persist_reconstruct_continue_preserves_dictum_structure() -> None:
     assert snapshot["telemetry"]["processed_candidate_ids"] is not None
     serialized = json.loads(json.dumps(snapshot))
     assert serialized["bundle"]["source_syntax_ref"]
+
+
+def test_dictum_bridge_reflects_l03_lexical_basis_quality() -> None:
+    without_lexicon = _dictum_result(
+        "thing",
+        "m-l04-roundtrip-bridge-without",
+        with_lexicon=False,
+    )
+    with_lexicon = _dictum_result(
+        "thing",
+        "m-l04-roundtrip-bridge-with",
+        with_lexicon=True,
+    )
+
+    assert without_lexicon.telemetry.lexicon_handoff_missing_upstream is True
+    assert without_lexicon.telemetry.no_strong_lexical_basis_from_upstream is True
+    assert "heuristic_fallback" in without_lexicon.telemetry.input_lexical_basis_classes
+
+    assert with_lexicon.telemetry.lexicon_handoff_missing_upstream is False
+    assert with_lexicon.telemetry.no_strong_lexical_basis_from_upstream is False
+    assert "lexicon_backed" in with_lexicon.telemetry.input_lexical_basis_classes

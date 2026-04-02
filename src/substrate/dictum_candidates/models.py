@@ -160,6 +160,11 @@ class DictumCandidateBundle:
     blocked_candidate_reasons: tuple[str, ...]
     no_final_resolution_performed: bool
     reason: str
+    input_lexical_basis_classes: tuple[str, ...] = ()
+    fallback_basis_present: bool = False
+    lexicon_basis_missing_or_capped: bool = False
+    no_strong_lexical_basis_from_upstream: bool = False
+    lexicon_handoff_missing_upstream: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -189,6 +194,11 @@ class DictumTelemetry:
     blocked_candidate_count: int
     ambiguity_reasons: tuple[str, ...]
     attempted_construction_paths: tuple[str, ...]
+    input_lexical_basis_classes: tuple[str, ...]
+    fallback_basis_present: bool
+    lexicon_basis_missing_or_capped: bool
+    no_strong_lexical_basis_from_upstream: bool
+    lexicon_handoff_missing_upstream: bool
     downstream_gate: DictumGateDecision
     causal_basis: str
     emitted_at: str = field(default_factory=lambda: datetime.now(tz=timezone.utc).isoformat())

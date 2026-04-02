@@ -31,6 +31,13 @@ class DeixisKind(str, Enum):
     UNKNOWN = "unknown"
 
 
+class LexicalBasisClass(str, Enum):
+    LEXICON_BACKED = "lexicon_backed"
+    LEXICON_CAPPED_UNKNOWN = "lexicon_capped_unknown"
+    HEURISTIC_FALLBACK = "heuristic_fallback"
+    NO_USABLE_LEXICAL_BASIS = "no_usable_lexical_basis"
+
+
 @dataclass(frozen=True, slots=True)
 class MentionAnchor:
     mention_id: str
@@ -42,6 +49,22 @@ class MentionAnchor:
     supporting_syntax_hypothesis_refs: tuple[str, ...]
     inside_quote: bool
     confidence: float
+
+
+@dataclass(frozen=True, slots=True)
+class MentionLexicalBasis:
+    mention_id: str
+    token_id: str
+    basis_class: LexicalBasisClass
+    lexicon_used: bool
+    lexicon_usable: bool
+    lexicon_unknown_classes: tuple[str, ...]
+    lexicon_matched_entry_ids: tuple[str, ...]
+    lexicon_matched_sense_ids: tuple[str, ...]
+    lexicon_context_blocked_entry_ids: tuple[str, ...]
+    heuristic_fallback_used: bool
+    heuristic_fallback_reason: str | None
+    no_strong_lexical_claim_from_fallback: bool
 
 
 @dataclass(frozen=True, slots=True)
@@ -138,6 +161,7 @@ class LexicalGroundingBundle:
     source_surface_ref: str | None
     linked_hypothesis_ids: tuple[str, ...]
     mention_anchors: tuple[MentionAnchor, ...]
+    lexical_basis_records: tuple[MentionLexicalBasis, ...]
     lexeme_candidates: tuple[LexemeCandidate, ...]
     sense_candidates: tuple[SenseCandidate, ...]
     entity_candidates: tuple[EntityCandidate, ...]
@@ -147,8 +171,15 @@ class LexicalGroundingBundle:
     conflicts: tuple[GroundingConflict, ...]
     ambiguity_reasons: tuple[str, ...]
     syntax_instability_present: bool
+    lexicon_primary_used: bool
+    heuristic_fallback_used: bool
+    no_strong_lexical_claim_from_fallback: bool
+    fallback_reasons: tuple[str, ...]
     no_final_resolution_performed: bool
     reason: str
+    lexicon_handoff_missing: bool = False
+    lexical_basis_degraded: bool = False
+    no_strong_lexical_claim_without_lexicon: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -176,12 +207,22 @@ class LexicalGroundingTelemetry:
     conflict_count: int
     syntax_hypothesis_count: int
     syntax_instability_mention_count: int
+    lexicon_primary_used: bool
+    lexicon_backed_mention_count: int
+    lexicon_capped_unknown_mention_count: int
+    heuristic_fallback_mention_count: int
+    no_usable_lexical_basis_mention_count: int
+    fallback_reasons: tuple[str, ...]
+    no_strong_lexical_claim_from_fallback: bool
     ambiguity_reasons: tuple[str, ...]
     discourse_context_keys_used: tuple[str, ...]
     attempted_grounding_paths: tuple[str, ...]
     blocked_grounding_reasons: tuple[str, ...]
     downstream_gate: LexicalGroundingGateDecision
     causal_basis: str
+    lexicon_handoff_missing: bool = False
+    lexical_basis_degraded: bool = False
+    no_strong_lexical_claim_without_lexicon: bool = False
     emitted_at: str = field(default_factory=lambda: datetime.now(tz=timezone.utc).isoformat())
 
 
@@ -190,8 +231,14 @@ class LexicalGroundingResult:
     bundle: LexicalGroundingBundle
     telemetry: LexicalGroundingTelemetry
     confidence: float
+    lexicon_primary_used: bool
+    heuristic_fallback_used: bool
+    no_usable_lexical_basis: bool
     partial_known: bool
     partial_known_reason: str | None
     abstain: bool
     abstain_reason: str | None
     no_final_resolution_performed: bool
+    lexicon_handoff_missing: bool = False
+    lexical_basis_degraded: bool = False
+    no_strong_lexical_claim_without_lexicon: bool = False

@@ -31,6 +31,22 @@ def evaluate_lexical_grounding_downstream_gate(
         restrictions.append("grounding_conflict_present")
     if bundle.syntax_instability_present:
         restrictions.append("syntax_instability_present")
+    if bundle.lexicon_primary_used:
+        restrictions.append("lexicon_primary_used")
+    if bundle.heuristic_fallback_used:
+        restrictions.append("heuristic_fallback_used")
+    if bundle.no_strong_lexical_claim_from_fallback:
+        restrictions.append("no_strong_lexical_claim_from_fallback")
+    if bundle.lexicon_handoff_missing:
+        restrictions.append("lexicon_handoff_missing")
+    if bundle.lexical_basis_degraded:
+        restrictions.append("lexical_basis_degraded")
+    if bundle.no_strong_lexical_claim_without_lexicon:
+        restrictions.append("no_strong_lexical_claim_without_lexicon")
+    if any(basis.basis_class.value == "lexicon_capped_unknown" for basis in bundle.lexical_basis_records):
+        restrictions.append("lexicon_capped_unknown_basis_present")
+    if any(basis.basis_class.value == "no_usable_lexical_basis" for basis in bundle.lexical_basis_records):
+        restrictions.append("no_usable_lexical_basis_present")
     if any(hypothesis.unresolved for hypothesis in bundle.reference_hypotheses):
         restrictions.append("unresolved_reference_present")
     if bundle.ambiguity_reasons:

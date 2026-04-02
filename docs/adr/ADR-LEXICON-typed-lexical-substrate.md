@@ -81,6 +81,8 @@ Accepted as a narrow build-mode substrate increment.
 - Unknown lexical items remain unknown unless explicit typed evidence is added.
 - Episode-driven learning is minimal and rule-based (no parser, no WSD, no phrase semantics).
 - Optional lexical substrate usage by L03 is allowed but not required in this increment.
+- L03 integration treats lexicon query artifacts as primary lexical basis when provided; heuristic lexical guesses remain explicit fallback with capped claim strength.
+- When L03 contour runs without lexicon handoff, runtime emits explicit degraded bounded mode (`lexicon_handoff_missing`, `lexical_basis_degraded`, `no_strong_lexical_claim_without_lexicon`) instead of silently normal lexical mode.
 - Syntax-known lexical gaps can be represented via typed lexical query context only; no parser/semantic integration is introduced here.
 - Contour-level proof that lexicon ablation degrades full L03 behavior is not closed here to avoid L03 phase creep.
 - Hostile/raw bypass outside typed seams is out of scope.

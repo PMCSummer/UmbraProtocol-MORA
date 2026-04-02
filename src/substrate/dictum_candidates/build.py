@@ -430,6 +430,28 @@ def build_dictum_candidates(
             )
         )
 
+    input_lexical_basis_classes = tuple(
+        dict.fromkeys(
+            basis.basis_class.value for basis in lexical_bundle.lexical_basis_records
+        )
+    )
+    fallback_basis_present = lexical_bundle.heuristic_fallback_used
+    lexicon_basis_missing_or_capped = lexical_bundle.lexicon_handoff_missing or any(
+        basis.basis_class.value in {"lexicon_capped_unknown", "no_usable_lexical_basis"}
+        for basis in lexical_bundle.lexical_basis_records
+    )
+    no_strong_lexical_basis_from_upstream = (
+        lexical_bundle.no_strong_lexical_claim_from_fallback
+        or lexical_bundle.no_strong_lexical_claim_without_lexicon
+    )
+    lexicon_handoff_missing_upstream = lexical_bundle.lexicon_handoff_missing
+    if lexicon_handoff_missing_upstream:
+        blocked_reasons.append("upstream_lexicon_handoff_missing")
+    if lexicon_basis_missing_or_capped:
+        blocked_reasons.append("upstream_lexicon_basis_missing_or_capped")
+    if no_strong_lexical_basis_from_upstream:
+        blocked_reasons.append("upstream_no_strong_lexical_basis")
+
     bundle = DictumCandidateBundle(
         source_lexical_grounding_ref=lexical_bundle.source_syntax_ref,
         source_syntax_ref=syntax_set.source_surface_ref,
@@ -445,6 +467,11 @@ def build_dictum_candidates(
         blocked_candidate_reasons=tuple(dict.fromkeys(blocked_reasons)),
         no_final_resolution_performed=True,
         reason="dictum candidates built from typed lexical and syntax hypotheses without modus commitment",
+        input_lexical_basis_classes=input_lexical_basis_classes,
+        fallback_basis_present=fallback_basis_present,
+        lexicon_basis_missing_or_capped=lexicon_basis_missing_or_capped,
+        no_strong_lexical_basis_from_upstream=no_strong_lexical_basis_from_upstream,
+        lexicon_handoff_missing_upstream=lexicon_handoff_missing_upstream,
     )
     gate = evaluate_dictum_downstream_gate(bundle)
     source_lineage = tuple(
@@ -783,6 +810,24 @@ def _abstain_result(
         blocked_candidate_reasons=(reason,),
         no_final_resolution_performed=True,
         reason="dictum construction abstained due to invalid or empty upstream contract",
+        input_lexical_basis_classes=tuple(
+            dict.fromkeys(
+                basis.basis_class.value for basis in lexical_bundle.lexical_basis_records
+            )
+        ),
+        fallback_basis_present=lexical_bundle.heuristic_fallback_used,
+        lexicon_basis_missing_or_capped=(
+            lexical_bundle.lexicon_handoff_missing
+            or any(
+                basis.basis_class.value in {"lexicon_capped_unknown", "no_usable_lexical_basis"}
+                for basis in lexical_bundle.lexical_basis_records
+            )
+        ),
+        no_strong_lexical_basis_from_upstream=(
+            lexical_bundle.no_strong_lexical_claim_from_fallback
+            or lexical_bundle.no_strong_lexical_claim_without_lexicon
+        ),
+        lexicon_handoff_missing_upstream=lexical_bundle.lexicon_handoff_missing,
     )
     gate = evaluate_dictum_downstream_gate(bundle)
     telemetry = build_dictum_telemetry(

@@ -43,12 +43,38 @@ def build_lexical_grounding_telemetry(
             for mention in bundle.mention_anchors
             if len(mention.supporting_syntax_hypothesis_refs) > 1
         ),
+        lexicon_primary_used=bundle.lexicon_primary_used,
+        lexicon_backed_mention_count=sum(
+            1
+            for basis in bundle.lexical_basis_records
+            if basis.basis_class.value == "lexicon_backed"
+        ),
+        lexicon_capped_unknown_mention_count=sum(
+            1
+            for basis in bundle.lexical_basis_records
+            if basis.basis_class.value == "lexicon_capped_unknown"
+        ),
+        heuristic_fallback_mention_count=sum(
+            1
+            for basis in bundle.lexical_basis_records
+            if basis.heuristic_fallback_used
+        ),
+        no_usable_lexical_basis_mention_count=sum(
+            1
+            for basis in bundle.lexical_basis_records
+            if basis.basis_class.value == "no_usable_lexical_basis"
+        ),
+        fallback_reasons=bundle.fallback_reasons,
+        no_strong_lexical_claim_from_fallback=bundle.no_strong_lexical_claim_from_fallback,
         ambiguity_reasons=bundle.ambiguity_reasons,
         discourse_context_keys_used=discourse_context_keys_used,
         attempted_grounding_paths=attempted_grounding_paths,
         blocked_grounding_reasons=blocked_grounding_reasons,
         downstream_gate=downstream_gate,
         causal_basis=causal_basis,
+        lexicon_handoff_missing=bundle.lexicon_handoff_missing,
+        lexical_basis_degraded=bundle.lexical_basis_degraded,
+        no_strong_lexical_claim_without_lexicon=bundle.no_strong_lexical_claim_without_lexicon,
     )
 
 
@@ -56,6 +82,12 @@ def lexical_grounding_result_snapshot(result: LexicalGroundingResult) -> dict[st
     bundle = result.bundle
     return {
         "confidence": result.confidence,
+        "lexicon_primary_used": result.lexicon_primary_used,
+        "heuristic_fallback_used": result.heuristic_fallback_used,
+        "no_usable_lexical_basis": result.no_usable_lexical_basis,
+        "lexicon_handoff_missing": result.lexicon_handoff_missing,
+        "lexical_basis_degraded": result.lexical_basis_degraded,
+        "no_strong_lexical_claim_without_lexicon": result.no_strong_lexical_claim_without_lexicon,
         "partial_known": result.partial_known,
         "partial_known_reason": result.partial_known_reason,
         "abstain": result.abstain,
@@ -66,7 +98,14 @@ def lexical_grounding_result_snapshot(result: LexicalGroundingResult) -> dict[st
             "source_surface_ref": bundle.source_surface_ref,
             "linked_hypothesis_ids": bundle.linked_hypothesis_ids,
             "syntax_instability_present": bundle.syntax_instability_present,
+            "lexicon_primary_used": bundle.lexicon_primary_used,
+            "heuristic_fallback_used": bundle.heuristic_fallback_used,
+            "no_strong_lexical_claim_from_fallback": bundle.no_strong_lexical_claim_from_fallback,
+            "fallback_reasons": bundle.fallback_reasons,
             "no_final_resolution_performed": bundle.no_final_resolution_performed,
+            "lexicon_handoff_missing": bundle.lexicon_handoff_missing,
+            "lexical_basis_degraded": bundle.lexical_basis_degraded,
+            "no_strong_lexical_claim_without_lexicon": bundle.no_strong_lexical_claim_without_lexicon,
             "ambiguity_reasons": bundle.ambiguity_reasons,
             "mention_anchors": tuple(
                 {
@@ -82,6 +121,23 @@ def lexical_grounding_result_snapshot(result: LexicalGroundingResult) -> dict[st
                     "confidence": mention.confidence,
                 }
                 for mention in bundle.mention_anchors
+            ),
+            "lexical_basis_records": tuple(
+                {
+                    "mention_id": basis.mention_id,
+                    "token_id": basis.token_id,
+                    "basis_class": basis.basis_class.value,
+                    "lexicon_used": basis.lexicon_used,
+                    "lexicon_usable": basis.lexicon_usable,
+                    "lexicon_unknown_classes": basis.lexicon_unknown_classes,
+                    "lexicon_matched_entry_ids": basis.lexicon_matched_entry_ids,
+                    "lexicon_matched_sense_ids": basis.lexicon_matched_sense_ids,
+                    "lexicon_context_blocked_entry_ids": basis.lexicon_context_blocked_entry_ids,
+                    "heuristic_fallback_used": basis.heuristic_fallback_used,
+                    "heuristic_fallback_reason": basis.heuristic_fallback_reason,
+                    "no_strong_lexical_claim_from_fallback": basis.no_strong_lexical_claim_from_fallback,
+                }
+                for basis in bundle.lexical_basis_records
             ),
             "lexeme_candidates": tuple(
                 {
@@ -186,6 +242,16 @@ def lexical_grounding_result_snapshot(result: LexicalGroundingResult) -> dict[st
             "ambiguity_reasons": result.telemetry.ambiguity_reasons,
             "syntax_hypothesis_count": result.telemetry.syntax_hypothesis_count,
             "syntax_instability_mention_count": result.telemetry.syntax_instability_mention_count,
+            "lexicon_primary_used": result.telemetry.lexicon_primary_used,
+            "lexicon_backed_mention_count": result.telemetry.lexicon_backed_mention_count,
+            "lexicon_capped_unknown_mention_count": result.telemetry.lexicon_capped_unknown_mention_count,
+            "heuristic_fallback_mention_count": result.telemetry.heuristic_fallback_mention_count,
+            "no_usable_lexical_basis_mention_count": result.telemetry.no_usable_lexical_basis_mention_count,
+            "fallback_reasons": result.telemetry.fallback_reasons,
+            "no_strong_lexical_claim_from_fallback": result.telemetry.no_strong_lexical_claim_from_fallback,
+            "lexicon_handoff_missing": result.telemetry.lexicon_handoff_missing,
+            "lexical_basis_degraded": result.telemetry.lexical_basis_degraded,
+            "no_strong_lexical_claim_without_lexicon": result.telemetry.no_strong_lexical_claim_without_lexicon,
             "discourse_context_keys_used": result.telemetry.discourse_context_keys_used,
             "attempted_grounding_paths": result.telemetry.attempted_grounding_paths,
             "blocked_grounding_reasons": result.telemetry.blocked_grounding_reasons,
