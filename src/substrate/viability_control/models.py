@@ -69,6 +69,9 @@ class ViabilityCalibrationSpec:
     pressure_critical_threshold: float = 0.85
     min_recoverability_evidence_quality: float = 0.2
     strong_override_min_recoverability_evidence: float = 0.35
+    mixed_deterioration_requires_cap: bool = True
+    mixed_deterioration_dominance_margin: float = 0.2
+    epistemic_block_override_cap_threshold: int = 2
 
 
 @dataclass(frozen=True, slots=True)
@@ -109,6 +112,7 @@ class ViabilityContext:
     expected_boundary_schema_version: str = "r04.boundary.v1"
     expected_calibration_schema_version: str = "r04.calibration.v1"
     expected_calibration_id: str | None = None
+    expected_calibration_formula_version: str = "r04.formula.v1"
 
 
 @dataclass(frozen=True, slots=True)
@@ -143,12 +147,14 @@ class ViabilityControlState:
     recoverability_components: ViabilityRecoverabilityComponents | None
     calibration_id: str
     calibration_schema_version: str
+    calibration_formula_version: str
     override_scope: ViabilityOverrideScope
     persistence_state: ViabilityPersistenceState
     deescalation_conditions: tuple[str, ...]
     confidence: RegulationConfidence
     uncertainty_state: tuple[ViabilityUncertaintyState, ...]
     recent_failed_recovery_count: int
+    preference_epistemic_block_count: int
     mixed_deterioration: bool
     no_strong_override_claim: bool
     input_regulation_snapshot_ref: str
@@ -181,6 +187,7 @@ class ViabilityTelemetry:
     recoverability_components: ViabilityRecoverabilityComponents | None
     calibration_id: str
     calibration_schema_version: str
+    calibration_formula_version: str
     override_scope: ViabilityOverrideScope
     persistence_status: ViabilityPersistenceState
     deescalation_condition_markers: tuple[str, ...]
@@ -190,6 +197,7 @@ class ViabilityTelemetry:
     causal_basis: str
     attempted_computation_paths: tuple[str, ...]
     recent_failed_recovery_count: int
+    preference_epistemic_block_count: int
     boundary_compatibility: tuple[str, ...]
     emitted_at: str = field(default_factory=lambda: datetime.now(tz=timezone.utc).isoformat())
 

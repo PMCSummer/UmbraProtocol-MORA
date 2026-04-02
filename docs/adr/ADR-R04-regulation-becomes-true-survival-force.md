@@ -22,6 +22,10 @@ Accepted for phase `R04` over implemented `F01`, `F02`, `R01`, `R02`, and `R03`.
   - recoverability estimate (from available means + preference support, without collapsing threat into preference)
 - Uses typed/versioned calibration and compatibility guards (`ViabilityCalibrationSpec`) so threshold/weight changes are explicit and traceable.
 - Stores recoverability as factorized components (`ViabilityRecoverabilityComponents`) instead of one opaque score.
+- Treats mixed deterioration as strong-override-capping unless clean single-axis threat attribution basis is present.
+- Rejects normal reuse of incompatible prior viability state (calibration/formula mismatch) in persistence/de-escalation.
+- Makes `formula_version` operational: mismatch triggers compatibility caps and prior-reuse restrictions.
+- Keeps preference epistemic blockage separated from actual failed restoration count.
 - Emits explicit escalation stages and override scope.
 - Emits typed control directives:
   - `priority_raise`
@@ -72,6 +76,7 @@ Accepted for phase `R04` over implemented `F01`, `F02`, `R01`, `R02`, and `R03`.
 - R04 does not select concrete action; it only emits typed viability-control directives and restrictions.
 - `preference != survival threat` is enforced by contract: preference affects recoverability hints, not boundary threat definition.
 - recoverability evidence quality gates strong override; weak basis degrades claims instead of faking precision.
+- preference blocked updates are tracked separately for uncertainty capping; they do not increase failed restoration pressure terms.
 - When observability/boundary compatibility is weak, R04 must cap claims via uncertainty markers and `no_strong_override_claim`.
 - Hostile bypass outside typed seam/gate remains out of scope.
 - Current mechanism is intentionally minimal/rule-based; claim is operational viability control, not full survival cognition.

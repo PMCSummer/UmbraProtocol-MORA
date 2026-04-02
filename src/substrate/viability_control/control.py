@@ -222,8 +222,9 @@ def compute_viability_control_state(
         step_delta=context.step_delta,
     )
     recent_failed_recovery_count = context.recent_failed_recovery_attempts
-    if preference_result is not None:
-        recent_failed_recovery_count += len(preference_result.blocked_updates)
+    preference_epistemic_block_count = (
+        len(preference_result.blocked_updates) if preference_result is not None else 0
+    )
 
     recoverability_estimate, recoverability_components, recoverability_notes = _recoverability_estimate(
         affordance_result=affordance_result,
@@ -241,18 +242,37 @@ def compute_viability_control_state(
         calibration=calibration,
         boundary=boundary,
     )
+    clean_threat_attribution_basis = _clean_threat_attribution_basis(
+        axis_risks=axis_risks,
+        predicted_time_to_boundary=predicted_time_to_boundary,
+        regulation_confidence=regulation_state.confidence,
+        tradeoff_state=tradeoff_state,
+        boundary=boundary,
+        calibration=calibration,
+    )
     escalation_stage = _escalation_stage(
         pressure_level=pressure_level,
         predicted_time_to_boundary=predicted_time_to_boundary,
         boundary=boundary,
         calibration=calibration,
     )
+    incompatibility_markers_for_prior_reuse = {
+        "calibration_schema_incompatible",
+        "calibration_id_incompatible",
+        "calibration_formula_incompatible",
+        "prior_viability_calibration_mismatch",
+        "prior_viability_formula_mismatch",
+    }
+    prior_viability_state_for_persistence = context.prior_viability_state
+    if set(compatibility) & incompatibility_markers_for_prior_reuse:
+        prior_viability_state_for_persistence = None
+        blocked_reasons += ("prior_viability_state_incompatible_for_reuse",)
     persistence_state, deescalation_conditions = _persistence_and_deescalation(
         escalation_stage=escalation_stage,
         pressure_level=pressure_level,
         max_unresolved=max_unresolved,
         recent_failed_recovery_count=recent_failed_recovery_count,
-        prior_viability_state=context.prior_viability_state,
+        prior_viability_state=prior_viability_state_for_persistence,
     )
 
     mixed_deterioration = len(affected_needs) >= 2 and len(directions) > 1
@@ -288,6 +308,17 @@ def compute_viability_control_state(
             ViabilityUncertaintyState.DEGRADED_MODE_ONLY,
         }
     ) or bool(compatibility)
+    if (
+        mixed_deterioration
+        and calibration.mixed_deterioration_requires_cap
+        and not clean_threat_attribution_basis
+    ):
+        no_strong_override_claim = True
+    if (
+        preference_epistemic_block_count >= calibration.epistemic_block_override_cap_threshold
+        and not clean_threat_attribution_basis
+    ):
+        no_strong_override_claim = True
     if no_strong_override_claim:
         uncertainty.append(ViabilityUncertaintyState.NO_STRONG_OVERRIDE_CLAIM)
 
@@ -321,12 +352,14 @@ def compute_viability_control_state(
         recoverability_components=recoverability_components,
         calibration_id=calibration.calibration_id,
         calibration_schema_version=calibration.schema_version,
+        calibration_formula_version=calibration.formula_version,
         override_scope=override_scope,
         persistence_state=persistence_state,
         deescalation_conditions=deescalation_conditions,
         confidence=confidence,
         uncertainty_state=tuple(dict.fromkeys(uncertainty)),
         recent_failed_recovery_count=recent_failed_recovery_count,
+        preference_epistemic_block_count=preference_epistemic_block_count,
         mixed_deterioration=mixed_deterioration,
         no_strong_override_claim=no_strong_override_claim,
         input_regulation_snapshot_ref=regulation_ref,
@@ -465,10 +498,25 @@ def validate_viability_inputs(
     ):
         blocked.append("invalid calibration strong_override_min_recoverability_evidence")
     if (
+        calibration.mixed_deterioration_dominance_margin < 0
+        or calibration.mixed_deterioration_dominance_margin > 1
+    ):
+        blocked.append("invalid calibration mixed_deterioration_dominance_margin")
+    if calibration.epistemic_block_override_cap_threshold < 0:
+        blocked.append("invalid calibration epistemic_block_override_cap_threshold")
+    if calibration.formula_version != context.expected_calibration_formula_version:
+        compatibility.append("calibration_formula_incompatible")
+    if (
         context.prior_viability_state is not None
         and context.prior_viability_state.calibration_id != calibration.calibration_id
     ):
         compatibility.append("prior_viability_calibration_mismatch")
+    if (
+        context.prior_viability_state is not None
+        and context.prior_viability_state.calibration_formula_version
+        != calibration.formula_version
+    ):
+        compatibility.append("prior_viability_formula_mismatch")
     _ = affordance_result
     return len(blocked) == 0, tuple(dict.fromkeys(compatibility)), tuple(dict.fromkeys(blocked))
 
@@ -731,6 +779,35 @@ def _escalation_stage(
     return ViabilityEscalationStage.BASELINE
 
 
+def _clean_threat_attribution_basis(
+    *,
+    axis_risks: dict[NeedAxis, float],
+    predicted_time_to_boundary: float | None,
+    regulation_confidence: RegulationConfidence,
+    tradeoff_state: TradeoffState | None,
+    boundary: ViabilityBoundarySpec,
+    calibration: ViabilityCalibrationSpec,
+) -> bool:
+    if not axis_risks:
+        return False
+    sorted_risks = sorted(axis_risks.values(), reverse=True)
+    top = sorted_risks[0]
+    second = sorted_risks[1] if len(sorted_risks) > 1 else 0.0
+    dominance = top - second
+    has_dominant_axis = dominance >= calibration.mixed_deterioration_dominance_margin
+    urgent_boundary = (
+        predicted_time_to_boundary is not None
+        and predicted_time_to_boundary <= boundary.threat_time_to_boundary
+    )
+    no_tradeoff_conflict = tradeoff_state is None or len(tradeoff_state.competing_pairs) == 0
+    return (
+        has_dominant_axis
+        and urgent_boundary
+        and regulation_confidence == RegulationConfidence.HIGH
+        and no_tradeoff_conflict
+    )
+
+
 def _persistence_and_deescalation(
     *,
     escalation_stage: ViabilityEscalationStage,
@@ -937,6 +1014,7 @@ def _abstain_result(
         recoverability_components=None,
         calibration_id=calibration.calibration_id,
         calibration_schema_version=calibration.schema_version,
+        calibration_formula_version=calibration.formula_version,
         override_scope=ViabilityOverrideScope.NONE,
         persistence_state=ViabilityPersistenceState.STABLE,
         deescalation_conditions=("invalid_input_contract",),
@@ -946,6 +1024,7 @@ def _abstain_result(
             ViabilityUncertaintyState.NO_STRONG_OVERRIDE_CLAIM,
         ),
         recent_failed_recovery_count=0,
+        preference_epistemic_block_count=0,
         mixed_deterioration=False,
         no_strong_override_claim=True,
         input_regulation_snapshot_ref=regulation_ref,
