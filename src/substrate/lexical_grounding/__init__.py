@@ -1,0 +1,47 @@
+from substrate.lexical_grounding.build import (
+    build_lexical_grounding_hypotheses,
+    lexical_grounding_result_to_payload,
+    persist_lexical_grounding_result_via_f01,
+)
+from substrate.lexical_grounding.models import (
+    DeixisCandidate,
+    DeixisKind,
+    EntityCandidate,
+    GroundingConflict,
+    GroundingUnknownState,
+    LexemeCandidate,
+    LexicalCandidateType,
+    LexicalDiscourseContext,
+    LexicalGroundingBundle,
+    LexicalGroundingGateDecision,
+    LexicalGroundingResult,
+    LexicalGroundingTelemetry,
+    MentionAnchor,
+    ReferenceHypothesis,
+    ReferenceKind,
+    SenseCandidate,
+)
+from substrate.lexical_grounding.policy import evaluate_lexical_grounding_downstream_gate
+
+__all__ = [
+    "DeixisCandidate",
+    "DeixisKind",
+    "EntityCandidate",
+    "GroundingConflict",
+    "GroundingUnknownState",
+    "LexemeCandidate",
+    "LexicalCandidateType",
+    "LexicalDiscourseContext",
+    "LexicalGroundingBundle",
+    "LexicalGroundingGateDecision",
+    "LexicalGroundingResult",
+    "LexicalGroundingTelemetry",
+    "MentionAnchor",
+    "ReferenceHypothesis",
+    "ReferenceKind",
+    "SenseCandidate",
+    "build_lexical_grounding_hypotheses",
+    "evaluate_lexical_grounding_downstream_gate",
+    "lexical_grounding_result_to_payload",
+    "persist_lexical_grounding_result_via_f01",
+]
