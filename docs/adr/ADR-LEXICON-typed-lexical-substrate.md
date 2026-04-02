@@ -1,0 +1,53 @@
+# ADR-LEXICON: Typed Lexical Substrate
+
+## Status
+Accepted as a narrow build-mode substrate increment.
+
+## Canonical Seams
+- `create_or_update_lexicon_state(...) -> LexiconUpdateResult`
+- `query_lexical_entries(...) -> LexiconQueryResult`
+- `evaluate_lexicon_downstream_gate(...) -> LexiconGateDecision`
+- `persist_lexicon_result_via_f01(...) -> execute_transition(...)`
+
+## What This Substrate Claims
+- Provides a typed storage and update/query surface for lexical knowledge.
+- Stores lexical entries as bundles, not string-to-single-meaning maps.
+- Preserves lexical ambiguity:
+  - one form may map to multiple entries
+  - one entry may carry multiple senses
+- Enforces split-or-freeze behavior on ambiguous multi-target updates (no silent winner-take-all collapse).
+- Preserves provisional/conflict/unknown lexical states as first-class outputs.
+- Stores composition and reference behavior hints for later phases.
+- Applies `reference_profile.requires_context` as a runtime query/gate restriction (`context_required_for_reference_profile`).
+- Enforces schema/lexicon/taxonomy compatibility checks on update/query seams.
+- Persists load-bearing lexical state through F01 seam only.
+
+## What This Substrate Does Not Claim
+- No full language learning.
+- No final lexical grounding.
+- No final referent resolution.
+- No dictum/proposition construction.
+- No semantic completion.
+- No illocution/discourse acceptance/commitment updates.
+
+## Load-Bearing Telemetry
+- source lineage
+- processed entry ids
+- new/updated/provisional/stable counts
+- unknown/conflict/blocked counts
+- ambiguity reasons
+- queried forms
+- matched entry ids
+- no-match count
+- compatibility markers
+- downstream gate decision
+- attempted update/query paths
+- causal basis
+
+## Explicit Bounds
+- Mechanism is intentionally minimal and rule-based.
+- Seed lexicon is intentionally small and typed (not language mastery).
+- Unknown lexical items remain unknown unless explicit typed evidence is added.
+- Optional lexical substrate usage by L03 is allowed but not required in this increment.
+- Contour-level proof that lexicon ablation degrades full L03 behavior is not closed here to avoid L03 phase creep.
+- Hostile/raw bypass outside typed seams is out of scope.
