@@ -244,6 +244,19 @@ def _build_token_anchors(raw_text: str) -> tuple[TokenAnchor, ...]:
                 confidence=confidence,
             )
         )
+    if not tokens and raw_text:
+        # Keep non-empty noisy/whitespace-only payloads inspectable instead of failing hard.
+        span = RawSpan(start=0, end=len(raw_text), raw_text=raw_text)
+        tokens.append(
+            TokenAnchor(
+                token_id=f"tok-{uuid4().hex[:10]}",
+                raw_span=span,
+                raw_text=raw_text,
+                normalized_text=raw_text,
+                token_kind=TokenKind.UNKNOWN,
+                confidence=0.35,
+            )
+        )
     return tuple(tokens)
 
 
@@ -449,6 +462,30 @@ def _derive_ambiguities_and_alternatives(
         )
         warnings.append("quote_boundary_uncertain")
 
+    if raw_text.count("(") != raw_text.count(")"):
+        ambiguities.append(
+            SurfaceAmbiguity(
+                ambiguity_kind=AmbiguityKind.NOISY_SEPARATOR,
+                affected_span=RawSpan(start=0, end=len(raw_text), raw_text=raw_text),
+                alternatives_ref=tuple(alternative_ids),
+                confidence=0.53,
+                reason="unbalanced parenthetical markers",
+            )
+        )
+        warnings.append("parenthetical_boundary_uncertain")
+
+    if raw_text.count("`") % 2 != 0:
+        ambiguities.append(
+            SurfaceAmbiguity(
+                ambiguity_kind=AmbiguityKind.NOISY_SEPARATOR,
+                affected_span=RawSpan(start=0, end=len(raw_text), raw_text=raw_text),
+                alternatives_ref=tuple(alternative_ids),
+                confidence=0.52,
+                reason="unbalanced code marker",
+            )
+        )
+        warnings.append("code_span_boundary_uncertain")
+
     if re.search(r"\s{2,}", raw_text):
         ambiguities.append(
             SurfaceAmbiguity(
@@ -560,6 +597,8 @@ def _token_confidence(token_kind: TokenKind) -> float:
 def _has_reversible_span_map(surface: UtteranceSurface) -> bool:
     raw_text = surface.raw_text
     token_map = {token.token_id: token for token in surface.tokens}
+    if not token_map and raw_text == "" and not surface.segments:
+        return True
     if not token_map:
         return False
     for token in surface.tokens:

@@ -56,3 +56,9 @@ def test_stage_contour_f01_f02_l01_uses_single_runtime_write_seam() -> None:
     assert persisted.provenance.transition_kind == TransitionKind.APPLY_INTERNAL_EVENT
     assert persisted.state.runtime.revision == initial_revision + 1
     assert "surface_snapshot" in persisted.state.trace.events[-1].payload
+    snapshot = persisted.state.trace.events[-1].payload["surface_snapshot"]["surface"]
+    assert snapshot["reversible_span_map_present"] is True
+    assert snapshot["tokens"]
+    assert snapshot["segments"]
+    assert snapshot["quotes"]
+    assert snapshot["normalization_log"]
