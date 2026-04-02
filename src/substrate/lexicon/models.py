@@ -39,6 +39,13 @@ class LexicalAcquisitionStatus(str, Enum):
     FROZEN = "frozen"
 
 
+class LexicalAcquisitionMode(str, Enum):
+    SEED = "seed"
+    DIRECT_CURATION = "direct_curation"
+    EPISODE_PROMOTION = "episode_promotion"
+    UNKNOWN = "unknown"
+
+
 class LexicalConflictState(str, Enum):
     NONE = "none"
     SENSE_CONFLICT = "sense_conflict"
@@ -59,6 +66,23 @@ class LexicalExampleStatus(str, Enum):
     PROVISIONAL = "provisional"
     STABLE = "stable"
     CONFLICTED = "conflicted"
+
+
+class LexicalEpisodeStatus(str, Enum):
+    RECORDED = "recorded"
+    INSUFFICIENT_EVIDENCE = "insufficient_evidence"
+    CONFLICTING = "conflicting"
+    CONSOLIDATED = "consolidated"
+    BLOCKED = "blocked"
+
+
+class LexicalHypothesisStatus(str, Enum):
+    PROVISIONAL = "provisional"
+    PROMOTION_ELIGIBLE = "promotion_eligible"
+    STABLE_PROMOTED = "stable_promoted"
+    CONFLICTED = "conflicted"
+    FROZEN = "frozen"
+    UNKNOWN = "unknown"
 
 
 class LexiconUpdateKind(str, Enum):
@@ -164,6 +188,7 @@ class LexicalEntry:
     aliases: tuple[str, ...] = ()
     examples: tuple[LexicalExampleRecord, ...] = ()
     entry_status: LexicalAcquisitionStatus = LexicalAcquisitionStatus.UNKNOWN
+    acquisition_mode: LexicalAcquisitionMode = LexicalAcquisitionMode.UNKNOWN
     schema_version: str = DEFAULT_LEXICON_SCHEMA_VERSION
     lexicon_version: str = DEFAULT_LEXICON_VERSION
     taxonomy_version: str = DEFAULT_LEXICON_TAXONOMY_VERSION
@@ -194,6 +219,8 @@ class LexiconBlockedUpdate:
 class LexiconState:
     entries: tuple[LexicalEntry, ...]
     unknown_items: tuple[UnknownLexicalItem, ...]
+    usage_episodes: tuple[LexicalUsageEpisode, ...] = ()
+    provisional_hypotheses: tuple[ProvisionalLexicalHypothesis, ...] = ()
     unresolved_updates: tuple[LexiconBlockedUpdate, ...] = ()
     conflict_index: tuple[str, ...] = ()
     frozen_updates: tuple[LexiconBlockedUpdate, ...] = ()
@@ -234,6 +261,53 @@ class LexicalEntryProposal:
 
 
 @dataclass(frozen=True, slots=True)
+class LexicalUsageEpisode:
+    episode_id: str
+    observed_surface_form: str
+    observed_lemma_hint: str | None
+    language_code: str
+    observed_context_keys: tuple[str, ...]
+    source_kind: str
+    proposed_sense_hypotheses: tuple[LexicalSenseHypothesis, ...]
+    proposed_role_hints: tuple[LexicalCompositionRole, ...]
+    usage_span: str | None
+    confidence: float
+    evidence_quality: float
+    step_index: int
+    episode_status: LexicalEpisodeStatus
+    provenance: str
+    schema_version: str = DEFAULT_LEXICON_SCHEMA_VERSION
+    lexicon_version: str = DEFAULT_LEXICON_VERSION
+    taxonomy_version: str = DEFAULT_LEXICON_TAXONOMY_VERSION
+    blocked_reason: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class ProvisionalLexicalHypothesis:
+    hypothesis_id: str
+    target_surface_form: str
+    target_lemma: str | None
+    language_code: str
+    candidate_entry_id: str | None
+    candidate_sense_bundle: tuple[LexicalSenseHypothesis, ...]
+    candidate_role_hints: tuple[LexicalCompositionRole, ...]
+    supporting_episode_ids: tuple[str, ...]
+    conflicting_episode_ids: tuple[str, ...]
+    support_count: int
+    conflict_count: int
+    status: LexicalHypothesisStatus
+    promotion_eligibility: bool
+    blocked_reasons: tuple[str, ...]
+    confidence: float
+    evidence_quality: float
+    provenance: str
+    promoted_entry_id: str | None = None
+    schema_version: str = DEFAULT_LEXICON_SCHEMA_VERSION
+    lexicon_version: str = DEFAULT_LEXICON_VERSION
+    taxonomy_version: str = DEFAULT_LEXICON_TAXONOMY_VERSION
+
+
+@dataclass(frozen=True, slots=True)
 class UnknownLexicalObservation:
     surface_form: str
     occurrence_ref: str
@@ -257,6 +331,31 @@ class LexiconUpdateContext:
     freeze_on_ambiguous_target: bool = True
     ambiguous_target_score_margin: float = 0.2
     allow_competing_entry_on_ambiguous_target: bool = False
+
+
+@dataclass(frozen=True, slots=True)
+class LexicalEpisodeRecordContext:
+    source_lineage: tuple[str, ...] = ()
+    expected_schema_version: str = DEFAULT_LEXICON_SCHEMA_VERSION
+    expected_lexicon_version: str = DEFAULT_LEXICON_VERSION
+    expected_taxonomy_version: str = DEFAULT_LEXICON_TAXONOMY_VERSION
+    min_episode_confidence: float = 0.35
+    min_episode_evidence_quality: float = 0.35
+    min_support_for_promotion: int = 3
+    promotion_confidence_threshold: float = 0.7
+    freeze_on_conflict: bool = True
+    step_delta: int = 1
+
+
+@dataclass(frozen=True, slots=True)
+class LexicalHypothesisConsolidationContext:
+    source_lineage: tuple[str, ...] = ()
+    expected_schema_version: str = DEFAULT_LEXICON_SCHEMA_VERSION
+    expected_lexicon_version: str = DEFAULT_LEXICON_VERSION
+    expected_taxonomy_version: str = DEFAULT_LEXICON_TAXONOMY_VERSION
+    min_support_for_promotion: int = 3
+    promotion_confidence_threshold: float = 0.7
+    step_delta: int = 1
 
 
 @dataclass(frozen=True, slots=True)
@@ -307,6 +406,16 @@ class LexiconGateDecision:
 
 
 @dataclass(frozen=True, slots=True)
+class LexicalLearningGateDecision:
+    accepted: bool
+    restrictions: tuple[str, ...]
+    reason: str
+    accepted_hypothesis_ids: tuple[str, ...]
+    rejected_hypothesis_ids: tuple[str, ...]
+    state_ref: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
 class LexicalTelemetry:
     source_lineage: tuple[str, ...]
     processed_entry_ids: tuple[str, ...]
@@ -322,9 +431,16 @@ class LexicalTelemetry:
     matched_entry_ids: tuple[str, ...]
     no_match_count: int
     compatibility_markers: tuple[str, ...]
-    downstream_gate: LexiconGateDecision
+    downstream_gate: LexiconGateDecision | LexicalLearningGateDecision
     attempted_paths: tuple[str, ...]
     causal_basis: str
+    processed_episode_ids: tuple[str, ...] = ()
+    processed_hypothesis_ids: tuple[str, ...] = ()
+    recorded_episode_count: int = 0
+    promoted_hypothesis_count: int = 0
+    conflicted_hypothesis_count: int = 0
+    frozen_hypothesis_count: int = 0
+    insufficient_episode_count: int = 0
     emitted_at: str = field(default_factory=lambda: datetime.now(tz=timezone.utc).isoformat())
 
 
@@ -344,6 +460,32 @@ class LexiconUpdateResult:
     update_events: tuple[LexiconUpdateEvent, ...]
     blocked_updates: tuple[LexiconBlockedUpdate, ...]
     downstream_gate: LexiconGateDecision
+    telemetry: LexicalTelemetry
+    no_final_meaning_resolution_performed: bool
+    abstain: bool
+    abstain_reason: str | None
+
+
+@dataclass(frozen=True, slots=True)
+class LexicalEpisodeRecordResult:
+    updated_state: LexiconState
+    recorded_episode_ids: tuple[str, ...]
+    blocked_episode_ids: tuple[str, ...]
+    updated_hypothesis_ids: tuple[str, ...]
+    downstream_gate: LexicalLearningGateDecision
+    telemetry: LexicalTelemetry
+    no_final_meaning_resolution_performed: bool
+    abstain: bool
+    abstain_reason: str | None
+
+
+@dataclass(frozen=True, slots=True)
+class LexicalHypothesisUpdateResult:
+    updated_state: LexiconState
+    promoted_hypothesis_ids: tuple[str, ...]
+    frozen_hypothesis_ids: tuple[str, ...]
+    conflicted_hypothesis_ids: tuple[str, ...]
+    downstream_gate: LexicalLearningGateDecision
     telemetry: LexicalTelemetry
     no_final_meaning_resolution_performed: bool
     abstain: bool

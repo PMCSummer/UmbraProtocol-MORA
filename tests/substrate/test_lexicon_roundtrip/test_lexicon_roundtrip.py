@@ -66,6 +66,7 @@ def _state_projection(state):
                 entry.aliases,
                 entry.acquisition_state.status.value,
                 entry.entry_status.value,
+                entry.acquisition_mode.value,
                 entry.acquisition_state.evidence_count,
                 tuple(
                     (

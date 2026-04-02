@@ -8,6 +8,10 @@ Accepted as a narrow build-mode substrate increment.
 - `query_lexical_entries(...) -> LexiconQueryResult`
 - `evaluate_lexicon_downstream_gate(...) -> LexiconGateDecision`
 - `persist_lexicon_result_via_f01(...) -> execute_transition(...)`
+- `record_lexical_usage_episode(...) -> LexicalEpisodeRecordResult`
+- `consolidate_lexical_hypotheses(...) -> LexicalHypothesisUpdateResult`
+- `evaluate_lexical_learning_downstream_gate(...) -> LexicalLearningGateDecision`
+- `persist_lexical_learning_result_via_f01(...) -> execute_transition(...)`
 
 ## What This Substrate Claims
 - Provides a typed storage and update/query surface for lexical knowledge.
@@ -25,6 +29,14 @@ Accepted as a narrow build-mode substrate increment.
 - Uses a single gate semantics path for query and canonical downstream gate decisions.
 - Caps strong lexical claims when only non-stable senses remain (`only_unstable_senses`).
 - Uses example support as a minimal runtime evidence-quality cap for non-stable entries (`non_stable_entry_without_example_support`).
+- Supports episode-driven lexical acquisition:
+  - usage episode -> provisional hypothesis
+  - repeated compatible support -> promotion-eligible
+  - conflict episodes -> conflicted/frozen hypothesis
+  - consolidation promotes to lexical entries only after evidence threshold.
+- Ordinary episode-driven acquisition uses a hard support floor of 2 (single-shot promotion is blocked by runtime guard).
+- Episode/hypothesis schema/lexicon/taxonomy mismatch is runtime load-bearing (block/freeze/cap), not telemetry-only.
+- Lexical entry acquisition origin is explicit (`seed` / `direct_curation` / `episode_promotion`) so direct curation is not misclaimed as learned-from-episodes.
 - Enforces schema/lexicon/taxonomy compatibility checks on update/query seams.
 - Freezes/caps per-entry version-incompatible records on reconstruct/continue boundary (no silent incompatible carry-forward).
 - Persists load-bearing lexical state through F01 seam only.
@@ -56,6 +68,7 @@ Accepted as a narrow build-mode substrate increment.
 - Mechanism is intentionally minimal and rule-based.
 - Seed lexicon is intentionally small and typed (not language mastery).
 - Unknown lexical items remain unknown unless explicit typed evidence is added.
+- Episode-driven learning is minimal and rule-based (no parser, no WSD, no phrase semantics).
 - Optional lexical substrate usage by L03 is allowed but not required in this increment.
 - Contour-level proof that lexicon ablation degrades full L03 behavior is not closed here to avoid L03 phase creep.
 - Hostile/raw bypass outside typed seams is out of scope.

@@ -1,8 +1,11 @@
 from __future__ import annotations
 
 from substrate.lexicon.models import (
+    LexicalEpisodeRecordResult,
+    LexicalLearningGateDecision,
     LexicalTelemetry,
     LexiconGateDecision,
+    LexicalHypothesisUpdateResult,
     LexiconQueryResult,
     LexiconState,
     LexiconUpdateResult,
@@ -22,8 +25,15 @@ def build_lexical_telemetry(
     no_match_count: int,
     compatibility_markers: tuple[str, ...],
     attempted_paths: tuple[str, ...],
-    downstream_gate: LexiconGateDecision,
+    downstream_gate: LexiconGateDecision | LexicalLearningGateDecision,
     causal_basis: str,
+    processed_episode_ids: tuple[str, ...] = (),
+    processed_hypothesis_ids: tuple[str, ...] = (),
+    recorded_episode_count: int = 0,
+    promoted_hypothesis_count: int = 0,
+    conflicted_hypothesis_count: int = 0,
+    frozen_hypothesis_count: int = 0,
+    insufficient_episode_count: int = 0,
 ) -> LexicalTelemetry:
     provisional_count = sum(
         1 for entry in state.entries if entry.acquisition_state.status.value == "provisional"
@@ -50,11 +60,18 @@ def build_lexical_telemetry(
         downstream_gate=downstream_gate,
         attempted_paths=attempted_paths,
         causal_basis=causal_basis,
+        processed_episode_ids=processed_episode_ids,
+        processed_hypothesis_ids=processed_hypothesis_ids,
+        recorded_episode_count=recorded_episode_count,
+        promoted_hypothesis_count=promoted_hypothesis_count,
+        conflicted_hypothesis_count=conflicted_hypothesis_count,
+        frozen_hypothesis_count=frozen_hypothesis_count,
+        insufficient_episode_count=insufficient_episode_count,
     )
 
 
 def lexicon_result_snapshot(
-    result: LexiconUpdateResult | LexiconQueryResult,
+    result: LexiconUpdateResult | LexiconQueryResult | LexicalEpisodeRecordResult | LexicalHypothesisUpdateResult,
 ) -> dict[str, object]:
     if isinstance(result, LexiconUpdateResult):
         state = result.updated_state
@@ -83,7 +100,7 @@ def lexicon_result_snapshot(
         abstain = result.abstain
         abstain_reason = result.abstain_reason
         no_final = result.no_final_meaning_resolution_performed
-    else:
+    elif isinstance(result, LexiconQueryResult):
         state = result.state
         query_records = tuple(
             {
@@ -100,6 +117,24 @@ def lexicon_result_snapshot(
         update_events = ()
         blocked_updates = ()
         kind = "query"
+        abstain = result.abstain
+        abstain_reason = result.abstain_reason
+        no_final = result.no_final_meaning_resolution_performed
+    elif isinstance(result, LexicalEpisodeRecordResult):
+        state = result.updated_state
+        query_records = ()
+        update_events = ()
+        blocked_updates = ()
+        kind = "episode_record"
+        abstain = result.abstain
+        abstain_reason = result.abstain_reason
+        no_final = result.no_final_meaning_resolution_performed
+    else:
+        state = result.updated_state
+        query_records = ()
+        update_events = ()
+        blocked_updates = ()
+        kind = "hypothesis_update"
         abstain = result.abstain
         abstain_reason = result.abstain_reason
         no_final = result.no_final_meaning_resolution_performed
@@ -164,6 +199,7 @@ def lexicon_result_snapshot(
                         for example in entry.examples
                     ),
                     "entry_status": entry.entry_status.value,
+                    "acquisition_mode": entry.acquisition_mode.value,
                     "composition_profile": {
                         "role_hints": tuple(role.value for role in entry.composition_profile.role_hints),
                         "argument_structure_hints": entry.composition_profile.argument_structure_hints,
@@ -217,6 +253,83 @@ def lexicon_result_snapshot(
                 }
                 for item in state.unknown_items
             ),
+            "usage_episodes": tuple(
+                {
+                    "episode_id": episode.episode_id,
+                    "observed_surface_form": episode.observed_surface_form,
+                    "observed_lemma_hint": episode.observed_lemma_hint,
+                    "language_code": episode.language_code,
+                    "observed_context_keys": episode.observed_context_keys,
+                    "source_kind": episode.source_kind,
+                    "proposed_sense_hypotheses": tuple(
+                        {
+                            "sense_family": sense.sense_family,
+                            "sense_label": sense.sense_label,
+                            "coarse_semantic_type": sense.coarse_semantic_type.value,
+                            "compatibility_cues": sense.compatibility_cues,
+                            "anti_cues": sense.anti_cues,
+                            "confidence": sense.confidence,
+                            "provisional": sense.provisional,
+                            "status_hint": sense.status_hint.value if sense.status_hint else None,
+                            "example_texts": sense.example_texts,
+                        }
+                        for sense in episode.proposed_sense_hypotheses
+                    ),
+                    "proposed_role_hints": tuple(role.value for role in episode.proposed_role_hints),
+                    "usage_span": episode.usage_span,
+                    "confidence": episode.confidence,
+                    "evidence_quality": episode.evidence_quality,
+                    "step_index": episode.step_index,
+                    "episode_status": episode.episode_status.value,
+                    "provenance": episode.provenance,
+                    "schema_version": episode.schema_version,
+                    "lexicon_version": episode.lexicon_version,
+                    "taxonomy_version": episode.taxonomy_version,
+                    "blocked_reason": episode.blocked_reason,
+                }
+                for episode in state.usage_episodes
+            ),
+            "provisional_hypotheses": tuple(
+                {
+                    "hypothesis_id": hypothesis.hypothesis_id,
+                    "target_surface_form": hypothesis.target_surface_form,
+                    "target_lemma": hypothesis.target_lemma,
+                    "language_code": hypothesis.language_code,
+                    "candidate_entry_id": hypothesis.candidate_entry_id,
+                    "candidate_sense_bundle": tuple(
+                        {
+                            "sense_family": sense.sense_family,
+                            "sense_label": sense.sense_label,
+                            "coarse_semantic_type": sense.coarse_semantic_type.value,
+                            "compatibility_cues": sense.compatibility_cues,
+                            "anti_cues": sense.anti_cues,
+                            "confidence": sense.confidence,
+                            "provisional": sense.provisional,
+                            "status_hint": sense.status_hint.value if sense.status_hint else None,
+                            "example_texts": sense.example_texts,
+                        }
+                        for sense in hypothesis.candidate_sense_bundle
+                    ),
+                    "candidate_role_hints": tuple(
+                        role.value for role in hypothesis.candidate_role_hints
+                    ),
+                    "supporting_episode_ids": hypothesis.supporting_episode_ids,
+                    "conflicting_episode_ids": hypothesis.conflicting_episode_ids,
+                    "support_count": hypothesis.support_count,
+                    "conflict_count": hypothesis.conflict_count,
+                    "status": hypothesis.status.value,
+                    "promotion_eligibility": hypothesis.promotion_eligibility,
+                    "blocked_reasons": hypothesis.blocked_reasons,
+                    "confidence": hypothesis.confidence,
+                    "evidence_quality": hypothesis.evidence_quality,
+                    "provenance": hypothesis.provenance,
+                    "promoted_entry_id": hypothesis.promoted_entry_id,
+                    "schema_version": hypothesis.schema_version,
+                    "lexicon_version": hypothesis.lexicon_version,
+                    "taxonomy_version": hypothesis.taxonomy_version,
+                }
+                for hypothesis in state.provisional_hypotheses
+            ),
             "unresolved_updates": tuple(
                 {
                     "surface_form": blocked.surface_form,
@@ -257,16 +370,34 @@ def lexicon_result_snapshot(
             "matched_entry_ids": result.telemetry.matched_entry_ids,
             "no_match_count": result.telemetry.no_match_count,
             "compatibility_markers": result.telemetry.compatibility_markers,
-            "downstream_gate": {
-                "accepted": result.telemetry.downstream_gate.accepted,
-                "restrictions": result.telemetry.downstream_gate.restrictions,
-                "reason": result.telemetry.downstream_gate.reason,
-                "accepted_entry_ids": result.telemetry.downstream_gate.accepted_entry_ids,
-                "rejected_entry_ids": result.telemetry.downstream_gate.rejected_entry_ids,
-                "state_ref": result.telemetry.downstream_gate.state_ref,
-            },
+            "downstream_gate": (
+                {
+                    "accepted": result.telemetry.downstream_gate.accepted,
+                    "restrictions": result.telemetry.downstream_gate.restrictions,
+                    "reason": result.telemetry.downstream_gate.reason,
+                    "accepted_hypothesis_ids": result.telemetry.downstream_gate.accepted_hypothesis_ids,
+                    "rejected_hypothesis_ids": result.telemetry.downstream_gate.rejected_hypothesis_ids,
+                    "state_ref": result.telemetry.downstream_gate.state_ref,
+                }
+                if isinstance(result.telemetry.downstream_gate, LexicalLearningGateDecision)
+                else {
+                    "accepted": result.telemetry.downstream_gate.accepted,
+                    "restrictions": result.telemetry.downstream_gate.restrictions,
+                    "reason": result.telemetry.downstream_gate.reason,
+                    "accepted_entry_ids": result.telemetry.downstream_gate.accepted_entry_ids,
+                    "rejected_entry_ids": result.telemetry.downstream_gate.rejected_entry_ids,
+                    "state_ref": result.telemetry.downstream_gate.state_ref,
+                }
+            ),
             "attempted_paths": result.telemetry.attempted_paths,
             "causal_basis": result.telemetry.causal_basis,
+            "processed_episode_ids": result.telemetry.processed_episode_ids,
+            "processed_hypothesis_ids": result.telemetry.processed_hypothesis_ids,
+            "recorded_episode_count": result.telemetry.recorded_episode_count,
+            "promoted_hypothesis_count": result.telemetry.promoted_hypothesis_count,
+            "conflicted_hypothesis_count": result.telemetry.conflicted_hypothesis_count,
+            "frozen_hypothesis_count": result.telemetry.frozen_hypothesis_count,
+            "insufficient_episode_count": result.telemetry.insufficient_episode_count,
             "emitted_at": result.telemetry.emitted_at,
         },
     }

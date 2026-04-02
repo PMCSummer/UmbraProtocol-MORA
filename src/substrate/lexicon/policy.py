@@ -3,6 +3,10 @@ from __future__ import annotations
 from substrate.lexicon.models import (
     LexicalAcquisitionStatus,
     LexicalEntry,
+    LexicalEpisodeRecordResult,
+    LexicalHypothesisStatus,
+    LexicalHypothesisUpdateResult,
+    LexicalLearningGateDecision,
     LexicalSenseStatus,
     LexiconQueryRecord,
     LexiconGateDecision,
@@ -44,6 +48,23 @@ def build_lexicon_gate_decision(
         restrictions.append("conflict_entries_present")
     if state.unknown_items:
         restrictions.append("unknown_items_present")
+    if state.provisional_hypotheses:
+        restrictions.append("learning_hypotheses_present")
+        if any(
+            hypothesis.status == LexicalHypothesisStatus.PROVISIONAL
+            for hypothesis in state.provisional_hypotheses
+        ):
+            restrictions.append("learning_hypothesis_provisional")
+        if any(
+            hypothesis.status == LexicalHypothesisStatus.CONFLICTED
+            for hypothesis in state.provisional_hypotheses
+        ):
+            restrictions.append("learning_hypothesis_conflicted")
+        if any(
+            hypothesis.status == LexicalHypothesisStatus.FROZEN
+            for hypothesis in state.provisional_hypotheses
+        ):
+            restrictions.append("learning_hypothesis_frozen")
 
     if query_records:
         candidate_entry_ids = {
@@ -151,4 +172,66 @@ def evaluate_lexicon_downstream_gate(lexicon_result_or_state: object) -> Lexicon
         state=state,
         query_records=query_records,
         abstain=abstain,
+    )
+
+
+def evaluate_lexical_learning_downstream_gate(
+    lexical_learning_artifact: object,
+) -> LexicalLearningGateDecision:
+    if isinstance(lexical_learning_artifact, LexicalEpisodeRecordResult):
+        state = lexical_learning_artifact.updated_state
+        abstain = lexical_learning_artifact.abstain
+    elif isinstance(lexical_learning_artifact, LexicalHypothesisUpdateResult):
+        state = lexical_learning_artifact.updated_state
+        abstain = lexical_learning_artifact.abstain
+    elif isinstance(lexical_learning_artifact, LexiconState):
+        state = lexical_learning_artifact
+        abstain = False
+    else:
+        raise TypeError(
+            "lexical learning downstream gate requires typed LexiconState/LexicalEpisodeRecordResult/LexicalHypothesisUpdateResult"
+        )
+
+    restrictions: list[str] = []
+    accepted_hypothesis_ids: list[str] = []
+    rejected_hypothesis_ids: list[str] = []
+    if abstain:
+        restrictions.append("abstain")
+
+    if not state.provisional_hypotheses:
+        restrictions.append("no_learning_hypotheses")
+
+    for hypothesis in state.provisional_hypotheses:
+        status = hypothesis.status
+        if status == LexicalHypothesisStatus.PROMOTION_ELIGIBLE:
+            accepted_hypothesis_ids.append(hypothesis.hypothesis_id)
+            continue
+        if status == LexicalHypothesisStatus.STABLE_PROMOTED:
+            restrictions.append("already_promoted_hypothesis_present")
+            continue
+        rejected_hypothesis_ids.append(hypothesis.hypothesis_id)
+        if status == LexicalHypothesisStatus.CONFLICTED:
+            restrictions.append("learning_conflict_present")
+        elif status == LexicalHypothesisStatus.FROZEN:
+            restrictions.append("learning_frozen_present")
+        elif status == LexicalHypothesisStatus.PROVISIONAL:
+            if hypothesis.support_count <= 1:
+                restrictions.append("single_episode_only")
+            restrictions.append("learning_provisional_only")
+        else:
+            restrictions.append("learning_unknown_state")
+
+    accepted = bool(accepted_hypothesis_ids) and not abstain
+    reason = (
+        "episode-backed lexical hypotheses have promotion-eligible support"
+        if accepted
+        else "lexical learning state remains provisional/conflicted/insufficient"
+    )
+    return LexicalLearningGateDecision(
+        accepted=accepted,
+        restrictions=tuple(dict.fromkeys(restrictions)),
+        reason=reason,
+        accepted_hypothesis_ids=tuple(dict.fromkeys(accepted_hypothesis_ids)),
+        rejected_hypothesis_ids=tuple(dict.fromkeys(rejected_hypothesis_ids)),
+        state_ref=f"{state.schema_version}|{state.lexicon_version}|{state.taxonomy_version}",
     )

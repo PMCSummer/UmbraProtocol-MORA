@@ -11,6 +11,7 @@ from substrate.contracts import (
     WriterIdentity,
 )
 from substrate.lexicon.models import (
+    LexicalAcquisitionMode,
     DEFAULT_LEXICON_SCHEMA_VERSION,
     DEFAULT_LEXICON_TAXONOMY_VERSION,
     DEFAULT_LEXICON_VERSION,
@@ -24,10 +25,18 @@ from substrate.lexicon.models import (
     LexicalExampleStatus,
     LexicalEntry,
     LexicalEntryProposal,
+    LexicalEpisodeRecordContext,
+    LexicalEpisodeRecordResult,
+    LexicalEpisodeStatus,
+    LexicalHypothesisConsolidationContext,
+    LexicalHypothesisStatus,
+    LexicalHypothesisUpdateResult,
+    LexicalLearningGateDecision,
     LexicalReferenceProfile,
     LexicalSenseHypothesis,
     LexicalSenseRecord,
     LexicalSenseStatus,
+    LexicalUsageEpisode,
     LexiconBlockedUpdate,
     LexiconGateDecision,
     LexiconQueryContext,
@@ -39,12 +48,14 @@ from substrate.lexicon.models import (
     LexiconUpdateEvent,
     LexiconUpdateKind,
     LexiconUpdateResult,
+    ProvisionalLexicalHypothesis,
     SurfaceFormRecord,
     UnknownLexicalItem,
     UnknownLexicalObservation,
 )
 from substrate.lexicon.policy import (
     build_lexicon_gate_decision,
+    evaluate_lexical_learning_downstream_gate,
     evaluate_lexicon_downstream_gate,
 )
 from substrate.lexicon.telemetry import build_lexical_telemetry, lexicon_result_snapshot
@@ -69,6 +80,22 @@ ATTEMPTED_LEXICON_QUERY_PATHS: tuple[str, ...] = (
     "lexicon.downstream_gate",
 )
 
+ATTEMPTED_LEXICON_EPISODE_PATHS: tuple[str, ...] = (
+    "lexicon.validate_typed_episode_input",
+    "lexicon.version_compatibility_guard",
+    "lexicon.episode_record",
+    "lexicon.hypothesis_support_conflict_update",
+    "lexicon.learning_downstream_gate",
+)
+
+ATTEMPTED_LEXICON_HYPOTHESIS_PATHS: tuple[str, ...] = (
+    "lexicon.validate_typed_hypothesis_input",
+    "lexicon.version_compatibility_guard",
+    "lexicon.promotion_eligibility_check",
+    "lexicon.promote_or_freeze_hypothesis",
+    "lexicon.learning_downstream_gate",
+)
+
 
 def create_empty_lexicon_state(
     *,
@@ -79,6 +106,8 @@ def create_empty_lexicon_state(
     return LexiconState(
         entries=(),
         unknown_items=(),
+        usage_episodes=(),
+        provisional_hypotheses=(),
         unresolved_updates=(),
         conflict_index=(),
         frozen_updates=(),
@@ -93,6 +122,8 @@ def create_seed_lexicon_state() -> LexiconState:
     return LexiconState(
         entries=_seed_entries(),
         unknown_items=(),
+        usage_episodes=(),
+        provisional_hypotheses=(),
         unresolved_updates=(),
         conflict_index=(),
         frozen_updates=(),
@@ -145,6 +176,8 @@ def create_or_update_lexicon_state(
         )
         next_state = replace(
             state,
+            usage_episodes=state.usage_episodes,
+            provisional_hypotheses=state.provisional_hypotheses,
             unresolved_updates=state.unresolved_updates + (blocked,),
             frozen_updates=state.frozen_updates + (blocked,),
         )
@@ -315,6 +348,8 @@ def create_or_update_lexicon_state(
     next_state = LexiconState(
         entries=sorted_entries,
         unknown_items=tuple(unknown_items),
+        usage_episodes=state.usage_episodes,
+        provisional_hypotheses=state.provisional_hypotheses,
         unresolved_updates=tuple(blocked_updates),
         conflict_index=conflict_index,
         frozen_updates=frozen_updates,
@@ -353,6 +388,461 @@ def create_or_update_lexicon_state(
         updated_state=next_state,
         update_events=tuple(update_events),
         blocked_updates=tuple(blocked_updates),
+        downstream_gate=gate,
+        telemetry=telemetry,
+        no_final_meaning_resolution_performed=True,
+        abstain=abstain,
+        abstain_reason=abstain_reason,
+    )
+
+
+def record_lexical_usage_episode(
+    *,
+    lexicon_state: LexiconState,
+    episodes: LexicalUsageEpisode | tuple[LexicalUsageEpisode, ...] | list[LexicalUsageEpisode],
+    context: LexicalEpisodeRecordContext | None = None,
+) -> LexicalEpisodeRecordResult:
+    if not isinstance(lexicon_state, LexiconState):
+        raise TypeError("lexicon_state must be LexiconState")
+    if context is None:
+        context = LexicalEpisodeRecordContext()
+    if not isinstance(context, LexicalEpisodeRecordContext):
+        raise TypeError("context must be LexicalEpisodeRecordContext")
+    if isinstance(episodes, LexicalUsageEpisode):
+        normalized_episodes = (episodes,)
+    elif isinstance(episodes, (tuple, list)):
+        normalized_episodes = tuple(episodes)
+    else:
+        raise TypeError("episodes must be LexicalUsageEpisode or tuple/list of LexicalUsageEpisode")
+    if not all(isinstance(episode, LexicalUsageEpisode) for episode in normalized_episodes):
+        raise TypeError("episodes must contain only LexicalUsageEpisode")
+
+    compatibility_markers = _compatibility_markers(
+        state=lexicon_state,
+        expected_schema_version=context.expected_schema_version,
+        expected_lexicon_version=context.expected_lexicon_version,
+        expected_taxonomy_version=context.expected_taxonomy_version,
+    )
+    if compatibility_markers:
+        gate = LexicalLearningGateDecision(
+            accepted=False,
+            restrictions=("compatibility_mismatch", "no_strong_meaning_claim"),
+            reason="lexical episode record blocked due to incompatible schema/version contract",
+            accepted_hypothesis_ids=(),
+            rejected_hypothesis_ids=(),
+            state_ref=f"{lexicon_state.schema_version}|{lexicon_state.lexicon_version}|{lexicon_state.taxonomy_version}",
+        )
+        telemetry = build_lexical_telemetry(
+            state=lexicon_state,
+            source_lineage=context.source_lineage,
+            processed_entry_ids=(),
+            new_entry_count=0,
+            updated_entry_count=0,
+            ambiguity_reasons=("compatibility_mismatch",),
+            queried_forms=(),
+            matched_entry_ids=(),
+            no_match_count=0,
+            compatibility_markers=compatibility_markers,
+            attempted_paths=ATTEMPTED_LEXICON_EPISODE_PATHS,
+            downstream_gate=gate,
+            causal_basis="lexical episode recording blocked due to incompatible schema/version contract",
+        )
+        return LexicalEpisodeRecordResult(
+            updated_state=lexicon_state,
+            recorded_episode_ids=(),
+            blocked_episode_ids=tuple(episode.episode_id for episode in normalized_episodes),
+            updated_hypothesis_ids=(),
+            downstream_gate=gate,
+            telemetry=telemetry,
+            no_final_meaning_resolution_performed=True,
+            abstain=True,
+            abstain_reason="version compatibility mismatch",
+        )
+
+    episodes_out = list(lexicon_state.usage_episodes)
+    hypotheses_map = {hypothesis.hypothesis_id: hypothesis for hypothesis in lexicon_state.provisional_hypotheses}
+    recorded_episode_ids: list[str] = []
+    blocked_episode_ids: list[str] = []
+    updated_hypothesis_ids: list[str] = []
+    ambiguity_reasons: list[str] = []
+    compatibility_markers: list[str] = []
+    insufficient_count = 0
+    conflicted_count = 0
+    frozen_count = 0
+
+    for episode in normalized_episodes:
+        episode_compatibility = _episode_compatibility_markers(
+            episode=episode,
+            expected_schema_version=context.expected_schema_version,
+            expected_lexicon_version=context.expected_lexicon_version,
+            expected_taxonomy_version=context.expected_taxonomy_version,
+        )
+        if episode_compatibility:
+            compatibility_markers.extend(episode_compatibility)
+            blocked_episode_ids.append(episode.episode_id)
+            ambiguity_reasons.append("episode_version_mismatch")
+            episodes_out.append(
+                replace(
+                    episode,
+                    episode_status=LexicalEpisodeStatus.BLOCKED,
+                    blocked_reason=f"compatibility_mismatch:{'|'.join(episode_compatibility)}",
+                )
+            )
+            continue
+        normalized_surface = _normalize(episode.observed_surface_form)
+        hypothesis_index = _find_learning_hypothesis(
+            hypotheses=tuple(hypotheses_map.values()),
+            episode=episode,
+        )
+        if (
+            not normalized_surface
+            or not episode.proposed_sense_hypotheses
+            or episode.confidence < context.min_episode_confidence
+            or episode.evidence_quality < context.min_episode_evidence_quality
+        ):
+            insufficient_count += 1
+            blocked_episode_ids.append(episode.episode_id)
+            ambiguity_reasons.append("insufficient_episode_evidence")
+            episodes_out.append(
+                replace(
+                    episode,
+                    episode_status=LexicalEpisodeStatus.INSUFFICIENT_EVIDENCE,
+                    blocked_reason="insufficient_episode_evidence",
+                )
+            )
+            continue
+
+        if hypothesis_index is None:
+            new_hypothesis = _create_hypothesis_from_episode(
+                episode=episode,
+                context=context,
+            )
+            hypotheses_map[new_hypothesis.hypothesis_id] = new_hypothesis
+            updated_hypothesis_ids.append(new_hypothesis.hypothesis_id)
+            recorded_episode_ids.append(episode.episode_id)
+            episodes_out.append(
+                replace(
+                    episode,
+                    episode_status=LexicalEpisodeStatus.RECORDED,
+                    blocked_reason=None,
+                )
+            )
+            continue
+
+        current_hypothesis = hypotheses_map[hypothesis_index]
+        hypothesis_compatibility = _hypothesis_compatibility_markers(
+            hypothesis=current_hypothesis,
+            expected_schema_version=context.expected_schema_version,
+            expected_lexicon_version=context.expected_lexicon_version,
+            expected_taxonomy_version=context.expected_taxonomy_version,
+        )
+        if hypothesis_compatibility:
+            compatibility_markers.extend(hypothesis_compatibility)
+            frozen_count += 1
+            ambiguity_reasons.append("hypothesis_version_mismatch")
+            blocked_episode_ids.append(episode.episode_id)
+            frozen_hypothesis = replace(
+                current_hypothesis,
+                status=LexicalHypothesisStatus.FROZEN,
+                promotion_eligibility=False,
+                blocked_reasons=tuple(
+                    dict.fromkeys(
+                        current_hypothesis.blocked_reasons
+                        + tuple(f"compatibility:{marker}" for marker in hypothesis_compatibility)
+                    )
+                ),
+            )
+            hypotheses_map[frozen_hypothesis.hypothesis_id] = frozen_hypothesis
+            episodes_out.append(
+                replace(
+                    episode,
+                    episode_status=LexicalEpisodeStatus.BLOCKED,
+                    blocked_reason=f"hypothesis_compatibility_mismatch:{'|'.join(hypothesis_compatibility)}",
+                )
+            )
+            continue
+        if current_hypothesis.status in {
+            LexicalHypothesisStatus.FROZEN,
+            LexicalHypothesisStatus.CONFLICTED,
+            LexicalHypothesisStatus.STABLE_PROMOTED,
+        }:
+            blocked_episode_ids.append(episode.episode_id)
+            ambiguity_reasons.append("hypothesis_not_updatable")
+            episodes_out.append(
+                replace(
+                    episode,
+                    episode_status=LexicalEpisodeStatus.BLOCKED,
+                    blocked_reason=f"hypothesis_not_updatable:{current_hypothesis.status.value}",
+                )
+            )
+            continue
+        hypothesis_next, status_reason = _update_hypothesis_from_episode(
+            hypothesis=current_hypothesis,
+            episode=episode,
+            context=context,
+        )
+        hypotheses_map[hypothesis_next.hypothesis_id] = hypothesis_next
+        updated_hypothesis_ids.append(hypothesis_next.hypothesis_id)
+        recorded_episode_ids.append(episode.episode_id)
+        if hypothesis_next.status == LexicalHypothesisStatus.CONFLICTED:
+            conflicted_count += 1
+            ambiguity_reasons.append("episode_conflict_detected")
+        if hypothesis_next.status == LexicalHypothesisStatus.FROZEN:
+            frozen_count += 1
+            ambiguity_reasons.append("episode_conflict_frozen")
+        episodes_out.append(
+            replace(
+                episode,
+                episode_status=(
+                    LexicalEpisodeStatus.CONFLICTING
+                    if status_reason.startswith("conflict")
+                    else LexicalEpisodeStatus.RECORDED
+                ),
+                blocked_reason=status_reason if status_reason.startswith("conflict") else None,
+            )
+        )
+
+    next_state = LexiconState(
+        entries=lexicon_state.entries,
+        unknown_items=lexicon_state.unknown_items,
+        usage_episodes=tuple(episodes_out),
+        provisional_hypotheses=tuple(sorted(hypotheses_map.values(), key=lambda item: item.hypothesis_id)),
+        unresolved_updates=lexicon_state.unresolved_updates,
+        conflict_index=lexicon_state.conflict_index,
+        frozen_updates=lexicon_state.frozen_updates,
+        schema_version=lexicon_state.schema_version,
+        lexicon_version=lexicon_state.lexicon_version,
+        taxonomy_version=lexicon_state.taxonomy_version,
+        last_updated_step=lexicon_state.last_updated_step + context.step_delta,
+    )
+    gate = evaluate_lexical_learning_downstream_gate(next_state)
+    telemetry = build_lexical_telemetry(
+        state=next_state,
+        source_lineage=context.source_lineage,
+        processed_entry_ids=(),
+        new_entry_count=0,
+        updated_entry_count=0,
+        ambiguity_reasons=tuple(dict.fromkeys(ambiguity_reasons)),
+        queried_forms=(),
+        matched_entry_ids=(),
+        no_match_count=0,
+        compatibility_markers=tuple(dict.fromkeys(compatibility_markers)),
+        attempted_paths=ATTEMPTED_LEXICON_EPISODE_PATHS,
+        downstream_gate=gate,
+        causal_basis="episode-backed provisional lexical hypothesis update",
+        processed_episode_ids=tuple(dict.fromkeys(recorded_episode_ids + blocked_episode_ids)),
+        processed_hypothesis_ids=tuple(dict.fromkeys(updated_hypothesis_ids)),
+        recorded_episode_count=len(recorded_episode_ids),
+        promoted_hypothesis_count=0,
+        conflicted_hypothesis_count=conflicted_count,
+        frozen_hypothesis_count=frozen_count,
+        insufficient_episode_count=insufficient_count,
+    )
+    abstain = bool(not recorded_episode_ids and blocked_episode_ids)
+    abstain_reason = "all lexical usage episodes blocked" if abstain else None
+    return LexicalEpisodeRecordResult(
+        updated_state=next_state,
+        recorded_episode_ids=tuple(dict.fromkeys(recorded_episode_ids)),
+        blocked_episode_ids=tuple(dict.fromkeys(blocked_episode_ids)),
+        updated_hypothesis_ids=tuple(dict.fromkeys(updated_hypothesis_ids)),
+        downstream_gate=gate,
+        telemetry=telemetry,
+        no_final_meaning_resolution_performed=True,
+        abstain=abstain,
+        abstain_reason=abstain_reason,
+    )
+
+
+def consolidate_lexical_hypotheses(
+    *,
+    lexicon_state: LexiconState,
+    context: LexicalHypothesisConsolidationContext | None = None,
+) -> LexicalHypothesisUpdateResult:
+    if not isinstance(lexicon_state, LexiconState):
+        raise TypeError("lexicon_state must be LexiconState")
+    if context is None:
+        context = LexicalHypothesisConsolidationContext()
+    if not isinstance(context, LexicalHypothesisConsolidationContext):
+        raise TypeError("context must be LexicalHypothesisConsolidationContext")
+
+    compatibility_markers = _compatibility_markers(
+        state=lexicon_state,
+        expected_schema_version=context.expected_schema_version,
+        expected_lexicon_version=context.expected_lexicon_version,
+        expected_taxonomy_version=context.expected_taxonomy_version,
+    )
+    if compatibility_markers:
+        gate = LexicalLearningGateDecision(
+            accepted=False,
+            restrictions=("compatibility_mismatch", "no_strong_meaning_claim"),
+            reason="lexical hypothesis consolidation blocked due to incompatible schema/version contract",
+            accepted_hypothesis_ids=(),
+            rejected_hypothesis_ids=(),
+            state_ref=f"{lexicon_state.schema_version}|{lexicon_state.lexicon_version}|{lexicon_state.taxonomy_version}",
+        )
+        telemetry = build_lexical_telemetry(
+            state=lexicon_state,
+            source_lineage=context.source_lineage,
+            processed_entry_ids=(),
+            new_entry_count=0,
+            updated_entry_count=0,
+            ambiguity_reasons=("compatibility_mismatch",),
+            queried_forms=(),
+            matched_entry_ids=(),
+            no_match_count=0,
+            compatibility_markers=compatibility_markers,
+            attempted_paths=ATTEMPTED_LEXICON_HYPOTHESIS_PATHS,
+            downstream_gate=gate,
+            causal_basis="lexical hypothesis consolidation blocked due to incompatible schema/version contract",
+        )
+        return LexicalHypothesisUpdateResult(
+            updated_state=lexicon_state,
+            promoted_hypothesis_ids=(),
+            frozen_hypothesis_ids=(),
+            conflicted_hypothesis_ids=(),
+            downstream_gate=gate,
+            telemetry=telemetry,
+            no_final_meaning_resolution_performed=True,
+            abstain=True,
+            abstain_reason="version compatibility mismatch",
+        )
+
+    working_state = lexicon_state
+    promoted_hypothesis_ids: list[str] = []
+    frozen_hypothesis_ids: list[str] = []
+    conflicted_hypothesis_ids: list[str] = []
+    processed_hypothesis_ids: list[str] = []
+    ambiguity_reasons: list[str] = []
+    compatibility_markers: list[str] = []
+    hypotheses_out: list[ProvisionalLexicalHypothesis] = []
+    new_entry_count = 0
+    updated_entry_count = 0
+
+    for hypothesis in lexicon_state.provisional_hypotheses:
+        processed_hypothesis_ids.append(hypothesis.hypothesis_id)
+        hypothesis_compatibility = _hypothesis_compatibility_markers(
+            hypothesis=hypothesis,
+            expected_schema_version=context.expected_schema_version,
+            expected_lexicon_version=context.expected_lexicon_version,
+            expected_taxonomy_version=context.expected_taxonomy_version,
+        )
+        if hypothesis_compatibility:
+            frozen_hypothesis_ids.append(hypothesis.hypothesis_id)
+            ambiguity_reasons.append("hypothesis_version_mismatch")
+            compatibility_markers.extend(hypothesis_compatibility)
+            hypotheses_out.append(
+                replace(
+                    hypothesis,
+                    status=LexicalHypothesisStatus.FROZEN,
+                    promotion_eligibility=False,
+                    blocked_reasons=tuple(
+                        dict.fromkeys(
+                            hypothesis.blocked_reasons
+                            + tuple(f"compatibility:{marker}" for marker in hypothesis_compatibility)
+                        )
+                    ),
+                )
+            )
+            continue
+        if hypothesis.status == LexicalHypothesisStatus.FROZEN:
+            frozen_hypothesis_ids.append(hypothesis.hypothesis_id)
+            hypotheses_out.append(hypothesis)
+            continue
+        if hypothesis.status == LexicalHypothesisStatus.CONFLICTED:
+            conflicted_hypothesis_ids.append(hypothesis.hypothesis_id)
+            hypotheses_out.append(hypothesis)
+            continue
+
+        promotion_ready = (
+            hypothesis.support_count
+            >= _effective_min_support_for_promotion(context.min_support_for_promotion)
+            and hypothesis.confidence >= context.promotion_confidence_threshold
+            and hypothesis.status == LexicalHypothesisStatus.PROMOTION_ELIGIBLE
+        )
+        if not promotion_ready:
+            hypotheses_out.append(
+                replace(
+                    hypothesis,
+                    status=LexicalHypothesisStatus.PROVISIONAL,
+                    promotion_eligibility=False,
+                )
+            )
+            ambiguity_reasons.append("insufficient_hypothesis_support_for_promotion")
+            continue
+
+        proposal = _proposal_from_hypothesis(hypothesis)
+        update_result = create_or_update_lexicon_state(
+            lexicon_state=working_state,
+            entry_proposals=(proposal,),
+            context=LexiconUpdateContext(
+                source_lineage=context.source_lineage,
+                expected_schema_version=context.expected_schema_version,
+                expected_lexicon_version=context.expected_lexicon_version,
+                expected_taxonomy_version=context.expected_taxonomy_version,
+                min_evidence_for_stable=1,
+                stable_confidence_threshold=0.0,
+            ),
+        )
+        working_state = update_result.updated_state
+        event_entry_ids = tuple(event.entry_id for event in update_result.update_events if event.entry_id)
+        promoted_entry_id = event_entry_ids[-1] if event_entry_ids else None
+        promoted_hypothesis_ids.append(hypothesis.hypothesis_id)
+        if update_result.telemetry.new_entry_count:
+            new_entry_count += update_result.telemetry.new_entry_count
+        if update_result.telemetry.updated_entry_count:
+            updated_entry_count += update_result.telemetry.updated_entry_count
+        hypotheses_out.append(
+            replace(
+                hypothesis,
+                status=LexicalHypothesisStatus.STABLE_PROMOTED,
+                promotion_eligibility=False,
+                promoted_entry_id=promoted_entry_id,
+            )
+        )
+
+    next_state = LexiconState(
+        entries=working_state.entries,
+        unknown_items=working_state.unknown_items,
+        usage_episodes=working_state.usage_episodes,
+        provisional_hypotheses=tuple(sorted(hypotheses_out, key=lambda item: item.hypothesis_id)),
+        unresolved_updates=working_state.unresolved_updates,
+        conflict_index=working_state.conflict_index,
+        frozen_updates=working_state.frozen_updates,
+        schema_version=working_state.schema_version,
+        lexicon_version=working_state.lexicon_version,
+        taxonomy_version=working_state.taxonomy_version,
+        last_updated_step=working_state.last_updated_step + context.step_delta,
+    )
+    gate = evaluate_lexical_learning_downstream_gate(next_state)
+    telemetry = build_lexical_telemetry(
+        state=next_state,
+        source_lineage=context.source_lineage,
+        processed_entry_ids=(),
+        new_entry_count=new_entry_count,
+        updated_entry_count=updated_entry_count,
+        ambiguity_reasons=tuple(dict.fromkeys(ambiguity_reasons)),
+        queried_forms=(),
+        matched_entry_ids=(),
+        no_match_count=0,
+        compatibility_markers=tuple(dict.fromkeys(compatibility_markers)),
+        attempted_paths=ATTEMPTED_LEXICON_HYPOTHESIS_PATHS,
+        downstream_gate=gate,
+        causal_basis="provisional lexical hypothesis consolidation via evidence threshold",
+        processed_episode_ids=(),
+        processed_hypothesis_ids=tuple(dict.fromkeys(processed_hypothesis_ids)),
+        recorded_episode_count=0,
+        promoted_hypothesis_count=len(promoted_hypothesis_ids),
+        conflicted_hypothesis_count=len(conflicted_hypothesis_ids),
+        frozen_hypothesis_count=len(frozen_hypothesis_ids),
+        insufficient_episode_count=0,
+    )
+    abstain = bool(not promoted_hypothesis_ids and lexicon_state.provisional_hypotheses)
+    abstain_reason = "no promotion-eligible lexical hypotheses" if abstain else None
+    return LexicalHypothesisUpdateResult(
+        updated_state=next_state,
+        promoted_hypothesis_ids=tuple(dict.fromkeys(promoted_hypothesis_ids)),
+        frozen_hypothesis_ids=tuple(dict.fromkeys(frozen_hypothesis_ids)),
+        conflicted_hypothesis_ids=tuple(dict.fromkeys(conflicted_hypothesis_ids)),
         downstream_gate=gate,
         telemetry=telemetry,
         no_final_meaning_resolution_performed=True,
@@ -487,6 +977,33 @@ def query_lexical_entries(
             local_ambiguity.append("operator_scope_context_required")
         if any(_entry_compatibility_markers(entry=entry, state=lexicon_state) for entry in matches):
             local_ambiguity.append("entry_version_mismatch")
+        learning_hypotheses = tuple(
+            hypothesis
+            for hypothesis in lexicon_state.provisional_hypotheses
+            if _normalize(hypothesis.target_surface_form) == normalized_form
+        )
+        if learning_hypotheses:
+            local_ambiguity.append("learning_hypotheses_present")
+        if any(
+            hypothesis.status == LexicalHypothesisStatus.PROVISIONAL
+            for hypothesis in learning_hypotheses
+        ):
+            local_ambiguity.append("learning_hypothesis_provisional")
+        if any(
+            hypothesis.status == LexicalHypothesisStatus.CONFLICTED
+            for hypothesis in learning_hypotheses
+        ):
+            local_ambiguity.append("learning_hypothesis_conflicted")
+        if any(
+            hypothesis.status == LexicalHypothesisStatus.FROZEN
+            for hypothesis in learning_hypotheses
+        ):
+            local_ambiguity.append("learning_hypothesis_frozen")
+        if any(
+            hypothesis.status == LexicalHypothesisStatus.PROMOTION_ELIGIBLE
+            for hypothesis in learning_hypotheses
+        ):
+            local_ambiguity.append("learning_hypothesis_promotion_eligible")
 
         ambiguity_reasons.extend(local_ambiguity)
         matched_entry_ids_all.extend(matched_entry_ids)
@@ -539,7 +1056,9 @@ def query_lexical_entries(
     )
 
 
-def lexicon_result_to_payload(result: LexiconUpdateResult | LexiconQueryResult) -> dict[str, object]:
+def lexicon_result_to_payload(
+    result: LexiconUpdateResult | LexiconQueryResult | LexicalEpisodeRecordResult | LexicalHypothesisUpdateResult,
+) -> dict[str, object]:
     return lexicon_result_snapshot(result)
 
 
@@ -552,6 +1071,8 @@ def reconstruct_lexicon_state_from_snapshot(snapshot: dict[str, object]) -> Lexi
 
     entries_payload = state_payload.get("entries", ())
     unknown_payload = state_payload.get("unknown_items", ())
+    usage_episode_payload = state_payload.get("usage_episodes", ())
+    provisional_hypothesis_payload = state_payload.get("provisional_hypotheses", ())
     unresolved_payload = state_payload.get("unresolved_updates", ())
     frozen_payload = state_payload.get("frozen_updates", ())
     conflict_index_payload = state_payload.get("conflict_index", ())
@@ -560,6 +1081,10 @@ def reconstruct_lexicon_state_from_snapshot(snapshot: dict[str, object]) -> Lexi
         raise TypeError("state.entries must be tuple/list")
     if not isinstance(unknown_payload, (tuple, list)):
         raise TypeError("state.unknown_items must be tuple/list")
+    if not isinstance(usage_episode_payload, (tuple, list)):
+        raise TypeError("state.usage_episodes must be tuple/list")
+    if not isinstance(provisional_hypothesis_payload, (tuple, list)):
+        raise TypeError("state.provisional_hypotheses must be tuple/list")
     if not isinstance(unresolved_payload, (tuple, list)):
         raise TypeError("state.unresolved_updates must be tuple/list")
     if not isinstance(frozen_payload, (tuple, list)):
@@ -646,6 +1171,9 @@ def reconstruct_lexicon_state_from_snapshot(snapshot: dict[str, object]) -> Lexi
                 entry_status=LexicalAcquisitionStatus(
                     str(raw_entry.get("entry_status", acquisition.get("status", "unknown")))
                 ),
+                acquisition_mode=LexicalAcquisitionMode(
+                    str(raw_entry.get("acquisition_mode", "unknown"))
+                ),
                 composition_profile=LexicalCompositionProfile(
                     role_hints=tuple(
                         LexicalCompositionRole(str(role))
@@ -713,6 +1241,111 @@ def reconstruct_lexicon_state_from_snapshot(snapshot: dict[str, object]) -> Lexi
         )
         for item in unknown_payload
     )
+    usage_episodes = tuple(
+        LexicalUsageEpisode(
+            episode_id=str(episode["episode_id"]),
+            observed_surface_form=str(episode["observed_surface_form"]),
+            observed_lemma_hint=episode.get("observed_lemma_hint"),
+            language_code=str(episode["language_code"]),
+            observed_context_keys=tuple(episode.get("observed_context_keys", ())),
+            source_kind=str(episode.get("source_kind", "unknown")),
+            proposed_sense_hypotheses=tuple(
+                LexicalSenseHypothesis(
+                    sense_family=str(sense["sense_family"]),
+                    sense_label=str(sense["sense_label"]),
+                    coarse_semantic_type=LexicalCoarseSemanticType(str(sense["coarse_semantic_type"])),
+                    compatibility_cues=tuple(sense.get("compatibility_cues", ())),
+                    anti_cues=tuple(sense.get("anti_cues", ())),
+                    confidence=_clamp(float(sense.get("confidence", 0.5))),
+                    provisional=bool(sense.get("provisional", True)),
+                    status_hint=(
+                        LexicalSenseStatus(str(sense["status_hint"]))
+                        if sense.get("status_hint") is not None
+                        else None
+                    ),
+                    example_texts=tuple(sense.get("example_texts", ())),
+                )
+                for sense in episode.get("proposed_sense_hypotheses", ())
+            ),
+            proposed_role_hints=tuple(
+                LexicalCompositionRole(str(role))
+                for role in episode.get("proposed_role_hints", ())
+            ),
+            usage_span=episode.get("usage_span"),
+            confidence=_clamp(float(episode.get("confidence", 0.0))),
+            evidence_quality=_clamp(float(episode.get("evidence_quality", 0.0))),
+            step_index=int(episode.get("step_index", 0)),
+            episode_status=LexicalEpisodeStatus(str(episode.get("episode_status", "recorded"))),
+            provenance=str(episode.get("provenance", "lexicon.reconstruct")),
+            schema_version=str(episode.get("schema_version", state_payload.get("schema_version", DEFAULT_LEXICON_SCHEMA_VERSION))),
+            lexicon_version=str(episode.get("lexicon_version", state_payload.get("lexicon_version", DEFAULT_LEXICON_VERSION))),
+            taxonomy_version=str(episode.get("taxonomy_version", state_payload.get("taxonomy_version", DEFAULT_LEXICON_TAXONOMY_VERSION))),
+            blocked_reason=episode.get("blocked_reason"),
+        )
+        for episode in usage_episode_payload
+    )
+    provisional_hypotheses = tuple(
+        ProvisionalLexicalHypothesis(
+            hypothesis_id=str(hypothesis["hypothesis_id"]),
+            target_surface_form=str(hypothesis["target_surface_form"]),
+            target_lemma=hypothesis.get("target_lemma"),
+            language_code=str(hypothesis.get("language_code", "")),
+            candidate_entry_id=hypothesis.get("candidate_entry_id"),
+            candidate_sense_bundle=tuple(
+                LexicalSenseHypothesis(
+                    sense_family=str(sense["sense_family"]),
+                    sense_label=str(sense["sense_label"]),
+                    coarse_semantic_type=LexicalCoarseSemanticType(str(sense["coarse_semantic_type"])),
+                    compatibility_cues=tuple(sense.get("compatibility_cues", ())),
+                    anti_cues=tuple(sense.get("anti_cues", ())),
+                    confidence=_clamp(float(sense.get("confidence", 0.5))),
+                    provisional=bool(sense.get("provisional", True)),
+                    status_hint=(
+                        LexicalSenseStatus(str(sense["status_hint"]))
+                        if sense.get("status_hint") is not None
+                        else None
+                    ),
+                    example_texts=tuple(sense.get("example_texts", ())),
+                )
+                for sense in hypothesis.get("candidate_sense_bundle", ())
+            ),
+            candidate_role_hints=tuple(
+                LexicalCompositionRole(str(role))
+                for role in hypothesis.get("candidate_role_hints", ())
+            )
+            or (LexicalCompositionRole.UNKNOWN,),
+            supporting_episode_ids=tuple(hypothesis.get("supporting_episode_ids", ())),
+            conflicting_episode_ids=tuple(hypothesis.get("conflicting_episode_ids", ())),
+            support_count=int(hypothesis.get("support_count", 0)),
+            conflict_count=int(hypothesis.get("conflict_count", 0)),
+            status=LexicalHypothesisStatus(str(hypothesis.get("status", "unknown"))),
+            promotion_eligibility=bool(hypothesis.get("promotion_eligibility", False)),
+            blocked_reasons=tuple(hypothesis.get("blocked_reasons", ())),
+            confidence=_clamp(float(hypothesis.get("confidence", 0.0))),
+            evidence_quality=_clamp(float(hypothesis.get("evidence_quality", 0.0))),
+            provenance=str(hypothesis.get("provenance", "lexicon.reconstruct")),
+            promoted_entry_id=hypothesis.get("promoted_entry_id"),
+            schema_version=str(
+                hypothesis.get(
+                    "schema_version",
+                    state_payload.get("schema_version", DEFAULT_LEXICON_SCHEMA_VERSION),
+                )
+            ),
+            lexicon_version=str(
+                hypothesis.get(
+                    "lexicon_version",
+                    state_payload.get("lexicon_version", DEFAULT_LEXICON_VERSION),
+                )
+            ),
+            taxonomy_version=str(
+                hypothesis.get(
+                    "taxonomy_version",
+                    state_payload.get("taxonomy_version", DEFAULT_LEXICON_TAXONOMY_VERSION),
+                )
+            ),
+        )
+        for hypothesis in provisional_hypothesis_payload
+    )
     unresolved_updates = tuple(
         LexiconBlockedUpdate(
             surface_form=str(blocked.get("surface_form", "")),
@@ -736,6 +1369,8 @@ def reconstruct_lexicon_state_from_snapshot(snapshot: dict[str, object]) -> Lexi
     return LexiconState(
         entries=tuple(entries),
         unknown_items=unknown_items,
+        usage_episodes=usage_episodes,
+        provisional_hypotheses=provisional_hypotheses,
         unresolved_updates=unresolved_updates,
         conflict_index=tuple(str(entry_id) for entry_id in conflict_index_payload),
         frozen_updates=frozen_updates,
@@ -769,12 +1404,246 @@ def persist_lexicon_result_via_f01(
     return execute_transition(request, runtime_state)
 
 
+def persist_lexical_learning_result_via_f01(
+    *,
+    result: LexicalEpisodeRecordResult | LexicalHypothesisUpdateResult,
+    runtime_state: RuntimeState,
+    transition_id: str,
+    requested_at: str,
+    cause_chain: tuple[str, ...] = ("lexicon-learning",),
+) -> TransitionResult:
+    request = TransitionRequest(
+        transition_id=transition_id,
+        transition_kind=TransitionKind.APPLY_INTERNAL_EVENT,
+        writer=WriterIdentity.TRANSITION_ENGINE,
+        cause_chain=cause_chain,
+        requested_at=requested_at,
+        event_id=f"ev-{transition_id}",
+        event_payload={
+            "turn_id": f"lexicon-learning-step-{transition_id}",
+            "lexicon_learning_snapshot": lexicon_result_to_payload(result),
+        },
+    )
+    return execute_transition(request, runtime_state)
+
+
 def _normalize(value: str) -> str:
     return value.strip().lower()
 
 
 def _clamp(value: float) -> float:
     return max(0.0, min(1.0, round(value, 4)))
+
+
+def _find_learning_hypothesis(
+    *,
+    hypotheses: tuple[ProvisionalLexicalHypothesis, ...],
+    episode: LexicalUsageEpisode,
+) -> str | None:
+    normalized_surface = _normalize(episode.observed_surface_form)
+    normalized_lemma = _normalize(episode.observed_lemma_hint or episode.observed_surface_form)
+    for hypothesis in hypotheses:
+        if hypothesis.language_code != episode.language_code:
+            continue
+        if _normalize(hypothesis.target_surface_form) == normalized_surface:
+            return hypothesis.hypothesis_id
+        if hypothesis.target_lemma and _normalize(hypothesis.target_lemma) == normalized_lemma:
+            return hypothesis.hypothesis_id
+    return None
+
+
+def _merge_hypothesis_sense_bundle(
+    *,
+    existing: tuple[LexicalSenseHypothesis, ...],
+    incoming: tuple[LexicalSenseHypothesis, ...],
+) -> tuple[LexicalSenseHypothesis, ...]:
+    merged: dict[tuple[str, str], LexicalSenseHypothesis] = {
+        (sense.sense_family, sense.sense_label): sense
+        for sense in existing
+    }
+    for sense in incoming:
+        key = (sense.sense_family, sense.sense_label)
+        if key not in merged:
+            merged[key] = sense
+            continue
+        current = merged[key]
+        merged[key] = LexicalSenseHypothesis(
+            sense_family=current.sense_family,
+            sense_label=current.sense_label,
+            coarse_semantic_type=current.coarse_semantic_type,
+            compatibility_cues=tuple(dict.fromkeys(current.compatibility_cues + sense.compatibility_cues)),
+            anti_cues=tuple(dict.fromkeys(current.anti_cues + sense.anti_cues)),
+            confidence=_clamp((current.confidence * 0.6) + (sense.confidence * 0.4)),
+            provisional=current.provisional and sense.provisional,
+            status_hint=current.status_hint or sense.status_hint,
+            example_texts=tuple(dict.fromkeys(current.example_texts + sense.example_texts)),
+        )
+    return tuple(merged.values())
+
+
+def _episode_conflicts_with_hypothesis(
+    *,
+    hypothesis: ProvisionalLexicalHypothesis,
+    episode: LexicalUsageEpisode,
+) -> bool:
+    existing_labels = {(sense.sense_family, sense.sense_label) for sense in hypothesis.candidate_sense_bundle}
+    incoming_labels = {(sense.sense_family, sense.sense_label) for sense in episode.proposed_sense_hypotheses}
+    label_disjoint = bool(existing_labels and incoming_labels and existing_labels.isdisjoint(incoming_labels))
+    if label_disjoint:
+        return True
+    existing_roles = {
+        role for role in hypothesis.candidate_role_hints if role != LexicalCompositionRole.UNKNOWN
+    }
+    incoming_roles = {
+        role for role in episode.proposed_role_hints if role != LexicalCompositionRole.UNKNOWN
+    }
+    if existing_roles and incoming_roles and existing_roles.isdisjoint(incoming_roles):
+        return True
+    existing_coarse = {
+        (sense.sense_family, sense.sense_label): sense.coarse_semantic_type
+        for sense in hypothesis.candidate_sense_bundle
+    }
+    incoming_coarse = {
+        (sense.sense_family, sense.sense_label): sense.coarse_semantic_type
+        for sense in episode.proposed_sense_hypotheses
+    }
+    if any(
+        key in incoming_coarse and incoming_coarse[key] != existing_coarse[key]
+        for key in existing_coarse
+    ):
+        return True
+    for existing in hypothesis.candidate_sense_bundle:
+        for incoming in episode.proposed_sense_hypotheses:
+            if set(existing.compatibility_cues).intersection(set(incoming.anti_cues)):
+                return True
+            if set(existing.anti_cues).intersection(set(incoming.compatibility_cues)):
+                return True
+    return False
+
+
+def _create_hypothesis_from_episode(
+    *,
+    episode: LexicalUsageEpisode,
+    context: LexicalEpisodeRecordContext,
+) -> ProvisionalLexicalHypothesis:
+    confidence = _clamp((episode.confidence * 0.6) + (episode.evidence_quality * 0.4))
+    min_support_for_promotion = _effective_min_support_for_promotion(
+        context.min_support_for_promotion
+    )
+    promotion_eligibility = (
+        1 >= min_support_for_promotion
+        and confidence >= context.promotion_confidence_threshold
+    )
+    status = (
+        LexicalHypothesisStatus.PROMOTION_ELIGIBLE
+        if promotion_eligibility
+        else LexicalHypothesisStatus.PROVISIONAL
+    )
+    return ProvisionalLexicalHypothesis(
+        hypothesis_id=f"lexhyp-{uuid4().hex[:10]}",
+        target_surface_form=episode.observed_surface_form,
+        target_lemma=episode.observed_lemma_hint,
+        language_code=episode.language_code,
+        candidate_entry_id=None,
+        candidate_sense_bundle=episode.proposed_sense_hypotheses,
+        candidate_role_hints=episode.proposed_role_hints,
+        supporting_episode_ids=(episode.episode_id,),
+        conflicting_episode_ids=(),
+        support_count=1,
+        conflict_count=0,
+        status=status,
+        promotion_eligibility=promotion_eligibility,
+        blocked_reasons=(),
+        confidence=confidence,
+        evidence_quality=_clamp(episode.evidence_quality),
+        provenance=episode.provenance,
+        schema_version=episode.schema_version,
+        lexicon_version=episode.lexicon_version,
+        taxonomy_version=episode.taxonomy_version,
+    )
+
+
+def _update_hypothesis_from_episode(
+    *,
+    hypothesis: ProvisionalLexicalHypothesis,
+    episode: LexicalUsageEpisode,
+    context: LexicalEpisodeRecordContext,
+) -> tuple[ProvisionalLexicalHypothesis, str]:
+    is_conflict = _episode_conflicts_with_hypothesis(hypothesis=hypothesis, episode=episode)
+    merged_senses = _merge_hypothesis_sense_bundle(
+        existing=hypothesis.candidate_sense_bundle,
+        incoming=episode.proposed_sense_hypotheses,
+    )
+    support_count = hypothesis.support_count + (0 if is_conflict else 1)
+    conflict_count = hypothesis.conflict_count + (1 if is_conflict else 0)
+    confidence = _clamp((hypothesis.confidence * 0.65) + (episode.confidence * 0.35))
+    evidence_quality = _clamp((hypothesis.evidence_quality * 0.65) + (episode.evidence_quality * 0.35))
+
+    status = hypothesis.status
+    promotion_eligibility = False
+    blocked_reasons = list(hypothesis.blocked_reasons)
+    status_reason = "support"
+    if is_conflict:
+        status = LexicalHypothesisStatus.FROZEN if context.freeze_on_conflict else LexicalHypothesisStatus.CONFLICTED
+        promotion_eligibility = False
+        blocked_reasons.append("conflicting_episode")
+        status_reason = "conflict_frozen" if context.freeze_on_conflict else "conflict"
+    elif (
+        support_count >= _effective_min_support_for_promotion(context.min_support_for_promotion)
+        and confidence >= context.promotion_confidence_threshold
+    ):
+        status = LexicalHypothesisStatus.PROMOTION_ELIGIBLE
+        promotion_eligibility = True
+        status_reason = "promotion_eligible"
+    else:
+        status = LexicalHypothesisStatus.PROVISIONAL
+        promotion_eligibility = False
+        status_reason = "support"
+
+    return (
+        replace(
+            hypothesis,
+            candidate_sense_bundle=merged_senses,
+            candidate_role_hints=tuple(
+                dict.fromkeys(hypothesis.candidate_role_hints + episode.proposed_role_hints)
+            ),
+            supporting_episode_ids=(
+                hypothesis.supporting_episode_ids + (() if is_conflict else (episode.episode_id,))
+            ),
+            conflicting_episode_ids=(
+                hypothesis.conflicting_episode_ids + ((episode.episode_id,) if is_conflict else ())
+            ),
+            support_count=support_count,
+            conflict_count=conflict_count,
+            status=status,
+            promotion_eligibility=promotion_eligibility,
+            blocked_reasons=tuple(dict.fromkeys(blocked_reasons)),
+            confidence=confidence,
+            evidence_quality=evidence_quality,
+        ),
+        status_reason,
+    )
+
+
+def _proposal_from_hypothesis(hypothesis: ProvisionalLexicalHypothesis) -> LexicalEntryProposal:
+    return LexicalEntryProposal(
+        surface_form=hypothesis.target_surface_form,
+        canonical_form=hypothesis.target_lemma or hypothesis.target_surface_form,
+        language_code=hypothesis.language_code,
+        part_of_speech_candidates=(),
+        sense_hypotheses=tuple(
+            replace(
+                sense,
+                provisional=False,
+                status_hint=LexicalSenseStatus.STABLE,
+            )
+            for sense in hypothesis.candidate_sense_bundle
+        ),
+        lemma=hypothesis.target_lemma or hypothesis.target_surface_form,
+        aliases=(hypothesis.target_surface_form,),
+        confidence=hypothesis.confidence,
+        evidence_ref=f"lexicon.hypothesis_promotion:{hypothesis.hypothesis_id}",
+    )
 
 
 def _compatibility_markers(
@@ -807,6 +1676,45 @@ def _entry_compatibility_markers(
     if entry.taxonomy_version != state.taxonomy_version:
         markers.append("entry_taxonomy_version_mismatch")
     return tuple(markers)
+
+
+def _episode_compatibility_markers(
+    *,
+    episode: LexicalUsageEpisode,
+    expected_schema_version: str,
+    expected_lexicon_version: str,
+    expected_taxonomy_version: str,
+) -> tuple[str, ...]:
+    markers: list[str] = []
+    if episode.schema_version != expected_schema_version:
+        markers.append("episode_schema_version_mismatch")
+    if episode.lexicon_version != expected_lexicon_version:
+        markers.append("episode_lexicon_version_mismatch")
+    if episode.taxonomy_version != expected_taxonomy_version:
+        markers.append("episode_taxonomy_version_mismatch")
+    return tuple(markers)
+
+
+def _hypothesis_compatibility_markers(
+    *,
+    hypothesis: ProvisionalLexicalHypothesis,
+    expected_schema_version: str,
+    expected_lexicon_version: str,
+    expected_taxonomy_version: str,
+) -> tuple[str, ...]:
+    markers: list[str] = []
+    if hypothesis.schema_version != expected_schema_version:
+        markers.append("hypothesis_schema_version_mismatch")
+    if hypothesis.lexicon_version != expected_lexicon_version:
+        markers.append("hypothesis_lexicon_version_mismatch")
+    if hypothesis.taxonomy_version != expected_taxonomy_version:
+        markers.append("hypothesis_taxonomy_version_mismatch")
+    return tuple(markers)
+
+
+def _effective_min_support_for_promotion(min_support: int) -> int:
+    # Ordinary episode learning must not stabilize after a single observation.
+    return max(2, int(min_support))
 
 
 def _freeze_incompatible_entries(
@@ -1026,6 +1934,15 @@ def _update_entry(
         sense_records=merged_senses,
         examples=merged_examples,
         entry_status=status,
+        acquisition_mode=(
+            LexicalAcquisitionMode.EPISODE_PROMOTION
+            if _is_episode_promotion_proposal(proposal.evidence_ref)
+            else (
+                existing.acquisition_mode
+                if existing.acquisition_mode != LexicalAcquisitionMode.UNKNOWN
+                else LexicalAcquisitionMode.DIRECT_CURATION
+            )
+        ),
         composition_profile=proposal.composition_profile or existing.composition_profile,
         reference_profile=proposal.reference_profile or existing.reference_profile,
         acquisition_state=LexicalAcquisitionState(
@@ -1122,6 +2039,11 @@ def _create_entry(
         sense_records=sense_records,
         examples=entry_examples,
         entry_status=status,
+        acquisition_mode=(
+            LexicalAcquisitionMode.EPISODE_PROMOTION
+            if _is_episode_promotion_proposal(proposal.evidence_ref)
+            else LexicalAcquisitionMode.DIRECT_CURATION
+        ),
         composition_profile=proposal.composition_profile or _default_composition_profile(),
         reference_profile=proposal.reference_profile or _default_reference_profile(),
         acquisition_state=LexicalAcquisitionState(
@@ -1149,6 +2071,10 @@ def _create_entry(
         provenance=entry.provenance,
     )
     return entry, event
+
+
+def _is_episode_promotion_proposal(evidence_ref: str | None) -> bool:
+    return bool(evidence_ref and evidence_ref.startswith("lexicon.hypothesis_promotion:"))
 
 
 def _merge_senses(
@@ -1520,6 +2446,7 @@ def _seed_entries() -> tuple[LexicalEntry, ...]:
             aliases=(canonical_form,),
             examples=(),
             entry_status=LexicalAcquisitionStatus.STABLE,
+            acquisition_mode=LexicalAcquisitionMode.SEED,
             schema_version=DEFAULT_LEXICON_SCHEMA_VERSION,
             lexicon_version=DEFAULT_LEXICON_VERSION,
             taxonomy_version=DEFAULT_LEXICON_TAXONOMY_VERSION,

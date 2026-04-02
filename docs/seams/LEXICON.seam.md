@@ -16,6 +16,10 @@ direct_downstream:
 - `query_lexical_entries(...) -> LexiconQueryResult`
 - `evaluate_lexicon_downstream_gate(...) -> LexiconGateDecision`
 - `persist_lexicon_result_via_f01(...) -> execute_transition(...)`
+- `record_lexical_usage_episode(...) -> LexicalEpisodeRecordResult`
+- `consolidate_lexical_hypotheses(...) -> LexicalHypothesisUpdateResult`
+- `evaluate_lexical_learning_downstream_gate(...) -> LexicalLearningGateDecision`
+- `persist_lexical_learning_result_via_f01(...) -> execute_transition(...)`
 
 ## UPSTREAM CONTRACT
 - typed-only critical path:
@@ -25,6 +29,9 @@ direct_downstream:
   - `LexiconUpdateContext`
   - `LexiconQueryRequest`
   - `LexiconQueryContext`
+  - `LexicalUsageEpisode`
+  - `LexicalEpisodeRecordContext`
+  - `LexicalHypothesisConsolidationContext`
 - raw/untyped payloads on critical path are rejected.
 
 ## DOWNSTREAM CONTRACT
@@ -38,12 +45,18 @@ direct_downstream:
 
 ## SEAM OBLIGATIONS
 - preserve one-form-to-many-entry and one-form-to-many-sense ambiguity.
+- new lexical knowledge enters through episode-backed provisional hypotheses, not single-shot stable truth.
+- ordinary episode-driven promotion has a hard minimum support floor of 2; single episode must not silently stabilize lexical meaning.
+- conflicting usage episodes must preserve conflict/freeze state (no silent averaging to stable).
+- promotion to stable lexical entry/sense requires explicit support threshold + confidence criteria.
+- episode/hypothesis payload schema/lexicon/taxonomy mismatches must be blocked/frozen/capped at runtime (not telemetry-only markers).
 - ambiguous multi-match updates must use split-or-freeze discipline; no silent forced winner.
 - preserve unknown/provisional/conflict as first-class state.
 - preserve entry != sense separation across update/query/snapshot/roundtrip.
 - no hidden top-1 lexical meaning collapse.
 - no referent resolution claim.
 - no dictum/proposition/illocution/discourse-acceptance claim.
+- direct lexical curation path and episode-backed promotion path must remain distinguishable via typed acquisition origin markers.
 - runtime mutation only via F01 persistence seam.
 - enforce schema/lexicon/taxonomy compatibility on update/query seams.
 - query gate must not accept when remaining matches are only conflicted/frozen/context-blocked.
@@ -64,7 +77,10 @@ direct_downstream:
 ## LOAD-BEARING SEAM TELEMETRY
 - source lineage
 - processed entry ids
+- processed episode ids
+- processed hypothesis ids
 - new/updated/provisional/stable counts
+- recorded/promoted/conflicted/frozen/insufficient episode-learning counts
 - unknown/conflict/blocked counts
 - ambiguity reasons
 - queried forms and matched entry ids
@@ -85,13 +101,20 @@ direct_downstream:
 - lexical example integrity (entry/sense link + roundtrip survival).
 - compatibility mismatch -> honest blocked/abstain path.
 - F01-only persistence and roundtrip integrity, including persist -> reconstruct -> continue equivalence.
+- episode-learning tests:
+  - single-episode provisional discipline
+  - repeated support -> promotion eligibility/promotion
+  - conflict episode -> conflicted/frozen path
+  - roundtrip preservation of episodes/hypotheses/support/conflict state
 - boundary tests: no lexical substrate claim stronger than authority.
 
 ## SEAM FALSIFIERS
 - surface form silently collapsed to one final sense.
 - multi-match update silently collapsed to one update target.
 - unknown lexical item forced into fabricated stable meaning.
+- single observed usage silently promoted to stable lexical truth.
 - conflict evidence averaged away without explicit conflict state.
+- episode ledger exists but has no effect on promotion/conflict outcomes.
 - compatibility mismatch silently reused as compatible state.
 - context-dependent lexical reference treated as strong match without context.
 - downstream can treat lexical output as final grounding/proposition.
