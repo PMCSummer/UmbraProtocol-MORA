@@ -20,11 +20,14 @@ from substrate.lexicon.models import (
     LexicalCompositionProfile,
     LexicalCompositionRole,
     LexicalConflictState,
+    LexicalExampleRecord,
+    LexicalExampleStatus,
     LexicalEntry,
     LexicalEntryProposal,
     LexicalReferenceProfile,
     LexicalSenseHypothesis,
     LexicalSenseRecord,
+    LexicalSenseStatus,
     LexiconBlockedUpdate,
     LexiconGateDecision,
     LexiconQueryContext,
@@ -40,7 +43,10 @@ from substrate.lexicon.models import (
     UnknownLexicalItem,
     UnknownLexicalObservation,
 )
-from substrate.lexicon.policy import evaluate_lexicon_downstream_gate
+from substrate.lexicon.policy import (
+    build_lexicon_gate_decision,
+    evaluate_lexicon_downstream_gate,
+)
 from substrate.lexicon.telemetry import build_lexical_telemetry, lexicon_result_snapshot
 from substrate.transition import execute_transition
 
@@ -170,11 +176,18 @@ def create_or_update_lexicon_state(
         )
 
     decayed_entries, decay_events = _apply_decay(state.entries, context=context)
-    entry_map = {entry.entry_id: entry for entry in decayed_entries}
-    blocked_updates: list[LexiconBlockedUpdate] = []
-    update_events: list[LexiconUpdateEvent] = list(decay_events)
+    compatible_entries, entry_compatibility_blocks, entry_compatibility_events = _freeze_incompatible_entries(
+        entries=decayed_entries,
+        state=state,
+    )
+    entry_map = {entry.entry_id: entry for entry in compatible_entries}
+    blocked_updates: list[LexiconBlockedUpdate] = list(entry_compatibility_blocks)
+    update_events: list[LexiconUpdateEvent] = list(decay_events) + list(entry_compatibility_events)
     processed_entry_ids: list[str] = []
-    ambiguity_reasons: list[str] = []
+    ambiguity_reasons: list[str] = [
+        "entry_version_mismatch"
+        for _ in entry_compatibility_blocks
+    ]
     new_entry_count = 0
     updated_entry_count = 0
 
@@ -200,7 +213,13 @@ def create_or_update_lexicon_state(
             )
             continue
 
-        matching_entries = _find_matching_entries(state=tuple(entry_map.values()), proposal=proposal)
+        matching_entries = _find_matching_entries(
+            state=tuple(entry_map.values()),
+            proposal=proposal,
+            expected_schema_version=context.expected_schema_version,
+            expected_lexicon_version=context.expected_lexicon_version,
+            expected_taxonomy_version=context.expected_taxonomy_version,
+        )
         if matching_entries:
             ambiguous_targets = _ambiguous_update_targets(
                 matches=matching_entries,
@@ -305,6 +324,13 @@ def create_or_update_lexicon_state(
         last_updated_step=state.last_updated_step + context.step_delta,
     )
     gate = evaluate_lexicon_downstream_gate(next_state)
+    compatibility_markers = tuple(
+        dict.fromkeys(
+            block.compatibility_marker
+            for block in entry_compatibility_blocks
+            if block.compatibility_marker
+        )
+    )
     telemetry = build_lexical_telemetry(
         state=next_state,
         source_lineage=context.source_lineage,
@@ -315,7 +341,7 @@ def create_or_update_lexicon_state(
         queried_forms=(),
         matched_entry_ids=(),
         no_match_count=0,
-        compatibility_markers=(),
+        compatibility_markers=compatibility_markers,
         attempted_paths=ATTEMPTED_LEXICON_UPDATE_PATHS,
         downstream_gate=gate,
         causal_basis="typed lexical entry updates with conflict/provisional/unknown discipline",
@@ -424,11 +450,23 @@ def query_lexical_entries(
                 for sense in entry.sense_records
             )
         )
-        context_blocked_entry_ids = tuple(
-            entry.entry_id
-            for entry in matches
-            if entry.reference_profile.requires_context and not context.context_keys
-        )
+        context_blocked_entry_ids: list[str] = []
+        reference_context_blocked = False
+        operator_scope_blocked = False
+        for entry in matches:
+            if entry.reference_profile.requires_context and not context.context_keys:
+                context_blocked_entry_ids.append(entry.entry_id)
+                reference_context_blocked = True
+                continue
+            if (
+                entry.composition_profile.behaves_as_operator
+                and entry.composition_profile.scope_sensitive
+                and entry.composition_profile.remains_underspecified
+                and "scope_anchor" not in context.context_keys
+            ):
+                context_blocked_entry_ids.append(entry.entry_id)
+                operator_scope_blocked = True
+        context_blocked_entry_ids_tuple = tuple(dict.fromkeys(context_blocked_entry_ids))
         local_ambiguity: list[str] = []
         if len(matches) > 1:
             local_ambiguity.append("multiple_entries_for_surface_form")
@@ -443,8 +481,12 @@ def query_lexical_entries(
         if not matches and not unknown_ids:
             local_ambiguity.append("no_match")
             no_match_count += 1
-        if context_blocked_entry_ids:
+        if reference_context_blocked:
             local_ambiguity.append("context_required_for_reference_profile")
+        if operator_scope_blocked:
+            local_ambiguity.append("operator_scope_context_required")
+        if any(_entry_compatibility_markers(entry=entry, state=lexicon_state) for entry in matches):
+            local_ambiguity.append("entry_version_mismatch")
 
         ambiguity_reasons.extend(local_ambiguity)
         matched_entry_ids_all.extend(matched_entry_ids)
@@ -454,7 +496,7 @@ def query_lexical_entries(
                 matched_entry_ids=matched_entry_ids,
                 matched_sense_ids=matched_sense_ids,
                 unknown_item_ids=unknown_ids,
-                context_blocked_entry_ids=context_blocked_entry_ids,
+                context_blocked_entry_ids=context_blocked_entry_ids_tuple,
                 ambiguity_reasons=tuple(dict.fromkeys(local_ambiguity)),
                 no_final_meaning_resolution_performed=True,
             )
@@ -463,6 +505,11 @@ def query_lexical_entries(
     gate = _query_gate_from_records(
         records=tuple(records),
         state=lexicon_state,
+    )
+    query_compatibility_markers = (
+        ("entry_version_mismatch",)
+        if any("entry_version_mismatch" in record.ambiguity_reasons for record in records)
+        else ()
     )
     telemetry = build_lexical_telemetry(
         state=lexicon_state,
@@ -474,7 +521,7 @@ def query_lexical_entries(
         queried_forms=tuple(queried_forms),
         matched_entry_ids=tuple(dict.fromkeys(matched_entry_ids_all)),
         no_match_count=no_match_count,
-        compatibility_markers=(),
+        compatibility_markers=query_compatibility_markers,
         attempted_paths=ATTEMPTED_LEXICON_QUERY_PATHS,
         downstream_gate=gate,
         causal_basis="typed lexical query over ambiguity-preserving lexicon substrate",
@@ -573,8 +620,31 @@ def reconstruct_lexicon_state_from_snapshot(snapshot: dict[str, object]) -> Lexi
                         confidence=_clamp(float(sense["confidence"])),
                         provisional=bool(sense["provisional"]),
                         provenance=str(sense["provenance"]),
+                        status=LexicalSenseStatus(str(sense.get("status", "provisional"))),
+                        evidence_count=int(sense.get("evidence_count", 1)),
+                        conflict_markers=tuple(sense.get("conflict_markers", ())),
+                        example_ids=tuple(sense.get("example_ids", ())),
                     )
                     for sense in raw_senses
+                ),
+                examples=tuple(
+                    LexicalExampleRecord(
+                        example_id=str(example["example_id"]),
+                        example_text=str(example["example_text"]),
+                        linked_entry_id=str(example["linked_entry_id"]),
+                        linked_sense_id=(
+                            str(example["linked_sense_id"])
+                            if example.get("linked_sense_id") is not None
+                            else None
+                        ),
+                        status=LexicalExampleStatus(str(example.get("status", "illustrative"))),
+                        illustrative_only=bool(example.get("illustrative_only", True)),
+                        provenance=str(example.get("provenance", "lexicon.reconstruct")),
+                    )
+                    for example in raw_entry.get("examples", ())
+                ),
+                entry_status=LexicalAcquisitionStatus(
+                    str(raw_entry.get("entry_status", acquisition.get("status", "unknown")))
                 ),
                 composition_profile=LexicalCompositionProfile(
                     role_hints=tuple(
@@ -618,6 +688,15 @@ def reconstruct_lexicon_state_from_snapshot(snapshot: dict[str, object]) -> Lexi
                 confidence=_clamp(float(raw_entry.get("confidence", 0.0))),
                 conflict_state=LexicalConflictState(str(raw_entry.get("conflict_state", "none"))),
                 provenance=str(raw_entry.get("provenance", "lexicon.reconstruct")),
+                lemma=(
+                    str(raw_entry["lemma"])
+                    if raw_entry.get("lemma") is not None
+                    else None
+                ),
+                aliases=tuple(raw_entry.get("aliases", ())),
+                schema_version=str(raw_entry.get("schema_version", state_payload.get("schema_version", DEFAULT_LEXICON_SCHEMA_VERSION))),
+                lexicon_version=str(raw_entry.get("lexicon_version", state_payload.get("lexicon_version", DEFAULT_LEXICON_VERSION))),
+                taxonomy_version=str(raw_entry.get("taxonomy_version", state_payload.get("taxonomy_version", DEFAULT_LEXICON_TAXONOMY_VERSION))),
             )
         )
 
@@ -715,6 +794,67 @@ def _compatibility_markers(
     return tuple(markers)
 
 
+def _entry_compatibility_markers(
+    *,
+    entry: LexicalEntry,
+    state: LexiconState,
+) -> tuple[str, ...]:
+    markers: list[str] = []
+    if entry.schema_version != state.schema_version:
+        markers.append("entry_schema_version_mismatch")
+    if entry.lexicon_version != state.lexicon_version:
+        markers.append("entry_lexicon_version_mismatch")
+    if entry.taxonomy_version != state.taxonomy_version:
+        markers.append("entry_taxonomy_version_mismatch")
+    return tuple(markers)
+
+
+def _freeze_incompatible_entries(
+    *,
+    entries: tuple[LexicalEntry, ...],
+    state: LexiconState,
+) -> tuple[tuple[LexicalEntry, ...], tuple[LexiconBlockedUpdate, ...], tuple[LexiconUpdateEvent, ...]]:
+    adjusted_entries: list[LexicalEntry] = []
+    blocked_updates: list[LexiconBlockedUpdate] = []
+    update_events: list[LexiconUpdateEvent] = []
+    for entry in entries:
+        markers = _entry_compatibility_markers(entry=entry, state=state)
+        if not markers:
+            adjusted_entries.append(entry)
+            continue
+        marker_value = "|".join(markers)
+        blocked = LexiconBlockedUpdate(
+            surface_form=entry.canonical_form,
+            reason="entry version mismatch frozen to avoid incompatible carry-forward",
+            frozen=True,
+            provenance=f"lexicon.entry_compatibility_guard:{entry.entry_id}",
+            compatibility_marker=marker_value,
+        )
+        blocked_updates.append(blocked)
+        update_events.append(
+            LexiconUpdateEvent(
+                event_id=f"lexev-{uuid4().hex[:10]}",
+                entry_id=entry.entry_id,
+                update_kind=LexiconUpdateKind.FREEZE_UPDATE,
+                reason_tags=("entry_version_mismatch",),
+                provenance=blocked.provenance,
+            )
+        )
+        adjusted_entries.append(
+            replace(
+                entry,
+                entry_status=LexicalAcquisitionStatus.FROZEN,
+                acquisition_state=replace(
+                    entry.acquisition_state,
+                    status=LexicalAcquisitionStatus.FROZEN,
+                    frozen_update=True,
+                    blocked_reason=f"entry_version_mismatch:{marker_value}",
+                ),
+            )
+        )
+    return tuple(adjusted_entries), tuple(blocked_updates), tuple(update_events)
+
+
 def _query_matches(
     state: LexiconState,
     *,
@@ -728,7 +868,9 @@ def _query_matches(
         if not query.allow_provisional and entry.acquisition_state.status != LexicalAcquisitionStatus.STABLE:
             continue
         in_surface = any(variant.normalized_form == normalized_form for variant in entry.surface_variants)
-        if in_surface or _normalize(entry.canonical_form) == normalized_form:
+        in_alias = any(_normalize(alias) == normalized_form for alias in entry.aliases)
+        in_lemma = bool(entry.lemma and _normalize(entry.lemma) == normalized_form)
+        if in_surface or in_alias or in_lemma or _normalize(entry.canonical_form) == normalized_form:
             matches.append(entry)
     return tuple(matches)
 
@@ -737,14 +879,29 @@ def _find_matching_entries(
     *,
     state: tuple[LexicalEntry, ...],
     proposal: LexicalEntryProposal,
+    expected_schema_version: str,
+    expected_lexicon_version: str,
+    expected_taxonomy_version: str,
 ) -> tuple[LexicalEntry, ...]:
     normalized_surface = _normalize(proposal.surface_form)
     normalized_canonical = _normalize(proposal.canonical_form or proposal.surface_form)
     matches: list[LexicalEntry] = []
     for entry in state:
+        if entry.schema_version != expected_schema_version:
+            continue
+        if entry.lexicon_version != expected_lexicon_version:
+            continue
+        if entry.taxonomy_version != expected_taxonomy_version:
+            continue
         if entry.language_code != proposal.language_code:
             continue
         if _normalize(entry.canonical_form) == normalized_canonical:
+            matches.append(entry)
+            continue
+        if entry.lemma and _normalize(entry.lemma) == normalized_canonical:
+            matches.append(entry)
+            continue
+        if any(_normalize(alias) == normalized_surface for alias in entry.aliases):
             matches.append(entry)
             continue
         if any(variant.normalized_form == normalized_surface for variant in entry.surface_variants):
@@ -783,6 +940,10 @@ def _entry_match_score(
     normalized_canonical = _normalize(proposal.canonical_form or proposal.surface_form)
     if _normalize(entry.canonical_form) == normalized_canonical:
         score += 1.0
+    if entry.lemma and _normalize(entry.lemma) == normalized_canonical:
+        score += 0.5
+    if any(_normalize(alias) == normalized_surface for alias in entry.aliases):
+        score += 0.5
     if any(variant.normalized_form == normalized_surface for variant in entry.surface_variants):
         score += 1.0
     proposal_pos = set(proposal.part_of_speech_candidates)
@@ -813,7 +974,19 @@ def _update_entry(
     proposal: LexicalEntryProposal,
     context: LexiconUpdateContext,
 ) -> tuple[LexicalEntry, LexiconUpdateEvent, LexiconBlockedUpdate | None]:
-    merged_senses, has_conflict = _merge_senses(existing.sense_records, proposal.sense_hypotheses)
+    merged_senses, has_conflict = _merge_senses(
+        existing.sense_records,
+        proposal.sense_hypotheses,
+        context=context,
+        provenance=proposal.evidence_ref or "lexicon.entry_update",
+    )
+    merged_examples = _merge_examples(
+        existing.examples,
+        entry_id=existing.entry_id,
+        sense_records=merged_senses,
+        proposal=proposal,
+    )
+    merged_senses = _attach_example_ids_to_senses(merged_senses, merged_examples)
     merged_surface = _merge_surface_variants(existing.surface_variants, proposal=proposal)
     merged_pos = tuple(dict.fromkeys(existing.part_of_speech_candidates + proposal.part_of_speech_candidates))
     evidence_count = existing.acquisition_state.evidence_count + 1
@@ -826,6 +999,10 @@ def _update_entry(
     if proposal.conflict_hint or has_conflict:
         conflict_state = LexicalConflictState.EVIDENCE_CONFLICT
         status = LexicalAcquisitionStatus.CONFLICTED
+        merged_senses = _apply_sense_conflict_state(
+            merged_senses,
+            freeze=context.freeze_on_conflict,
+        )
         if context.freeze_on_conflict:
             status = LexicalAcquisitionStatus.FROZEN
             blocked = LexiconBlockedUpdate(
@@ -842,9 +1019,13 @@ def _update_entry(
 
     updated = replace(
         existing,
+        lemma=proposal.lemma or existing.lemma,
+        aliases=tuple(dict.fromkeys(existing.aliases + proposal.aliases)),
         surface_variants=merged_surface,
         part_of_speech_candidates=merged_pos,
         sense_records=merged_senses,
+        examples=merged_examples,
+        entry_status=status,
         composition_profile=proposal.composition_profile or existing.composition_profile,
         reference_profile=proposal.reference_profile or existing.reference_profile,
         acquisition_state=LexicalAcquisitionState(
@@ -860,6 +1041,9 @@ def _update_entry(
         confidence=merged_confidence,
         conflict_state=conflict_state,
         provenance=proposal.evidence_ref or existing.provenance,
+        schema_version=existing.schema_version,
+        lexicon_version=existing.lexicon_version,
+        taxonomy_version=existing.taxonomy_version,
     )
     event_kind = LexiconUpdateKind.REGISTER_CONFLICT if blocked else LexiconUpdateKind.UPDATE_ENTRY
     event_tags = ("conflict",) if blocked else ("evidence_update",)
@@ -881,6 +1065,9 @@ def _create_entry(
     entry_id = f"lex-{uuid4().hex[:10]}"
     normalized_surface = _normalize(proposal.surface_form)
     canonical_form = proposal.canonical_form or normalized_surface
+    lemma = proposal.lemma or canonical_form
+    aliases = tuple(dict.fromkeys((proposal.aliases or ()) + (canonical_form,)))
+    provenance = proposal.evidence_ref or "lexicon.entry_proposal"
     sense_records = tuple(
         LexicalSenseRecord(
             sense_id=f"sense-{uuid4().hex[:10]}",
@@ -891,10 +1078,21 @@ def _create_entry(
             anti_cues=hypothesis.anti_cues,
             confidence=_clamp(hypothesis.confidence),
             provisional=hypothesis.provisional,
-            provenance=proposal.evidence_ref or "lexicon.entry_proposal",
+            provenance=provenance,
+            status=_sense_status_for_hypothesis(hypothesis),
+            evidence_count=1,
+            conflict_markers=(),
+            example_ids=(),
         )
         for hypothesis in proposal.sense_hypotheses
     )
+    entry_examples = _build_examples_for_new_entry(
+        entry_id=entry_id,
+        sense_records=sense_records,
+        proposal=proposal,
+        provenance=provenance,
+    )
+    sense_records = _attach_example_ids_to_senses(sense_records, entry_examples)
     status = LexicalAcquisitionStatus.PROVISIONAL
     confidence = _clamp(proposal.confidence)
     if (
@@ -907,6 +1105,8 @@ def _create_entry(
     entry = LexicalEntry(
         entry_id=entry_id,
         canonical_form=canonical_form,
+        lemma=lemma,
+        aliases=aliases,
         surface_variants=(
             SurfaceFormRecord(
                 form=proposal.surface_form,
@@ -914,12 +1114,14 @@ def _create_entry(
                 locale_hint=proposal.language_code,
                 variant_kind="observed",
                 confidence=confidence,
-                provenance=proposal.evidence_ref or "lexicon.entry_proposal",
+                provenance=provenance,
             ),
         ),
         language_code=proposal.language_code,
         part_of_speech_candidates=proposal.part_of_speech_candidates,
         sense_records=sense_records,
+        examples=entry_examples,
+        entry_status=status,
         composition_profile=proposal.composition_profile or _default_composition_profile(),
         reference_profile=proposal.reference_profile or _default_reference_profile(),
         acquisition_state=LexicalAcquisitionState(
@@ -934,7 +1136,10 @@ def _create_entry(
         ),
         confidence=confidence,
         conflict_state=LexicalConflictState.NONE,
-        provenance=proposal.evidence_ref or "lexicon.entry_proposal",
+        provenance=provenance,
+        schema_version=DEFAULT_LEXICON_SCHEMA_VERSION,
+        lexicon_version=DEFAULT_LEXICON_VERSION,
+        taxonomy_version=DEFAULT_LEXICON_TAXONOMY_VERSION,
     )
     event = LexiconUpdateEvent(
         event_id=f"lexev-{uuid4().hex[:10]}",
@@ -949,6 +1154,9 @@ def _create_entry(
 def _merge_senses(
     existing_senses: tuple[LexicalSenseRecord, ...],
     sense_hypotheses: tuple[LexicalSenseHypothesis, ...],
+    *,
+    context: LexiconUpdateContext,
+    provenance: str,
 ) -> tuple[tuple[LexicalSenseRecord, ...], bool]:
     merged = list(existing_senses)
     conflict = False
@@ -973,25 +1181,176 @@ def _merge_senses(
                     anti_cues=hypothesis.anti_cues,
                     confidence=_clamp(hypothesis.confidence),
                     provisional=hypothesis.provisional,
-                    provenance="lexicon.entry_update",
+                    provenance=provenance,
+                    status=_sense_status_for_hypothesis(hypothesis),
+                    evidence_count=1,
+                    conflict_markers=(),
+                    example_ids=(),
                 )
             )
             continue
         record = merged[found_index]
         anti_cue_overlap = set(record.compatibility_cues).intersection(set(hypothesis.anti_cues))
         cue_anti_overlap = set(record.anti_cues).intersection(set(hypothesis.compatibility_cues))
+        conflict_markers = set(record.conflict_markers)
         if anti_cue_overlap or cue_anti_overlap:
             conflict = True
+            conflict_markers.add("cue_conflict")
+        updated_confidence = _clamp((record.confidence * 0.6) + (_clamp(hypothesis.confidence) * 0.4))
+        updated_evidence = record.evidence_count + 1
+        next_status = record.status
+        if conflict_markers:
+            next_status = (
+                LexicalSenseStatus.FROZEN
+                if context.freeze_on_conflict
+                else LexicalSenseStatus.CONFLICTED
+            )
+        elif (
+            updated_evidence >= context.min_evidence_for_stable
+            and updated_confidence >= context.stable_confidence_threshold
+        ):
+            next_status = LexicalSenseStatus.STABLE
+        elif hypothesis.provisional:
+            next_status = LexicalSenseStatus.PROVISIONAL
+        else:
+            next_status = LexicalSenseStatus.UNKNOWN
         merged[found_index] = replace(
             record,
             compatibility_cues=tuple(
                 dict.fromkeys(record.compatibility_cues + hypothesis.compatibility_cues)
             ),
             anti_cues=tuple(dict.fromkeys(record.anti_cues + hypothesis.anti_cues)),
-            confidence=_clamp((record.confidence * 0.6) + (_clamp(hypothesis.confidence) * 0.4)),
+            confidence=updated_confidence,
             provisional=record.provisional and hypothesis.provisional,
+            status=next_status,
+            evidence_count=updated_evidence,
+            conflict_markers=tuple(sorted(conflict_markers)),
         )
     return tuple(merged), conflict
+
+
+def _apply_sense_conflict_state(
+    sense_records: tuple[LexicalSenseRecord, ...],
+    *,
+    freeze: bool,
+) -> tuple[LexicalSenseRecord, ...]:
+    target = LexicalSenseStatus.FROZEN if freeze else LexicalSenseStatus.CONFLICTED
+    updated: list[LexicalSenseRecord] = []
+    for sense in sense_records:
+        markers = tuple(dict.fromkeys(sense.conflict_markers + ("entry_level_conflict",)))
+        updated.append(
+            replace(
+                sense,
+                status=target,
+                conflict_markers=markers,
+            )
+        )
+    return tuple(updated)
+
+
+def _sense_status_for_hypothesis(hypothesis: LexicalSenseHypothesis) -> LexicalSenseStatus:
+    if hypothesis.status_hint is not None:
+        return hypothesis.status_hint
+    if hypothesis.provisional:
+        return LexicalSenseStatus.PROVISIONAL
+    return LexicalSenseStatus.UNKNOWN
+
+
+def _build_examples_for_new_entry(
+    *,
+    entry_id: str,
+    sense_records: tuple[LexicalSenseRecord, ...],
+    proposal: LexicalEntryProposal,
+    provenance: str,
+) -> tuple[LexicalExampleRecord, ...]:
+    examples: list[LexicalExampleRecord] = []
+    for text in proposal.entry_example_texts:
+        normalized = text.strip()
+        if not normalized:
+            continue
+        examples.append(
+            LexicalExampleRecord(
+                example_id=f"lexex-{uuid4().hex[:10]}",
+                example_text=normalized,
+                linked_entry_id=entry_id,
+                linked_sense_id=None,
+                status=LexicalExampleStatus.ILLUSTRATIVE,
+                illustrative_only=True,
+                provenance=provenance,
+            )
+        )
+    sense_by_label = {record.sense_label: record for record in sense_records}
+    for hypothesis in proposal.sense_hypotheses:
+        target_sense = sense_by_label.get(hypothesis.sense_label)
+        if target_sense is None:
+            continue
+        for text in hypothesis.example_texts:
+            normalized = text.strip()
+            if not normalized:
+                continue
+            examples.append(
+                LexicalExampleRecord(
+                    example_id=f"lexex-{uuid4().hex[:10]}",
+                    example_text=normalized,
+                    linked_entry_id=entry_id,
+                    linked_sense_id=target_sense.sense_id,
+                    status=LexicalExampleStatus.PROVISIONAL,
+                    illustrative_only=False,
+                    provenance=provenance,
+                )
+            )
+    unique: dict[tuple[str, str | None], LexicalExampleRecord] = {}
+    for record in examples:
+        key = (record.example_text.lower(), record.linked_sense_id)
+        unique[key] = record
+    return tuple(unique.values())
+
+
+def _attach_example_ids_to_senses(
+    sense_records: tuple[LexicalSenseRecord, ...],
+    examples: tuple[LexicalExampleRecord, ...],
+) -> tuple[LexicalSenseRecord, ...]:
+    linked_example_ids: dict[str, list[str]] = {}
+    for example in examples:
+        if example.linked_sense_id is None:
+            continue
+        linked_example_ids.setdefault(example.linked_sense_id, []).append(example.example_id)
+    updated: list[LexicalSenseRecord] = []
+    for sense in sense_records:
+        extra_ids = tuple(linked_example_ids.get(sense.sense_id, ()))
+        if not extra_ids:
+            updated.append(sense)
+            continue
+        updated.append(
+            replace(
+                sense,
+                example_ids=tuple(dict.fromkeys(sense.example_ids + extra_ids)),
+            )
+        )
+    return tuple(updated)
+
+
+def _merge_examples(
+    existing_examples: tuple[LexicalExampleRecord, ...],
+    *,
+    entry_id: str,
+    sense_records: tuple[LexicalSenseRecord, ...],
+    proposal: LexicalEntryProposal,
+) -> tuple[LexicalExampleRecord, ...]:
+    additions = _build_examples_for_new_entry(
+        entry_id=entry_id,
+        sense_records=sense_records,
+        proposal=proposal,
+        provenance=proposal.evidence_ref or "lexicon.entry_update",
+    )
+    merged: dict[tuple[str, str | None], LexicalExampleRecord] = {}
+    for existing in existing_examples:
+        merged[(existing.example_text.lower(), existing.linked_sense_id)] = existing
+    for item in additions:
+        key = (item.example_text.lower(), item.linked_sense_id)
+        merged.setdefault(key, item)
+    combined = tuple(merged.values())
+    return combined
 
 
 def _merge_surface_variants(
@@ -1051,48 +1410,10 @@ def _query_gate_from_records(
     records: tuple[LexiconQueryRecord, ...],
     state: LexiconState,
 ) -> LexiconGateDecision:
-    restrictions: list[str] = ["no_final_meaning_resolution_performed"]
-    accepted_entry_ids: list[str] = []
-    rejected_entry_ids: list[str] = []
-    entry_by_id = {entry.entry_id: entry for entry in state.entries}
-    for record in records:
-        if record.ambiguity_reasons:
-            restrictions.append("query_ambiguity_present")
-        if not record.matched_entry_ids and record.unknown_item_ids:
-            restrictions.append("query_unknown_item_present")
-        if not record.matched_entry_ids and not record.unknown_item_ids:
-            restrictions.append("query_no_match")
-        if record.context_blocked_entry_ids:
-            restrictions.append("context_required_for_reference_profile")
-        for entry_id in record.matched_entry_ids:
-            if entry_id in record.context_blocked_entry_ids:
-                rejected_entry_ids.append(entry_id)
-                continue
-            entry = entry_by_id.get(entry_id)
-            if entry is None:
-                rejected_entry_ids.append(entry_id)
-                continue
-            if entry.acquisition_state.status in {
-                LexicalAcquisitionStatus.CONFLICTED,
-                LexicalAcquisitionStatus.FROZEN,
-            }:
-                rejected_entry_ids.append(entry.entry_id)
-                restrictions.append("conflicted_or_frozen_entry_present")
-                continue
-            accepted_entry_ids.append(entry.entry_id)
-    accepted = bool(accepted_entry_ids)
-    reason = (
-        "typed lexical query output with bounded lexical uncertainty"
-        if accepted
-        else "no strong lexical match under current lexical substrate state"
-    )
-    return LexiconGateDecision(
-        accepted=accepted,
-        restrictions=tuple(dict.fromkeys(restrictions)),
-        reason=reason,
-        accepted_entry_ids=tuple(dict.fromkeys(accepted_entry_ids)),
-        rejected_entry_ids=tuple(dict.fromkeys(rejected_entry_ids)),
-        state_ref=f"{state.schema_version}|{state.lexicon_version}|{state.taxonomy_version}",
+    return build_lexicon_gate_decision(
+        state=state,
+        query_records=records,
+        abstain=False,
     )
 
 
@@ -1163,6 +1484,10 @@ def _seed_entries() -> tuple[LexicalEntry, ...]:
                     confidence=confidence,
                     provisional=False,
                     provenance="lexicon.seed",
+                    status=LexicalSenseStatus.STABLE,
+                    evidence_count=5,
+                    conflict_markers=(),
+                    example_ids=(),
                 )
                 for index, (family, label, coarse_type) in enumerate(senses, start=1)
             ),
@@ -1176,7 +1501,7 @@ def _seed_entries() -> tuple[LexicalEntry, ...]:
                 behaves_as_referential_carrier=LexicalCompositionRole.REFERENTIAL_CARRIER in role_hints,
                 scope_sensitive=LexicalCompositionRole.OPERATOR in role_hints,
                 negation_sensitive=canonical_form in {"not", "не"},
-                remains_underspecified=False,
+                remains_underspecified=LexicalCompositionRole.OPERATOR in role_hints,
             ),
             reference_profile=reference_profile,
             acquisition_state=LexicalAcquisitionState(
@@ -1191,6 +1516,13 @@ def _seed_entries() -> tuple[LexicalEntry, ...]:
             confidence=confidence,
             conflict_state=LexicalConflictState.NONE,
             provenance="lexicon.seed",
+            lemma=canonical_form,
+            aliases=(canonical_form,),
+            examples=(),
+            entry_status=LexicalAcquisitionStatus.STABLE,
+            schema_version=DEFAULT_LEXICON_SCHEMA_VERSION,
+            lexicon_version=DEFAULT_LEXICON_VERSION,
+            taxonomy_version=DEFAULT_LEXICON_TAXONOMY_VERSION,
         )
 
     pronoun_profile = LexicalReferenceProfile(

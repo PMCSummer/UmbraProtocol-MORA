@@ -5,11 +5,14 @@ from substrate.lexicon import (
     LexicalCompositionRole,
     LexicalEntryProposal,
     LexicalSenseHypothesis,
+    LexicalSenseStatus,
+    LexiconQueryRequest,
     LexiconUpdateContext,
     LexiconUpdateKind,
     create_empty_lexicon_state,
     create_or_update_lexicon_state,
     create_seed_lexicon_state,
+    query_lexical_entries,
 )
 
 
@@ -112,3 +115,99 @@ def test_multi_match_update_freezes_instead_of_forced_winner_selection() -> None
     assert any(event.update_kind == LexiconUpdateKind.FREEZE_UPDATE for event in result.update_events)
     assert result.telemetry.updated_entry_count == 0
     assert result.telemetry.new_entry_count == 0
+
+
+def test_typed_examples_are_attached_to_entry_and_sense() -> None:
+    proposal = LexicalEntryProposal(
+        surface_form="lumen",
+        canonical_form="lumen",
+        language_code="en",
+        part_of_speech_candidates=("noun",),
+        sense_hypotheses=(
+            LexicalSenseHypothesis(
+                sense_family="entity.light",
+                sense_label="light_unit",
+                coarse_semantic_type=LexicalCoarseSemanticType.ENTITY,
+                confidence=0.74,
+                example_texts=("the lumen value increased",),
+            ),
+        ),
+        entry_example_texts=("lumen appears in specs",),
+        confidence=0.74,
+        evidence_ref="ev-examples-1",
+    )
+    result = create_or_update_lexicon_state(
+        lexicon_state=create_empty_lexicon_state(),
+        entry_proposals=(proposal,),
+    )
+    assert result.updated_state.entries
+    entry = result.updated_state.entries[0]
+    assert entry.examples
+    assert all(example.linked_entry_id == entry.entry_id for example in entry.examples)
+    linked_sense_ids = {example.linked_sense_id for example in entry.examples if example.linked_sense_id}
+    assert linked_sense_ids
+    assert any(sense.example_ids for sense in entry.sense_records)
+
+
+def test_examples_are_runtime_load_bearing_for_non_stable_entry_claim_strength() -> None:
+    without_examples = create_or_update_lexicon_state(
+        lexicon_state=create_empty_lexicon_state(),
+        entry_proposals=(
+            LexicalEntryProposal(
+                surface_form="kappa",
+                canonical_form="kappa",
+                language_code="en",
+                part_of_speech_candidates=("noun",),
+                sense_hypotheses=(
+                    LexicalSenseHypothesis(
+                        sense_family="entity.kappa",
+                        sense_label="kappa_entity",
+                        coarse_semantic_type=LexicalCoarseSemanticType.ENTITY,
+                        confidence=0.71,
+                        status_hint=LexicalSenseStatus.STABLE,
+                    ),
+                ),
+                confidence=0.62,
+                evidence_ref="ev-kappa-no-examples",
+            ),
+        ),
+        context=LexiconUpdateContext(min_evidence_for_stable=3, stable_confidence_threshold=0.7),
+    )
+    with_examples = create_or_update_lexicon_state(
+        lexicon_state=create_empty_lexicon_state(),
+        entry_proposals=(
+            LexicalEntryProposal(
+                surface_form="kappa",
+                canonical_form="kappa",
+                language_code="en",
+                part_of_speech_candidates=("noun",),
+                sense_hypotheses=(
+                    LexicalSenseHypothesis(
+                        sense_family="entity.kappa",
+                        sense_label="kappa_entity",
+                        coarse_semantic_type=LexicalCoarseSemanticType.ENTITY,
+                        confidence=0.71,
+                        status_hint=LexicalSenseStatus.STABLE,
+                        example_texts=("kappa appears as a domain entity",),
+                    ),
+                ),
+                entry_example_texts=("kappa entry usage sample",),
+                confidence=0.62,
+                evidence_ref="ev-kappa-with-examples",
+            ),
+        ),
+        context=LexiconUpdateContext(min_evidence_for_stable=3, stable_confidence_threshold=0.7),
+    )
+
+    query_without = query_lexical_entries(
+        lexicon_state=without_examples.updated_state,
+        queries=(LexiconQueryRequest(surface_form="kappa", language_code="en"),),
+    )
+    query_with = query_lexical_entries(
+        lexicon_state=with_examples.updated_state,
+        queries=(LexiconQueryRequest(surface_form="kappa", language_code="en"),),
+    )
+
+    assert query_without.downstream_gate.accepted is False
+    assert "non_stable_entry_without_example_support" in query_without.downstream_gate.restrictions
+    assert query_with.downstream_gate.accepted is True

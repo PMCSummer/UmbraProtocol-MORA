@@ -46,6 +46,21 @@ class LexicalConflictState(str, Enum):
     EVIDENCE_CONFLICT = "evidence_conflict"
 
 
+class LexicalSenseStatus(str, Enum):
+    STABLE = "stable"
+    PROVISIONAL = "provisional"
+    UNKNOWN = "unknown"
+    CONFLICTED = "conflicted"
+    FROZEN = "frozen"
+
+
+class LexicalExampleStatus(str, Enum):
+    ILLUSTRATIVE = "illustrative"
+    PROVISIONAL = "provisional"
+    STABLE = "stable"
+    CONFLICTED = "conflicted"
+
+
 class LexiconUpdateKind(str, Enum):
     CREATE_ENTRY = "create_entry"
     UPDATE_ENTRY = "update_entry"
@@ -67,6 +82,17 @@ class SurfaceFormRecord:
 
 
 @dataclass(frozen=True, slots=True)
+class LexicalExampleRecord:
+    example_id: str
+    example_text: str
+    linked_entry_id: str
+    linked_sense_id: str | None
+    status: LexicalExampleStatus
+    illustrative_only: bool
+    provenance: str
+
+
+@dataclass(frozen=True, slots=True)
 class LexicalSenseRecord:
     sense_id: str
     sense_family: str
@@ -77,6 +103,10 @@ class LexicalSenseRecord:
     confidence: float
     provisional: bool
     provenance: str
+    status: LexicalSenseStatus = LexicalSenseStatus.PROVISIONAL
+    evidence_count: int = 1
+    conflict_markers: tuple[str, ...] = ()
+    example_ids: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -130,6 +160,13 @@ class LexicalEntry:
     confidence: float
     conflict_state: LexicalConflictState
     provenance: str
+    lemma: str | None = None
+    aliases: tuple[str, ...] = ()
+    examples: tuple[LexicalExampleRecord, ...] = ()
+    entry_status: LexicalAcquisitionStatus = LexicalAcquisitionStatus.UNKNOWN
+    schema_version: str = DEFAULT_LEXICON_SCHEMA_VERSION
+    lexicon_version: str = DEFAULT_LEXICON_VERSION
+    taxonomy_version: str = DEFAULT_LEXICON_TAXONOMY_VERSION
 
 
 @dataclass(frozen=True, slots=True)
@@ -175,6 +212,8 @@ class LexicalSenseHypothesis:
     anti_cues: tuple[str, ...] = ()
     confidence: float = 0.5
     provisional: bool = True
+    status_hint: LexicalSenseStatus | None = None
+    example_texts: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -184,6 +223,9 @@ class LexicalEntryProposal:
     language_code: str
     part_of_speech_candidates: tuple[str, ...]
     sense_hypotheses: tuple[LexicalSenseHypothesis, ...]
+    lemma: str | None = None
+    aliases: tuple[str, ...] = ()
+    entry_example_texts: tuple[str, ...] = ()
     composition_profile: LexicalCompositionProfile | None = None
     reference_profile: LexicalReferenceProfile | None = None
     confidence: float = 0.5

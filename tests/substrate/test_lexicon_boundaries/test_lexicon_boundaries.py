@@ -4,6 +4,7 @@ import pytest
 
 from substrate.lexicon import (
     LexicalEntry,
+    LexicalSenseRecord,
     LexiconQueryContext,
     LexiconQueryRequest,
     create_or_update_lexicon_state,
@@ -36,6 +37,8 @@ def test_lexicon_public_models_do_not_claim_dictum_or_illocution() -> None:
     forbidden = {
         "dictum",
         "proposition",
+        "parse_tree",
+        "syntax_winner",
         "illocution",
         "commitment",
         "accepted_fact",
@@ -43,3 +46,5 @@ def test_lexicon_public_models_do_not_claim_dictum_or_illocution() -> None:
     }
     field_names = {field_info.name for field_info in fields(LexicalEntry)}
     assert forbidden.isdisjoint(field_names)
+    sense_field_names = {field_info.name for field_info in fields(LexicalSenseRecord)}
+    assert forbidden.isdisjoint(sense_field_names)

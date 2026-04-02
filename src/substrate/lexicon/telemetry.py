@@ -118,6 +118,8 @@ def lexicon_result_snapshot(
                 {
                     "entry_id": entry.entry_id,
                     "canonical_form": entry.canonical_form,
+                    "lemma": entry.lemma,
+                    "aliases": entry.aliases,
                     "language_code": entry.language_code,
                     "surface_variants": tuple(
                         {
@@ -141,10 +143,27 @@ def lexicon_result_snapshot(
                             "anti_cues": sense.anti_cues,
                             "confidence": sense.confidence,
                             "provisional": sense.provisional,
+                            "status": sense.status.value,
+                            "evidence_count": sense.evidence_count,
+                            "conflict_markers": sense.conflict_markers,
+                            "example_ids": sense.example_ids,
                             "provenance": sense.provenance,
                         }
                         for sense in entry.sense_records
                     ),
+                    "examples": tuple(
+                        {
+                            "example_id": example.example_id,
+                            "example_text": example.example_text,
+                            "linked_entry_id": example.linked_entry_id,
+                            "linked_sense_id": example.linked_sense_id,
+                            "status": example.status.value,
+                            "illustrative_only": example.illustrative_only,
+                            "provenance": example.provenance,
+                        }
+                        for example in entry.examples
+                    ),
+                    "entry_status": entry.entry_status.value,
                     "composition_profile": {
                         "role_hints": tuple(role.value for role in entry.composition_profile.role_hints),
                         "argument_structure_hints": entry.composition_profile.argument_structure_hints,
@@ -179,6 +198,9 @@ def lexicon_result_snapshot(
                     "confidence": entry.confidence,
                     "conflict_state": entry.conflict_state.value,
                     "provenance": entry.provenance,
+                    "schema_version": entry.schema_version,
+                    "lexicon_version": entry.lexicon_version,
+                    "taxonomy_version": entry.taxonomy_version,
                 }
                 for entry in state.entries
             ),

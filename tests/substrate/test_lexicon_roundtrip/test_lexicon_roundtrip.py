@@ -47,8 +47,10 @@ def _proposal(surface: str, ref: str) -> LexicalEntryProposal:
                 sense_label=f"{surface}_sense",
                 coarse_semantic_type=LexicalCoarseSemanticType.ENTITY,
                 confidence=0.73,
+                example_texts=(f"{surface} appears in an example",),
             ),
         ),
+        entry_example_texts=(f"{surface} is used in a lexical entry sample",),
         confidence=0.73,
         evidence_ref=ref,
     )
@@ -60,9 +62,29 @@ def _state_projection(state):
             (
                 entry.entry_id,
                 entry.canonical_form,
+                entry.lemma,
+                entry.aliases,
                 entry.acquisition_state.status.value,
+                entry.entry_status.value,
                 entry.acquisition_state.evidence_count,
-                tuple((sense.sense_family, sense.sense_label) for sense in entry.sense_records),
+                tuple(
+                    (
+                        sense.sense_family,
+                        sense.sense_label,
+                        sense.status.value,
+                        sense.evidence_count,
+                        sense.example_ids,
+                    )
+                    for sense in entry.sense_records
+                ),
+                tuple(
+                    (
+                        example.example_text,
+                        example.linked_sense_id,
+                        example.status.value,
+                    )
+                    for example in entry.examples
+                ),
                 entry.conflict_state.value,
             )
             for entry in sorted(state.entries, key=lambda value: value.entry_id)
@@ -116,6 +138,8 @@ def test_persist_reconstruct_continue_preserves_lexicon_artifacts() -> None:
     assert persisted_first.accepted is True
     first_snapshot = persisted_first.state.trace.events[-1].payload["lexicon_snapshot"]
     reconstructed_state = reconstruct_lexicon_state_from_snapshot(first_snapshot)
+    assert reconstructed_state.entries[0].examples
+    assert reconstructed_state.entries[0].sense_records[0].example_ids
 
     uninterrupted_continue = create_or_update_lexicon_state(
         lexicon_state=first_update.updated_state,
@@ -157,3 +181,35 @@ def test_persist_reconstruct_continue_preserves_lexicon_artifacts() -> None:
     assert serialized["state"]["entries"]
     assert serialized["state"]["unknown_items"]
     assert serialized["telemetry"]["source_lineage"] is not None
+
+
+def test_reconstruct_continue_caps_per_entry_version_mismatch() -> None:
+    initial = create_or_update_lexicon_state(
+        lexicon_state=create_empty_lexicon_state(),
+        entry_proposals=(_proposal("rho", "ev-rho-1"),),
+    )
+    payload = lexicon_result_to_payload(initial)
+    payload["state"]["entries"][0]["schema_version"] = "lexicon.schema.v999"
+    reconstructed = reconstruct_lexicon_state_from_snapshot(payload)
+
+    query = query_lexical_entries(
+        lexicon_state=reconstructed,
+        queries=(LexiconQueryRequest(surface_form="rho", language_code="en"),),
+    )
+    assert query.downstream_gate.accepted is False
+    assert "entry_version_mismatch" in query.downstream_gate.restrictions
+
+    continued = create_or_update_lexicon_state(
+        lexicon_state=reconstructed,
+        entry_proposals=(_proposal("rho", "ev-rho-2"),),
+    )
+    assert any(
+        "entry version mismatch frozen" in blocked.reason
+        for blocked in continued.blocked_updates
+    )
+    assert any(
+        blocked.compatibility_marker and "entry_schema_version_mismatch" in blocked.compatibility_marker
+        for blocked in continued.blocked_updates
+    )
+    rho_entries = [entry for entry in continued.updated_state.entries if entry.canonical_form == "rho"]
+    assert len(rho_entries) >= 2

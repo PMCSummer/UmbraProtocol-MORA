@@ -19,6 +19,9 @@ def test_single_form_supports_multiple_senses_without_top1_collapse() -> None:
     assert len(record.matched_sense_ids) >= 2
     assert "multiple_senses_for_surface_form" in record.ambiguity_reasons
     assert record.no_final_meaning_resolution_performed is True
+    entry = next(entry for entry in state.entries if entry.entry_id == record.matched_entry_ids[0])
+    assert len(entry.sense_records) >= 2
+    assert len({sense.sense_id for sense in entry.sense_records}) >= 2
 
 
 def test_single_form_can_map_to_multiple_entries() -> None:
@@ -30,6 +33,7 @@ def test_single_form_can_map_to_multiple_entries() -> None:
     record = result.query_records[0]
     assert len(record.matched_entry_ids) >= 2
     assert "multiple_entries_for_surface_form" in record.ambiguity_reasons
+    assert len(set(record.matched_entry_ids)) >= 2
 
 
 def test_negative_control_ablation_of_ambiguity_changes_behavior() -> None:

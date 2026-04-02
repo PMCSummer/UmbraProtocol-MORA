@@ -12,20 +12,28 @@ Accepted as a narrow build-mode substrate increment.
 ## What This Substrate Claims
 - Provides a typed storage and update/query surface for lexical knowledge.
 - Stores lexical entries as bundles, not string-to-single-meaning maps.
+- Entry model is explicit and distinct from sense model (entry identity + sense bundles).
 - Preserves lexical ambiguity:
   - one form may map to multiple entries
   - one entry may carry multiple senses
 - Enforces split-or-freeze behavior on ambiguous multi-target updates (no silent winner-take-all collapse).
 - Preserves provisional/conflict/unknown lexical states as first-class outputs.
 - Stores composition and reference behavior hints for later phases.
+- Stores typed lexical examples linked to entries/senses as inspectable usage evidence.
 - Applies `reference_profile.requires_context` as a runtime query/gate restriction (`context_required_for_reference_profile`).
+- Applies operator scope-context restriction for underspecified operator-like entries (`operator_scope_context_required`).
+- Uses a single gate semantics path for query and canonical downstream gate decisions.
+- Caps strong lexical claims when only non-stable senses remain (`only_unstable_senses`).
+- Uses example support as a minimal runtime evidence-quality cap for non-stable entries (`non_stable_entry_without_example_support`).
 - Enforces schema/lexicon/taxonomy compatibility checks on update/query seams.
+- Freezes/caps per-entry version-incompatible records on reconstruct/continue boundary (no silent incompatible carry-forward).
 - Persists load-bearing lexical state through F01 seam only.
 
 ## What This Substrate Does Not Claim
 - No full language learning.
 - No final lexical grounding.
 - No final referent resolution.
+- No word-sense disambiguation engine.
 - No dictum/proposition construction.
 - No semantic completion.
 - No illocution/discourse acceptance/commitment updates.

@@ -78,3 +78,19 @@ def test_conflicted_query_matches_do_not_stay_accepted() -> None:
     canonical_gate = evaluate_lexicon_downstream_gate(query_result)
     assert canonical_gate.accepted is False
     assert canonical_gate.rejected_entry_ids
+
+
+def test_sense_level_conflict_state_remains_first_class() -> None:
+    state = create_empty_lexicon_state()
+    first = create_or_update_lexicon_state(
+        lexicon_state=state,
+        entry_proposals=(_proposal("sense_a", False, "ev-sense-c1"),),
+    )
+    second = create_or_update_lexicon_state(
+        lexicon_state=first.updated_state,
+        entry_proposals=(_proposal("sense_b", True, "ev-sense-c2"),),
+        context=LexiconUpdateContext(freeze_on_conflict=True),
+    )
+    entry = second.updated_state.entries[0]
+    assert any(sense.status.value in {"conflicted", "frozen"} for sense in entry.sense_records)
+    assert any("entry_level_conflict" in sense.conflict_markers for sense in entry.sense_records)

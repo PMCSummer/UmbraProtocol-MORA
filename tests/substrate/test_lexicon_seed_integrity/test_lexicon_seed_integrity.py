@@ -6,7 +6,11 @@ def test_seed_lexicon_size_and_typed_records_are_load_bearing() -> None:
     assert 20 <= len(state.entries) <= 60
     assert all(entry.sense_records for entry in state.entries)
     assert all(entry.composition_profile.role_hints for entry in state.entries)
+    assert all(entry.lemma for entry in state.entries)
+    assert all(entry.entry_status.value == "stable" for entry in state.entries)
+    assert all(entry.schema_version == state.schema_version for entry in state.entries)
     assert all(entry.reference_profile.can_remain_unresolved in (True, False) for entry in state.entries)
+    assert all(hasattr(sense, "status") for entry in state.entries for sense in entry.sense_records)
 
 
 def test_seed_contains_pronoun_deixis_negation_temporal_quantifier_and_ambiguity() -> None:
