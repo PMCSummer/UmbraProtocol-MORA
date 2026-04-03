@@ -13,11 +13,24 @@ def _mirror_qml() -> str:
     return path.read_text(encoding="utf-8")
 
 
-def test_mirror_uses_native_animation_core_instead_of_per_frame_tick_loop() -> None:
+def _main_qml() -> str:
+    path = (
+        Path(__file__).resolve().parents[2]
+        / "src"
+        / "desktop_shell"
+        / "qml"
+        / "Main.qml"
+    )
+    return path.read_text(encoding="utf-8")
+
+
+def test_mirror_primary_path_is_2d_sigil_not_quick3d_or_shapes() -> None:
     qml = _mirror_qml()
-    assert "QuaternionAnimation" in qml
-    assert "function tick(" not in qml
-    assert "id: ticker" not in qml
+    assert "import QtQuick3D" not in qml
+    assert "View3D" not in qml
+    assert "import QtQuick.Shapes" not in qml
+    assert "ShapePath" not in qml
+    assert "Repeater3D" not in qml
 
 
 def test_mirror_runtime_is_lifecycle_gated() -> None:
@@ -27,8 +40,17 @@ def test_mirror_runtime_is_lifecycle_gated() -> None:
     assert "stopRuntimeEngines()" in qml
 
 
-def test_mirror_target_updates_are_interval_driven_not_frame_driven() -> None:
+def test_mirror_uses_interval_drift_not_frame_tick_loop_or_path_math() -> None:
     qml = _mirror_qml()
-    assert "id: targetTimer" in qml
-    assert "scheduleNextTargetIntervalMs" in qml
-    assert "repeat: false" in qml
+    assert "id: driftTimer" in qml
+    assert "retargetAnomaly()" in qml
+    assert "function tick(" not in qml
+    assert "id: ticker" not in qml
+
+
+def test_main_tabs_are_lazy_loaded_via_loaders() -> None:
+    qml = _main_qml()
+    assert "Loader {" in qml
+    assert "sourceComponent: active ? entityTabComponent : undefined" in qml
+    assert "sourceComponent: active ? languageTabComponent : undefined" in qml
+    assert "sourceComponent: active ? diagnosticsTabComponent : undefined" in qml

@@ -90,36 +90,96 @@ ApplicationWindow {
             Layout.fillHeight: true
             currentIndex: tabBar.currentIndex
 
-            EntityTab {
-                theme: shellTheme
-                railModel: shellBridge.criticalRail
-                bridge: shellBridge
+            Loader {
+                id: entityLoader
+                Layout.fillWidth: true
+                Layout.fillHeight: true
                 active: tabBar.currentIndex === 0
+                asynchronous: true
+                sourceComponent: active ? entityTabComponent : undefined
             }
 
-            TraceTab {
-                theme: shellTheme
-                bridge: shellBridge
+            Loader {
+                id: traceLoader
+                Layout.fillWidth: true
+                Layout.fillHeight: true
                 active: tabBar.currentIndex === 1
+                asynchronous: true
+                sourceComponent: active ? traceTabComponent : undefined
             }
 
-            LanguageTab {
-                theme: shellTheme
-                bridge: shellBridge
+            Loader {
+                id: languageLoader
+                Layout.fillWidth: true
+                Layout.fillHeight: true
                 active: tabBar.currentIndex === 2
+                asynchronous: true
+                sourceComponent: active ? languageTabComponent : undefined
             }
 
-            ViabilityTab {
-                theme: shellTheme
-                bridge: shellBridge
+            Loader {
+                id: viabilityLoader
+                Layout.fillWidth: true
+                Layout.fillHeight: true
                 active: tabBar.currentIndex === 3
+                asynchronous: true
+                sourceComponent: active ? viabilityTabComponent : undefined
             }
 
-            DiagnosticsTab {
-                theme: shellTheme
-                bridge: shellBridge
+            Loader {
+                id: diagnosticsLoader
+                Layout.fillWidth: true
+                Layout.fillHeight: true
                 active: tabBar.currentIndex === 4
+                asynchronous: true
+                sourceComponent: active ? diagnosticsTabComponent : undefined
             }
+        }
+    }
+
+    Component {
+        id: entityTabComponent
+        EntityTab {
+            theme: shellTheme
+            railModel: shellBridge.criticalRail
+            bridge: shellBridge
+            active: true
+        }
+    }
+
+    Component {
+        id: traceTabComponent
+        TraceTab {
+            theme: shellTheme
+            bridge: shellBridge
+            active: true
+        }
+    }
+
+    Component {
+        id: languageTabComponent
+        LanguageTab {
+            theme: shellTheme
+            bridge: shellBridge
+            active: true
+        }
+    }
+
+    Component {
+        id: viabilityTabComponent
+        ViabilityTab {
+            theme: shellTheme
+            bridge: shellBridge
+            active: true
+        }
+    }
+
+    Component {
+        id: diagnosticsTabComponent
+        DiagnosticsTab {
+            theme: shellTheme
+            bridge: shellBridge
+            active: true
         }
     }
 }
