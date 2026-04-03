@@ -23,3 +23,16 @@ def test_qml_theme_payload_exposes_mirror_motion_tokens() -> None:
     assert "slerp_response" in mirror
     assert "precession_intensity" in mirror
     assert "reduced_motion_scale" in mirror
+
+
+def test_qml_theme_payload_exposes_mirror_semantic_tokens() -> None:
+    payload = to_qml_theme_map(default_shell_theme())
+    semantics = payload["mirror_semantics"]
+
+    assert 0.0 < semantics["advisory_gate"] < semantics["caution_gate"] < semantics["warning_gate"] <= 1.0
+    assert semantics["density_pressure_scale"] > 0.0
+    assert semantics["echo_uncertainty_scale"] > 0.0
+    assert semantics["center_offset_conflict_scale"] > 0.0
+    assert semantics["orbital_activity_scale"] > 0.0
+    assert semantics["motion_pressure_speedup"] > 0.0
+    assert 0.0 < semantics["reduced_semantic_scale"] <= 1.0

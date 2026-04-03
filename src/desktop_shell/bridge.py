@@ -79,6 +79,37 @@ class ShellBridge(QObject):
             "waiting": "waiting",
             "subject-speaking": "subject-speaking",
         }
+        self._semantic_presets: dict[str, dict[str, float]] = {
+            "empty": {
+                "pressure_level": 0.12,
+                "uncertainty_level": 0.1,
+                "conflict_level": 0.08,
+                "recovery_level": 0.76,
+                "warning_level": 0.0,
+            },
+            "active": {
+                "pressure_level": 0.34,
+                "uncertainty_level": 0.22,
+                "conflict_level": 0.18,
+                "recovery_level": 0.58,
+                "warning_level": 0.0,
+            },
+            "waiting": {
+                "pressure_level": 0.44,
+                "uncertainty_level": 0.5,
+                "conflict_level": 0.22,
+                "recovery_level": 0.42,
+                "warning_level": 0.0,
+            },
+            "subject-speaking": {
+                "pressure_level": 0.56,
+                "uncertainty_level": 0.34,
+                "conflict_level": 0.28,
+                "recovery_level": 0.36,
+                "warning_level": 0.0,
+            },
+        }
+        self._mirror_semantic_input = deepcopy(self._semantic_presets[self._entity_state])
 
     @Property("QVariantList", constant=True)
     def criticalRail(self) -> list[dict[str, str]]:
@@ -86,6 +117,7 @@ class ShellBridge(QObject):
 
     entitySurfaceStateChanged = Signal()
     dialogueMessagesChanged = Signal()
+    mirrorSemanticInputChanged = Signal()
 
     @Property("QVariantList", constant=True)
     def entityStates(self) -> list[str]:
@@ -107,6 +139,31 @@ class ShellBridge(QObject):
     def dialogueMessages(self) -> list[dict[str, str]]:
         return deepcopy(self._messages_by_state.get(self._entity_state, []))
 
+    @Property("QVariantMap", notify=mirrorSemanticInputChanged)
+    def mirrorSemanticInput(self) -> dict[str, float]:
+        return deepcopy(self._mirror_semantic_input)
+
+    def _clamp_level(self, value: float) -> float:
+        return max(0.0, min(1.0, float(value)))
+
+    def _set_semantic_levels(
+        self,
+        *,
+        pressure: float,
+        uncertainty: float,
+        conflict: float,
+        recovery: float,
+        warning: float,
+    ) -> None:
+        self._mirror_semantic_input = {
+            "pressure_level": self._clamp_level(pressure),
+            "uncertainty_level": self._clamp_level(uncertainty),
+            "conflict_level": self._clamp_level(conflict),
+            "recovery_level": self._clamp_level(recovery),
+            "warning_level": self._clamp_level(warning),
+        }
+        self.mirrorSemanticInputChanged.emit()
+
     @Slot(str)
     def setEntitySurfaceState(self, state: str) -> None:
         normalized = state.strip().lower()
@@ -115,6 +172,15 @@ class ShellBridge(QObject):
         if normalized == self._entity_state:
             return
         self._entity_state = normalized
+        preset = self._semantic_presets.get(self._entity_state)
+        if preset is not None:
+            self._set_semantic_levels(
+                pressure=preset["pressure_level"],
+                uncertainty=preset["uncertainty_level"],
+                conflict=preset["conflict_level"],
+                recovery=preset["recovery_level"],
+                warning=preset["warning_level"],
+            )
         self.entitySurfaceStateChanged.emit()
         self.dialogueMessagesChanged.emit()
 
@@ -133,6 +199,41 @@ class ShellBridge(QObject):
         ]
         self.entitySurfaceStateChanged.emit()
         self.dialogueMessagesChanged.emit()
+
+    @Slot(float, float, float, float, result=bool)
+    def setMirrorSemanticLevels(
+        self,
+        pressure_level: float,
+        uncertainty_level: float,
+        conflict_level: float,
+        recovery_level: float,
+    ) -> bool:
+        self._set_semantic_levels(
+            pressure=pressure_level,
+            uncertainty=uncertainty_level,
+            conflict=conflict_level,
+            recovery=recovery_level,
+            warning=0.0,
+        )
+        return True
+
+    @Slot(float, float, float, float, float, result=bool)
+    def setMirrorSemanticLevelsWithWarning(
+        self,
+        pressure_level: float,
+        uncertainty_level: float,
+        conflict_level: float,
+        recovery_level: float,
+        warning_level: float,
+    ) -> bool:
+        self._set_semantic_levels(
+            pressure=pressure_level,
+            uncertainty=uncertainty_level,
+            conflict=conflict_level,
+            recovery=recovery_level,
+            warning=warning_level,
+        )
+        return True
 
     @Slot(result=bool)
     def reducedMotionPreferred(self) -> bool:

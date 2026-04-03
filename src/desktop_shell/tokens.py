@@ -115,6 +115,30 @@ class MirrorMotionTokens:
 
 
 @dataclass(frozen=True, slots=True)
+class MirrorSemanticTokens:
+    advisory_gate: float = 0.34
+    caution_gate: float = 0.64
+    warning_gate: float = 0.9
+    symmetry_conflict_influence: float = 0.24
+    symmetry_recovery_restore: float = 0.2
+    density_pressure_scale: float = 0.9
+    density_conflict_scale: float = 0.45
+    echo_uncertainty_scale: float = 0.72
+    echo_recovery_damp: float = 0.5
+    echo_distance_scale: float = 28.0
+    center_offset_conflict_scale: float = 14.0
+    center_offset_pressure_scale: float = 8.0
+    center_offset_recovery_damp: float = 0.7
+    orbital_activity_scale: float = 0.86
+    orbital_radius: float = 126.0
+    motion_pressure_speedup: float = 0.42
+    motion_conflict_irregularity: float = 0.28
+    motion_uncertainty_drift: float = 0.22
+    motion_recovery_calm: float = 0.36
+    reduced_semantic_scale: float = 0.5
+
+
+@dataclass(frozen=True, slots=True)
 class ShellTheme:
     colors: ColorTokens = field(default_factory=ColorTokens)
     typography: TypographyTokens = field(default_factory=TypographyTokens)
@@ -124,6 +148,7 @@ class ShellTheme:
     timing: TimingTokens = field(default_factory=TimingTokens)
     hierarchy: PanelHierarchyTokens = field(default_factory=PanelHierarchyTokens)
     mirror: MirrorMotionTokens = field(default_factory=MirrorMotionTokens)
+    mirror_semantics: MirrorSemanticTokens = field(default_factory=MirrorSemanticTokens)
     reduced_motion: bool = False
 
 
