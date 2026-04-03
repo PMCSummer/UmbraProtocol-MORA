@@ -1,12 +1,14 @@
+pragma ComponentBehavior: Bound
 import QtQuick
-import QtQuick.Controls
 import QtQuick3D
+import QtQuick.Window
 
 Rectangle {
     id: root
     required property var theme
     required property var bridge
     property bool active: true
+    property bool runtimeActive: root.active && root.visible && (!Window.window || Window.window.active)
     opacity: active ? 1.0 : 0.0
     y: active ? 0 : root.phaseShiftDistance()
     color: root.theme.colors.panel_secondary
@@ -16,11 +18,8 @@ Rectangle {
     property var currentOrientation: Qt.quaternion(1, 0, 0, 0)
     property var targetOrientation: Qt.quaternion(1, 0, 0, 0)
     property var driftAxis: Qt.vector3d(0.0, 1.0, 0.0)
-    property real precessionPhase: 0.0
-    property real semanticPhase: 0.0
-    property real orbitPhase: 0.0
-    property double nextTargetMs: 0.0
-    property double lastTickMs: 0.0
+    property var precessionOrientation: Qt.quaternion(1, 0, 0, 0)
+    property real orbitAngleOffset: 0.0
 
     property real semanticPressure: 0.12
     property real semanticUncertainty: 0.1
@@ -36,14 +35,6 @@ Rectangle {
     property real orbitalActivity: 0.0
     property real speedScalar: 1.0
     property real driftIrregularity: 0.0
-    property real targetStructuralAsymmetry: 0.0
-    property real targetDensityLevel: 0.0
-    property real targetEchoLevel: 0.0
-    property real targetCenterOffsetX: 0.0
-    property real targetCenterOffsetY: 0.0
-    property real targetOrbitalActivity: 0.0
-    property real targetSpeedScalar: 1.0
-    property real targetDriftIrregularity: 0.0
     property int semanticBand: 0
     property bool warningActive: false
 
@@ -127,12 +118,6 @@ Rectangle {
         return (2.0 * radius * Math.sin(Math.PI / ringSegments)) / 100.0
     }
 
-    function approach(currentValue, targetValue, dt, durationMs) {
-        var sec = Math.max(0.01, durationMs / 1000.0)
-        var alpha = 1.0 - Math.exp(-dt / sec)
-        return currentValue + (targetValue - currentValue) * alpha
-    }
-
     function qNormalize(q) {
         var n = Math.sqrt(q.scalar * q.scalar + q.x * q.x + q.y * q.y + q.z * q.z)
         if (n <= 0.0000001) {
@@ -177,40 +162,6 @@ Rectangle {
         return qNormalize(Qt.quaternion(Math.cos(half), na.x * s, na.y * s, na.z * s))
     }
 
-    function qSlerp(a, b, t) {
-        var qa = qNormalize(a)
-        var qb = qNormalize(b)
-        var dot = qDot(qa, qb)
-        if (dot < 0.0) {
-            qb = Qt.quaternion(-qb.scalar, -qb.x, -qb.y, -qb.z)
-            dot = -dot
-        }
-        dot = clamp(dot, -1.0, 1.0)
-
-        if (dot > 0.9995) {
-            var lerped = Qt.quaternion(
-                qa.scalar + (qb.scalar - qa.scalar) * t,
-                qa.x + (qb.x - qa.x) * t,
-                qa.y + (qb.y - qa.y) * t,
-                qa.z + (qb.z - qa.z) * t
-            )
-            return qNormalize(lerped)
-        }
-
-        var theta0 = Math.acos(dot)
-        var theta = theta0 * t
-        var sinTheta = Math.sin(theta)
-        var sinTheta0 = Math.sin(theta0)
-        var s0 = Math.cos(theta) - dot * sinTheta / sinTheta0
-        var s1 = sinTheta / sinTheta0
-        return qNormalize(Qt.quaternion(
-            qa.scalar * s0 + qb.scalar * s1,
-            qa.x * s0 + qb.x * s1,
-            qa.y * s0 + qb.y * s1,
-            qa.z * s0 + qb.z * s1
-        ))
-    }
-
     function levelFromInput(payload, key, fallback) {
         if (!payload || payload[key] === undefined || payload[key] === null) {
             return fallback
@@ -236,14 +187,14 @@ Rectangle {
         var r = semanticRecovery
         var w = semanticWarning
 
-        targetStructuralAsymmetry = clamp(
+        structuralAsymmetry = clamp(
             c * root.theme.mirror_semantics.symmetry_conflict_influence
             - r * root.theme.mirror_semantics.symmetry_recovery_restore,
             0.0,
             0.36
         )
 
-        targetDensityLevel = clamp(
+        densityLevel = clamp(
             p * root.theme.mirror_semantics.density_pressure_scale
             + c * root.theme.mirror_semantics.density_conflict_scale
             - r * 0.24,
@@ -251,7 +202,7 @@ Rectangle {
             1.0
         )
 
-        targetEchoLevel = clamp(
+        echoLevel = clamp(
             u * root.theme.mirror_semantics.echo_uncertainty_scale
             - r * root.theme.mirror_semantics.echo_recovery_damp,
             0.0,
@@ -265,10 +216,10 @@ Rectangle {
             0.0,
             22.0
         )
-        targetCenterOffsetX = clamp(driftAxis.x, -1.0, 1.0) * offsetMagnitude * 0.66
-        targetCenterOffsetY = clamp(driftAxis.z, -1.0, 1.0) * offsetMagnitude * 0.5
+        centerOffsetX = clamp(driftAxis.x, -1.0, 1.0) * offsetMagnitude * 0.66
+        centerOffsetY = clamp(driftAxis.z, -1.0, 1.0) * offsetMagnitude * 0.5
 
-        targetOrbitalActivity = clamp(
+        orbitalActivity = clamp(
             (p * 0.64 + c * 0.52 + (1.0 - u) * 0.18)
             * root.theme.mirror_semantics.orbital_activity_scale
             - r * 0.26,
@@ -276,7 +227,7 @@ Rectangle {
             0.9
         )
 
-        targetSpeedScalar = clamp(
+        speedScalar = clamp(
             1.0
             + p * root.theme.mirror_semantics.motion_pressure_speedup
             + c * root.theme.mirror_semantics.motion_conflict_irregularity * 0.52
@@ -286,7 +237,7 @@ Rectangle {
             1.72
         )
 
-        targetDriftIrregularity = clamp(
+        driftIrregularity = clamp(
             c * root.theme.mirror_semantics.motion_conflict_irregularity
             + u * root.theme.mirror_semantics.motion_uncertainty_drift
             - r * 0.12,
@@ -323,20 +274,20 @@ Rectangle {
         return clamp(
             1.0
             - semanticPressure * 0.24
-            - targetDriftIrregularity * 0.18
+            - driftIrregularity * 0.18
             + semanticRecovery * 0.25,
             0.72,
             1.46
         )
     }
 
-    function scheduleNextTarget(nowMs) {
+    function scheduleNextTargetIntervalMs() {
         var low = root.theme.mirror.min_target_interval_s * intervalScale() * semanticIntervalMultiplier()
         var high = root.theme.mirror.max_target_interval_s * intervalScale() * semanticIntervalMultiplier()
         if (high <= low + 0.35) {
             high = low + 0.35
         }
-        nextTargetMs = nowMs + randomBetween(low, high) * 1000.0
+        return Math.max(500, Math.round(randomBetween(low, high) * 1000.0))
     }
 
     function buildNextTargetOrientation() {
@@ -362,15 +313,48 @@ Rectangle {
         return candidate
     }
 
-    function composeDisplayOrientation() {
-        var precessionAxis = vNormalize(Qt.vector3d(0.19, 1.0, 0.11))
-        var precessionAmplitude = root.theme.mirror.precession_max_deg
+    function orientationDurationMs() {
+        var base = root.motionDuration("convergence_ms")
+        var scalar = clamp(1.4 - speedScalar * 0.42 + semanticRecovery * 0.2, 0.66, 1.72)
+        return Math.max(180, Math.round(base * scalar))
+    }
+
+    function precessionDurationMs() {
+        var base = root.motionDuration("phase_shift_ms") * 4
+        return Math.max(900, Math.round(base * clamp(1.2 - speedScalar * 0.18, 0.86, 1.4)))
+    }
+
+    function precessionMaxDegrees() {
+        return root.theme.mirror.precession_max_deg
             * root.theme.mirror.precession_intensity
             * motionScale()
             * clamp(1.0 + semanticPressure * 0.26 + driftIrregularity * 0.24 - semanticRecovery * 0.18, 0.64, 1.44)
-        var precessionDeg = Math.sin(precessionPhase) * precessionAmplitude
-        var precessionQ = qFromAxisAngle(precessionAxis, precessionDeg)
-        return qNormalize(qMul(precessionQ, currentOrientation))
+    }
+
+    function updatePrecessionTarget() {
+        var precessionAxis = vNormalize(Qt.vector3d(0.19, 1.0, 0.11))
+        var sign = Math.random() > 0.5 ? 1.0 : -1.0
+        var nextDeg = sign * randomBetween(precessionMaxDegrees() * 0.35, precessionMaxDegrees())
+        var next = qFromAxisAngle(precessionAxis, nextDeg)
+        precessionAnim.stop()
+        precessionAnim.from = precessionOrientation
+        precessionAnim.to = next
+        precessionAnim.duration = precessionDurationMs()
+        precessionAnim.start()
+    }
+
+    function retargetOrientation() {
+        targetOrientation = buildNextTargetOrientation()
+        orientationAnim.stop()
+        orientationAnim.from = currentOrientation
+        orientationAnim.to = targetOrientation
+        orientationAnim.duration = orientationDurationMs()
+        orientationAnim.start()
+    }
+
+    function orbitDurationMs() {
+        var base = reducedMotion() ? 76000 : 36000
+        return Math.max(18000, Math.round(base / clamp(speedScalar, 0.62, 1.8)))
     }
 
     function angleRadians(angleDeg) {
@@ -386,7 +370,7 @@ Rectangle {
     }
 
     function orbitalAngle(index) {
-        return index * (360.0 / 4.0) + orbitPhase * 57.2958
+        return index * (360.0 / 4.0) + orbitAngleOffset
     }
 
     function orbitalVisible(index) {
@@ -401,39 +385,101 @@ Rectangle {
         return clamp(0.2 + orbitalActivity * 0.46 + leadBoost, 0.0, 0.76)
     }
 
-    function tick(nowMs) {
-        var dt = clamp((nowMs - lastTickMs) / 1000.0, 0.0, 0.2)
-        lastTickMs = nowMs
-
-        structuralAsymmetry = approach(structuralAsymmetry, targetStructuralAsymmetry, dt, motionDuration("shear_drift_ms"))
-        densityLevel = approach(densityLevel, targetDensityLevel, dt, motionDuration("line_reveal_ms"))
-        echoLevel = approach(echoLevel, targetEchoLevel, dt, motionDuration("ghost_echo_ms"))
-        centerOffsetX = approach(centerOffsetX, targetCenterOffsetX, dt, motionDuration("shear_drift_ms"))
-        centerOffsetY = approach(centerOffsetY, targetCenterOffsetY, dt, motionDuration("shear_drift_ms"))
-        orbitalActivity = approach(orbitalActivity, targetOrbitalActivity, dt, motionDuration("phase_shift_ms"))
-        speedScalar = approach(speedScalar, targetSpeedScalar, dt, motionDuration("convergence_ms"))
-        driftIrregularity = approach(driftIrregularity, targetDriftIrregularity, dt, motionDuration("convergence_ms"))
-
-        if (nowMs >= nextTargetMs) {
-            targetOrientation = buildNextTargetOrientation()
-            scheduleNextTarget(nowMs)
-            recomputeSemanticCarrier()
+    function startRuntimeEngines() {
+        if (!runtimeActive) {
+            return
         }
+        targetTimer.interval = scheduleNextTargetIntervalMs()
+        targetTimer.restart()
 
-        var response = root.theme.mirror.slerp_response * motionScale() * speedScalar
-        var blend = 1.0 - Math.exp(-response * dt)
-        blend = clamp(blend * (1.0 + Math.sin(semanticPhase * 0.71) * driftIrregularity * 0.08), 0.0, 0.22)
-        currentOrientation = qSlerp(currentOrientation, targetOrientation, blend)
+        precessionTimer.interval = precessionDurationMs()
+        precessionTimer.restart()
+        updatePrecessionTarget()
 
-        var frequency = root.theme.mirror.precession_frequency_hz * clamp(
-            1.0 + semanticPressure * 0.4 + driftIrregularity * 0.24 - semanticRecovery * 0.26,
-            0.62,
-            1.42
-        )
-        precessionPhase += dt * (Math.PI * 2.0) * frequency
-        semanticPhase += dt * (0.32 + speedScalar * 0.14)
-        orbitPhase += dt * (0.22 + speedScalar * 0.58)
-        mirrorNode.rotation = composeDisplayOrientation()
+        if (orbitalActivity > 0.08) {
+            orbitAnim.duration = orbitDurationMs()
+            orbitAnim.start()
+        } else {
+            orbitAnim.stop()
+        }
+    }
+
+    function stopRuntimeEngines() {
+        targetTimer.stop()
+        precessionTimer.stop()
+        orientationAnim.stop()
+        precessionAnim.stop()
+        orbitAnim.stop()
+    }
+
+    Behavior on structuralAsymmetry {
+        NumberAnimation {
+            duration: root.motionDuration("shear_drift_ms")
+            easing.type: root.easingForClass(root.theme.motion.easing_slow_settle)
+        }
+    }
+
+    Behavior on densityLevel {
+        NumberAnimation {
+            duration: root.motionDuration("line_reveal_ms")
+            easing.type: root.easingForClass(root.theme.motion.easing_soft_standard)
+        }
+    }
+
+    Behavior on echoLevel {
+        NumberAnimation {
+            duration: root.motionDuration("ghost_echo_ms")
+            easing.type: root.easingForClass(root.theme.motion.easing_slow_settle)
+        }
+    }
+
+    Behavior on centerOffsetX {
+        NumberAnimation {
+            duration: root.motionDuration("shear_drift_ms")
+            easing.type: root.easingForClass(root.theme.motion.easing_slow_settle)
+        }
+    }
+
+    Behavior on centerOffsetY {
+        NumberAnimation {
+            duration: root.motionDuration("shear_drift_ms")
+            easing.type: root.easingForClass(root.theme.motion.easing_slow_settle)
+        }
+    }
+
+    Behavior on orbitalActivity {
+        NumberAnimation {
+            duration: root.motionDuration("phase_shift_ms")
+            easing.type: root.easingForClass(root.theme.motion.easing_soft_standard)
+        }
+    }
+
+    Behavior on speedScalar {
+        NumberAnimation {
+            duration: root.motionDuration("convergence_ms")
+            easing.type: root.easingForClass(root.theme.motion.easing_soft_standard)
+        }
+    }
+
+    Behavior on driftIrregularity {
+        NumberAnimation {
+            duration: root.motionDuration("convergence_ms")
+            easing.type: root.easingForClass(root.theme.motion.easing_soft_standard)
+        }
+    }
+
+    Behavior on secondaryLineColor {
+        ColorAnimation {
+            duration: root.motionDuration("fade_ms")
+            easing.type: root.easingForClass(root.theme.motion.easing_soft_standard)
+        }
+    }
+
+    Behavior on accentLineColor {
+        ColorAnimation {
+            duration: root.motionDuration("fade_ms")
+            easing.type: root.easingForClass(root.theme.motion.easing_soft_standard)
+        }
     }
 
     Text {
@@ -486,214 +532,235 @@ Rectangle {
                 ambientColor: root.theme.colors.text_secondary
             }
 
+            PrincipledMaterial {
+                id: matMain
+                baseColor: root.mainLineColor
+                metalness: 0.0
+                roughness: 1.0
+            }
+
+            PrincipledMaterial {
+                id: matSecondary
+                baseColor: root.secondaryLineColor
+                metalness: 0.0
+                roughness: 1.0
+                opacity: 0.78
+            }
+
+            PrincipledMaterial {
+                id: matSecondaryBridge
+                baseColor: root.secondaryLineColor
+                metalness: 0.0
+                roughness: 1.0
+                opacity: 0.66
+            }
+
+            PrincipledMaterial {
+                id: matMainDepth
+                baseColor: root.mainLineColor
+                metalness: 0.0
+                roughness: 1.0
+                opacity: 0.74
+            }
+
+            PrincipledMaterial {
+                id: matInnerDepth
+                baseColor: root.secondaryLineColor
+                metalness: 0.0
+                roughness: 1.0
+                opacity: 0.5 + root.secondaryDetailOpacity * 0.3
+            }
+
+            PrincipledMaterial {
+                id: matAccent
+                baseColor: root.accentLineColor
+                metalness: 0.0
+                roughness: 1.0
+                opacity: root.secondaryDetailOpacity
+            }
+
+            PrincipledMaterial {
+                id: matCenter
+                baseColor: root.mainLineColor
+                metalness: 0.0
+                roughness: 1.0
+                opacity: 0.82
+            }
+
+            PrincipledMaterial {
+                id: matGhost
+                baseColor: root.secondaryLineColor
+                metalness: 0.0
+                roughness: 1.0
+                opacity: 0.5
+            }
+
             Node {
                 id: mirrorNode
+                rotation: root.currentOrientation
 
                 Node {
-                    id: artifactCarrier
-                    position: Qt.vector3d(root.centerOffsetX, root.centerOffsetY, 0.0)
+                    id: precessionNode
+                    rotation: root.precessionOrientation
 
                     Node {
-                        id: artifactBody
-                        scale: Qt.vector3d(
-                            1.0 + root.structuralAsymmetry * 0.06,
-                            1.0 - root.structuralAsymmetry * 0.04,
-                            1.0
-                        )
+                        id: artifactCarrier
+                        position: Qt.vector3d(root.centerOffsetX, root.centerOffsetY, 0.0)
 
-                        Repeater3D {
-                            model: root.ringSegments
-                            delegate: Model {
-                                required property int index
-                                readonly property real angle: index * (360.0 / root.ringSegments)
-                                source: "#Cube"
-                                x: root.ringX(root.outerRadius, angle)
-                                y: root.ringY(root.outerRadius, angle, root.outerYScale)
-                                z: root.depthHalf
-                                eulerRotation.z: angle + 90.0
-                                scale: Qt.vector3d(root.outerSegmentLength, root.edgeThickness, root.edgeThickness)
-                                materials: PrincipledMaterial {
-                                    baseColor: root.mainLineColor
-                                    metalness: 0.0
-                                    roughness: 1.0
+                        Node {
+                            id: artifactBody
+                            scale: Qt.vector3d(
+                                1.0 + root.structuralAsymmetry * 0.06,
+                                1.0 - root.structuralAsymmetry * 0.04,
+                                1.0
+                            )
+
+                            Repeater3D {
+                                model: root.ringSegments
+                                delegate: Model {
+                                    required property int index
+                                    readonly property real angle: index * (360.0 / root.ringSegments)
+                                    source: "#Cube"
+                                    x: root.ringX(root.outerRadius, angle)
+                                    y: root.ringY(root.outerRadius, angle, root.outerYScale)
+                                    z: root.depthHalf
+                                    eulerRotation.z: angle + 90.0
+                                    scale: Qt.vector3d(root.outerSegmentLength, root.edgeThickness, root.edgeThickness)
+                                    materials: [matMain]
                                 }
                             }
-                        }
 
-                        Repeater3D {
-                            model: root.ringSegments
-                            delegate: Model {
-                                required property int index
-                                readonly property real angle: index * (360.0 / root.ringSegments)
-                                source: "#Cube"
-                                x: root.ringX(root.outerRadius, angle)
-                                y: root.ringY(root.outerRadius, angle, root.outerYScale)
-                                z: -root.depthHalf
-                                eulerRotation.z: angle + 90.0
-                                scale: Qt.vector3d(root.outerSegmentLength, root.edgeThickness, root.edgeThickness)
-                                materials: PrincipledMaterial {
-                                    baseColor: root.mainLineColor
-                                    metalness: 0.0
-                                    roughness: 1.0
+                            Repeater3D {
+                                model: root.ringSegments
+                                delegate: Model {
+                                    required property int index
+                                    readonly property real angle: index * (360.0 / root.ringSegments)
+                                    source: "#Cube"
+                                    x: root.ringX(root.outerRadius, angle)
+                                    y: root.ringY(root.outerRadius, angle, root.outerYScale)
+                                    z: -root.depthHalf
+                                    eulerRotation.z: angle + 90.0
+                                    scale: Qt.vector3d(root.outerSegmentLength, root.edgeThickness, root.edgeThickness)
+                                    materials: [matMain]
                                 }
                             }
-                        }
 
-                        Repeater3D {
-                            model: root.ringSegments
-                            delegate: Model {
-                                required property int index
-                                readonly property real angle: index * (360.0 / root.ringSegments)
-                                source: "#Cube"
-                                x: root.ringX(root.innerRadius, angle)
-                                y: root.ringY(root.innerRadius, angle, root.innerYScale)
-                                z: root.depthHalf
-                                eulerRotation.z: angle + 90.0
-                                scale: Qt.vector3d(root.innerSegmentLength, root.edgeThickness, root.edgeThickness)
-                                materials: PrincipledMaterial {
-                                    baseColor: root.secondaryLineColor
-                                    metalness: 0.0
-                                    roughness: 1.0
-                                    opacity: 0.78
+                            Repeater3D {
+                                model: root.ringSegments
+                                delegate: Model {
+                                    required property int index
+                                    readonly property real angle: index * (360.0 / root.ringSegments)
+                                    source: "#Cube"
+                                    x: root.ringX(root.innerRadius, angle)
+                                    y: root.ringY(root.innerRadius, angle, root.innerYScale)
+                                    z: root.depthHalf
+                                    eulerRotation.z: angle + 90.0
+                                    scale: Qt.vector3d(root.innerSegmentLength, root.edgeThickness, root.edgeThickness)
+                                    materials: [matSecondary]
                                 }
                             }
-                        }
 
-                        Repeater3D {
-                            model: root.ringSegments
-                            delegate: Model {
-                                required property int index
-                                readonly property real angle: index * (360.0 / root.ringSegments)
-                                source: "#Cube"
-                                x: root.ringX(root.innerRadius, angle)
-                                y: root.ringY(root.innerRadius, angle, root.innerYScale)
-                                z: -root.depthHalf
-                                eulerRotation.z: angle + 90.0
-                                scale: Qt.vector3d(root.innerSegmentLength, root.edgeThickness, root.edgeThickness)
-                                materials: PrincipledMaterial {
-                                    baseColor: root.secondaryLineColor
-                                    metalness: 0.0
-                                    roughness: 1.0
-                                    opacity: 0.78
+                            Repeater3D {
+                                model: root.ringSegments
+                                delegate: Model {
+                                    required property int index
+                                    readonly property real angle: index * (360.0 / root.ringSegments)
+                                    source: "#Cube"
+                                    x: root.ringX(root.innerRadius, angle)
+                                    y: root.ringY(root.innerRadius, angle, root.innerYScale)
+                                    z: -root.depthHalf
+                                    eulerRotation.z: angle + 90.0
+                                    scale: Qt.vector3d(root.innerSegmentLength, root.edgeThickness, root.edgeThickness)
+                                    materials: [matSecondary]
                                 }
                             }
-                        }
 
-                        Repeater3D {
-                            model: root.ringSegments
-                            delegate: Model {
-                                required property int index
-                                readonly property real angle: index * (360.0 / root.ringSegments)
-                                source: "#Cube"
-                                x: (root.ringX(root.outerRadius, angle) + root.ringX(root.innerRadius, angle)) / 2.0
-                                y: (root.ringY(root.outerRadius, angle, root.outerYScale)
-                                    + root.ringY(root.innerRadius, angle, root.innerYScale)) / 2.0
-                                z: root.depthHalf
-                                eulerRotation.z: angle
-                                scale: Qt.vector3d(root.radialBridgeLength, root.edgeThickness, root.edgeThickness)
-                                materials: PrincipledMaterial {
-                                    baseColor: root.secondaryLineColor
-                                    metalness: 0.0
-                                    roughness: 1.0
-                                    opacity: 0.66
+                            Repeater3D {
+                                model: root.ringSegments
+                                delegate: Model {
+                                    required property int index
+                                    readonly property real angle: index * (360.0 / root.ringSegments)
+                                    source: "#Cube"
+                                    x: (root.ringX(root.outerRadius, angle) + root.ringX(root.innerRadius, angle)) / 2.0
+                                    y: (root.ringY(root.outerRadius, angle, root.outerYScale)
+                                        + root.ringY(root.innerRadius, angle, root.innerYScale)) / 2.0
+                                    z: root.depthHalf
+                                    eulerRotation.z: angle
+                                    scale: Qt.vector3d(root.radialBridgeLength, root.edgeThickness, root.edgeThickness)
+                                    materials: [matSecondaryBridge]
                                 }
                             }
-                        }
 
-                        Repeater3D {
-                            model: root.ringSegments
-                            delegate: Model {
-                                required property int index
-                                readonly property real angle: index * (360.0 / root.ringSegments)
-                                source: "#Cube"
-                                x: (root.ringX(root.outerRadius, angle) + root.ringX(root.innerRadius, angle)) / 2.0
-                                y: (root.ringY(root.outerRadius, angle, root.outerYScale)
-                                    + root.ringY(root.innerRadius, angle, root.innerYScale)) / 2.0
-                                z: -root.depthHalf
-                                eulerRotation.z: angle
-                                scale: Qt.vector3d(root.radialBridgeLength, root.edgeThickness, root.edgeThickness)
-                                materials: PrincipledMaterial {
-                                    baseColor: root.secondaryLineColor
-                                    metalness: 0.0
-                                    roughness: 1.0
-                                    opacity: 0.66
+                            Repeater3D {
+                                model: root.ringSegments
+                                delegate: Model {
+                                    required property int index
+                                    readonly property real angle: index * (360.0 / root.ringSegments)
+                                    source: "#Cube"
+                                    x: (root.ringX(root.outerRadius, angle) + root.ringX(root.innerRadius, angle)) / 2.0
+                                    y: (root.ringY(root.outerRadius, angle, root.outerYScale)
+                                        + root.ringY(root.innerRadius, angle, root.innerYScale)) / 2.0
+                                    z: -root.depthHalf
+                                    eulerRotation.z: angle
+                                    scale: Qt.vector3d(root.radialBridgeLength, root.edgeThickness, root.edgeThickness)
+                                    materials: [matSecondaryBridge]
                                 }
                             }
-                        }
 
-                        Repeater3D {
-                            model: root.ringSegments
-                            delegate: Model {
-                                required property int index
-                                readonly property real angle: index * (360.0 / root.ringSegments)
-                                source: "#Cube"
-                                x: root.ringX(root.outerRadius, angle)
-                                y: root.ringY(root.outerRadius, angle, root.outerYScale)
-                                z: 0.0
-                                scale: Qt.vector3d(root.edgeThickness, root.edgeThickness, root.depthBridgeLength)
-                                materials: PrincipledMaterial {
-                                    baseColor: root.mainLineColor
-                                    metalness: 0.0
-                                    roughness: 1.0
-                                    opacity: 0.74
+                            Repeater3D {
+                                model: root.ringSegments
+                                delegate: Model {
+                                    required property int index
+                                    readonly property real angle: index * (360.0 / root.ringSegments)
+                                    source: "#Cube"
+                                    x: root.ringX(root.outerRadius, angle)
+                                    y: root.ringY(root.outerRadius, angle, root.outerYScale)
+                                    z: 0.0
+                                    scale: Qt.vector3d(root.edgeThickness, root.edgeThickness, root.depthBridgeLength)
+                                    materials: [matMainDepth]
                                 }
                             }
-                        }
 
-                        Repeater3D {
-                            model: root.ringSegments
-                            delegate: Model {
-                                required property int index
-                                readonly property real angle: index * (360.0 / root.ringSegments)
-                                source: "#Cube"
-                                x: root.ringX(root.innerRadius, angle)
-                                y: root.ringY(root.innerRadius, angle, root.innerYScale)
-                                z: 0.0
-                                scale: Qt.vector3d(root.edgeThickness, root.edgeThickness, root.depthBridgeLength * 0.92)
-                                materials: PrincipledMaterial {
-                                    baseColor: root.secondaryLineColor
-                                    metalness: 0.0
-                                    roughness: 1.0
-                                    opacity: 0.5 + root.secondaryDetailOpacity * 0.3
+                            Repeater3D {
+                                model: root.ringSegments
+                                delegate: Model {
+                                    required property int index
+                                    readonly property real angle: index * (360.0 / root.ringSegments)
+                                    source: "#Cube"
+                                    x: root.ringX(root.innerRadius, angle)
+                                    y: root.ringY(root.innerRadius, angle, root.innerYScale)
+                                    z: 0.0
+                                    scale: Qt.vector3d(root.edgeThickness, root.edgeThickness, root.depthBridgeLength * 0.92)
+                                    materials: [matInnerDepth]
                                 }
                             }
-                        }
 
-                        Repeater3D {
-                            model: root.ringSegments
-                            delegate: Model {
-                                required property int index
-                                readonly property real angle: index * (360.0 / root.ringSegments)
-                                source: "#Cube"
-                                x: (root.ringX(root.innerRadius, angle) * 0.6)
-                                y: (root.ringY(root.innerRadius, angle, root.innerYScale) * 0.6)
-                                z: 0.0
-                                eulerRotation.z: angle + 45.0
-                                scale: Qt.vector3d(root.innerSegmentLength * 0.7, root.edgeThickness, root.depthBridgeLength * 0.22)
-                                materials: PrincipledMaterial {
-                                    baseColor: root.accentLineColor
-                                    metalness: 0.0
-                                    roughness: 1.0
-                                    opacity: root.secondaryDetailOpacity
+                            Repeater3D {
+                                model: root.ringSegments
+                                delegate: Model {
+                                    required property int index
+                                    readonly property real angle: index * (360.0 / root.ringSegments)
+                                    source: "#Cube"
+                                    x: (root.ringX(root.innerRadius, angle) * 0.6)
+                                    y: (root.ringY(root.innerRadius, angle, root.innerYScale) * 0.6)
+                                    z: 0.0
+                                    eulerRotation.z: angle + 45.0
+                                    scale: Qt.vector3d(root.innerSegmentLength * 0.7, root.edgeThickness, root.depthBridgeLength * 0.22)
+                                    materials: [matAccent]
                                 }
                             }
-                        }
 
-                        Repeater3D {
-                            model: 4
-                            delegate: Model {
-                                required property int index
-                                readonly property real ySlot: index < 2 ? (46 + index * 14) : (-46 - (index - 2) * 14)
-                                source: "#Cube"
-                                x: 0.0
-                                y: ySlot
-                                z: 0.0
-                                scale: Qt.vector3d(root.edgeThickness * 2.2, 0.24, root.depthBridgeLength * 0.84)
-                                materials: PrincipledMaterial {
-                                    baseColor: root.mainLineColor
-                                    metalness: 0.0
-                                    roughness: 1.0
-                                    opacity: 0.82
+                            Repeater3D {
+                                model: 4
+                                delegate: Model {
+                                    required property int index
+                                    readonly property real ySlot: index < 2 ? (46 + index * 14) : (-46 - (index - 2) * 14)
+                                    source: "#Cube"
+                                    x: 0.0
+                                    y: ySlot
+                                    z: 0.0
+                                    scale: Qt.vector3d(root.edgeThickness * 2.2, 0.24, root.depthBridgeLength * 0.84)
+                                    materials: [matCenter]
                                 }
                             }
                         }
@@ -716,12 +783,7 @@ Rectangle {
                             z: 0.0
                             eulerRotation.z: angle + 90.0
                             scale: Qt.vector3d(root.outerSegmentLength * 0.98, root.edgeThickness * 0.88, root.depthBridgeLength * 0.8)
-                            materials: PrincipledMaterial {
-                                baseColor: root.secondaryLineColor
-                                metalness: 0.0
-                                roughness: 1.0
-                                opacity: 0.5
-                            }
+                            materials: [matGhost]
                         }
                     }
                 }
@@ -731,6 +793,7 @@ Rectangle {
                     Repeater3D {
                         model: 4
                         delegate: Node {
+                            id: orbitalNode
                             required property int index
                             readonly property real angle: root.orbitalAngle(index)
                             visible: root.orbitalVisible(index)
@@ -744,7 +807,7 @@ Rectangle {
                                     baseColor: root.semanticBand >= 2 ? root.accentLineColor : root.secondaryLineColor
                                     metalness: 0.0
                                     roughness: 1.0
-                                    opacity: root.orbitalOpacity(index)
+                                    opacity: root.orbitalOpacity(orbitalNode.index)
                                 }
                             }
                         }
@@ -764,7 +827,6 @@ Rectangle {
             font.weight: root.fontWeight("secondary_text")
         }
     }
-
     Behavior on opacity {
         NumberAnimation {
             duration: root.motionDuration("fade_ms")
@@ -780,33 +842,103 @@ Rectangle {
     }
 
     Timer {
-        id: ticker
-        interval: root.reducedMotion() ? 42 : 24
+        id: targetTimer
+        interval: 1000
+        repeat: false
+        running: false
+        onTriggered: {
+            root.retargetOrientation()
+            interval = root.scheduleNextTargetIntervalMs()
+            start()
+        }
+    }
+
+    Timer {
+        id: precessionTimer
+        interval: 1800
         repeat: true
-        running: root.active && root.visible
-        onTriggered: root.tick(Date.now())
+        running: false
+        onTriggered: {
+            root.updatePrecessionTarget()
+            interval = root.precessionDurationMs()
+        }
+    }
+
+    QuaternionAnimation {
+        id: orientationAnim
+        target: root
+        property: "currentOrientation"
+        duration: root.motionDuration("convergence_ms")
+        easing.type: root.easingForClass(root.theme.motion.easing_soft_standard)
+    }
+
+    QuaternionAnimation {
+        id: precessionAnim
+        target: root
+        property: "precessionOrientation"
+        duration: root.motionDuration("phase_shift_ms")
+        easing.type: root.easingForClass(root.theme.motion.easing_slow_settle)
+    }
+
+    NumberAnimation {
+        id: orbitAnim
+        target: root
+        property: "orbitAngleOffset"
+        from: 0
+        to: 360
+        duration: 36000
+        loops: Animation.Infinite
+        easing.type: Easing.Linear
     }
 
     Connections {
         target: root.bridge
         function onMirrorSemanticInputChanged() {
             root.syncSemanticInput()
+            if (root.runtimeActive && root.orbitalActivity > 0.08) {
+                orbitAnim.stop()
+                orbitAnim.duration = root.orbitDurationMs()
+                orbitAnim.start()
+            }
         }
     }
 
     Component.onCompleted: {
         syncSemanticInput()
-        var now = Date.now()
-        lastTickMs = now
         currentOrientation = Qt.quaternion(1, 0, 0, 0)
         targetOrientation = buildNextTargetOrientation()
-        scheduleNextTarget(now)
-        mirrorNode.rotation = composeDisplayOrientation()
+        precessionOrientation = Qt.quaternion(1, 0, 0, 0)
+        if (runtimeActive) {
+            retargetOrientation()
+            startRuntimeEngines()
+        }
     }
 
-    onActiveChanged: {
-        if (active) {
-            lastTickMs = Date.now()
+    onRuntimeActiveChanged: {
+        if (runtimeActive) {
+            startRuntimeEngines()
+        } else {
+            stopRuntimeEngines()
+        }
+    }
+
+    onSpeedScalarChanged: {
+        if (runtimeActive && orbitAnim.running) {
+            orbitAnim.stop()
+            orbitAnim.duration = orbitDurationMs()
+            orbitAnim.start()
+        }
+    }
+
+    onOrbitalActivityChanged: {
+        if (!runtimeActive) {
+            return
+        }
+        if (orbitalActivity > 0.08) {
+            orbitAnim.duration = orbitDurationMs()
+            orbitAnim.start()
+        } else {
+            orbitAnim.stop()
         }
     }
 }
