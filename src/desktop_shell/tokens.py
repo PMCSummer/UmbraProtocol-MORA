@@ -100,6 +100,21 @@ class PanelHierarchyTokens:
 
 
 @dataclass(frozen=True, slots=True)
+class MirrorMotionTokens:
+    min_target_interval_s: float = 6.0
+    max_target_interval_s: float = 18.0
+    slerp_response: float = 0.72
+    base_motion_intensity: float = 1.0
+    target_delta_min_deg: float = 18.0
+    target_delta_max_deg: float = 52.0
+    precession_intensity: float = 0.24
+    precession_frequency_hz: float = 0.018
+    precession_max_deg: float = 7.5
+    reduced_motion_scale: float = 0.35
+    reduced_interval_scale: float = 1.8
+
+
+@dataclass(frozen=True, slots=True)
 class ShellTheme:
     colors: ColorTokens = field(default_factory=ColorTokens)
     typography: TypographyTokens = field(default_factory=TypographyTokens)
@@ -108,6 +123,7 @@ class ShellTheme:
     lines: LineTokens = field(default_factory=LineTokens)
     timing: TimingTokens = field(default_factory=TimingTokens)
     hierarchy: PanelHierarchyTokens = field(default_factory=PanelHierarchyTokens)
+    mirror: MirrorMotionTokens = field(default_factory=MirrorMotionTokens)
     reduced_motion: bool = False
 
 
@@ -120,4 +136,3 @@ def to_qml_theme_map(theme: ShellTheme | None = None) -> dict[str, object]:
     payload = asdict(selected)
     payload["version"] = "desktop-shell-foundation-v1-qt"
     return payload
-
