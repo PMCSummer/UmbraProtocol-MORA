@@ -5,6 +5,7 @@ import QtQuick.Layouts
 Rectangle {
     id: root
     required property var theme
+    required property var bridge
     required property bool enabled
     signal submitRequested(string payload)
 
@@ -15,6 +16,28 @@ Rectangle {
 
     function fontWeight(roleName) {
         return root.theme.typography[roleName].weight === "bold" ? Font.DemiBold : Font.Normal
+    }
+
+    function reducedMotion() {
+        return root.theme.reduced_motion || root.bridge.reducedMotionEnabled
+    }
+
+    function motionDuration(key) {
+        var base = root.theme.motion[key]
+        if (base === undefined) {
+            return root.theme.motion.fade_ms
+        }
+        return reducedMotion() ? Math.round(base * root.theme.motion.reduced_duration_scale) : base
+    }
+
+    function easingForClass(className) {
+        if (className === root.theme.motion.easing_sharp_warning) {
+            return Easing.OutCubic
+        }
+        if (className === root.theme.motion.easing_slow_settle) {
+            return Easing.InOutQuad
+        }
+        return Easing.InOutSine
     }
 
     RowLayout {
@@ -48,6 +71,18 @@ Rectangle {
             border.color: root.theme.colors.divider_subtle
             color: root.enabled ? root.theme.colors.panel_secondary : root.theme.colors.panel_primary
             opacity: root.enabled ? 1.0 : 0.55
+            Behavior on color {
+                ColorAnimation {
+                    duration: root.motionDuration("fade_ms")
+                    easing.type: root.easingForClass(root.theme.motion.easing_soft_standard)
+                }
+            }
+            Behavior on opacity {
+                NumberAnimation {
+                    duration: root.motionDuration("fade_ms")
+                    easing.type: root.easingForClass(root.theme.motion.easing_slow_settle)
+                }
+            }
 
             Text {
                 anchors.centerIn: parent
@@ -72,4 +107,3 @@ Rectangle {
         }
     }
 }
-

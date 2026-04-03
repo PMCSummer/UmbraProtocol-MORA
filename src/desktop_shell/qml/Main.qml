@@ -12,6 +12,25 @@ ApplicationWindow {
     visible: true
     title: "Umbra Protocol // Entity Shell"
     color: shellTheme.colors.app_background
+    property bool reducedMotion: shellTheme.reduced_motion || shellBridge.reducedMotionEnabled
+
+    function motionDuration(key) {
+        var base = shellTheme.motion[key]
+        if (base === undefined) {
+            return shellTheme.motion.fade_ms
+        }
+        return reducedMotion ? Math.round(base * shellTheme.motion.reduced_duration_scale) : base
+    }
+
+    function easingForClass(className) {
+        if (className === shellTheme.motion.easing_sharp_warning) {
+            return Easing.OutCubic
+        }
+        if (className === shellTheme.motion.easing_slow_settle) {
+            return Easing.InOutQuad
+        }
+        return Easing.InOutSine
+    }
 
     function fontWeight(roleName) {
         var value = shellTheme.typography[roleName].weight
@@ -55,6 +74,12 @@ ApplicationWindow {
                     background: Rectangle {
                         color: parent.checked ? shellTheme.colors.panel_primary : shellTheme.colors.panel_secondary
                         border.width: 0
+                        Behavior on color {
+                            ColorAnimation {
+                                duration: root.motionDuration("fade_ms")
+                                easing.type: root.easingForClass(shellTheme.motion.easing_soft_standard)
+                            }
+                        }
                     }
                 }
             }
@@ -69,24 +94,28 @@ ApplicationWindow {
                 theme: shellTheme
                 railModel: shellBridge.criticalRail
                 bridge: shellBridge
+                active: tabBar.currentIndex === 0
             }
 
             PlaceholderTab {
                 theme: shellTheme
                 title: "Trace"
                 subtitle: "Trace stream shell. Provenance lanes reserved for next increment."
+                active: tabBar.currentIndex === 1
             }
 
             PlaceholderTab {
                 theme: shellTheme
                 title: "Language"
                 subtitle: "Language shell. Lexical/dictum panes remain bounded and staged."
+                active: tabBar.currentIndex === 2
             }
 
             PlaceholderTab {
                 theme: shellTheme
                 title: "Viability"
                 subtitle: "Viability shell. Pressure/escalation visuals reserved for dedicated step."
+                active: tabBar.currentIndex === 3
             }
 
             PlaceholderTab {
@@ -94,6 +123,7 @@ ApplicationWindow {
                 title: "Diagnostics"
                 subtitle: "Machine-facing diagnostics shell with restrained raw hierarchy."
                 diagnosticsMode: true
+                active: tabBar.currentIndex === 4
             }
         }
     }

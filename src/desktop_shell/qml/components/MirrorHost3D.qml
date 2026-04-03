@@ -6,6 +6,9 @@ Rectangle {
     id: root
     required property var theme
     required property var bridge
+    property bool active: true
+    opacity: active ? 1.0 : 0.0
+    y: active ? 0 : root.phaseShiftDistance()
     color: root.theme.colors.panel_secondary
     border.width: root.theme.lines.thin
     border.color: root.theme.colors.divider_subtle
@@ -33,6 +36,14 @@ Rectangle {
     property real orbitalActivity: 0.0
     property real speedScalar: 1.0
     property real driftIrregularity: 0.0
+    property real targetStructuralAsymmetry: 0.0
+    property real targetDensityLevel: 0.0
+    property real targetEchoLevel: 0.0
+    property real targetCenterOffsetX: 0.0
+    property real targetCenterOffsetY: 0.0
+    property real targetOrbitalActivity: 0.0
+    property real targetSpeedScalar: 1.0
+    property real targetDriftIrregularity: 0.0
     property int semanticBand: 0
     property bool warningActive: false
 
@@ -62,7 +73,30 @@ Rectangle {
     }
 
     function reducedMotion() {
-        return root.bridge.reducedMotionPreferred()
+        return root.theme.reduced_motion || root.bridge.reducedMotionEnabled
+    }
+
+    function phaseShiftDistance() {
+        var base = root.theme.spacing.md
+        return reducedMotion() ? Math.round(base * root.theme.motion.reduced_distance_scale) : base
+    }
+
+    function motionDuration(key) {
+        var base = root.theme.motion[key]
+        if (base === undefined) {
+            return root.theme.motion.fade_ms
+        }
+        return reducedMotion() ? Math.round(base * root.theme.motion.reduced_duration_scale) : base
+    }
+
+    function easingForClass(className) {
+        if (className === root.theme.motion.easing_sharp_warning) {
+            return Easing.OutCubic
+        }
+        if (className === root.theme.motion.easing_slow_settle) {
+            return Easing.InOutQuad
+        }
+        return Easing.InOutSine
     }
 
     function motionScale() {
@@ -87,6 +121,12 @@ Rectangle {
 
     function randomBetween(minValue, maxValue) {
         return minValue + (maxValue - minValue) * Math.random()
+    }
+
+    function approach(currentValue, targetValue, dt, durationMs) {
+        var sec = Math.max(0.01, durationMs / 1000.0)
+        var alpha = 1.0 - Math.exp(-dt / sec)
+        return currentValue + (targetValue - currentValue) * alpha
     }
 
     function qNormalize(q) {
@@ -192,14 +232,14 @@ Rectangle {
         var r = semanticRecovery
         var w = semanticWarning
 
-        structuralAsymmetry = clamp(
+        targetStructuralAsymmetry = clamp(
             c * root.theme.mirror_semantics.symmetry_conflict_influence
             - r * root.theme.mirror_semantics.symmetry_recovery_restore,
             0.0,
             0.36
         )
 
-        densityLevel = clamp(
+        targetDensityLevel = clamp(
             p * root.theme.mirror_semantics.density_pressure_scale
             + c * root.theme.mirror_semantics.density_conflict_scale
             - r * 0.24,
@@ -207,7 +247,7 @@ Rectangle {
             1.0
         )
 
-        echoLevel = clamp(
+        targetEchoLevel = clamp(
             u * root.theme.mirror_semantics.echo_uncertainty_scale
             - r * root.theme.mirror_semantics.echo_recovery_damp,
             0.0,
@@ -221,10 +261,10 @@ Rectangle {
             0.0,
             22.0
         )
-        centerOffsetX = Math.cos(semanticPhase * 0.36) * offsetMagnitude
-        centerOffsetY = Math.sin(semanticPhase * 0.31) * offsetMagnitude * 0.62
+        targetCenterOffsetX = Math.cos(semanticPhase * 0.36) * offsetMagnitude
+        targetCenterOffsetY = Math.sin(semanticPhase * 0.31) * offsetMagnitude * 0.62
 
-        orbitalActivity = clamp(
+        targetOrbitalActivity = clamp(
             (p * 0.64 + c * 0.52 + (1.0 - u) * 0.18)
             * root.theme.mirror_semantics.orbital_activity_scale
             - r * 0.26,
@@ -232,7 +272,7 @@ Rectangle {
             1.0
         )
 
-        speedScalar = clamp(
+        targetSpeedScalar = clamp(
             1.0
             + p * root.theme.mirror_semantics.motion_pressure_speedup
             + c * root.theme.mirror_semantics.motion_conflict_irregularity * 0.52
@@ -242,7 +282,7 @@ Rectangle {
             1.72
         )
 
-        driftIrregularity = clamp(
+        targetDriftIrregularity = clamp(
             c * root.theme.mirror_semantics.motion_conflict_irregularity
             + u * root.theme.mirror_semantics.motion_uncertainty_drift
             - r * 0.12,
@@ -279,7 +319,7 @@ Rectangle {
         return clamp(
             1.0
             - semanticPressure * 0.24
-            - driftIrregularity * 0.18
+            - targetDriftIrregularity * 0.18
             + semanticRecovery * 0.25,
             0.72,
             1.46
@@ -366,6 +406,17 @@ Rectangle {
         var dt = clamp((nowMs - lastTickMs) / 1000.0, 0.0, 0.2)
         lastTickMs = nowMs
 
+        recomputeSemanticCarrier()
+
+        structuralAsymmetry = approach(structuralAsymmetry, targetStructuralAsymmetry, dt, motionDuration("shear_drift_ms"))
+        densityLevel = approach(densityLevel, targetDensityLevel, dt, motionDuration("line_reveal_ms"))
+        echoLevel = approach(echoLevel, targetEchoLevel, dt, motionDuration("ghost_echo_ms"))
+        centerOffsetX = approach(centerOffsetX, targetCenterOffsetX, dt, motionDuration("shear_drift_ms"))
+        centerOffsetY = approach(centerOffsetY, targetCenterOffsetY, dt, motionDuration("shear_drift_ms"))
+        orbitalActivity = approach(orbitalActivity, targetOrbitalActivity, dt, motionDuration("phase_shift_ms"))
+        speedScalar = approach(speedScalar, targetSpeedScalar, dt, motionDuration("convergence_ms"))
+        driftIrregularity = approach(driftIrregularity, targetDriftIrregularity, dt, motionDuration("convergence_ms"))
+
         if (nowMs >= nextTargetMs) {
             targetOrientation = buildNextTargetOrientation()
             scheduleNextTarget(nowMs)
@@ -384,8 +435,6 @@ Rectangle {
         precessionPhase += dt * (Math.PI * 2.0) * frequency
         semanticPhase += dt * (0.32 + speedScalar * 0.14)
         orbitPhase += dt * (0.22 + speedScalar * 0.58)
-
-        recomputeSemanticCarrier()
         mirrorNode.rotation = composeDisplayOrientation()
     }
 
@@ -715,6 +764,20 @@ Rectangle {
             font.family: root.theme.typography.secondary_text.families[0]
             font.pixelSize: root.theme.typography.secondary_text.size
             font.weight: root.fontWeight("secondary_text")
+        }
+    }
+
+    Behavior on opacity {
+        NumberAnimation {
+            duration: root.motionDuration("fade_ms")
+            easing.type: root.easingForClass(root.theme.motion.easing_soft_standard)
+        }
+    }
+
+    Behavior on y {
+        NumberAnimation {
+            duration: root.motionDuration("phase_shift_ms")
+            easing.type: root.easingForClass(root.theme.motion.easing_slow_settle)
         }
     }
 

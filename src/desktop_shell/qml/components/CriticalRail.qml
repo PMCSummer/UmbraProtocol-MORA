@@ -6,12 +6,36 @@ Rectangle {
     id: root
     required property var theme
     required property var railModel
+    required property var bridge
+    property bool active: true
     color: root.theme.colors.panel_primary
     border.width: root.theme.lines.thin
     border.color: root.theme.colors.divider_subtle
 
     function fontWeight(roleName) {
         return root.theme.typography[roleName].weight === "bold" ? Font.DemiBold : Font.Normal
+    }
+
+    function reducedMotion() {
+        return root.theme.reduced_motion || root.bridge.reducedMotionEnabled
+    }
+
+    function motionDuration(key) {
+        var base = root.theme.motion[key]
+        if (base === undefined) {
+            return root.theme.motion.fade_ms
+        }
+        return reducedMotion() ? Math.round(base * root.theme.motion.reduced_duration_scale) : base
+    }
+
+    function easingForClass(className) {
+        if (className === root.theme.motion.easing_sharp_warning) {
+            return Easing.OutCubic
+        }
+        if (className === root.theme.motion.easing_slow_settle) {
+            return Easing.InOutQuad
+        }
+        return Easing.InOutSine
     }
 
     ColumnLayout {
@@ -34,6 +58,21 @@ Rectangle {
                 required property int index
                 Layout.fillWidth: true
                 spacing: root.theme.spacing.xs
+                opacity: root.active ? 1.0 : 0.0
+                y: root.active ? 0.0 : root.theme.spacing.xs
+
+                Behavior on opacity {
+                    NumberAnimation {
+                        duration: root.motionDuration("line_reveal_ms")
+                        easing.type: root.easingForClass(root.theme.motion.easing_slow_settle)
+                    }
+                }
+                Behavior on y {
+                    NumberAnimation {
+                        duration: root.motionDuration("line_reveal_ms")
+                        easing.type: root.easingForClass(root.theme.motion.easing_slow_settle)
+                    }
+                }
 
                 RowLayout {
                     Layout.fillWidth: true
@@ -63,6 +102,13 @@ Rectangle {
                     Layout.fillWidth: true
                     Layout.preferredHeight: root.theme.lines.thin
                     color: root.theme.colors.divider_subtle
+                    opacity: root.active ? 1.0 : 0.0
+                    Behavior on opacity {
+                        NumberAnimation {
+                            duration: root.motionDuration("line_reveal_ms")
+                            easing.type: root.easingForClass(root.theme.motion.easing_slow_settle)
+                        }
+                    }
                 }
             }
         }

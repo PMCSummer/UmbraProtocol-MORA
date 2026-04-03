@@ -36,3 +36,19 @@ def test_qml_theme_payload_exposes_mirror_semantic_tokens() -> None:
     assert semantics["orbital_activity_scale"] > 0.0
     assert semantics["motion_pressure_speedup"] > 0.0
     assert 0.0 < semantics["reduced_semantic_scale"] <= 1.0
+
+
+def test_qml_theme_payload_exposes_motion_grammar_tokens() -> None:
+    payload = to_qml_theme_map(default_shell_theme())
+    motion = payload["motion"]
+
+    assert motion["fade_ms"] > 0
+    assert motion["line_reveal_ms"] >= motion["fade_ms"]
+    assert motion["phase_shift_ms"] >= motion["convergence_ms"]
+    assert motion["shear_drift_ms"] >= motion["phase_shift_ms"]
+    assert motion["ghost_echo_ms"] >= motion["shear_drift_ms"]
+    assert motion["easing_soft_standard"] == "soft_standard"
+    assert motion["easing_slow_settle"] == "slow_settle"
+    assert motion["easing_sharp_warning"] == "sharp_warning"
+    assert 0.0 < motion["reduced_duration_scale"] <= 1.0
+    assert 0.0 < motion["reduced_distance_scale"] <= 1.0

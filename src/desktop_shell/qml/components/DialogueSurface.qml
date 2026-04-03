@@ -7,6 +7,7 @@ Rectangle {
     id: root
     required property var theme
     required property var bridge
+    property bool active: true
     color: root.theme.colors.panel_primary
     border.width: root.theme.lines.thin
     border.color: root.theme.colors.divider_subtle
@@ -29,6 +30,28 @@ Rectangle {
         if (stateName === "waiting") return "Awaiting next turn."
         if (stateName === "subject-speaking") return "Subject response in progress."
         return "Unknown state."
+    }
+
+    function reducedMotion() {
+        return root.theme.reduced_motion || root.bridge.reducedMotionEnabled
+    }
+
+    function motionDuration(key) {
+        var base = root.theme.motion[key]
+        if (base === undefined) {
+            return root.theme.motion.fade_ms
+        }
+        return reducedMotion() ? Math.round(base * root.theme.motion.reduced_duration_scale) : base
+    }
+
+    function easingForClass(className) {
+        if (className === root.theme.motion.easing_sharp_warning) {
+            return Easing.OutCubic
+        }
+        if (className === root.theme.motion.easing_slow_settle) {
+            return Easing.InOutQuad
+        }
+        return Easing.InOutSine
     }
 
     ColumnLayout {
@@ -57,6 +80,13 @@ Rectangle {
                 radius: root.theme.radii.sm
                 implicitWidth: badgeText.implicitWidth + root.theme.spacing.md
                 implicitHeight: badgeText.implicitHeight + root.theme.spacing.xs
+                opacity: root.active ? 1.0 : 0.0
+                Behavior on opacity {
+                    NumberAnimation {
+                        duration: root.motionDuration("fade_ms")
+                        easing.type: root.easingForClass(root.theme.motion.easing_soft_standard)
+                    }
+                }
                 Text {
                     id: badgeText
                     anchors.centerIn: parent
@@ -92,6 +122,7 @@ Rectangle {
                            : root.theme.colors.panel_primary
                     implicitHeight: 24
                     implicitWidth: stateText.implicitWidth + root.theme.spacing.md
+                    opacity: root.active ? 1.0 : 0.0
 
                     Text {
                         id: stateText
@@ -108,6 +139,19 @@ Rectangle {
                     MouseArea {
                         anchors.fill: parent
                         onClicked: root.bridge.setEntitySurfaceState(parent.modelData)
+                    }
+
+                    Behavior on color {
+                        ColorAnimation {
+                            duration: root.motionDuration("fade_ms")
+                            easing.type: root.easingForClass(root.theme.motion.easing_soft_standard)
+                        }
+                    }
+                    Behavior on opacity {
+                        NumberAnimation {
+                            duration: root.motionDuration("line_reveal_ms")
+                            easing.type: root.easingForClass(root.theme.motion.easing_slow_settle)
+                        }
                     }
                 }
             }
@@ -128,13 +172,21 @@ Rectangle {
                 sourceComponent: MessageList {
                     theme: root.theme
                     messages: root.bridge.dialogueMessages
+                    reducedMotion: root.reducedMotion()
                 }
             }
 
             Item {
                 anchors.fill: parent
-                visible: root.bridge.entitySurfaceState === "empty"
-                Column {
+            visible: root.bridge.entitySurfaceState === "empty"
+            opacity: visible ? 1.0 : 0.0
+            Behavior on opacity {
+                NumberAnimation {
+                    duration: root.motionDuration("fade_ms")
+                    easing.type: root.easingForClass(root.theme.motion.easing_soft_standard)
+                }
+            }
+            Column {
                     anchors.centerIn: parent
                     spacing: root.theme.spacing.sm
                     Text {
@@ -159,6 +211,7 @@ Rectangle {
             Layout.fillWidth: true
             Layout.preferredHeight: 96
             theme: root.theme
+            bridge: root.bridge
             enabled: root.bridge.composerEnabled
             onSubmitRequested: function(payload) {
                 root.bridge.submitDraftMessage(payload)
@@ -166,4 +219,3 @@ Rectangle {
         }
     }
 }
-

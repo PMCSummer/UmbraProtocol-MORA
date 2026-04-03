@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from copy import deepcopy
+import os
 
 from PySide6.QtCore import QObject, Property, Signal, Slot
 
@@ -110,6 +111,12 @@ class ShellBridge(QObject):
             },
         }
         self._mirror_semantic_input = deepcopy(self._semantic_presets[self._entity_state])
+        self._reduced_motion_enabled = os.getenv("UMBRA_REDUCED_MOTION", "").strip().lower() in {
+            "1",
+            "true",
+            "yes",
+            "on",
+        }
 
     @Property("QVariantList", constant=True)
     def criticalRail(self) -> list[dict[str, str]]:
@@ -118,6 +125,7 @@ class ShellBridge(QObject):
     entitySurfaceStateChanged = Signal()
     dialogueMessagesChanged = Signal()
     mirrorSemanticInputChanged = Signal()
+    reducedMotionChanged = Signal()
 
     @Property("QVariantList", constant=True)
     def entityStates(self) -> list[str]:
@@ -142,6 +150,10 @@ class ShellBridge(QObject):
     @Property("QVariantMap", notify=mirrorSemanticInputChanged)
     def mirrorSemanticInput(self) -> dict[str, float]:
         return deepcopy(self._mirror_semantic_input)
+
+    @Property(bool, notify=reducedMotionChanged)
+    def reducedMotionEnabled(self) -> bool:
+        return self._reduced_motion_enabled
 
     def _clamp_level(self, value: float) -> float:
         return max(0.0, min(1.0, float(value)))
@@ -235,7 +247,14 @@ class ShellBridge(QObject):
         )
         return True
 
+    @Slot(bool)
+    def setReducedMotionEnabled(self, enabled: bool) -> None:
+        normalized = bool(enabled)
+        if normalized == self._reduced_motion_enabled:
+            return
+        self._reduced_motion_enabled = normalized
+        self.reducedMotionChanged.emit()
+
     @Slot(result=bool)
     def reducedMotionPreferred(self) -> bool:
-        # Hook for future motion/accessibility wiring.
-        return False
+        return self._reduced_motion_enabled

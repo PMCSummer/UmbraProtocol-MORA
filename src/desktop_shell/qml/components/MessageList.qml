@@ -6,9 +6,28 @@ Item {
     id: root
     required property var theme
     required property var messages
+    required property bool reducedMotion
 
     function fontWeight(roleName) {
         return root.theme.typography[roleName].weight === "bold" ? Font.DemiBold : Font.Normal
+    }
+
+    function motionDuration(key) {
+        var base = root.theme.motion[key]
+        if (base === undefined) {
+            return root.theme.motion.fade_ms
+        }
+        return reducedMotion ? Math.round(base * root.theme.motion.reduced_duration_scale) : base
+    }
+
+    function easingForClass(className) {
+        if (className === root.theme.motion.easing_sharp_warning) {
+            return Easing.OutCubic
+        }
+        if (className === root.theme.motion.easing_slow_settle) {
+            return Easing.InOutQuad
+        }
+        return Easing.InOutSine
     }
 
     ListView {
@@ -21,8 +40,30 @@ Item {
 
         delegate: Item {
             required property var modelData
+            required property int index
             width: listView.width
             height: bubble.implicitHeight + root.theme.spacing.xs
+            opacity: 0.0
+            x: modelData.source === "operator" ? root.theme.spacing.sm : -root.theme.spacing.sm
+
+            SequentialAnimation on opacity {
+                running: true
+                PauseAnimation { duration: reducedMotion ? 0 : index * 28 }
+                NumberAnimation {
+                    to: 1.0
+                    duration: root.motionDuration("convergence_ms")
+                    easing.type: root.easingForClass(root.theme.motion.easing_soft_standard)
+                }
+            }
+
+            Behavior on x {
+                NumberAnimation {
+                    duration: root.motionDuration("convergence_ms")
+                    easing.type: root.easingForClass(root.theme.motion.easing_slow_settle)
+                }
+            }
+
+            Component.onCompleted: x = 0
 
             Rectangle {
                 id: bubble
@@ -69,4 +110,3 @@ Item {
         }
     }
 }
-

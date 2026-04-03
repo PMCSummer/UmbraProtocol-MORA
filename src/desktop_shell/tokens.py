@@ -92,6 +92,21 @@ class TimingTokens:
 
 
 @dataclass(frozen=True, slots=True)
+class MotionGrammarTokens:
+    fade_ms: int = 160
+    line_reveal_ms: int = 280
+    phase_shift_ms: int = 360
+    convergence_ms: int = 300
+    shear_drift_ms: int = 520
+    ghost_echo_ms: int = 620
+    easing_soft_standard: str = "soft_standard"
+    easing_slow_settle: str = "slow_settle"
+    easing_sharp_warning: str = "sharp_warning"
+    reduced_duration_scale: float = 0.56
+    reduced_distance_scale: float = 0.4
+
+
+@dataclass(frozen=True, slots=True)
 class PanelHierarchyTokens:
     entity_dialogue_weight: float = 0.58
     entity_side_weight: float = 0.42
@@ -146,6 +161,7 @@ class ShellTheme:
     radii: RadiusTokens = field(default_factory=RadiusTokens)
     lines: LineTokens = field(default_factory=LineTokens)
     timing: TimingTokens = field(default_factory=TimingTokens)
+    motion: MotionGrammarTokens = field(default_factory=MotionGrammarTokens)
     hierarchy: PanelHierarchyTokens = field(default_factory=PanelHierarchyTokens)
     mirror: MirrorMotionTokens = field(default_factory=MirrorMotionTokens)
     mirror_semantics: MirrorSemanticTokens = field(default_factory=MirrorSemanticTokens)

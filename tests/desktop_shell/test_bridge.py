@@ -15,6 +15,7 @@ def test_bridge_exposes_required_entity_states() -> None:
         "recovery_level",
         "warning_level",
     }
+    assert isinstance(bridge.reducedMotionEnabled, bool)
 
 
 def test_bridge_state_switch_updates_messages_and_composer() -> None:
@@ -57,3 +58,11 @@ def test_bridge_semantic_setters_are_clamped_and_updatable() -> None:
     assert semantic["conflict_level"] == 0.4
     assert semantic["recovery_level"] == 0.3
     assert semantic["warning_level"] == 1.0
+
+
+def test_bridge_reduced_motion_toggle() -> None:
+    bridge = ShellBridge()
+    initial = bridge.reducedMotionEnabled
+    bridge.setReducedMotionEnabled(not initial)
+    assert bridge.reducedMotionEnabled is (not initial)
+    assert bridge.reducedMotionPreferred() is (not initial)

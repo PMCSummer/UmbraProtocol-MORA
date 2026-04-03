@@ -8,14 +8,58 @@ Item {
     required property var theme
     required property var railModel
     required property var bridge
+    property bool active: true
+    opacity: active ? 1.0 : 0.0
+    y: active ? 0 : root.phaseShiftDistance()
 
     function fontWeight(roleName) {
         return root.theme.typography[roleName].weight === "bold" ? Font.DemiBold : Font.Normal
     }
 
+    function reducedMotion() {
+        return root.theme.reduced_motion || root.bridge.reducedMotionEnabled
+    }
+
+    function phaseShiftDistance() {
+        var base = root.theme.spacing.md
+        return reducedMotion() ? Math.round(base * root.theme.motion.reduced_distance_scale) : base
+    }
+
+    function motionDuration(key) {
+        var base = root.theme.motion[key]
+        if (base === undefined) {
+            return root.theme.motion.fade_ms
+        }
+        return reducedMotion() ? Math.round(base * root.theme.motion.reduced_duration_scale) : base
+    }
+
+    function easingForClass(className) {
+        if (className === root.theme.motion.easing_sharp_warning) {
+            return Easing.OutCubic
+        }
+        if (className === root.theme.motion.easing_slow_settle) {
+            return Easing.InOutQuad
+        }
+        return Easing.InOutSine
+    }
+
     Rectangle {
         anchors.fill: parent
         color: root.theme.colors.app_background
+    }
+
+    Behavior on opacity {
+        NumberAnimation {
+            duration: root.motionDuration("fade_ms")
+            easing.type: root.easingForClass(root.theme.motion.easing_soft_standard)
+        }
+    }
+
+    Behavior on y {
+        NumberAnimation {
+            duration: root.motionDuration("phase_shift_ms")
+            easing.type: root.easingForClass(root.theme.motion.easing_slow_settle)
+        }
     }
 
     ColumnLayout {
@@ -54,6 +98,7 @@ Item {
                 Layout.fillHeight: true
                 theme: root.theme
                 bridge: root.bridge
+                active: root.active
             }
 
             ColumnLayout {
@@ -67,6 +112,7 @@ Item {
                     Layout.fillHeight: true
                     theme: root.theme
                     bridge: root.bridge
+                    active: root.active
                 }
 
                 CriticalRail {
@@ -75,6 +121,8 @@ Item {
                     Layout.fillHeight: true
                     theme: root.theme
                     railModel: root.railModel
+                    bridge: root.bridge
+                    active: root.active
                 }
             }
         }
