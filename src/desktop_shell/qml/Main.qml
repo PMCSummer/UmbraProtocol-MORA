@@ -68,6 +68,7 @@ ApplicationWindow {
             EntityTab {
                 theme: shellTheme
                 railModel: shellBridge.criticalRail
+                bridge: shellBridge
             }
 
             PlaceholderTab {
@@ -97,4 +98,3 @@ ApplicationWindow {
         }
     }
 }
-

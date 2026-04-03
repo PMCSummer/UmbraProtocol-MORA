@@ -29,31 +29,42 @@ Rectangle {
 
         Repeater {
             model: root.railModel
-            delegate: RowLayout {
+            delegate: ColumnLayout {
                 required property var modelData
+                required property int index
                 Layout.fillWidth: true
-                spacing: root.theme.spacing.md
+                spacing: root.theme.spacing.xs
 
-                Text {
+                RowLayout {
                     Layout.fillWidth: true
-                    text: modelData.label
-                    color: root.theme.colors.text_secondary
-                    font.family: root.theme.typography.status_label.families[0]
-                    font.pixelSize: root.theme.typography.status_label.size
-                    font.weight: root.fontWeight("status_label")
-                    elide: Text.ElideRight
+                    spacing: root.theme.spacing.md
+                    Text {
+                        Layout.fillWidth: true
+                        text: modelData.label
+                        color: root.theme.colors.text_secondary
+                        font.family: root.theme.typography.status_label.families[0]
+                        font.pixelSize: root.theme.typography.status_label.size
+                        font.weight: root.fontWeight("status_label")
+                        elide: Text.ElideRight
+                    }
+
+                    Text {
+                        text: modelData.value
+                        color: root.theme.colors.text_primary
+                        font.family: root.theme.typography.mono_text.families[0]
+                        font.pixelSize: root.theme.typography.mono_text.size
+                        font.weight: root.fontWeight("mono_text")
+                        horizontalAlignment: Text.AlignRight
+                    }
                 }
 
-                Text {
-                    text: modelData.value
-                    color: root.theme.colors.text_primary
-                    font.family: root.theme.typography.mono_text.families[0]
-                    font.pixelSize: root.theme.typography.mono_text.size
-                    font.weight: root.fontWeight("mono_text")
-                    horizontalAlignment: Text.AlignRight
+                Rectangle {
+                    visible: index === 4 || index === 7
+                    Layout.fillWidth: true
+                    Layout.preferredHeight: root.theme.lines.thin
+                    color: root.theme.colors.divider_subtle
                 }
             }
         }
     }
 }
-

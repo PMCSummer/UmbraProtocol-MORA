@@ -5,6 +5,7 @@ import QtQuick3D
 Rectangle {
     id: root
     required property var theme
+    required property var bridge
     color: root.theme.colors.panel_secondary
     border.width: root.theme.lines.thin
     border.color: root.theme.colors.divider_subtle
@@ -58,6 +59,7 @@ Rectangle {
             }
 
             Node {
+                id: mirrorNode
                 eulerRotation.y: 16
                 Model {
                     source: "#Sphere"
@@ -113,5 +115,16 @@ Rectangle {
             font.weight: root.fontWeight("secondary_text")
         }
     }
-}
 
+    NumberAnimation {
+        id: ambientTurn
+        target: mirrorNode
+        property: "eulerRotation.y"
+        from: 12
+        to: 20
+        duration: root.theme.timing.slow_settle_ms * 80
+        loops: Animation.Infinite
+        running: !root.bridge.reducedMotionPreferred()
+        easing.type: Easing.InOutSine
+    }
+}
