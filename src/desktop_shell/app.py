@@ -8,8 +8,12 @@ from PySide6.QtCore import QUrl
 from PySide6.QtGui import QGuiApplication
 from PySide6.QtQml import QQmlApplicationEngine
 
-from desktop_shell.bridge import ShellBridge
-from desktop_shell.tokens import ShellTheme, default_shell_theme, to_qml_theme_map
+try:
+    from .bridge import ShellBridge
+    from .tokens import ShellTheme, default_shell_theme, to_qml_theme_map
+except ImportError:  # pragma: no cover - direct file execution fallback
+    from bridge import ShellBridge
+    from tokens import ShellTheme, default_shell_theme, to_qml_theme_map
 
 
 def _qml_main_file() -> Path:
@@ -40,4 +44,3 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-
