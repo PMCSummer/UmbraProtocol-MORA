@@ -105,52 +105,63 @@ Rectangle {
             font.family: root.theme.typography.secondary_text.families[0]
             font.pixelSize: root.theme.typography.secondary_text.size
             font.weight: root.fontWeight("secondary_text")
+            wrapMode: Text.WordWrap
+            maximumLineCount: 2
+            elide: Text.ElideRight
+            Layout.fillWidth: true
         }
 
-        RowLayout {
+        Item {
             Layout.fillWidth: true
-            spacing: root.theme.spacing.xs
-            Repeater {
-                model: root.bridge.entityStates
-                delegate: Rectangle {
-                    required property var modelData
-                    radius: root.theme.radii.sm
-                    border.width: root.theme.lines.thin
-                    border.color: root.theme.colors.divider_subtle
-                    color: root.bridge.entitySurfaceState === modelData
-                           ? root.theme.colors.panel_secondary
-                           : root.theme.colors.panel_primary
-                    implicitHeight: 24
-                    implicitWidth: stateText.implicitWidth + root.theme.spacing.md
-                    opacity: root.active ? 1.0 : 0.0
+            Layout.preferredHeight: chipsFlow.implicitHeight
 
-                    Text {
-                        id: stateText
-                        anchors.centerIn: parent
-                        text: root.stateLabel(modelData)
+            Flow {
+                id: chipsFlow
+                width: parent.width
+                spacing: root.theme.spacing.xs
+
+                Repeater {
+                    model: root.bridge.entityStates
+                    delegate: Rectangle {
+                        required property var modelData
+                        radius: root.theme.radii.sm
+                        border.width: root.theme.lines.thin
+                        border.color: root.theme.colors.divider_subtle
                         color: root.bridge.entitySurfaceState === modelData
-                               ? root.theme.colors.text_primary
-                               : root.theme.colors.text_secondary
-                        font.family: root.theme.typography.status_label.families[0]
-                        font.pixelSize: root.theme.typography.status_label.size
-                        font.weight: root.fontWeight("status_label")
-                    }
+                               ? root.theme.colors.panel_secondary
+                               : root.theme.colors.panel_primary
+                        implicitHeight: 26
+                        implicitWidth: stateText.implicitWidth + root.theme.spacing.md
+                        opacity: root.active ? 1.0 : 0.0
 
-                    MouseArea {
-                        anchors.fill: parent
-                        onClicked: root.bridge.setEntitySurfaceState(parent.modelData)
-                    }
-
-                    Behavior on color {
-                        ColorAnimation {
-                            duration: root.motionDuration("fade_ms")
-                            easing.type: root.easingForClass(root.theme.motion.easing_soft_standard)
+                        Text {
+                            id: stateText
+                            anchors.centerIn: parent
+                            text: root.stateLabel(modelData)
+                            color: root.bridge.entitySurfaceState === modelData
+                                   ? root.theme.colors.text_primary
+                                   : root.theme.colors.text_secondary
+                            font.family: root.theme.typography.status_label.families[0]
+                            font.pixelSize: root.theme.typography.status_label.size
+                            font.weight: root.fontWeight("status_label")
                         }
-                    }
-                    Behavior on opacity {
-                        NumberAnimation {
-                            duration: root.motionDuration("line_reveal_ms")
-                            easing.type: root.easingForClass(root.theme.motion.easing_slow_settle)
+
+                        MouseArea {
+                            anchors.fill: parent
+                            onClicked: root.bridge.setEntitySurfaceState(parent.modelData)
+                        }
+
+                        Behavior on color {
+                            ColorAnimation {
+                                duration: root.motionDuration("fade_ms")
+                                easing.type: root.easingForClass(root.theme.motion.easing_soft_standard)
+                            }
+                        }
+                        Behavior on opacity {
+                            NumberAnimation {
+                                duration: root.motionDuration("line_reveal_ms")
+                                easing.type: root.easingForClass(root.theme.motion.easing_slow_settle)
+                            }
                         }
                     }
                 }
@@ -178,15 +189,15 @@ Rectangle {
 
             Item {
                 anchors.fill: parent
-            visible: root.bridge.entitySurfaceState === "empty"
-            opacity: visible ? 1.0 : 0.0
-            Behavior on opacity {
-                NumberAnimation {
-                    duration: root.motionDuration("fade_ms")
-                    easing.type: root.easingForClass(root.theme.motion.easing_soft_standard)
+                visible: root.bridge.entitySurfaceState === "empty"
+                opacity: visible ? 1.0 : 0.0
+                Behavior on opacity {
+                    NumberAnimation {
+                        duration: root.motionDuration("fade_ms")
+                        easing.type: root.easingForClass(root.theme.motion.easing_soft_standard)
+                    }
                 }
-            }
-            Column {
+                Column {
                     anchors.centerIn: parent
                     spacing: root.theme.spacing.sm
                     Text {
@@ -209,7 +220,7 @@ Rectangle {
 
         DialogueComposer {
             Layout.fillWidth: true
-            Layout.preferredHeight: 96
+            Layout.preferredHeight: 112
             theme: root.theme
             bridge: root.bridge
             enabled: root.bridge.composerEnabled

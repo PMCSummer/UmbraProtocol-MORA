@@ -64,7 +64,7 @@ Rectangle {
 
         Rectangle {
             id: sendSurface
-            Layout.preferredWidth: 108
+            Layout.preferredWidth: 120
             Layout.fillHeight: true
             radius: root.theme.radii.sm
             border.width: root.theme.lines.thin

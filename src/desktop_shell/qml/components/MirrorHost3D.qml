@@ -51,21 +51,21 @@ Rectangle {
     property color secondaryLineColor: root.theme.colors.text_secondary
     property color accentLineColor: root.theme.colors.geometry_white
 
-    property int ringSegments: 12
-    property real outerRadius: 118.0
-    property real innerRadius: 71.0
+    property int ringSegments: 8
+    property real outerRadius: 116.0
+    property real innerRadius: 70.0
     property real depthHalf: 33.0
-    property real edgeThickness: 0.016
-    property real outerSegmentLength: 0.62
-    property real innerSegmentLength: 0.44
-    property real radialBridgeLength: 0.47
-    property real depthBridgeLength: 0.66
+    property real edgeThickness: 0.022
+    property real outerSegmentLength: chordScale(outerRadius) * 0.98
+    property real innerSegmentLength: chordScale(innerRadius) * 0.98
+    property real radialBridgeLength: Math.max(0.14, ((outerRadius - innerRadius) / 100.0) * 0.96)
+    property real depthBridgeLength: ((depthHalf * 2.0) / 100.0) * 0.94
 
     property real outerYScale: 1.0
-    property real innerYScale: 0.88
+    property real innerYScale: 0.9
     property real secondaryDetailOpacity: clamp(0.08 + densityLevel * 0.56, 0.08, 0.72)
     property real ghostOpacity: clamp(0.02 + echoLevel * 0.4, 0.0, 0.44)
-    property int orbitalNodeCount: Math.max(0, Math.min(4, Math.round(orbitalActivity * 4.0)))
+    property int orbitalNodeCount: Math.max(0, Math.min(3, Math.round(orbitalActivity * 3.0)))
     property real orbitalRadius: root.theme.mirror_semantics.orbital_radius
 
     function fontWeight(roleName) {
@@ -121,6 +121,10 @@ Rectangle {
 
     function randomBetween(minValue, maxValue) {
         return minValue + (maxValue - minValue) * Math.random()
+    }
+
+    function chordScale(radius) {
+        return (2.0 * radius * Math.sin(Math.PI / ringSegments)) / 100.0
     }
 
     function approach(currentValue, targetValue, dt, durationMs) {
@@ -261,15 +265,15 @@ Rectangle {
             0.0,
             22.0
         )
-        targetCenterOffsetX = Math.cos(semanticPhase * 0.36) * offsetMagnitude
-        targetCenterOffsetY = Math.sin(semanticPhase * 0.31) * offsetMagnitude * 0.62
+        targetCenterOffsetX = clamp(driftAxis.x, -1.0, 1.0) * offsetMagnitude * 0.66
+        targetCenterOffsetY = clamp(driftAxis.z, -1.0, 1.0) * offsetMagnitude * 0.5
 
         targetOrbitalActivity = clamp(
             (p * 0.64 + c * 0.52 + (1.0 - u) * 0.18)
             * root.theme.mirror_semantics.orbital_activity_scale
             - r * 0.26,
             0.0,
-            1.0
+            0.9
         )
 
         targetSpeedScalar = clamp(
@@ -373,17 +377,12 @@ Rectangle {
         return angleDeg * Math.PI / 180.0
     }
 
-    function radiusFor(baseRadius, angleDeg) {
-        var modulation = 1.0 + Math.sin(angleRadians(angleDeg) * 2.0 + semanticPhase * 0.44) * structuralAsymmetry * 0.22
-        return baseRadius * modulation
-    }
-
     function ringX(baseRadius, angleDeg) {
-        return Math.cos(angleRadians(angleDeg)) * radiusFor(baseRadius, angleDeg)
+        return Math.cos(angleRadians(angleDeg)) * baseRadius
     }
 
     function ringY(baseRadius, angleDeg, scaleY) {
-        return Math.sin(angleRadians(angleDeg)) * radiusFor(baseRadius, angleDeg) * scaleY
+        return Math.sin(angleRadians(angleDeg)) * baseRadius * scaleY
     }
 
     function orbitalAngle(index) {
@@ -406,8 +405,6 @@ Rectangle {
         var dt = clamp((nowMs - lastTickMs) / 1000.0, 0.0, 0.2)
         lastTickMs = nowMs
 
-        recomputeSemanticCarrier()
-
         structuralAsymmetry = approach(structuralAsymmetry, targetStructuralAsymmetry, dt, motionDuration("shear_drift_ms"))
         densityLevel = approach(densityLevel, targetDensityLevel, dt, motionDuration("line_reveal_ms"))
         echoLevel = approach(echoLevel, targetEchoLevel, dt, motionDuration("ghost_echo_ms"))
@@ -420,6 +417,7 @@ Rectangle {
         if (nowMs >= nextTargetMs) {
             targetOrientation = buildNextTargetOrientation()
             scheduleNextTarget(nowMs)
+            recomputeSemanticCarrier()
         }
 
         var response = root.theme.mirror.slerp_response * motionScale() * speedScalar
@@ -498,8 +496,8 @@ Rectangle {
                     Node {
                         id: artifactBody
                         scale: Qt.vector3d(
-                            1.0 + root.structuralAsymmetry * 0.16 * Math.sin(root.semanticPhase * 0.53),
-                            1.0 - root.structuralAsymmetry * 0.12 * Math.cos(root.semanticPhase * 0.47),
+                            1.0 + root.structuralAsymmetry * 0.06,
+                            1.0 - root.structuralAsymmetry * 0.04,
                             1.0
                         )
 
@@ -708,10 +706,10 @@ Rectangle {
                     position: Qt.vector3d(root.centerOffsetX * 0.42, root.centerOffsetY * 0.42, 0.0)
                     scale: Qt.vector3d(1.04, 1.04, 1.02)
                     Repeater3D {
-                        model: root.ringSegments
+                        model: Math.max(4, Math.floor(root.ringSegments / 2))
                         delegate: Model {
                             required property int index
-                            readonly property real angle: index * (360.0 / root.ringSegments)
+                            readonly property real angle: index * (360.0 / Math.max(4, Math.floor(root.ringSegments / 2)))
                             source: "#Cube"
                             x: root.ringX(root.outerRadius * 1.02, angle)
                             y: root.ringY(root.outerRadius * 1.02, angle, root.outerYScale)
@@ -741,7 +739,7 @@ Rectangle {
                             z: Math.sin(root.angleRadians(angle * 0.7 + 24.0)) * 18.0
                             Model {
                                 source: "#Sphere"
-                                scale: Qt.vector3d(0.06, 0.06, 0.06)
+                                scale: Qt.vector3d(0.052, 0.052, 0.052)
                                 materials: PrincipledMaterial {
                                     baseColor: root.semanticBand >= 2 ? root.accentLineColor : root.secondaryLineColor
                                     metalness: 0.0
@@ -783,9 +781,9 @@ Rectangle {
 
     Timer {
         id: ticker
-        interval: 16
+        interval: root.reducedMotion() ? 42 : 24
         repeat: true
-        running: true
+        running: root.active && root.visible
         onTriggered: root.tick(Date.now())
     }
 
@@ -804,5 +802,11 @@ Rectangle {
         targetOrientation = buildNextTargetOrientation()
         scheduleNextTarget(now)
         mirrorNode.rotation = composeDisplayOrientation()
+    }
+
+    onActiveChanged: {
+        if (active) {
+            lastTickMs = Date.now()
+        }
     }
 }

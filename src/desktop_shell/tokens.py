@@ -30,44 +30,44 @@ class TypographyRole:
 class TypographyTokens:
     display_title: TypographyRole = TypographyRole(
         families=("Tomorrow", "Bahnschrift", "Segoe UI", "Arial"),
-        size=18,
+        size=20,
         weight="bold",
     )
     section_title: TypographyRole = TypographyRole(
         families=("Oxanium", "Segoe UI Semibold", "Segoe UI", "Arial"),
-        size=11,
+        size=13,
         weight="bold",
     )
     status_label: TypographyRole = TypographyRole(
         families=("Oxanium", "Segoe UI", "Arial"),
-        size=10,
+        size=12,
         weight="normal",
     )
     body_text: TypographyRole = TypographyRole(
         families=("Inter", "Segoe UI", "Arial"),
-        size=11,
+        size=13,
         weight="normal",
     )
     secondary_text: TypographyRole = TypographyRole(
         families=("Inter", "Segoe UI", "Arial"),
-        size=10,
+        size=12,
         weight="normal",
     )
     mono_text: TypographyRole = TypographyRole(
         families=("IBM Plex Mono", "JetBrains Mono", "Consolas", "Courier New"),
-        size=10,
+        size=12,
         weight="normal",
     )
 
 
 @dataclass(frozen=True, slots=True)
 class SpacingTokens:
-    xxs: int = 2
+    xxs: int = 3
     xs: int = 4
-    sm: int = 8
-    md: int = 12
+    sm: int = 9
+    md: int = 14
     lg: int = 16
-    xl: int = 24
+    xl: int = 26
     xxl: int = 32
 
 

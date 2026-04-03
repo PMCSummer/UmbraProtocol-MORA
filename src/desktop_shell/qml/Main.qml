@@ -58,7 +58,7 @@ ApplicationWindow {
                 TabButton {
                     required property string modelData
                     text: modelData
-                    height: 42
+                    height: 46
                     leftPadding: shellTheme.spacing.lg
                     rightPadding: shellTheme.spacing.lg
                     font.family: shellTheme.typography.status_label.families[0]
@@ -97,32 +97,27 @@ ApplicationWindow {
                 active: tabBar.currentIndex === 0
             }
 
-            PlaceholderTab {
+            TraceTab {
                 theme: shellTheme
-                title: "Trace"
-                subtitle: "Trace stream shell. Provenance lanes reserved for next increment."
+                bridge: shellBridge
                 active: tabBar.currentIndex === 1
             }
 
-            PlaceholderTab {
+            LanguageTab {
                 theme: shellTheme
-                title: "Language"
-                subtitle: "Language shell. Lexical/dictum panes remain bounded and staged."
+                bridge: shellBridge
                 active: tabBar.currentIndex === 2
             }
 
-            PlaceholderTab {
+            ViabilityTab {
                 theme: shellTheme
-                title: "Viability"
-                subtitle: "Viability shell. Pressure/escalation visuals reserved for dedicated step."
+                bridge: shellBridge
                 active: tabBar.currentIndex === 3
             }
 
-            PlaceholderTab {
+            DiagnosticsTab {
                 theme: shellTheme
-                title: "Diagnostics"
-                subtitle: "Machine-facing diagnostics shell with restrained raw hierarchy."
-                diagnosticsMode: true
+                bridge: shellBridge
                 active: tabBar.currentIndex === 4
             }
         }
