@@ -40,5 +40,9 @@ def test_stage_contour_l06_exists_but_g01_legacy_bridge_remains_operational_debt
 
     assert l06_result.bundle.update_proposals
     assert l06_result.bundle.legacy_g01_bypass_risk_present is True
+    assert g01_result.bundle.normative_l05_l06_route_active is False
+    assert g01_result.bundle.legacy_surface_cue_fallback_used is True
+    assert g01_result.bundle.legacy_surface_cue_path_not_normative is True
+    assert "legacy_surface_cue_fallback_used" in g01_result.telemetry.downstream_gate.restrictions
     assert g01_result.bundle.modus_carriers
     assert g01_result.bundle.source_anchors

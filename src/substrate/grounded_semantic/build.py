@@ -11,6 +11,13 @@ from substrate.contracts import (
     WriterIdentity,
 )
 from substrate.dictum_candidates.models import DictumCandidateBundle, DictumCandidateResult
+from substrate.discourse_update.models import (
+    ContinuationStatus,
+    DiscourseUpdateBundle,
+    DiscourseUpdateResult,
+    ProposalType,
+    RepairClass,
+)
 from substrate.grounded_semantic.models import (
     AmbiguityState,
     CarrierKind,
@@ -37,10 +44,19 @@ from substrate.grounded_semantic.telemetry import (
     grounded_semantic_result_snapshot,
 )
 from substrate.language_surface.models import UtteranceSurface, UtteranceSurfaceResult
+from substrate.modus_hypotheses.models import (
+    AddressivityKind,
+    IllocutionKind,
+    ModusHypothesisBundle,
+    ModusHypothesisRecord,
+    ModusHypothesisResult,
+)
 from substrate.transition import execute_transition
 
 ATTEMPTED_PATHS: tuple[str, ...] = (
     "g01.validate_typed_inputs",
+    "g01.normative_l05_l06_intake",
+    "g01.legacy_surface_cue_fallback",
     "g01.substrate_unit_projection",
     "g01.phrase_scaffold_building",
     "g01.operator_carrier_projection",
@@ -70,13 +86,21 @@ def build_grounded_semantic_substrate(
     utterance_surface: UtteranceSurface | UtteranceSurfaceResult | None = None,
     memory_anchor_ref: str | None = None,
     cooperation_anchor_ref: str | None = None,
+    modus_hypotheses_result_or_bundle: ModusHypothesisResult | ModusHypothesisBundle | None = None,
+    discourse_update_result_or_bundle: DiscourseUpdateResult | DiscourseUpdateBundle | None = None,
 ) -> GroundedSemanticResult:
     dictum_bundle, dictum_lineage = _extract_dictum_input(dictum_result_or_bundle)
+    modus_bundle, modus_lineage = _extract_optional_modus_input(modus_hypotheses_result_or_bundle)
+    discourse_bundle, discourse_lineage = _extract_optional_discourse_update_input(discourse_update_result_or_bundle)
     surface = _extract_optional_surface(utterance_surface)
     if memory_anchor_ref is not None and not isinstance(memory_anchor_ref, str):
         raise TypeError("memory_anchor_ref must be str when provided")
     if cooperation_anchor_ref is not None and not isinstance(cooperation_anchor_ref, str):
         raise TypeError("cooperation_anchor_ref must be str when provided")
+    if (modus_bundle is None) ^ (discourse_bundle is None):
+        raise TypeError(
+            "normative g01 intake requires both typed L05 and typed L06 artifacts together, or neither"
+        )
 
     if not dictum_bundle.dictum_candidates:
         return _abstain_result(
@@ -102,6 +126,20 @@ def build_grounded_semantic_substrate(
     ambiguity_reasons: list[str] = []
     low_coverage_reasons: list[str] = []
     clause_ranges_by_id: dict[str, list[tuple[int, int]]] = defaultdict(list)
+    dictum_span_by_id = {
+        candidate.dictum_candidate_id: (
+            candidate.predicate_frame.predicate_span.start,
+            candidate.predicate_frame.predicate_span.end,
+        )
+        for candidate in dictum_bundle.dictum_candidates
+    }
+    normative_route_requested = modus_bundle is not None and discourse_bundle is not None
+    normative_route_binding_valid = False
+    normative_l05_l06_route_active = False
+    legacy_surface_cue_fallback_used = False
+    discourse_update_not_inferred_from_surface_when_l06_available = False
+    l06_blocked_update_present = False
+    l06_guarded_continue_present = False
 
     for candidate in dictum_bundle.dictum_candidates:
         clause_start = candidate.predicate_frame.predicate_span.start
@@ -292,17 +330,78 @@ def build_grounded_semantic_substrate(
                 )
             )
 
-    anchor_index, carrier_index, uncertainty_index = _register_surface_cues(
-        surface=surface,
-        linked_dictum_ids=tuple(candidate.dictum_candidate_id for candidate in dictum_bundle.dictum_candidates),
-        source_anchors=source_anchors,
-        operator_carriers=operator_carriers,
-        modus_carriers=modus_carriers,
-        uncertainty_markers=uncertainty_markers,
-        start_anchor_index=anchor_index,
-        start_carrier_index=carrier_index,
-        start_uncertainty_index=uncertainty_index,
-    )
+    if normative_route_requested and modus_bundle is not None and discourse_bundle is not None:
+        normative_route_binding_valid = _is_normative_binding_compatible(
+            dictum_bundle=dictum_bundle,
+            modus_bundle=modus_bundle,
+            discourse_bundle=discourse_bundle,
+        )
+        if normative_route_binding_valid:
+            (
+                anchor_index,
+                carrier_index,
+                uncertainty_index,
+                l06_blocked_update_present,
+                l06_guarded_continue_present,
+            ) = _register_normative_l05_l06_cues(
+                dictum_bundle=dictum_bundle,
+                dictum_span_by_id=dictum_span_by_id,
+                modus_bundle=modus_bundle,
+                discourse_bundle=discourse_bundle,
+                source_anchors=source_anchors,
+                operator_carriers=operator_carriers,
+                modus_carriers=modus_carriers,
+                uncertainty_markers=uncertainty_markers,
+                start_anchor_index=anchor_index,
+                start_carrier_index=carrier_index,
+                start_uncertainty_index=uncertainty_index,
+            )
+            normative_l05_l06_route_active = True
+            discourse_update_not_inferred_from_surface_when_l06_available = True
+            low_coverage_reasons.append("l05_l06_normative_route_active")
+            if l06_blocked_update_present:
+                low_coverage_reasons.append("l06_blocked_update_present")
+            if l06_guarded_continue_present:
+                low_coverage_reasons.append("l06_guarded_continue_present")
+        else:
+            legacy_surface_cue_fallback_used = True
+            low_coverage_reasons.extend(
+                [
+                    "l05_l06_binding_mismatch",
+                    "legacy_surface_cue_fallback_used",
+                    "l04_only_input_not_equivalent_to_l05_l06_route",
+                ]
+            )
+            anchor_index, carrier_index, uncertainty_index = _register_surface_cues(
+                surface=surface,
+                linked_dictum_ids=tuple(candidate.dictum_candidate_id for candidate in dictum_bundle.dictum_candidates),
+                source_anchors=source_anchors,
+                operator_carriers=operator_carriers,
+                modus_carriers=modus_carriers,
+                uncertainty_markers=uncertainty_markers,
+                start_anchor_index=anchor_index,
+                start_carrier_index=carrier_index,
+                start_uncertainty_index=uncertainty_index,
+            )
+    else:
+        legacy_surface_cue_fallback_used = True
+        low_coverage_reasons.extend(
+            [
+                "legacy_surface_cue_fallback_used",
+                "l04_only_input_not_equivalent_to_l05_l06_route",
+            ]
+        )
+        anchor_index, carrier_index, uncertainty_index = _register_surface_cues(
+            surface=surface,
+            linked_dictum_ids=tuple(candidate.dictum_candidate_id for candidate in dictum_bundle.dictum_candidates),
+            source_anchors=source_anchors,
+            operator_carriers=operator_carriers,
+            modus_carriers=modus_carriers,
+            uncertainty_markers=uncertainty_markers,
+            start_anchor_index=anchor_index,
+            start_carrier_index=carrier_index,
+            start_uncertainty_index=uncertainty_index,
+        )
 
     for clause_id, ranges in clause_ranges_by_id.items():
         if len(set(ranges)) > 1:
@@ -342,7 +441,11 @@ def build_grounded_semantic_substrate(
         source_dictum_ref=dictum_bundle.source_lexical_grounding_ref,
         source_syntax_ref=dictum_bundle.source_syntax_ref,
         source_surface_ref=dictum_bundle.source_surface_ref,
+        source_modus_ref=modus_bundle.source_dictum_ref if modus_bundle is not None else None,
+        source_discourse_update_ref=discourse_bundle.source_modus_ref if discourse_bundle is not None else None,
         linked_dictum_candidate_ids=tuple(candidate.dictum_candidate_id for candidate in dictum_bundle.dictum_candidates),
+        linked_modus_record_ids=tuple(record.record_id for record in modus_bundle.hypothesis_records) if modus_bundle is not None else (),
+        linked_update_proposal_ids=tuple(proposal.proposal_id for proposal in discourse_bundle.update_proposals) if discourse_bundle is not None else (),
         substrate_units=tuple(substrate_units),
         phrase_scaffolds=tuple(phrase_scaffolds),
         operator_carriers=tuple(operator_carriers),
@@ -353,8 +456,19 @@ def build_grounded_semantic_substrate(
         ambiguity_reasons=tuple(dict.fromkeys(ambiguity_reasons)),
         low_coverage_mode=low_coverage_mode,
         low_coverage_reasons=tuple(dict.fromkeys(low_coverage_reasons)),
+        normative_l05_l06_route_active=normative_l05_l06_route_active,
+        legacy_surface_cue_fallback_used=legacy_surface_cue_fallback_used,
+        legacy_surface_cue_path_not_normative=True,
+        l04_only_input_not_equivalent_to_l05_l06_route=True,
+        discourse_update_not_inferred_from_surface_when_l06_available=discourse_update_not_inferred_from_surface_when_l06_available,
+        l06_blocked_update_present=l06_blocked_update_present,
+        l06_guarded_continue_present=l06_guarded_continue_present,
         no_final_semantic_resolution=True,
-        reason="g01 grounded semantic scaffold generated from l04 candidates without semantic closure",
+        reason=(
+            "g01 grounded semantic scaffold generated via normative l05+l06 intake with bounded restrictions"
+            if normative_l05_l06_route_active
+            else "g01 grounded semantic scaffold generated from legacy l04/surface route with degraded fallback restrictions"
+        ),
     )
     gate = evaluate_grounded_semantic_downstream_gate(bundle)
     source_lineage = tuple(
@@ -362,7 +476,11 @@ def build_grounded_semantic_substrate(
             (
                 dictum_bundle.source_lexical_grounding_ref,
                 dictum_bundle.source_syntax_ref,
+                *((modus_bundle.source_dictum_ref,) if modus_bundle is not None else ()),
+                *((discourse_bundle.source_modus_ref,) if discourse_bundle is not None else ()),
                 *dictum_lineage,
+                *modus_lineage,
+                *discourse_lineage,
                 *((f"m03:{memory_anchor_ref}",) if memory_anchor_ref else ()),
                 *((f"o03:{cooperation_anchor_ref}",) if cooperation_anchor_ref else ()),
             )
@@ -374,7 +492,11 @@ def build_grounded_semantic_substrate(
         reversible_span_mapping_present=reversible_span_mapping_present,
         attempted_paths=ATTEMPTED_PATHS,
         downstream_gate=gate,
-        causal_basis="l04 dictum carriers projected into span-grounded scaffold with unresolved operator/source markers",
+        causal_basis=(
+            "l04 substrate scaffold combined with typed l05 force/addressivity and l06 update/repair signals"
+            if normative_l05_l06_route_active
+            else "legacy l04 dictum carriers projected with surface-derived operator/source cues under degraded compatibility fallback"
+        ),
     )
     confidence = _estimate_result_confidence(bundle)
     partial_known = bool(bundle.uncertainty_markers or bundle.low_coverage_mode or bundle.ambiguity_reasons)
@@ -446,6 +568,310 @@ def _extract_optional_surface(
     if isinstance(utterance_surface, UtteranceSurfaceResult):
         return utterance_surface.surface
     raise TypeError("utterance_surface must be UtteranceSurface or UtteranceSurfaceResult when provided")
+
+
+def _extract_optional_modus_input(
+    modus_result_or_bundle: ModusHypothesisResult | ModusHypothesisBundle | None,
+) -> tuple[ModusHypothesisBundle | None, tuple[str, ...]]:
+    if modus_result_or_bundle is None:
+        return None, ()
+    if isinstance(modus_result_or_bundle, ModusHypothesisResult):
+        return modus_result_or_bundle.bundle, modus_result_or_bundle.telemetry.source_lineage
+    if isinstance(modus_result_or_bundle, ModusHypothesisBundle):
+        return modus_result_or_bundle, ()
+    raise TypeError(
+        "modus_hypotheses_result_or_bundle must be typed ModusHypothesisResult/ModusHypothesisBundle when provided"
+    )
+
+
+def _extract_optional_discourse_update_input(
+    discourse_update_result_or_bundle: DiscourseUpdateResult | DiscourseUpdateBundle | None,
+) -> tuple[DiscourseUpdateBundle | None, tuple[str, ...]]:
+    if discourse_update_result_or_bundle is None:
+        return None, ()
+    if isinstance(discourse_update_result_or_bundle, DiscourseUpdateResult):
+        return discourse_update_result_or_bundle.bundle, discourse_update_result_or_bundle.telemetry.source_lineage
+    if isinstance(discourse_update_result_or_bundle, DiscourseUpdateBundle):
+        return discourse_update_result_or_bundle, ()
+    raise TypeError(
+        "discourse_update_result_or_bundle must be typed DiscourseUpdateResult/DiscourseUpdateBundle when provided"
+    )
+
+
+def _is_normative_binding_compatible(
+    *,
+    dictum_bundle: DictumCandidateBundle,
+    modus_bundle: ModusHypothesisBundle,
+    discourse_bundle: DiscourseUpdateBundle,
+) -> bool:
+    dictum_ids = {candidate.dictum_candidate_id for candidate in dictum_bundle.dictum_candidates}
+    if not dictum_ids:
+        return False
+    if not modus_bundle.hypothesis_records:
+        return False
+    if not discourse_bundle.update_proposals:
+        return False
+    if modus_bundle.source_dictum_ref != dictum_bundle.source_lexical_grounding_ref:
+        return False
+    if discourse_bundle.source_modus_ref != modus_bundle.source_dictum_ref:
+        return False
+    if not set(modus_bundle.linked_dictum_candidate_ids).intersection(dictum_ids):
+        return False
+    return True
+
+
+def _register_normative_l05_l06_cues(
+    *,
+    dictum_bundle: DictumCandidateBundle,
+    dictum_span_by_id: dict[str, tuple[int, int]],
+    modus_bundle: ModusHypothesisBundle,
+    discourse_bundle: DiscourseUpdateBundle,
+    source_anchors: list[SourceAnchor],
+    operator_carriers: list[OperatorCarrier],
+    modus_carriers: list[ModusCarrier],
+    uncertainty_markers: list[UncertaintyMarker],
+    start_anchor_index: int,
+    start_carrier_index: int,
+    start_uncertainty_index: int,
+) -> tuple[int, int, int, bool, bool]:
+    anchor_index = start_anchor_index
+    carrier_index = start_carrier_index
+    uncertainty_index = start_uncertainty_index
+    l06_blocked_update_present = False
+    l06_guarded_continue_present = False
+
+    record_by_id = {record.record_id: record for record in modus_bundle.hypothesis_records}
+    proposal_by_record_id: dict[str, list[str]] = {}
+    for proposal in discourse_bundle.update_proposals:
+        if proposal.source_record_ids:
+            proposal_by_record_id.setdefault(proposal.source_record_ids[0], []).append(proposal.proposal_id)
+
+    for record in modus_bundle.hypothesis_records:
+        anchor_span = dictum_span_by_id.get(record.source_dictum_candidate_id, (0, 0))
+        sorted_hypotheses = sorted(
+            record.illocution_hypotheses,
+            key=lambda hypothesis: hypothesis.confidence_weight,
+            reverse=True,
+        )
+        primary = sorted_hypotheses[0] if sorted_hypotheses else None
+        primary_kind = primary.illocution_kind if primary is not None else IllocutionKind.UNKNOWN_FORCE_CANDIDATE
+        evidence_refs = (record.record_id,) if primary is None else (record.record_id, *primary.evidence_refs)
+        carrier_index += 1
+        modus_carriers.append(
+            ModusCarrier(
+                carrier_id=f"carrier-{carrier_index}",
+                dictum_candidate_id=record.source_dictum_candidate_id,
+                stance_kind=f"{CarrierKind.MODUS_STANCE.value}:l05:{primary_kind.value}",
+                evidence_refs=evidence_refs,
+                unresolved=record.uncertainty_entropy >= 0.7 or (primary.unresolved if primary is not None else True),
+                confidence=min(0.92, max(0.18, record.confidence)),
+                provenance="g01 normative modus carrier from l05 hypothesis topology",
+            )
+        )
+
+        if primary_kind is IllocutionKind.INTERROGATIVE_CANDIDATE:
+            carrier_index += 1
+            operator_carriers.append(
+                OperatorCarrier(
+                    operator_id=f"op-{carrier_index}",
+                    operator_kind=OperatorKind.INTERROGATION,
+                    carrier_unit_ids=(),
+                    scope_anchor_refs=(record.source_dictum_candidate_id,),
+                    scope_uncertain=record.uncertainty_entropy >= 0.6,
+                    confidence=min(0.88, max(0.2, record.confidence)),
+                    provenance="g01 interrogation carrier from l05 illocution hypotheses",
+                )
+            )
+
+        if record.modality_profile.modality_markers:
+            carrier_index += 1
+            operator_carriers.append(
+                OperatorCarrier(
+                    operator_id=f"op-{carrier_index}",
+                    operator_kind=OperatorKind.MODALITY,
+                    carrier_unit_ids=(),
+                    scope_anchor_refs=(record.source_dictum_candidate_id,),
+                    scope_uncertain=record.modality_profile.unresolved,
+                    confidence=min(0.84, max(0.2, record.confidence)),
+                    provenance="g01 modality carrier from l05 modality profile",
+                )
+            )
+
+        if record.quoted_speech_state.quote_or_echo_present:
+            anchor_index += 1
+            source_anchors.append(
+                SourceAnchor(
+                    anchor_id=f"source-{anchor_index}",
+                    anchor_kind=SourceAnchorKind.QUOTE_BOUNDARY,
+                    span_start=anchor_span[0],
+                    span_end=anchor_span[1],
+                    marker_text="l05:quoted_or_echoic",
+                    unresolved=record.quoted_speech_state.unresolved_source_scope,
+                    confidence=min(0.86, max(0.2, record.confidence)),
+                    provenance="g01 quote anchor from l05 quoted speech state",
+                )
+            )
+            carrier_index += 1
+            operator_carriers.append(
+                OperatorCarrier(
+                    operator_id=f"op-{carrier_index}",
+                    operator_kind=OperatorKind.QUOTATION,
+                    carrier_unit_ids=(),
+                    scope_anchor_refs=(f"source-{anchor_index}",),
+                    scope_uncertain=record.quoted_speech_state.unresolved_source_scope,
+                    confidence=min(0.86, max(0.2, record.confidence)),
+                    provenance="g01 quotation carrier from l05 quoted speech state",
+                )
+            )
+
+        sorted_targets = sorted(
+            record.addressivity_hypotheses,
+            key=lambda addressivity: addressivity.confidence_weight,
+            reverse=True,
+        )
+        primary_target = sorted_targets[0] if sorted_targets else None
+        if primary_target is not None:
+            if primary_target.addressivity_kind is AddressivityKind.QUOTED_SPEAKER:
+                anchor_kind = SourceAnchorKind.QUOTE_BOUNDARY
+            elif primary_target.addressivity_kind is AddressivityKind.REPORTED_PARTICIPANT:
+                anchor_kind = SourceAnchorKind.REPORTED_SPEECH
+            elif primary_target.addressivity_kind is AddressivityKind.UNKNOWN_TARGET:
+                anchor_kind = SourceAnchorKind.UNKNOWN
+            else:
+                anchor_kind = SourceAnchorKind.SPEAKER_MARKER
+            anchor_index += 1
+            source_anchors.append(
+                SourceAnchor(
+                    anchor_id=f"source-{anchor_index}",
+                    anchor_kind=anchor_kind,
+                    span_start=anchor_span[0],
+                    span_end=anchor_span[1],
+                    marker_text=f"l05:addressivity:{primary_target.addressivity_kind.value}",
+                    unresolved=primary_target.unresolved,
+                    confidence=min(0.86, max(0.2, primary_target.confidence_weight)),
+                    provenance="g01 source anchor from l05 addressivity hypotheses",
+                )
+            )
+
+        if record.uncertainty_entropy >= 0.72:
+            uncertainty_index += 1
+            uncertainty_markers.append(
+                UncertaintyMarker(
+                    marker_id=f"uncertainty-{uncertainty_index}",
+                    uncertainty_kind=UncertaintyKind.OPERATOR_SCOPE_UNCERTAIN,
+                    related_refs=(record.record_id,),
+                    reason="l05 uncertainty entropy remains high for g01 grounding",
+                    confidence=min(0.78, max(0.2, record.uncertainty_entropy)),
+                )
+            )
+
+    proposal_ids_by_continuation = {
+        continuation.source_record_id: proposal_by_record_id.get(continuation.source_record_id, ())
+        for continuation in discourse_bundle.continuation_states
+    }
+    for continuation in discourse_bundle.continuation_states:
+        if continuation.continuation_status is ContinuationStatus.BLOCKED_PENDING_REPAIR:
+            l06_blocked_update_present = True
+            uncertainty_index += 1
+            uncertainty_markers.append(
+                UncertaintyMarker(
+                    marker_id=f"uncertainty-{uncertainty_index}",
+                    uncertainty_kind=UncertaintyKind.SOURCE_SCOPE_UNCERTAIN,
+                    related_refs=tuple(
+                        dict.fromkeys(
+                            (
+                                continuation.continuation_id,
+                                *proposal_ids_by_continuation.get(continuation.source_record_id, ()),
+                                *continuation.localized_repair_refs,
+                            )
+                        )
+                    ),
+                    reason="l06 blocked update pending localized repair",
+                    confidence=0.52,
+                )
+            )
+        elif continuation.continuation_status is ContinuationStatus.GUARDED_CONTINUE:
+            l06_guarded_continue_present = True
+            uncertainty_index += 1
+            uncertainty_markers.append(
+                UncertaintyMarker(
+                    marker_id=f"uncertainty-{uncertainty_index}",
+                    uncertainty_kind=UncertaintyKind.OPERATOR_SCOPE_UNCERTAIN,
+                    related_refs=tuple(
+                        dict.fromkeys(
+                            (
+                                continuation.continuation_id,
+                                *proposal_ids_by_continuation.get(continuation.source_record_id, ()),
+                                *continuation.localized_repair_refs,
+                            )
+                        )
+                    ),
+                    reason="l06 guarded continuation requires limits before strong downstream use",
+                    confidence=0.48,
+                )
+            )
+
+    for repair in discourse_bundle.repair_triggers:
+        if repair.repair_class is RepairClass.REFERENCE_REPAIR:
+            kind = UncertaintyKind.REFERENT_UNRESOLVED
+        elif repair.repair_class is RepairClass.SCOPE_REPAIR:
+            kind = UncertaintyKind.OPERATOR_SCOPE_UNCERTAIN
+        elif repair.repair_class is RepairClass.POLARITY_REPAIR:
+            kind = UncertaintyKind.OPERATOR_SCOPE_UNCERTAIN
+        elif repair.repair_class is RepairClass.FORCE_REPAIR:
+            kind = UncertaintyKind.SOURCE_SCOPE_UNCERTAIN
+        else:
+            kind = UncertaintyKind.ATTACHMENT_AMBIGUOUS
+        uncertainty_index += 1
+        uncertainty_markers.append(
+            UncertaintyMarker(
+                marker_id=f"uncertainty-{uncertainty_index}",
+                uncertainty_kind=kind,
+                related_refs=tuple(dict.fromkeys((repair.repair_id, *repair.localized_ref_ids))),
+                reason=f"l06 localized repair pending: {repair.localized_trouble_source}",
+                confidence=0.47,
+            )
+        )
+
+    for proposal in discourse_bundle.update_proposals:
+        if proposal.proposal_type is ProposalType.QUESTION_INTERPRETATION_UPDATE:
+            carrier_index += 1
+            operator_carriers.append(
+                OperatorCarrier(
+                    operator_id=f"op-{carrier_index}",
+                    operator_kind=OperatorKind.INTERROGATION,
+                    carrier_unit_ids=(),
+                    scope_anchor_refs=(proposal.proposal_id,),
+                    scope_uncertain=True,
+                    confidence=0.52,
+                    provenance="g01 interrogation carrier from l06 proposal topology",
+                )
+            )
+        elif proposal.proposal_type in {
+            ProposalType.REPORTED_CONTENT_UPDATE,
+            ProposalType.QUOTED_CONTENT_UPDATE,
+            ProposalType.ECHOIC_CONTENT_UPDATE,
+        }:
+            carrier_index += 1
+            operator_carriers.append(
+                OperatorCarrier(
+                    operator_id=f"op-{carrier_index}",
+                    operator_kind=OperatorKind.QUOTATION,
+                    carrier_unit_ids=(),
+                    scope_anchor_refs=(proposal.proposal_id,),
+                    scope_uncertain=True,
+                    confidence=0.5,
+                    provenance="g01 quotation carrier from l06 proposal topology",
+                )
+            )
+
+    return (
+        anchor_index,
+        carrier_index,
+        uncertainty_index,
+        l06_blocked_update_present,
+        l06_guarded_continue_present,
+    )
 
 
 def _register_surface_cues(
@@ -713,7 +1139,11 @@ def _abstain_result(
         source_dictum_ref=dictum_bundle.source_lexical_grounding_ref,
         source_syntax_ref=dictum_bundle.source_syntax_ref,
         source_surface_ref=dictum_bundle.source_surface_ref,
+        source_modus_ref=None,
+        source_discourse_update_ref=None,
         linked_dictum_candidate_ids=tuple(candidate.dictum_candidate_id for candidate in dictum_bundle.dictum_candidates),
+        linked_modus_record_ids=(),
+        linked_update_proposal_ids=(),
         substrate_units=(),
         phrase_scaffolds=(),
         operator_carriers=(),
@@ -731,7 +1161,18 @@ def _abstain_result(
         ),
         ambiguity_reasons=(reason,),
         low_coverage_mode=True,
-        low_coverage_reasons=("abstain",),
+        low_coverage_reasons=(
+            "abstain",
+            "legacy_surface_cue_fallback_used",
+            "l04_only_input_not_equivalent_to_l05_l06_route",
+        ),
+        normative_l05_l06_route_active=False,
+        legacy_surface_cue_fallback_used=True,
+        legacy_surface_cue_path_not_normative=True,
+        l04_only_input_not_equivalent_to_l05_l06_route=True,
+        discourse_update_not_inferred_from_surface_when_l06_available=False,
+        l06_blocked_update_present=False,
+        l06_guarded_continue_present=False,
         no_final_semantic_resolution=True,
         reason="g01 abstained due to insufficient l04 carriers",
     )

@@ -37,7 +37,7 @@ def test_stage_contour_l05_exists_but_g01_still_operates_on_legacy_l04_bridge_as
     )
 
     assert l05_result.bundle.hypothesis_records
-    assert l05_result.bundle.l06_downstream_absent is True
+    assert l05_result.bundle.l06_downstream_not_bound_here is True
     assert g01_result.bundle.modus_carriers
     assert g01_result.bundle.operator_carriers
     assert g01_result.bundle.source_anchors

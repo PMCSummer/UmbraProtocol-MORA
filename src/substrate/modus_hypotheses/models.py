@@ -106,9 +106,9 @@ class ModusHypothesisBundle:
     ambiguity_reasons: tuple[str, ...]
     low_coverage_mode: bool
     low_coverage_reasons: tuple[str, ...]
-    l06_downstream_absent: bool
-    discourse_update_consumer_absent: bool
-    repair_trigger_consumer_absent: bool
+    l06_downstream_not_bound_here: bool
+    l06_update_consumer_not_wired_here: bool
+    l06_repair_consumer_not_wired_here: bool
     legacy_l04_g01_shortcut_operational_debt: bool
     legacy_shortcut_bypass_risk: bool
     downstream_authority_degraded: bool
@@ -144,9 +144,9 @@ class ModusHypothesisTelemetry:
     low_coverage_mode: bool
     low_coverage_reasons: tuple[str, ...]
     ambiguity_reasons: tuple[str, ...]
-    l06_downstream_absent: bool
-    discourse_update_consumer_absent: bool
-    repair_trigger_consumer_absent: bool
+    l06_downstream_not_bound_here: bool
+    l06_update_consumer_not_wired_here: bool
+    l06_repair_consumer_not_wired_here: bool
     legacy_l04_g01_shortcut_operational_debt: bool
     legacy_shortcut_bypass_risk: bool
     attempted_paths: tuple[str, ...]

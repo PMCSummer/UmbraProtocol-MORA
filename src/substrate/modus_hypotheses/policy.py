@@ -129,12 +129,12 @@ def evaluate_modus_hypothesis_downstream_gate(
     if has_unresolved_slot_pressure:
         restrictions.append("unresolved_slot_pressure_must_be_read")
 
-    if bundle.l06_downstream_absent:
-        restrictions.append("l06_downstream_absent")
-    if bundle.discourse_update_consumer_absent:
-        restrictions.append("discourse_update_consumer_absent")
-    if bundle.repair_trigger_consumer_absent:
-        restrictions.append("repair_trigger_consumer_absent")
+    if bundle.l06_downstream_not_bound_here:
+        restrictions.append("l06_downstream_not_bound_here")
+    if bundle.l06_update_consumer_not_wired_here:
+        restrictions.append("l06_update_consumer_not_wired_here")
+    if bundle.l06_repair_consumer_not_wired_here:
+        restrictions.append("l06_repair_consumer_not_wired_here")
     if bundle.legacy_l04_g01_shortcut_operational_debt:
         restrictions.append("legacy_l04_g01_shortcut_operational_debt")
     if bundle.legacy_shortcut_bypass_risk:
@@ -154,9 +154,9 @@ def evaluate_modus_hypothesis_downstream_gate(
         bundle.low_coverage_mode
         or bool(bundle.ambiguity_reasons)
         or bundle.downstream_authority_degraded
-        or bundle.l06_downstream_absent
-        or bundle.discourse_update_consumer_absent
-        or bundle.repair_trigger_consumer_absent
+        or bundle.l06_downstream_not_bound_here
+        or bundle.l06_update_consumer_not_wired_here
+        or bundle.l06_repair_consumer_not_wired_here
         or has_single_label_collapse
         or has_weight_shape_violation
         or has_addressivity_gap

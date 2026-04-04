@@ -94,7 +94,7 @@ def test_framing_contract_requires_status_usability_and_cautions_read() -> None:
     assert view.requires_status_read is True
     assert view.requires_cautions_read is True
     assert view.accepted_provisional_not_closure is True
-    assert "l06_update_proposal_absent" in gate.restrictions
+    assert "l06_update_proposal_not_bound_here" in gate.restrictions
     assert "framing_requires_discourse_update_read" in gate.restrictions
     assert view.strong_closure_permitted is False
 

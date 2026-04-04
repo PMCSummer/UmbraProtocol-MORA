@@ -47,10 +47,10 @@ Accepted as a bounded partial implementation of phase `L05` over implemented `L0
   - `modality_profile_must_be_read`
   - `evidentiality_profile_must_be_read`
   - `addressivity_hypotheses_must_be_read`
-- Explicit degraded markers for missing downstream L06 consumer:
-  - `l06_downstream_absent`
-  - `discourse_update_consumer_absent`
-  - `repair_trigger_consumer_absent`
+- Explicit degraded markers for not-yet-wired L06 consumption on this path:
+  - `l06_downstream_not_bound_here`
+  - `l06_update_consumer_not_wired_here`
+  - `l06_repair_consumer_not_wired_here`
   - `downstream_authority_degraded`
 - Explicit legacy coupling markers (hardening):
   - `legacy_l04_g01_shortcut_operational_debt`
@@ -88,23 +88,23 @@ Accepted as a bounded partial implementation of phase `L05` over implemented `L0
 ## Bounded Partial Status
 - L05 is a bounded hypothesis layer over L04 candidates.
 - Alternatives/entropy remain explicit; no single-label force closure is authorized.
-- Missing normative downstream (`L06`) is explicit and degrades authority by contract.
+- Normative downstream (`L06`) exists in-repo, but this L05 path remains not-yet-bound and degrades authority by contract.
 
 ## Legacy Coupling Note
 - Current operational contour still includes historical `L04 -> G01`.
 - This is not treated as final architecture.
 - Normative contour for this segment is rewritten as:
   - `L04 -> L05 -> L06 -> G01`
-- Until L06 is implemented and integrated, historical coupling remains explicit seam debt.
+- Until runtime rewiring is completed, historical coupling remains explicit seam debt.
 
 ## Remaining Debts
-- Live `L06` producer/consumer integration is absent.
+- `L06` phase exists, but live L05->L06 consumer wiring is still absent on current runtime route.
 - Legacy `L04 -> G01` operational path still carries force/addressivity-like cues in G01.
 - No downstream consumer currently executes discourse update/repair using L05 outputs.
 - No full consumer-proof that later phases obey L05 restrictions instead of legacy shortcuts.
 
 ## Open Integration Obligations
-- Implement `L06` to consume L05 typed hypotheses and produce:
+- Bind existing `L06` runtime route to consume L05 typed hypotheses and produce:
   - discourse update proposals
   - repair triggers
   - bounded repair grounding

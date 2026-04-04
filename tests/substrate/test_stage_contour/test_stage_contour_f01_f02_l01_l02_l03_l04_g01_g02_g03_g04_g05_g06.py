@@ -86,12 +86,12 @@ def test_stage_contour_f01_f02_l01_l02_l03_l04_g01_g02_g03_g04_g05_g06_preserves
     assert len(boot.state.trace.events) == start_events
     assert framing_result.bundle.framing_records
     assert framing_result.bundle.competition_links
-    assert framing_result.bundle.l06_update_proposal_absent is True
+    assert framing_result.bundle.l06_update_proposal_not_bound_here is True
     assert framing_result.bundle.no_final_semantic_closure is True
     gate = evaluate_concept_framing_downstream_gate(framing_result)
     assert "no_final_semantic_closure" in gate.restrictions
     assert "accepted_provisional_not_closure" in gate.restrictions
-    assert "l06_update_proposal_absent" in gate.restrictions
+    assert "l06_update_proposal_not_bound_here" in gate.restrictions
     contract_view = derive_concept_framing_contract_view(framing_result)
     assert contract_view.requires_status_read is True
     assert contract_view.requires_cautions_read is True
@@ -111,7 +111,7 @@ def test_stage_contour_f01_f02_l01_l02_l03_l04_g01_g02_g03_g04_g05_g06_preserves
     snapshot = persisted.state.trace.events[-1].payload["concept_framing_snapshot"]
     assert snapshot["bundle"]["framing_records"]
     assert snapshot["bundle"]["competition_links"]
-    assert snapshot["bundle"]["l06_update_proposal_absent"] is True
+    assert snapshot["bundle"]["l06_update_proposal_not_bound_here"] is True
     assert snapshot["telemetry"]["attempted_paths"]
     assert snapshot["telemetry"]["downstream_gate"]["restrictions"]
 

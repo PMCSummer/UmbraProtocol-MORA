@@ -31,14 +31,37 @@ def evaluate_grounded_semantic_downstream_gate(
         restrictions.append("ambiguity_present")
     if bundle.low_coverage_mode:
         restrictions.append("low_coverage_mode")
+    if bundle.normative_l05_l06_route_active:
+        restrictions.append("normative_l05_l06_route_active")
+    if bundle.legacy_surface_cue_fallback_used:
+        restrictions.append("legacy_surface_cue_fallback_used")
+    if bundle.legacy_surface_cue_path_not_normative:
+        restrictions.append("legacy_surface_cue_path_not_normative")
+    if bundle.l04_only_input_not_equivalent_to_l05_l06_route:
+        restrictions.append("l04_only_input_not_equivalent_to_l05_l06_route")
+    if bundle.discourse_update_not_inferred_from_surface_when_l06_available:
+        restrictions.append("discourse_update_not_inferred_from_surface_when_l06_available")
+    if bundle.l06_blocked_update_present:
+        restrictions.append("l06_blocked_update_present")
+    if bundle.l06_guarded_continue_present:
+        restrictions.append("l06_guarded_continue_present")
     if not bundle.operator_carriers:
         restrictions.append("operator_carriers_sparse")
     if not bundle.source_anchors:
         restrictions.append("source_anchors_sparse")
     if not bundle.modus_carriers:
         restrictions.append("modus_carriers_sparse")
-    if bundle.low_coverage_mode or not bundle.operator_carriers or not bundle.source_anchors:
+    if (
+        bundle.low_coverage_mode
+        or not bundle.operator_carriers
+        or not bundle.source_anchors
+        or bundle.legacy_surface_cue_fallback_used
+        or bundle.l06_blocked_update_present
+        or bundle.l06_guarded_continue_present
+    ):
         restrictions.append("downstream_authority_degraded")
+    if bundle.legacy_surface_cue_fallback_used:
+        restrictions.append("legacy_fallback_requires_degraded_contract")
 
     for scaffold in bundle.phrase_scaffolds:
         if scaffold.confidence >= 0.2:

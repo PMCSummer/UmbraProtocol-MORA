@@ -20,9 +20,9 @@ class ModusHypothesisContractView:
     uncertainty_entropy_present: bool
     unresolved_slot_pressure_present: bool
     requires_cautions_read: bool
-    l06_downstream_absent: bool
-    discourse_update_consumer_absent: bool
-    repair_trigger_consumer_absent: bool
+    l06_downstream_not_bound_here: bool
+    l06_update_consumer_not_wired_here: bool
+    l06_repair_consumer_not_wired_here: bool
     legacy_l04_g01_shortcut_operational_debt: bool
     legacy_shortcut_bypass_risk: bool
     usability_class: ModusUsabilityClass
@@ -86,9 +86,9 @@ def derive_modus_hypothesis_contract_view(
         uncertainty_entropy_present=uncertainty_entropy_present,
         unresolved_slot_pressure_present=unresolved_slot_pressure_present,
         requires_cautions_read=("downstream_cautions_must_be_read" in gate.restrictions),
-        l06_downstream_absent=bundle.l06_downstream_absent,
-        discourse_update_consumer_absent=bundle.discourse_update_consumer_absent,
-        repair_trigger_consumer_absent=bundle.repair_trigger_consumer_absent,
+        l06_downstream_not_bound_here=bundle.l06_downstream_not_bound_here,
+        l06_update_consumer_not_wired_here=bundle.l06_update_consumer_not_wired_here,
+        l06_repair_consumer_not_wired_here=bundle.l06_repair_consumer_not_wired_here,
         legacy_l04_g01_shortcut_operational_debt=bundle.legacy_l04_g01_shortcut_operational_debt,
         legacy_shortcut_bypass_risk=bundle.legacy_shortcut_bypass_risk,
         usability_class=gate.usability_class,

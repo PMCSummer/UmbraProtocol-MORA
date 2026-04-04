@@ -168,7 +168,11 @@ class GroundedSemanticBundle:
     source_dictum_ref: str
     source_syntax_ref: str
     source_surface_ref: str | None
+    source_modus_ref: str | None
+    source_discourse_update_ref: str | None
     linked_dictum_candidate_ids: tuple[str, ...]
+    linked_modus_record_ids: tuple[str, ...]
+    linked_update_proposal_ids: tuple[str, ...]
     substrate_units: tuple[GroundedSubstrateUnit, ...]
     phrase_scaffolds: tuple[PhraseScaffold, ...]
     operator_carriers: tuple[OperatorCarrier, ...]
@@ -179,6 +183,13 @@ class GroundedSemanticBundle:
     ambiguity_reasons: tuple[str, ...]
     low_coverage_mode: bool
     low_coverage_reasons: tuple[str, ...]
+    normative_l05_l06_route_active: bool
+    legacy_surface_cue_fallback_used: bool
+    legacy_surface_cue_path_not_normative: bool
+    l04_only_input_not_equivalent_to_l05_l06_route: bool
+    discourse_update_not_inferred_from_surface_when_l06_available: bool
+    l06_blocked_update_present: bool
+    l06_guarded_continue_present: bool
     no_final_semantic_resolution: bool
     reason: str
 
@@ -199,6 +210,8 @@ class GroundedSemanticTelemetry:
     source_dictum_ref: str
     source_syntax_ref: str
     source_surface_ref: str | None
+    source_modus_ref: str | None
+    source_discourse_update_ref: str | None
     substrate_unit_count: int
     phrase_scaffold_count: int
     operator_carrier_count: int
@@ -212,6 +225,10 @@ class GroundedSemanticTelemetry:
     low_coverage_mode: bool
     low_coverage_reasons: tuple[str, ...]
     ambiguity_reasons: tuple[str, ...]
+    normative_l05_l06_route_active: bool
+    legacy_surface_cue_fallback_used: bool
+    l06_blocked_update_present: bool
+    l06_guarded_continue_present: bool
     attempted_paths: tuple[str, ...]
     downstream_gate: GroundedSemanticGateDecision
     causal_basis: str

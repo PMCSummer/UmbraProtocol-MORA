@@ -119,15 +119,16 @@ Accepted as a bounded partial implementation of phase `L06` over implemented `L0
 ## Normative Contour
 - Normative contour for this segment is:
   - `L04 -> L05 -> L06 -> G01`
-- Historical direct path toward `G01` remains operational debt until rewiring is completed.
+- `G01` now has a live typed intake route for `L05+L06`.
+- Historical direct `L04 -> G01` path still remains operational as degraded compatibility debt.
 
 ## Remaining Debts
 - No live downstream acceptor for update acceptance.
 - No live downstream repair executor.
 - No live consumer for discourse state mutation contract (intentionally absent in this phase).
-- Legacy `G01` operational path still exists and can bypass L06 unless consumers enforce L06 contract reading.
+- Legacy `L04 -> G01` fallback still exists and can bypass L06 unless callers choose normative intake path.
 
 ## Integration Obligations
 - Downstream phases (`G04`, `G05`, `G06`, `G07`, `T01`, `G08`, `V01`, `V02`, `L07`) must consume typed L06 outputs and restrictions.
 - Future rewiring should ensure update-like effects require explicit acceptance consumer, not implicit interpretation carryover.
-- `G01` integration must eventually depend on normative `L06` surface rather than historical shortcut path.
+- `G01` integration is now partially rewired to support normative `L05+L06` intake; remaining obligation is to retire degraded fallback usage where safe.

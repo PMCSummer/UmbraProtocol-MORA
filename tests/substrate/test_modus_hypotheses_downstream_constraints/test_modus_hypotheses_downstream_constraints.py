@@ -39,7 +39,7 @@ def test_record_presence_is_not_full_authority() -> None:
     assert gate.accepted is True
     assert gate.usability_class in {ModusUsabilityClass.DEGRADED_BOUNDED, ModusUsabilityClass.BLOCKED}
     assert "downstream_authority_degraded" in gate.restrictions
-    assert "l06_downstream_absent" in gate.restrictions
-    assert "discourse_update_consumer_absent" in gate.restrictions
-    assert "repair_trigger_consumer_absent" in gate.restrictions
+    assert "l06_downstream_not_bound_here" in gate.restrictions
+    assert "l06_update_consumer_not_wired_here" in gate.restrictions
+    assert "l06_repair_consumer_not_wired_here" in gate.restrictions
     assert "legacy_l04_g01_shortcut_operational_debt" in gate.restrictions

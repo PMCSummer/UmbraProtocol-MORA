@@ -114,7 +114,7 @@ class ConceptFramingBundle:
     ambiguity_reasons: tuple[str, ...]
     low_coverage_mode: bool
     low_coverage_reasons: tuple[str, ...]
-    l06_update_proposal_absent: bool
+    l06_update_proposal_not_bound_here: bool
     repair_trigger_basis_incomplete: bool
     no_final_semantic_closure: bool
     reason: str
@@ -150,7 +150,7 @@ class ConceptFramingTelemetry:
     low_coverage_mode: bool
     low_coverage_reasons: tuple[str, ...]
     ambiguity_reasons: tuple[str, ...]
-    l06_update_proposal_absent: bool
+    l06_update_proposal_not_bound_here: bool
     repair_trigger_basis_incomplete: bool
     attempted_paths: tuple[str, ...]
     downstream_gate: ConceptFramingGateDecision

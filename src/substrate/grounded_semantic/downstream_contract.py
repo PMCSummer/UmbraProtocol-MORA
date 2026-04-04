@@ -34,6 +34,10 @@ class GroundedDownstreamContractView:
     dictum_modus_split_present: bool
     uncertainty_elevated: bool
     low_coverage_mode: bool
+    normative_l05_l06_route_active: bool
+    legacy_surface_cue_fallback_used: bool
+    l06_blocked_update_present: bool
+    l06_guarded_continue_present: bool
     authority_level: GroundedAuthorityLevel
     usable_for_distinction: bool
     can_distinguish_source_handling: bool
@@ -93,6 +97,9 @@ def derive_grounded_downstream_contract(
         or "downstream_authority_degraded" in gate.restrictions
         or not bundle.operator_carriers
         or not bundle.source_anchors
+        or bundle.legacy_surface_cue_fallback_used
+        or bundle.l06_blocked_update_present
+        or bundle.l06_guarded_continue_present
     )
 
     if not gate.accepted:
@@ -122,6 +129,10 @@ def derive_grounded_downstream_contract(
         dictum_modus_split_present=dictum_modus_split_present,
         uncertainty_elevated=uncertainty_elevated,
         low_coverage_mode=low_coverage_mode,
+        normative_l05_l06_route_active=bundle.normative_l05_l06_route_active,
+        legacy_surface_cue_fallback_used=bundle.legacy_surface_cue_fallback_used,
+        l06_blocked_update_present=bundle.l06_blocked_update_present,
+        l06_guarded_continue_present=bundle.l06_guarded_continue_present,
         authority_level=authority_level,
         usable_for_distinction=usable_for_distinction,
         can_distinguish_source_handling=can_distinguish_source_handling,

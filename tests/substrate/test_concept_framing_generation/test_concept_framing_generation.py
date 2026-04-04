@@ -96,7 +96,7 @@ def test_g06_builds_typed_concept_framing_layer(case: CaseSpec) -> None:
     assert isinstance(result, ConceptFramingResult)
     assert result.bundle.framing_records
     assert result.bundle.competition_links
-    assert result.bundle.l06_update_proposal_absent is True
+    assert result.bundle.l06_update_proposal_not_bound_here is True
     assert result.no_final_semantic_closure is True
     assert result.telemetry.attempted_paths
     assert all(record.framing_basis for record in result.bundle.framing_records)

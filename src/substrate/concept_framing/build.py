@@ -55,11 +55,11 @@ def build_concept_framing(
             reason="semantic acquisition has no records for framing",
         )
 
-    # L06 remains absent in current contour; keep this explicit and load-bearing.
-    l06_update_proposal_absent = True
+    # L06 exists in-repo, but this G06 path is not yet runtime-bound to L06 proposal intake.
+    l06_update_proposal_not_bound_here = True
     ambiguity_reasons: list[str] = list(acquisition_bundle.ambiguity_reasons)
     low_coverage_reasons: list[str] = list(acquisition_bundle.low_coverage_reasons)
-    low_coverage_reasons.append("l06_update_proposal_absent")
+    low_coverage_reasons.append("l06_update_proposal_not_bound_here")
 
     records: list[ConceptFramingRecord] = []
     groups: dict[str, list[str]] = {}
@@ -81,7 +81,7 @@ def build_concept_framing(
         downstream_cautions = _derive_downstream_cautions(
             framing_status=framing_status,
             high_impact=vulnerability.high_impact,
-            l06_update_proposal_absent=l06_update_proposal_absent,
+            l06_update_proposal_not_bound_here=l06_update_proposal_not_bound_here,
         )
         downstream_permissions = _derive_downstream_permissions(
             framing_status=framing_status,
@@ -141,7 +141,7 @@ def build_concept_framing(
     records = _apply_frame_competition(records, groups, group_signatures)
     competition_links = _build_competition_links(records, groups)
 
-    repair_trigger_basis_incomplete = l06_update_proposal_absent and any(
+    repair_trigger_basis_incomplete = l06_update_proposal_not_bound_here and any(
         record.reframing_conditions for record in records
     )
     if repair_trigger_basis_incomplete:
@@ -170,7 +170,7 @@ def build_concept_framing(
         ambiguity_reasons=tuple(dict.fromkeys(ambiguity_reasons)),
         low_coverage_mode=low_coverage_mode,
         low_coverage_reasons=tuple(dict.fromkeys(low_coverage_reasons)),
-        l06_update_proposal_absent=l06_update_proposal_absent,
+        l06_update_proposal_not_bound_here=l06_update_proposal_not_bound_here,
         repair_trigger_basis_incomplete=repair_trigger_basis_incomplete,
         no_final_semantic_closure=True,
         reason="g06 compiled bounded concept framing and vulnerability audit over g05 acquisition",
@@ -435,7 +435,7 @@ def _derive_downstream_cautions(
     *,
     framing_status: FramingStatus,
     high_impact: bool,
-    l06_update_proposal_absent: bool,
+    l06_update_proposal_not_bound_here: bool,
 ) -> tuple[str, ...]:
     cautions: list[str] = ["provisional_frame_not_final"]
     if framing_status in {
@@ -450,7 +450,7 @@ def _derive_downstream_cautions(
         cautions.append("context_only_frame_hint")
     if high_impact:
         cautions.append("high_impact_frame_guard_required")
-    if l06_update_proposal_absent:
+    if l06_update_proposal_not_bound_here:
         cautions.append("framing_requires_discourse_update_read")
     return tuple(dict.fromkeys(cautions))
 
@@ -623,8 +623,8 @@ def _abstain_result(
         competition_links=(),
         ambiguity_reasons=(reason,),
         low_coverage_mode=True,
-        low_coverage_reasons=("abstain", "l06_update_proposal_absent"),
-        l06_update_proposal_absent=True,
+        low_coverage_reasons=("abstain", "l06_update_proposal_not_bound_here"),
+        l06_update_proposal_not_bound_here=True,
         repair_trigger_basis_incomplete=True,
         no_final_semantic_closure=True,
         reason="g06 abstained due to insufficient g05 acquisition basis",

@@ -36,9 +36,9 @@ def test_l05_roundtrip_persistence_snapshot_stable() -> None:
     assert persisted.provenance.writer == WriterIdentity.TRANSITION_ENGINE
     snapshot = persisted.state.trace.events[-1].payload["modus_hypothesis_snapshot"]
     assert snapshot["bundle"]["hypothesis_records"]
-    assert snapshot["bundle"]["l06_downstream_absent"] is True
-    assert snapshot["bundle"]["discourse_update_consumer_absent"] is True
-    assert snapshot["bundle"]["repair_trigger_consumer_absent"] is True
+    assert snapshot["bundle"]["l06_downstream_not_bound_here"] is True
+    assert snapshot["bundle"]["l06_update_consumer_not_wired_here"] is True
+    assert snapshot["bundle"]["l06_repair_consumer_not_wired_here"] is True
     assert snapshot["bundle"]["legacy_l04_g01_shortcut_operational_debt"] is True
     assert snapshot["bundle"]["legacy_shortcut_bypass_risk"] is True
     assert snapshot["telemetry"]["downstream_gate"]["restrictions"]

@@ -62,5 +62,5 @@ def test_snapshot_roundtrip_contains_load_bearing_framing_fields() -> None:
     assert "alternative_framings" in first
     assert "vulnerability_profile" in first
     assert "downstream_cautions" in first
-    assert payload["bundle"]["l06_update_proposal_absent"] is True
+    assert payload["bundle"]["l06_update_proposal_not_bound_here"] is True
     assert payload["telemetry"]["downstream_gate"]["restrictions"]

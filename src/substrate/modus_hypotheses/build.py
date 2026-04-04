@@ -72,17 +72,17 @@ def build_modus_hypotheses(
     if dictum_bundle.ambiguities:
         low_coverage_reasons.append("dictum_ambiguities_present")
 
-    # L06 is the normative downstream for discourse updates and repair triggers.
-    l06_downstream_absent = True
-    discourse_update_consumer_absent = True
-    repair_trigger_consumer_absent = True
+    # L06 exists in-repo, but this L05 path is not yet runtime-bound to a live L06 consumer route.
+    l06_downstream_not_bound_here = True
+    l06_update_consumer_not_wired_here = True
+    l06_repair_consumer_not_wired_here = True
     legacy_l04_g01_shortcut_operational_debt = True
     legacy_shortcut_bypass_risk = True
     low_coverage_reasons.extend(
         [
-            "l06_downstream_absent",
-            "discourse_update_consumer_absent",
-            "repair_trigger_consumer_absent",
+            "l06_downstream_not_bound_here",
+            "l06_update_consumer_not_wired_here",
+            "l06_repair_consumer_not_wired_here",
             "legacy_l04_g01_shortcut_operational_debt",
             "legacy_shortcut_bypass_risk",
         ]
@@ -99,9 +99,9 @@ def build_modus_hypotheses(
         ambiguity_reasons=ambiguity_reasons,
         low_coverage_mode=bool(low_coverage_reasons),
         low_coverage_reasons=tuple(dict.fromkeys(low_coverage_reasons)),
-        l06_downstream_absent=l06_downstream_absent,
-        discourse_update_consumer_absent=discourse_update_consumer_absent,
-        repair_trigger_consumer_absent=repair_trigger_consumer_absent,
+        l06_downstream_not_bound_here=l06_downstream_not_bound_here,
+        l06_update_consumer_not_wired_here=l06_update_consumer_not_wired_here,
+        l06_repair_consumer_not_wired_here=l06_repair_consumer_not_wired_here,
         legacy_l04_g01_shortcut_operational_debt=legacy_l04_g01_shortcut_operational_debt,
         legacy_shortcut_bypass_risk=legacy_shortcut_bypass_risk,
         downstream_authority_degraded=True,
@@ -659,15 +659,15 @@ def _abstain_result(
         low_coverage_mode=True,
         low_coverage_reasons=(
             "abstain",
-            "l06_downstream_absent",
-            "discourse_update_consumer_absent",
-            "repair_trigger_consumer_absent",
+            "l06_downstream_not_bound_here",
+            "l06_update_consumer_not_wired_here",
+            "l06_repair_consumer_not_wired_here",
             "legacy_l04_g01_shortcut_operational_debt",
             "legacy_shortcut_bypass_risk",
         ),
-        l06_downstream_absent=True,
-        discourse_update_consumer_absent=True,
-        repair_trigger_consumer_absent=True,
+        l06_downstream_not_bound_here=True,
+        l06_update_consumer_not_wired_here=True,
+        l06_repair_consumer_not_wired_here=True,
         legacy_l04_g01_shortcut_operational_debt=True,
         legacy_shortcut_bypass_risk=True,
         downstream_authority_degraded=True,

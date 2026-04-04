@@ -75,10 +75,16 @@ def test_stage_contour_f01_f02_l01_l02_l03_l04_g01_preserves_single_write_seam()
     assert len(boot.state.trace.events) == start_events
     assert grounded_result.bundle.substrate_units
     assert grounded_result.bundle.phrase_scaffolds
+    assert grounded_result.bundle.normative_l05_l06_route_active is False
+    assert grounded_result.bundle.legacy_surface_cue_fallback_used is True
+    assert grounded_result.bundle.legacy_surface_cue_path_not_normative is True
     assert grounded_result.bundle.no_final_semantic_resolution is True
     assert grounded_result.no_final_semantic_resolution is True
     gate = evaluate_grounded_semantic_downstream_gate(grounded_result)
     assert "no_final_semantic_resolution" in gate.restrictions
+    assert "legacy_surface_cue_fallback_used" in gate.restrictions
+    assert "legacy_surface_cue_path_not_normative" in gate.restrictions
+    assert "l04_only_input_not_equivalent_to_l05_l06_route" in gate.restrictions
 
     persisted = persist_grounded_semantic_result_via_f01(
         result=grounded_result,
@@ -96,6 +102,8 @@ def test_stage_contour_f01_f02_l01_l02_l03_l04_g01_preserves_single_write_seam()
     assert snapshot["bundle"]["phrase_scaffolds"]
     assert snapshot["bundle"]["operator_carriers"] is not None
     assert snapshot["bundle"]["source_anchors"] is not None
+    assert snapshot["bundle"]["normative_l05_l06_route_active"] is False
+    assert snapshot["bundle"]["legacy_surface_cue_fallback_used"] is True
     assert snapshot["bundle"]["no_final_semantic_resolution"] is True
     assert snapshot["telemetry"]["attempted_paths"]
     assert snapshot["telemetry"]["downstream_gate"]["restrictions"]

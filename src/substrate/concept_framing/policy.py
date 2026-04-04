@@ -75,8 +75,8 @@ def evaluate_concept_framing_downstream_gate(
     if has_competing or has_underframed or has_blocked or has_context_only or has_discarded:
         restrictions.append("memory_uptake_blocked")
 
-    if bundle.l06_update_proposal_absent:
-        restrictions.append("l06_update_proposal_absent")
+    if bundle.l06_update_proposal_not_bound_here:
+        restrictions.append("l06_update_proposal_not_bound_here")
         restrictions.append("framing_requires_discourse_update_read")
     if bundle.repair_trigger_basis_incomplete:
         restrictions.append("repair_trigger_basis_incomplete")
@@ -93,7 +93,7 @@ def evaluate_concept_framing_downstream_gate(
     degraded = (
         bundle.low_coverage_mode
         or bool(bundle.ambiguity_reasons)
-        or bundle.l06_update_proposal_absent
+        or bundle.l06_update_proposal_not_bound_here
         or bundle.repair_trigger_basis_incomplete
         or has_competing
         or has_underframed

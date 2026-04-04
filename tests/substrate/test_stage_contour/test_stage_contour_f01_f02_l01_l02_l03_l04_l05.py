@@ -69,7 +69,7 @@ def test_stage_contour_f01_f02_l01_l02_l03_l04_l05_preserves_single_write_seam()
     assert "dictum_not_equal_force" in gate.restrictions
     assert "likely_illocution_not_settled_intent" in gate.restrictions
     assert "quoted_force_not_current_commitment" in gate.restrictions
-    assert "l06_downstream_absent" in gate.restrictions
+    assert "l06_downstream_not_bound_here" in gate.restrictions
     assert "legacy_l04_g01_shortcut_operational_debt" in gate.restrictions
     assert "legacy_shortcut_bypass_risk" in gate.restrictions
     contract = derive_modus_hypothesis_contract_view(modus_result)
@@ -90,9 +90,9 @@ def test_stage_contour_f01_f02_l01_l02_l03_l04_l05_preserves_single_write_seam()
 
     snapshot = persisted.state.trace.events[-1].payload["modus_hypothesis_snapshot"]
     assert snapshot["bundle"]["hypothesis_records"]
-    assert snapshot["bundle"]["l06_downstream_absent"] is True
-    assert snapshot["bundle"]["discourse_update_consumer_absent"] is True
-    assert snapshot["bundle"]["repair_trigger_consumer_absent"] is True
+    assert snapshot["bundle"]["l06_downstream_not_bound_here"] is True
+    assert snapshot["bundle"]["l06_update_consumer_not_wired_here"] is True
+    assert snapshot["bundle"]["l06_repair_consumer_not_wired_here"] is True
     assert snapshot["bundle"]["legacy_l04_g01_shortcut_operational_debt"] is True
     assert snapshot["bundle"]["legacy_shortcut_bypass_risk"] is True
     assert snapshot["telemetry"]["attempted_paths"]
