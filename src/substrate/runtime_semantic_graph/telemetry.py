@@ -87,6 +87,7 @@ def runtime_graph_result_snapshot(result: RuntimeGraphResult) -> dict[str, objec
                     "frame_node_id": binding.frame_node_id,
                     "role_label": binding.role_label,
                     "target_ref": binding.target_ref,
+                    "target_lexeme_hint": binding.target_lexeme_hint,
                     "unresolved": binding.unresolved,
                     "unresolved_reason": binding.unresolved_reason,
                     "confidence": binding.confidence,

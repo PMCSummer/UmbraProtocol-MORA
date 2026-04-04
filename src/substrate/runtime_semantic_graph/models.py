@@ -61,6 +61,7 @@ class RoleBinding:
     frame_node_id: str
     role_label: str
     target_ref: str | None
+    target_lexeme_hint: str | None
     unresolved: bool
     unresolved_reason: str | None
     confidence: float

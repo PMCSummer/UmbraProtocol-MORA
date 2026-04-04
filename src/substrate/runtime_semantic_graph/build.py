@@ -73,6 +73,7 @@ def build_runtime_semantic_graph(
     ambiguity_reasons: list[str] = list(grounded_bundle.ambiguity_reasons)
 
     predicate_units = [u for u in grounded_bundle.substrate_units if u.unit_kind is GroundedUnitKind.PREDICATE]
+    argument_units = [u for u in grounded_bundle.substrate_units if u.unit_kind is GroundedUnitKind.ARGUMENT]
     source_anchor_ids = tuple(anchor.anchor_id for anchor in grounded_bundle.source_anchors)
     source_kinds = {anchor.anchor_kind for anchor in grounded_bundle.source_anchors}
 
@@ -103,11 +104,12 @@ def build_runtime_semantic_graph(
         frame_binding_ids: list[str] = []
         if scaffold and scaffold.candidate_head_links:
             unresolved_markers = tuple(scaffold.unresolved_attachments)
-            for _, target_ref in scaffold.candidate_head_links:
+            for head_idx, (_, target_ref) in enumerate(scaffold.candidate_head_links):
                 binding_index += 1
                 binding_id = f"binding-{binding_index}"
                 unresolved = any(target_ref in marker for marker in unresolved_markers)
                 reason = "upstream unresolved attachment" if unresolved else None
+                target_hint = argument_units[head_idx].normalized_form if head_idx < len(argument_units) else None
                 if unresolved:
                     unresolved_role_slots.append(binding_id)
                 role_bindings.append(
@@ -116,6 +118,7 @@ def build_runtime_semantic_graph(
                         frame_node_id=frame_id,
                         role_label=f"arg:{target_ref}",
                         target_ref=target_ref,
+                        target_lexeme_hint=target_hint,
                         unresolved=unresolved,
                         unresolved_reason=reason,
                         confidence=0.5 if unresolved else 0.72,
@@ -145,6 +148,7 @@ def build_runtime_semantic_graph(
                     frame_node_id=frame_id,
                     role_label="arg:unresolved",
                     target_ref=None,
+                    target_lexeme_hint=None,
                     unresolved=True,
                     unresolved_reason="missing explicit role links in g01 scaffold",
                     confidence=0.3,
@@ -172,6 +176,7 @@ def build_runtime_semantic_graph(
                     frame_node_id=frame_id,
                     role_label="arg:unresolved_placeholder",
                     target_ref=None,
+                    target_lexeme_hint=None,
                     unresolved=True,
                     unresolved_reason="sparse role evidence with unresolved upstream cues",
                     confidence=0.28,
@@ -425,7 +430,7 @@ def _derive_certainty(
         for carrier in bundle.operator_carriers
     )
     has_modality = any(
-        carrier.operator_kind in {OperatorKind.MODALITY, OperatorKind.DISCOURSE_PARTICLE}
+        carrier.operator_kind in {OperatorKind.MODALITY, OperatorKind.CONDITIONAL}
         and (not carrier.scope_anchor_refs or dictum_id in carrier.scope_anchor_refs)
         for carrier in bundle.operator_carriers
     )
