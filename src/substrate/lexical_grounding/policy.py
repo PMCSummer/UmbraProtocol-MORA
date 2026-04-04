@@ -33,6 +33,14 @@ def evaluate_lexical_grounding_downstream_gate(
         restrictions.append("syntax_instability_present")
     if bundle.lexicon_primary_used:
         restrictions.append("lexicon_primary_used")
+    if bundle.lexicon_handoff_present:
+        restrictions.append("lexicon_handoff_present")
+    if bundle.lexicon_query_attempted:
+        restrictions.append("lexicon_query_attempted")
+    if bundle.lexicon_usable_basis_present:
+        restrictions.append("lexicon_usable_basis_present")
+    if bundle.lexicon_query_attempted and not bundle.lexicon_usable_basis_present:
+        restrictions.append("lexicon_query_attempted_without_usable_basis")
     if bundle.heuristic_fallback_used:
         restrictions.append("heuristic_fallback_used")
     if bundle.no_strong_lexical_claim_from_fallback:

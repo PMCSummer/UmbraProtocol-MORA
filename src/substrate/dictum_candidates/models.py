@@ -165,6 +165,10 @@ class DictumCandidateBundle:
     lexicon_basis_missing_or_capped: bool = False
     no_strong_lexical_basis_from_upstream: bool = False
     lexicon_handoff_missing_upstream: bool = False
+    lexicon_handoff_present_upstream: bool = False
+    lexicon_query_attempted_upstream: bool = False
+    lexicon_usable_basis_present_upstream: bool = False
+    lexicon_backed_mentions_count_upstream: int = 0
 
 
 @dataclass(frozen=True, slots=True)
@@ -199,6 +203,10 @@ class DictumTelemetry:
     lexicon_basis_missing_or_capped: bool
     no_strong_lexical_basis_from_upstream: bool
     lexicon_handoff_missing_upstream: bool
+    lexicon_handoff_present_upstream: bool
+    lexicon_query_attempted_upstream: bool
+    lexicon_usable_basis_present_upstream: bool
+    lexicon_backed_mentions_count_upstream: int
     downstream_gate: DictumGateDecision
     causal_basis: str
     emitted_at: str = field(default_factory=lambda: datetime.now(tz=timezone.utc).isoformat())

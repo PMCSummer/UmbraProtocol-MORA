@@ -44,11 +44,11 @@ def build_lexical_grounding_telemetry(
             if len(mention.supporting_syntax_hypothesis_refs) > 1
         ),
         lexicon_primary_used=bundle.lexicon_primary_used,
-        lexicon_backed_mention_count=sum(
-            1
-            for basis in bundle.lexical_basis_records
-            if basis.basis_class.value == "lexicon_backed"
-        ),
+        lexicon_handoff_present=bundle.lexicon_handoff_present,
+        lexicon_query_attempted=bundle.lexicon_query_attempted,
+        lexicon_usable_basis_present=bundle.lexicon_usable_basis_present,
+        lexicon_backed_mentions_count=bundle.lexicon_backed_mentions_count,
+        lexicon_backed_mention_count=bundle.lexicon_backed_mentions_count,
         lexicon_capped_unknown_mention_count=sum(
             1
             for basis in bundle.lexical_basis_records
@@ -83,6 +83,10 @@ def lexical_grounding_result_snapshot(result: LexicalGroundingResult) -> dict[st
     return {
         "confidence": result.confidence,
         "lexicon_primary_used": result.lexicon_primary_used,
+        "lexicon_handoff_present": result.lexicon_handoff_present,
+        "lexicon_query_attempted": result.lexicon_query_attempted,
+        "lexicon_usable_basis_present": result.lexicon_usable_basis_present,
+        "lexicon_backed_mentions_count": result.lexicon_backed_mentions_count,
         "heuristic_fallback_used": result.heuristic_fallback_used,
         "no_usable_lexical_basis": result.no_usable_lexical_basis,
         "lexicon_handoff_missing": result.lexicon_handoff_missing,
@@ -99,6 +103,10 @@ def lexical_grounding_result_snapshot(result: LexicalGroundingResult) -> dict[st
             "linked_hypothesis_ids": bundle.linked_hypothesis_ids,
             "syntax_instability_present": bundle.syntax_instability_present,
             "lexicon_primary_used": bundle.lexicon_primary_used,
+            "lexicon_handoff_present": bundle.lexicon_handoff_present,
+            "lexicon_query_attempted": bundle.lexicon_query_attempted,
+            "lexicon_usable_basis_present": bundle.lexicon_usable_basis_present,
+            "lexicon_backed_mentions_count": bundle.lexicon_backed_mentions_count,
             "heuristic_fallback_used": bundle.heuristic_fallback_used,
             "no_strong_lexical_claim_from_fallback": bundle.no_strong_lexical_claim_from_fallback,
             "fallback_reasons": bundle.fallback_reasons,
@@ -243,6 +251,10 @@ def lexical_grounding_result_snapshot(result: LexicalGroundingResult) -> dict[st
             "syntax_hypothesis_count": result.telemetry.syntax_hypothesis_count,
             "syntax_instability_mention_count": result.telemetry.syntax_instability_mention_count,
             "lexicon_primary_used": result.telemetry.lexicon_primary_used,
+            "lexicon_handoff_present": result.telemetry.lexicon_handoff_present,
+            "lexicon_query_attempted": result.telemetry.lexicon_query_attempted,
+            "lexicon_usable_basis_present": result.telemetry.lexicon_usable_basis_present,
+            "lexicon_backed_mentions_count": result.telemetry.lexicon_backed_mentions_count,
             "lexicon_backed_mention_count": result.telemetry.lexicon_backed_mention_count,
             "lexicon_capped_unknown_mention_count": result.telemetry.lexicon_capped_unknown_mention_count,
             "heuristic_fallback_mention_count": result.telemetry.heuristic_fallback_mention_count,

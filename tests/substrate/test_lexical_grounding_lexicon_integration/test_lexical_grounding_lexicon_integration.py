@@ -50,6 +50,10 @@ def test_l03_uses_lexicon_as_primary_basis_when_usable() -> None:
     assert basis.heuristic_fallback_used is False
     assert basis.no_strong_lexical_claim_from_fallback is False
     assert result.lexicon_primary_used is True
+    assert result.lexicon_handoff_present is True
+    assert result.lexicon_query_attempted is True
+    assert result.lexicon_usable_basis_present is True
+    assert result.lexicon_backed_mentions_count >= 1
     thing_senses = [
         candidate
         for candidate in result.bundle.sense_candidates
@@ -77,4 +81,8 @@ def test_heuristic_fallback_only_when_lexicon_is_capped_or_unknown() -> None:
     assert basis["qzxv"].no_strong_lexical_claim_from_fallback is True
 
     assert result.heuristic_fallback_used is True
+    assert result.lexicon_handoff_present is True
+    assert result.lexicon_query_attempted is True
+    assert result.lexicon_usable_basis_present is False
+    assert result.lexicon_backed_mentions_count == 0
     assert result.bundle.no_strong_lexical_claim_from_fallback is True

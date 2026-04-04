@@ -177,6 +177,10 @@ class LexicalGroundingBundle:
     fallback_reasons: tuple[str, ...]
     no_final_resolution_performed: bool
     reason: str
+    lexicon_handoff_present: bool = False
+    lexicon_query_attempted: bool = False
+    lexicon_usable_basis_present: bool = False
+    lexicon_backed_mentions_count: int = 0
     lexicon_handoff_missing: bool = False
     lexical_basis_degraded: bool = False
     no_strong_lexical_claim_without_lexicon: bool = False
@@ -208,6 +212,10 @@ class LexicalGroundingTelemetry:
     syntax_hypothesis_count: int
     syntax_instability_mention_count: int
     lexicon_primary_used: bool
+    lexicon_handoff_present: bool
+    lexicon_query_attempted: bool
+    lexicon_usable_basis_present: bool
+    lexicon_backed_mentions_count: int
     lexicon_backed_mention_count: int
     lexicon_capped_unknown_mention_count: int
     heuristic_fallback_mention_count: int
@@ -232,6 +240,10 @@ class LexicalGroundingResult:
     telemetry: LexicalGroundingTelemetry
     confidence: float
     lexicon_primary_used: bool
+    lexicon_handoff_present: bool
+    lexicon_query_attempted: bool
+    lexicon_usable_basis_present: bool
+    lexicon_backed_mentions_count: int
     heuristic_fallback_used: bool
     no_usable_lexical_basis: bool
     partial_known: bool

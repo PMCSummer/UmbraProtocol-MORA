@@ -74,9 +74,17 @@ def test_dictum_payload_keeps_load_bearing_fields() -> None:
     assert payload["telemetry"]["magnitude_marker_count"] >= 0
     assert "input_lexical_basis_classes" in payload["bundle"]
     assert "lexicon_handoff_missing_upstream" in payload["bundle"]
+    assert "lexicon_handoff_present_upstream" in payload["bundle"]
+    assert "lexicon_query_attempted_upstream" in payload["bundle"]
+    assert "lexicon_usable_basis_present_upstream" in payload["bundle"]
+    assert "lexicon_backed_mentions_count_upstream" in payload["bundle"]
     assert "no_strong_lexical_basis_from_upstream" in payload["bundle"]
     assert "input_lexical_basis_classes" in payload["telemetry"]
     assert "lexicon_handoff_missing_upstream" in payload["telemetry"]
+    assert "lexicon_handoff_present_upstream" in payload["telemetry"]
+    assert "lexicon_query_attempted_upstream" in payload["telemetry"]
+    assert "lexicon_usable_basis_present_upstream" in payload["telemetry"]
+    assert "lexicon_backed_mentions_count_upstream" in payload["telemetry"]
     assert "no_strong_lexical_basis_from_upstream" in payload["telemetry"]
 
 
@@ -119,9 +127,17 @@ def test_dictum_bridge_reflects_l03_lexical_basis_quality() -> None:
     )
 
     assert without_lexicon.telemetry.lexicon_handoff_missing_upstream is True
+    assert without_lexicon.telemetry.lexicon_handoff_present_upstream is False
+    assert without_lexicon.telemetry.lexicon_query_attempted_upstream is False
+    assert without_lexicon.telemetry.lexicon_usable_basis_present_upstream is False
+    assert without_lexicon.telemetry.lexicon_backed_mentions_count_upstream == 0
     assert without_lexicon.telemetry.no_strong_lexical_basis_from_upstream is True
     assert "heuristic_fallback" in without_lexicon.telemetry.input_lexical_basis_classes
 
     assert with_lexicon.telemetry.lexicon_handoff_missing_upstream is False
+    assert with_lexicon.telemetry.lexicon_handoff_present_upstream is True
+    assert with_lexicon.telemetry.lexicon_query_attempted_upstream is True
+    assert with_lexicon.telemetry.lexicon_usable_basis_present_upstream is True
+    assert with_lexicon.telemetry.lexicon_backed_mentions_count_upstream >= 1
     assert with_lexicon.telemetry.no_strong_lexical_basis_from_upstream is False
     assert "lexicon_backed" in with_lexicon.telemetry.input_lexical_basis_classes

@@ -76,6 +76,28 @@ def test_lexicon_unknown_is_not_erased_by_fallback() -> None:
     assert result.bundle.no_final_resolution_performed is True
 
 
+def test_queried_but_capped_lexicon_is_not_reported_as_usable_basis() -> None:
+    syntax_result, surface_result = _syntax_result("bank", "m-l03-queried-capped")
+    result = build_lexical_grounding_hypotheses(
+        syntax_result,
+        utterance_surface=surface_result,
+        lexicon_state=create_seed_lexicon_state(),
+    )
+    gate = evaluate_lexical_grounding_downstream_gate(result)
+
+    assert result.lexicon_handoff_present is True
+    assert result.lexicon_query_attempted is True
+    assert result.lexicon_primary_used is True  # compatibility marker
+    assert result.lexicon_usable_basis_present is False
+    assert result.lexicon_backed_mentions_count == 0
+    assert result.telemetry.lexicon_query_attempted is True
+    assert result.telemetry.lexicon_usable_basis_present is False
+    assert result.telemetry.lexicon_backed_mentions_count == 0
+    assert "lexicon_query_attempted" in gate.restrictions
+    assert "lexicon_query_attempted_without_usable_basis" in gate.restrictions
+    assert "no_strong_lexical_claim_from_fallback" in gate.restrictions
+
+
 def test_missing_lexicon_handoff_enters_explicit_degraded_mode() -> None:
     syntax_result, surface_result = _syntax_result("thing", "m-l03-missing-lexicon-handoff")
     result = build_lexical_grounding_hypotheses(

@@ -43,6 +43,17 @@ def evaluate_dictum_downstream_gate(
         restrictions.append("no_strong_lexical_basis_from_upstream")
     if bundle.lexicon_handoff_missing_upstream:
         restrictions.append("lexicon_handoff_missing_upstream")
+    if bundle.lexicon_handoff_present_upstream:
+        restrictions.append("lexicon_handoff_present_upstream")
+    if bundle.lexicon_query_attempted_upstream:
+        restrictions.append("lexicon_query_attempted_upstream")
+    if bundle.lexicon_usable_basis_present_upstream:
+        restrictions.append("lexicon_usable_basis_present_upstream")
+    if (
+        bundle.lexicon_query_attempted_upstream
+        and not bundle.lexicon_usable_basis_present_upstream
+    ):
+        restrictions.append("lexicon_query_attempted_without_usable_basis_upstream")
 
     for candidate in bundle.dictum_candidates:
         if candidate.confidence >= 0.2:

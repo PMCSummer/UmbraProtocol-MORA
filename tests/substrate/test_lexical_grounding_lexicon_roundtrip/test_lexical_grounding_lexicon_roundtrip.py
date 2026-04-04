@@ -75,8 +75,15 @@ def test_roundtrip_preserves_lexicon_backed_vs_fallback_basis_markers() -> None:
     payload = lexical_grounding_result_to_payload(result)
     assert payload["bundle"]["lexical_basis_records"]
     assert payload["bundle"]["lexicon_primary_used"] is True
+    assert payload["bundle"]["lexicon_handoff_present"] is True
+    assert payload["bundle"]["lexicon_query_attempted"] is True
+    assert payload["bundle"]["lexicon_usable_basis_present"] is True
+    assert payload["bundle"]["lexicon_backed_mentions_count"] >= 1
     assert payload["bundle"]["heuristic_fallback_used"] is True
     assert payload["bundle"]["fallback_reasons"]
+    assert payload["telemetry"]["lexicon_query_attempted"] is True
+    assert payload["telemetry"]["lexicon_usable_basis_present"] is True
+    assert payload["telemetry"]["lexicon_backed_mentions_count"] >= 1
     assert payload["telemetry"]["lexicon_backed_mention_count"] >= 1
     assert payload["telemetry"]["heuristic_fallback_mention_count"] >= 1
 
@@ -90,4 +97,6 @@ def test_roundtrip_preserves_lexicon_backed_vs_fallback_basis_markers() -> None:
     snapshot = persisted.state.trace.events[-1].payload["lexical_grounding_snapshot"]
 
     assert _basis_signature(snapshot) == _basis_signature(payload)
+    assert snapshot["bundle"]["lexicon_query_attempted"] is True
+    assert snapshot["bundle"]["lexicon_usable_basis_present"] is True
     assert snapshot["bundle"]["no_strong_lexical_claim_from_fallback"] is True

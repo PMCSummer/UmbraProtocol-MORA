@@ -55,6 +55,10 @@ def test_stage_contour_mixed_human_like_input_preserves_boundedness() -> None:
     )
 
     assert lexical.lexicon_primary_used is True
+    assert lexical.lexicon_handoff_present is True
+    assert lexical.lexicon_query_attempted is True
+    assert lexical.lexicon_usable_basis_present is True
+    assert lexical.lexicon_backed_mentions_count >= 1
     assert any(
         basis.basis_class.value == "lexicon_backed"
         for basis in lexical.bundle.lexical_basis_records
@@ -69,6 +73,10 @@ def test_stage_contour_mixed_human_like_input_preserves_boundedness() -> None:
     assert dictum.telemetry.input_lexical_basis_classes
     assert dictum.telemetry.fallback_basis_present is True
     assert dictum.telemetry.lexicon_basis_missing_or_capped is True
+    assert dictum.telemetry.lexicon_handoff_present_upstream is True
+    assert dictum.telemetry.lexicon_query_attempted_upstream is True
+    assert dictum.telemetry.lexicon_usable_basis_present_upstream is True
+    assert dictum.telemetry.lexicon_backed_mentions_count_upstream >= 1
     assert "no_final_resolution_performed" in dictum.telemetry.downstream_gate.restrictions
 
 
@@ -88,14 +96,21 @@ def test_stage_contour_lexicon_ablation_is_measurably_degraded() -> None:
     without_gate = evaluate_lexical_grounding_downstream_gate(without_lexicon_l03)
 
     assert with_lexicon_l03.lexicon_handoff_missing is False
+    assert with_lexicon_l03.lexicon_query_attempted is True
+    assert with_lexicon_l03.lexicon_usable_basis_present is True
     assert without_lexicon_l03.lexicon_handoff_missing is True
+    assert without_lexicon_l03.lexicon_query_attempted is False
+    assert without_lexicon_l03.lexicon_usable_basis_present is False
     assert with_lexicon_l03.no_strong_lexical_claim_without_lexicon is False
     assert without_lexicon_l03.no_strong_lexical_claim_without_lexicon is True
     assert "lexicon_handoff_missing" not in with_gate.restrictions
     assert "lexicon_handoff_missing" in without_gate.restrictions
 
     assert with_lexicon_l04.telemetry.lexicon_handoff_missing_upstream is False
+    assert with_lexicon_l04.telemetry.lexicon_handoff_present_upstream is True
+    assert with_lexicon_l04.telemetry.lexicon_query_attempted_upstream is True
     assert without_lexicon_l04.telemetry.lexicon_handoff_missing_upstream is True
+    assert without_lexicon_l04.telemetry.lexicon_query_attempted_upstream is False
     assert (
         "no_strong_lexical_basis_from_upstream"
         not in with_lexicon_l04.telemetry.downstream_gate.restrictions
@@ -140,6 +155,14 @@ def test_stage_contour_l04_snapshot_keeps_l03_basis_bridge() -> None:
 
     snapshot = persisted.state.trace.events[-1].payload["dictum_snapshot"]
     assert snapshot["bundle"]["lexicon_handoff_missing_upstream"] is True
+    assert snapshot["bundle"]["lexicon_handoff_present_upstream"] is False
+    assert snapshot["bundle"]["lexicon_query_attempted_upstream"] is False
+    assert snapshot["bundle"]["lexicon_usable_basis_present_upstream"] is False
+    assert snapshot["bundle"]["lexicon_backed_mentions_count_upstream"] == 0
     assert snapshot["bundle"]["no_strong_lexical_basis_from_upstream"] is True
     assert snapshot["telemetry"]["lexicon_handoff_missing_upstream"] is True
+    assert snapshot["telemetry"]["lexicon_handoff_present_upstream"] is False
+    assert snapshot["telemetry"]["lexicon_query_attempted_upstream"] is False
+    assert snapshot["telemetry"]["lexicon_usable_basis_present_upstream"] is False
+    assert snapshot["telemetry"]["lexicon_backed_mentions_count_upstream"] == 0
     assert snapshot["telemetry"]["no_strong_lexical_basis_from_upstream"] is True

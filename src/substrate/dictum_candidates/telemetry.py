@@ -68,6 +68,10 @@ def build_dictum_telemetry(
         lexicon_basis_missing_or_capped=bundle.lexicon_basis_missing_or_capped,
         no_strong_lexical_basis_from_upstream=bundle.no_strong_lexical_basis_from_upstream,
         lexicon_handoff_missing_upstream=bundle.lexicon_handoff_missing_upstream,
+        lexicon_handoff_present_upstream=bundle.lexicon_handoff_present_upstream,
+        lexicon_query_attempted_upstream=bundle.lexicon_query_attempted_upstream,
+        lexicon_usable_basis_present_upstream=bundle.lexicon_usable_basis_present_upstream,
+        lexicon_backed_mentions_count_upstream=bundle.lexicon_backed_mentions_count_upstream,
         downstream_gate=downstream_gate,
         causal_basis=causal_basis,
     )
@@ -95,6 +99,10 @@ def dictum_result_snapshot(result: DictumCandidateResult) -> dict[str, object]:
             "lexicon_basis_missing_or_capped": bundle.lexicon_basis_missing_or_capped,
             "no_strong_lexical_basis_from_upstream": bundle.no_strong_lexical_basis_from_upstream,
             "lexicon_handoff_missing_upstream": bundle.lexicon_handoff_missing_upstream,
+            "lexicon_handoff_present_upstream": bundle.lexicon_handoff_present_upstream,
+            "lexicon_query_attempted_upstream": bundle.lexicon_query_attempted_upstream,
+            "lexicon_usable_basis_present_upstream": bundle.lexicon_usable_basis_present_upstream,
+            "lexicon_backed_mentions_count_upstream": bundle.lexicon_backed_mentions_count_upstream,
             "reason": bundle.reason,
             "dictum_candidates": tuple(
                 {
@@ -245,6 +253,10 @@ def dictum_result_snapshot(result: DictumCandidateResult) -> dict[str, object]:
             "lexicon_basis_missing_or_capped": result.telemetry.lexicon_basis_missing_or_capped,
             "no_strong_lexical_basis_from_upstream": result.telemetry.no_strong_lexical_basis_from_upstream,
             "lexicon_handoff_missing_upstream": result.telemetry.lexicon_handoff_missing_upstream,
+            "lexicon_handoff_present_upstream": result.telemetry.lexicon_handoff_present_upstream,
+            "lexicon_query_attempted_upstream": result.telemetry.lexicon_query_attempted_upstream,
+            "lexicon_usable_basis_present_upstream": result.telemetry.lexicon_usable_basis_present_upstream,
+            "lexicon_backed_mentions_count_upstream": result.telemetry.lexicon_backed_mentions_count_upstream,
             "downstream_gate": {
                 "accepted": result.telemetry.downstream_gate.accepted,
                 "restrictions": result.telemetry.downstream_gate.restrictions,

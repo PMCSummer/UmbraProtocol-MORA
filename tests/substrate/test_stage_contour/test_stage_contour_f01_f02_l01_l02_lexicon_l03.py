@@ -52,6 +52,10 @@ def test_stage_contour_f01_f02_l01_l02_lexicon_l03_keeps_typed_path_and_single_w
     )
 
     assert result.lexicon_primary_used is True
+    assert result.lexicon_handoff_present is True
+    assert result.lexicon_query_attempted is True
+    assert result.lexicon_usable_basis_present is True
+    assert result.lexicon_backed_mentions_count >= 1
     assert result.bundle.lexical_basis_records
     assert boot.state.runtime.revision == start_revision
 
@@ -66,3 +70,7 @@ def test_stage_contour_f01_f02_l01_l02_lexicon_l03_keeps_typed_path_and_single_w
     snapshot = persisted.state.trace.events[-1].payload["lexical_grounding_snapshot"]
     assert snapshot["bundle"]["lexical_basis_records"]
     assert snapshot["bundle"]["lexicon_primary_used"] is True
+    assert snapshot["bundle"]["lexicon_handoff_present"] is True
+    assert snapshot["bundle"]["lexicon_query_attempted"] is True
+    assert snapshot["bundle"]["lexicon_usable_basis_present"] is True
+    assert snapshot["bundle"]["lexicon_backed_mentions_count"] >= 1

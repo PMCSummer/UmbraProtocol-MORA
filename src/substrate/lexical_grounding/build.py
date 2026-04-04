@@ -436,7 +436,17 @@ def build_lexical_grounding_hypotheses(
                 )
             )
 
-    lexicon_primary_used = any(basis.lexicon_used for basis in lexical_basis_records)
+    lexicon_handoff_present = lexicon_state is not None
+    lexicon_query_attempted = bool(lexicon_handoff_present and mentions)
+    lexicon_backed_mentions_count = sum(
+        1
+        for basis in lexical_basis_records
+        if basis.basis_class == LexicalBasisClass.LEXICON_BACKED
+    )
+    lexicon_usable_basis_present = lexicon_backed_mentions_count > 0
+    # Backward-compat marker: historically this meant "lexicon path participated".
+    # It is intentionally kept as a handoff/query marker, not a usable-basis claim.
+    lexicon_primary_used = lexicon_query_attempted
     heuristic_fallback_used = any(
         basis.heuristic_fallback_used for basis in lexical_basis_records
     )
@@ -454,7 +464,7 @@ def build_lexical_grounding_hypotheses(
         basis.basis_class == LexicalBasisClass.NO_USABLE_LEXICAL_BASIS
         for basis in lexical_basis_records
     )
-    lexicon_handoff_missing = lexicon_state is None
+    lexicon_handoff_missing = not lexicon_handoff_present
     lexical_basis_degraded = lexicon_handoff_missing or any(
         basis.basis_class
         in {
@@ -491,6 +501,10 @@ def build_lexical_grounding_hypotheses(
         fallback_reasons=fallback_reasons,
         no_final_resolution_performed=True,
         reason="candidate lexical and referential grounding generated without final discourse acceptance",
+        lexicon_handoff_present=lexicon_handoff_present,
+        lexicon_query_attempted=lexicon_query_attempted,
+        lexicon_usable_basis_present=lexicon_usable_basis_present,
+        lexicon_backed_mentions_count=lexicon_backed_mentions_count,
         lexicon_handoff_missing=lexicon_handoff_missing,
         lexical_basis_degraded=lexical_basis_degraded,
         no_strong_lexical_claim_without_lexicon=no_strong_lexical_claim_without_lexicon,
@@ -547,6 +561,10 @@ def build_lexical_grounding_hypotheses(
         telemetry=telemetry,
         confidence=confidence,
         lexicon_primary_used=lexicon_primary_used,
+        lexicon_handoff_present=lexicon_handoff_present,
+        lexicon_query_attempted=lexicon_query_attempted,
+        lexicon_usable_basis_present=lexicon_usable_basis_present,
+        lexicon_backed_mentions_count=lexicon_backed_mentions_count,
         heuristic_fallback_used=heuristic_fallback_used,
         no_usable_lexical_basis=no_usable_lexical_basis,
         partial_known=partial_known,
@@ -1094,6 +1112,10 @@ def _abstain_result(
         fallback_reasons=(),
         no_final_resolution_performed=True,
         reason="lexical grounding abstained due to invalid or empty upstream contract",
+        lexicon_handoff_present=not lexicon_handoff_missing,
+        lexicon_query_attempted=False,
+        lexicon_usable_basis_present=False,
+        lexicon_backed_mentions_count=0,
         lexicon_handoff_missing=lexicon_handoff_missing,
         lexical_basis_degraded=lexicon_handoff_missing,
         no_strong_lexical_claim_without_lexicon=lexicon_handoff_missing,
@@ -1113,6 +1135,10 @@ def _abstain_result(
         telemetry=telemetry,
         confidence=0.1,
         lexicon_primary_used=False,
+        lexicon_handoff_present=not lexicon_handoff_missing,
+        lexicon_query_attempted=False,
+        lexicon_usable_basis_present=False,
+        lexicon_backed_mentions_count=0,
         heuristic_fallback_used=False,
         no_usable_lexical_basis=True,
         partial_known=True,

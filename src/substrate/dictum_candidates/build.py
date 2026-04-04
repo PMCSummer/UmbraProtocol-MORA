@@ -445,6 +445,10 @@ def build_dictum_candidates(
         or lexical_bundle.no_strong_lexical_claim_without_lexicon
     )
     lexicon_handoff_missing_upstream = lexical_bundle.lexicon_handoff_missing
+    lexicon_handoff_present_upstream = lexical_bundle.lexicon_handoff_present
+    lexicon_query_attempted_upstream = lexical_bundle.lexicon_query_attempted
+    lexicon_usable_basis_present_upstream = lexical_bundle.lexicon_usable_basis_present
+    lexicon_backed_mentions_count_upstream = lexical_bundle.lexicon_backed_mentions_count
     if lexicon_handoff_missing_upstream:
         blocked_reasons.append("upstream_lexicon_handoff_missing")
     if lexicon_basis_missing_or_capped:
@@ -472,6 +476,10 @@ def build_dictum_candidates(
         lexicon_basis_missing_or_capped=lexicon_basis_missing_or_capped,
         no_strong_lexical_basis_from_upstream=no_strong_lexical_basis_from_upstream,
         lexicon_handoff_missing_upstream=lexicon_handoff_missing_upstream,
+        lexicon_handoff_present_upstream=lexicon_handoff_present_upstream,
+        lexicon_query_attempted_upstream=lexicon_query_attempted_upstream,
+        lexicon_usable_basis_present_upstream=lexicon_usable_basis_present_upstream,
+        lexicon_backed_mentions_count_upstream=lexicon_backed_mentions_count_upstream,
     )
     gate = evaluate_dictum_downstream_gate(bundle)
     source_lineage = tuple(
@@ -828,6 +836,10 @@ def _abstain_result(
             or lexical_bundle.no_strong_lexical_claim_without_lexicon
         ),
         lexicon_handoff_missing_upstream=lexical_bundle.lexicon_handoff_missing,
+        lexicon_handoff_present_upstream=lexical_bundle.lexicon_handoff_present,
+        lexicon_query_attempted_upstream=lexical_bundle.lexicon_query_attempted,
+        lexicon_usable_basis_present_upstream=lexical_bundle.lexicon_usable_basis_present,
+        lexicon_backed_mentions_count_upstream=lexical_bundle.lexicon_backed_mentions_count,
     )
     gate = evaluate_dictum_downstream_gate(bundle)
     telemetry = build_dictum_telemetry(
