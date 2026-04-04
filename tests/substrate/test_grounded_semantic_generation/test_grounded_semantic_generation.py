@@ -18,7 +18,7 @@ from substrate.grounded_semantic import (
     OperatorKind,
     SourceAnchorKind,
     UncertaintyKind,
-    build_grounded_semantic_substrate,
+    build_grounded_semantic_substrate_legacy_compatibility,
 )
 from substrate.language_surface import build_utterance_surface
 from substrate.lexical_grounding import (
@@ -89,7 +89,7 @@ def _run_pipeline(case: CaseSpec) -> GroundedSemanticResult:
         utterance_surface=surface_result,
         discourse_context=LexicalDiscourseContext(context_ref=f"ctx-g01-{case.case_id}"),
     )
-    return build_grounded_semantic_substrate(
+    return build_grounded_semantic_substrate_legacy_compatibility(
         dictum_result,
         utterance_surface=surface_result,
         memory_anchor_ref=f"m03-anchor-{case.case_id}",

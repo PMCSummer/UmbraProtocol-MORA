@@ -15,7 +15,7 @@ from substrate.grounded_semantic import (
     OperatorKind,
     SourceAnchorKind,
     UncertaintyKind,
-    build_grounded_semantic_substrate,
+    build_grounded_semantic_substrate_legacy_compatibility,
     evaluate_grounded_semantic_downstream_gate,
 )
 from substrate.language_surface import build_utterance_surface
@@ -37,7 +37,7 @@ def _build_result(text: str, material_id: str):
     syntax = build_morphosyntax_candidate_space(surface)
     lexical = build_lexical_grounding_hypotheses(syntax, utterance_surface=surface)
     dictum = build_dictum_candidates(lexical, syntax, utterance_surface=surface)
-    return build_grounded_semantic_substrate(
+    return build_grounded_semantic_substrate_legacy_compatibility(
         dictum,
         utterance_surface=surface,
         memory_anchor_ref=f"m03:{material_id}",

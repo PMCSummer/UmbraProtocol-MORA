@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import replace
 
+import pytest
 from substrate.dictum_candidates import build_dictum_candidates
 from substrate.discourse_update import (
     ContinuationStatus,
@@ -16,6 +17,7 @@ from substrate.epistemics import (
     ground_epistemic_input,
 )
 from substrate.grounded_semantic import (
+    build_grounded_semantic_substrate_legacy_compatibility,
     build_grounded_semantic_substrate,
     derive_grounded_downstream_contract,
     evaluate_grounded_semantic_downstream_gate,
@@ -70,7 +72,7 @@ def test_g01_normative_typed_route_is_active_with_l05_and_l06_inputs() -> None:
 
 def test_g01_legacy_l04_only_path_stays_explicit_degraded_fallback() -> None:
     surface, dictum, _, _ = _pipeline("alpha is stable?", "m-g01-rewire-legacy")
-    result = build_grounded_semantic_substrate(
+    result = build_grounded_semantic_substrate_legacy_compatibility(
         dictum,
         utterance_surface=surface,
         memory_anchor_ref="m03:g01-rewire-legacy",
@@ -172,3 +174,17 @@ def test_normative_route_does_not_project_surface_modus_shortcuts_when_typed_l05
     assert all("punctuation cue" not in provenance for provenance in operator_provenance)
     assert all("surface cue" not in provenance for provenance in source_anchor_provenance)
     assert any("from l05" in provenance or "from l06" in provenance for provenance in operator_provenance)
+
+
+def test_normative_route_rejects_l05_l06_binding_mismatch_without_silent_legacy_fallback() -> None:
+    surface_a, dictum_a, _, _ = _pipeline("alpha is stable", "m-g01-rewire-mismatch-a")
+    _, dictum_b, modus_b, discourse_b = _pipeline("beta is stable", "m-g01-rewire-mismatch-b")
+    with pytest.raises(TypeError):
+        build_grounded_semantic_substrate(
+            dictum_a,
+            utterance_surface=surface_a,
+            memory_anchor_ref="m03:g01-rewire-mismatch",
+            cooperation_anchor_ref="o03:g01-rewire-mismatch",
+            modus_hypotheses_result_or_bundle=modus_b,
+            discourse_update_result_or_bundle=discourse_b,
+        )

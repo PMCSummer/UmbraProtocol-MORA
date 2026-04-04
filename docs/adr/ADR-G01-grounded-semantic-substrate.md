@@ -5,7 +5,10 @@ Accepted as a bounded partial implementation of phase `G01` over implemented `F0
 
 ## Canonical Seams
 - Canonical G01 seam:
-  - `build_grounded_semantic_substrate(dictum_result_or_bundle, utterance_surface=None, memory_anchor_ref=None, cooperation_anchor_ref=None, modus_hypotheses_result_or_bundle=None, discourse_update_result_or_bundle=None) -> GroundedSemanticResult`
+  - `build_grounded_semantic_substrate(dictum_result_or_bundle, utterance_surface=None, memory_anchor_ref=None, cooperation_anchor_ref=None, modus_hypotheses_result_or_bundle=None, discourse_update_result_or_bundle=None, compatibility_legacy_l04_only_mode=False) -> GroundedSemanticResult`
+  - default path requires typed `L05+L06` intake; no silent fallback to `L04`-only route
+- Explicit compatibility shim:
+  - `build_grounded_semantic_substrate_legacy_compatibility(...) -> GroundedSemanticResult`
 - Canonical downstream gate:
   - `evaluate_grounded_semantic_downstream_gate(grounded_result_or_bundle) -> GroundedSemanticGateDecision`
 - Canonical runtime write seam:
@@ -26,7 +29,7 @@ Accepted as a bounded partial implementation of phase `G01` over implemented `F0
 - Projects explicit operator/scope carriers without semantic closure.
 - Distinguishes runtime routes:
   - normative route: `L04 + L05 + L06`
-  - degraded compatibility fallback: legacy `L04 (+surface)` path
+  - degraded compatibility fallback: legacy `L04 (+surface)` path via explicit compatibility shim only
 - Preserves dictum/modus split as distinct typed carriers.
 - Preserves source/deixis anchoring as typed source anchors and unresolved placeholders.
 - Preserves first-class uncertainty markers:
@@ -40,6 +43,7 @@ Accepted as a bounded partial implementation of phase `G01` over implemented `F0
   - `l04_only_input_not_equivalent_to_l05_l06_route`
   - `legacy_fallback_requires_degraded_contract`
   - `discourse_update_not_inferred_from_surface_when_l06_available`
+- Rejects typed-binding mismatch on normative entrypoint instead of silently downgrading to legacy fallback.
 - Provides a typed downstream role-contract surface so consumers can distinguish source/operator/uncertainty regimes without reparsing raw text.
 
 ## What G01 Does Not Claim
@@ -73,6 +77,8 @@ Accepted as a bounded partial implementation of phase `G01` over implemented `F0
 - G01 does not perform final acceptance of L06 proposals and does not execute repair.
 - G01 does not mutate common ground/self state.
 - Runtime rewiring is partial: normative `L05+L06` intake exists, but legacy `L04` fallback remains operational as debt.
+- Normal production entrypoint no longer allows implicit `L04`-only fallback.
+- Normative `L05+L06` mismatch is treated as contract error, not compatibility auto-repair.
 - Hostile bypass outside typed seams is out of scope.
 
 ## Remaining Debts

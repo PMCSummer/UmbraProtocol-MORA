@@ -14,7 +14,7 @@ from substrate.epistemics import (
 from substrate.grounded_semantic import (
     GroundedAuthorityLevel,
     GroundedSourceMode,
-    build_grounded_semantic_substrate,
+    build_grounded_semantic_substrate_legacy_compatibility,
     derive_grounded_downstream_contract,
 )
 from substrate.language_surface import build_utterance_surface
@@ -41,7 +41,7 @@ def _dictum_and_surface(text: str, material_id: str):
 
 def _build_result(text: str, material_id: str, *, with_surface: bool = True):
     dictum, surface = _dictum_and_surface(text, material_id)
-    return build_grounded_semantic_substrate(
+    return build_grounded_semantic_substrate_legacy_compatibility(
         dictum,
         utterance_surface=surface if with_surface else None,
         memory_anchor_ref=f"m03:{material_id}",

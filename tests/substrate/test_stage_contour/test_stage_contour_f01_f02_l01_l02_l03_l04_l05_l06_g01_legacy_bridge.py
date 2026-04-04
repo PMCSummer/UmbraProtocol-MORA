@@ -8,7 +8,7 @@ from substrate.epistemics import (
     SourceMetadata,
     ground_epistemic_input,
 )
-from substrate.grounded_semantic import build_grounded_semantic_substrate
+from substrate.grounded_semantic import build_grounded_semantic_substrate_legacy_compatibility
 from substrate.language_surface import build_utterance_surface
 from substrate.lexical_grounding import build_lexical_grounding_hypotheses
 from substrate.modus_hypotheses import build_modus_hypotheses
@@ -31,7 +31,7 @@ def test_stage_contour_l06_exists_but_g01_legacy_bridge_remains_operational_debt
     dictum = build_dictum_candidates(lexical, syntax, utterance_surface=surface)
     l05_result = build_modus_hypotheses(dictum)
     l06_result = build_discourse_update(l05_result)
-    g01_result = build_grounded_semantic_substrate(
+    g01_result = build_grounded_semantic_substrate_legacy_compatibility(
         dictum,
         utterance_surface=surface,
         memory_anchor_ref="m06:l06-g01-legacy",

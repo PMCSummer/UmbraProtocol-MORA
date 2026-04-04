@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from substrate.grounded_semantic import build_grounded_semantic_substrate
+from substrate.grounded_semantic import build_grounded_semantic_substrate_legacy_compatibility
 from substrate.modus_hypotheses import evaluate_modus_hypothesis_downstream_gate
 from tests.substrate.l05_testkit import build_l05_context
 
@@ -29,4 +29,4 @@ def test_legacy_l04_to_g01_shortcut_still_carries_modus_like_work_as_debt() -> N
 def test_g01_does_not_consume_l05_output_directly() -> None:
     ctx = build_l05_context("you are tired", "l05-shortcut-type-guard")
     with pytest.raises(TypeError):
-        build_grounded_semantic_substrate(ctx.modus)  # type: ignore[arg-type]
+        build_grounded_semantic_substrate_legacy_compatibility(ctx.modus)  # type: ignore[arg-type]

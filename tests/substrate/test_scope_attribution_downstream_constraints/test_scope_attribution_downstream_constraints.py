@@ -11,7 +11,7 @@ from substrate.epistemics import (
     SourceMetadata,
     ground_epistemic_input,
 )
-from substrate.grounded_semantic import build_grounded_semantic_substrate
+from substrate.grounded_semantic import build_grounded_semantic_substrate_legacy_compatibility
 from substrate.language_surface import build_utterance_surface
 from substrate.lexical_grounding import build_lexical_grounding_hypotheses
 from substrate.morphosyntax import build_morphosyntax_candidate_space
@@ -39,7 +39,7 @@ def _g03(text: str, material_id: str):
     syntax = build_morphosyntax_candidate_space(surface)
     lexical = build_lexical_grounding_hypotheses(syntax, utterance_surface=surface)
     dictum = build_dictum_candidates(lexical, syntax, utterance_surface=surface)
-    grounded = build_grounded_semantic_substrate(
+    grounded = build_grounded_semantic_substrate_legacy_compatibility(
         dictum,
         utterance_surface=surface,
         memory_anchor_ref=f"m03:{material_id}",
@@ -63,7 +63,7 @@ def _runtime_graph(text: str, material_id: str):
     syntax = build_morphosyntax_candidate_space(surface)
     lexical = build_lexical_grounding_hypotheses(syntax, utterance_surface=surface)
     dictum = build_dictum_candidates(lexical, syntax, utterance_surface=surface)
-    grounded = build_grounded_semantic_substrate(
+    grounded = build_grounded_semantic_substrate_legacy_compatibility(
         dictum,
         utterance_surface=surface,
         memory_anchor_ref=f"m03:{material_id}",

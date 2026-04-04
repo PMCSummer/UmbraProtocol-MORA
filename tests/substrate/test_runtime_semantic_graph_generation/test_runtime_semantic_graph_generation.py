@@ -13,7 +13,7 @@ from substrate.epistemics import (
     SourceMetadata,
     ground_epistemic_input,
 )
-from substrate.grounded_semantic import build_grounded_semantic_substrate
+from substrate.grounded_semantic import build_grounded_semantic_substrate_legacy_compatibility
 from substrate.language_surface import build_utterance_surface
 from substrate.lexical_grounding import (
     LexicalDiscourseContext,
@@ -94,7 +94,7 @@ def _g02_pipeline(case: CaseSpec) -> RuntimeGraphResult:
         utterance_surface=surface_result,
         discourse_context=LexicalDiscourseContext(context_ref=f"ctx-g02-{case.case_id}"),
     )
-    grounded_result = build_grounded_semantic_substrate(
+    grounded_result = build_grounded_semantic_substrate_legacy_compatibility(
         dictum_result,
         utterance_surface=surface_result,
         memory_anchor_ref=f"m03:{case.case_id}",

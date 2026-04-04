@@ -14,7 +14,7 @@ from substrate.epistemics import (
     SourceMetadata,
     ground_epistemic_input,
 )
-from substrate.grounded_semantic import build_grounded_semantic_substrate
+from substrate.grounded_semantic import build_grounded_semantic_substrate_legacy_compatibility
 from substrate.language_surface import build_utterance_surface
 from substrate.lexical_grounding import build_lexical_grounding_hypotheses
 from substrate.morphosyntax import build_morphosyntax_candidate_space
@@ -42,7 +42,7 @@ def _g04_result():
     syntax = build_morphosyntax_candidate_space(surface)
     lexical = build_lexical_grounding_hypotheses(syntax, utterance_surface=surface)
     dictum = build_dictum_candidates(lexical, syntax, utterance_surface=surface)
-    grounded = build_grounded_semantic_substrate(dictum, utterance_surface=surface)
+    grounded = build_grounded_semantic_substrate_legacy_compatibility(dictum, utterance_surface=surface)
     graph = build_runtime_semantic_graph(grounded)
     applicability = build_scope_attribution(graph)
     return build_discourse_provenance_chain(applicability)
@@ -62,7 +62,7 @@ def _g03_result():
     syntax = build_morphosyntax_candidate_space(surface)
     lexical = build_lexical_grounding_hypotheses(syntax, utterance_surface=surface)
     dictum = build_dictum_candidates(lexical, syntax, utterance_surface=surface)
-    grounded = build_grounded_semantic_substrate(dictum, utterance_surface=surface)
+    grounded = build_grounded_semantic_substrate_legacy_compatibility(dictum, utterance_surface=surface)
     graph = build_runtime_semantic_graph(grounded)
     return build_scope_attribution(graph)
 

@@ -3,7 +3,7 @@ from __future__ import annotations
 import pytest
 
 from substrate.discourse_update import evaluate_discourse_update_downstream_gate
-from substrate.grounded_semantic import build_grounded_semantic_substrate
+from substrate.grounded_semantic import build_grounded_semantic_substrate_legacy_compatibility
 from tests.substrate.l06_testkit import build_l06_context
 
 
@@ -20,4 +20,4 @@ def test_legacy_g01_path_still_represents_bypass_risk_as_debt() -> None:
 def test_g01_does_not_consume_l06_output_directly() -> None:
     ctx = build_l06_context("you are tired", "l06-hidden-shortcut-guard")
     with pytest.raises(TypeError):
-        build_grounded_semantic_substrate(ctx.discourse_update)  # type: ignore[arg-type]
+        build_grounded_semantic_substrate_legacy_compatibility(ctx.discourse_update)  # type: ignore[arg-type]

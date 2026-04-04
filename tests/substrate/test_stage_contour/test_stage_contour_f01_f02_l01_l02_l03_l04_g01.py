@@ -11,7 +11,7 @@ from substrate.epistemics import (
     ground_epistemic_input,
 )
 from substrate.grounded_semantic import (
-    build_grounded_semantic_substrate,
+    build_grounded_semantic_substrate_legacy_compatibility,
     evaluate_grounded_semantic_downstream_gate,
     persist_grounded_semantic_result_via_f01,
 )
@@ -64,7 +64,7 @@ def test_stage_contour_f01_f02_l01_l02_l03_l04_g01_preserves_single_write_seam()
         utterance_surface=surface_result,
         discourse_context=LexicalDiscourseContext(context_ref="ctx:g01-stage"),
     )
-    grounded_result = build_grounded_semantic_substrate(
+    grounded_result = build_grounded_semantic_substrate_legacy_compatibility(
         dictum_result,
         utterance_surface=surface_result,
         memory_anchor_ref="m03:g01-stage",
@@ -111,4 +111,4 @@ def test_stage_contour_f01_f02_l01_l02_l03_l04_g01_preserves_single_write_seam()
 
 def test_stage_contour_g01_typed_only_guards_no_raw_bypass() -> None:
     with pytest.raises(TypeError):
-        build_grounded_semantic_substrate("raw dictum")
+        build_grounded_semantic_substrate_legacy_compatibility("raw dictum")

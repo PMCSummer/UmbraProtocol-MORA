@@ -120,7 +120,7 @@ Accepted as a bounded partial implementation of phase `L06` over implemented `L0
 - Normative contour for this segment is:
   - `L04 -> L05 -> L06 -> G01`
 - `G01` now has a live typed intake route for `L05+L06`.
-- Historical direct `L04 -> G01` path still remains operational as degraded compatibility debt.
+- Historical direct `L04 -> G01` path is no longer default and is available only via explicit degraded compatibility shim.
 
 ## Remaining Debts
 - No live downstream acceptor for update acceptance.
