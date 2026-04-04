@@ -1,0 +1,160 @@
+from __future__ import annotations
+
+from substrate.discourse_update.models import (
+    DiscourseUpdateBundle,
+    DiscourseUpdateGateDecision,
+    DiscourseUpdateResult,
+    DiscourseUpdateTelemetry,
+)
+
+
+def build_discourse_update_telemetry(
+    *,
+    bundle: DiscourseUpdateBundle,
+    source_lineage: tuple[str, ...],
+    attempted_paths: tuple[str, ...],
+    downstream_gate: DiscourseUpdateGateDecision,
+    causal_basis: str,
+) -> DiscourseUpdateTelemetry:
+    return DiscourseUpdateTelemetry(
+        source_lineage=source_lineage,
+        source_modus_ref=bundle.source_modus_ref,
+        source_dictum_ref=bundle.source_dictum_ref,
+        source_syntax_ref=bundle.source_syntax_ref,
+        source_surface_ref=bundle.source_surface_ref,
+        proposal_count=len(bundle.update_proposals),
+        repair_count=len(bundle.repair_triggers),
+        continuation_count=len(bundle.continuation_states),
+        proposal_classes=tuple(dict.fromkeys(proposal.proposal_type.value for proposal in bundle.update_proposals)),
+        repair_classes=tuple(dict.fromkeys(trigger.repair_class.value for trigger in bundle.repair_triggers)),
+        continuation_statuses=tuple(dict.fromkeys(state.continuation_status.value for state in bundle.continuation_states)),
+        blocked_update_count=len(bundle.blocked_update_ids),
+        guarded_update_count=len(bundle.guarded_update_ids),
+        acceptance_required_count=bundle.acceptance_required_count,
+        low_coverage_mode=bundle.low_coverage_mode,
+        low_coverage_reasons=bundle.low_coverage_reasons,
+        ambiguity_reasons=bundle.ambiguity_reasons,
+        downstream_update_acceptor_absent=bundle.downstream_update_acceptor_absent,
+        repair_consumer_absent=bundle.repair_consumer_absent,
+        discourse_state_mutation_consumer_absent=bundle.discourse_state_mutation_consumer_absent,
+        legacy_g01_bypass_risk_present=bundle.legacy_g01_bypass_risk_present,
+        attempted_paths=attempted_paths,
+        downstream_gate=downstream_gate,
+        causal_basis=causal_basis,
+    )
+
+
+def discourse_update_result_snapshot(result: DiscourseUpdateResult) -> dict[str, object]:
+    bundle = result.bundle
+    return {
+        "confidence": result.confidence,
+        "partial_known": result.partial_known,
+        "partial_known_reason": result.partial_known_reason,
+        "abstain": result.abstain,
+        "abstain_reason": result.abstain_reason,
+        "no_final_acceptance_performed": result.no_final_acceptance_performed,
+        "bundle": {
+            "source_modus_ref": bundle.source_modus_ref,
+            "source_dictum_ref": bundle.source_dictum_ref,
+            "source_syntax_ref": bundle.source_syntax_ref,
+            "source_surface_ref": bundle.source_surface_ref,
+            "linked_modus_record_ids": bundle.linked_modus_record_ids,
+            "blocked_update_ids": bundle.blocked_update_ids,
+            "guarded_update_ids": bundle.guarded_update_ids,
+            "acceptance_required_count": bundle.acceptance_required_count,
+            "ambiguity_reasons": bundle.ambiguity_reasons,
+            "low_coverage_mode": bundle.low_coverage_mode,
+            "low_coverage_reasons": bundle.low_coverage_reasons,
+            "interpretation_not_equal_accepted_update": bundle.interpretation_not_equal_accepted_update,
+            "no_common_ground_mutation_performed": bundle.no_common_ground_mutation_performed,
+            "no_self_state_mutation_performed": bundle.no_self_state_mutation_performed,
+            "no_final_acceptance_performed": bundle.no_final_acceptance_performed,
+            "downstream_update_acceptor_absent": bundle.downstream_update_acceptor_absent,
+            "repair_consumer_absent": bundle.repair_consumer_absent,
+            "discourse_state_mutation_consumer_absent": bundle.discourse_state_mutation_consumer_absent,
+            "legacy_g01_bypass_risk_present": bundle.legacy_g01_bypass_risk_present,
+            "downstream_authority_degraded": bundle.downstream_authority_degraded,
+            "reason": bundle.reason,
+            "update_proposals": tuple(
+                {
+                    "proposal_id": proposal.proposal_id,
+                    "source_record_ids": proposal.source_record_ids,
+                    "proposal_type": proposal.proposal_type.value,
+                    "target_discourse_surface": proposal.target_discourse_surface,
+                    "proposed_effects": proposal.proposed_effects,
+                    "acceptance_required": proposal.acceptance_required,
+                    "acceptance_status": proposal.acceptance_status.value,
+                    "commitment_candidate": proposal.commitment_candidate,
+                    "proposal_basis": proposal.proposal_basis,
+                    "uncertainty_markers": proposal.uncertainty_markers,
+                    "downstream_permissions": proposal.downstream_permissions,
+                    "downstream_restrictions": proposal.downstream_restrictions,
+                    "provenance": proposal.provenance,
+                }
+                for proposal in bundle.update_proposals
+            ),
+            "repair_triggers": tuple(
+                {
+                    "repair_id": trigger.repair_id,
+                    "repair_class": trigger.repair_class.value,
+                    "localized_trouble_source": trigger.localized_trouble_source,
+                    "localized_ref_ids": trigger.localized_ref_ids,
+                    "why_this_is_broken": trigger.why_this_is_broken,
+                    "suggested_clarification_type": trigger.suggested_clarification_type,
+                    "blocked_updates": trigger.blocked_updates,
+                    "guarded_continue_allowed": trigger.guarded_continue_allowed,
+                    "guarded_continue_forbidden": trigger.guarded_continue_forbidden,
+                    "repair_basis": trigger.repair_basis,
+                    "provenance": trigger.provenance,
+                }
+                for trigger in bundle.repair_triggers
+            ),
+            "continuation_states": tuple(
+                {
+                    "continuation_id": state.continuation_id,
+                    "source_record_id": state.source_record_id,
+                    "continuation_status": state.continuation_status.value,
+                    "blocked_update_ids": state.blocked_update_ids,
+                    "guarded_continue_allowed": state.guarded_continue_allowed,
+                    "guarded_continue_forbidden": state.guarded_continue_forbidden,
+                    "acceptance_required": state.acceptance_required,
+                    "block_or_guard_reason": state.block_or_guard_reason,
+                    "localized_repair_refs": state.localized_repair_refs,
+                }
+                for state in bundle.continuation_states
+            ),
+        },
+        "telemetry": {
+            "source_lineage": result.telemetry.source_lineage,
+            "source_modus_ref": result.telemetry.source_modus_ref,
+            "source_dictum_ref": result.telemetry.source_dictum_ref,
+            "source_syntax_ref": result.telemetry.source_syntax_ref,
+            "source_surface_ref": result.telemetry.source_surface_ref,
+            "proposal_count": result.telemetry.proposal_count,
+            "repair_count": result.telemetry.repair_count,
+            "continuation_count": result.telemetry.continuation_count,
+            "proposal_classes": result.telemetry.proposal_classes,
+            "repair_classes": result.telemetry.repair_classes,
+            "continuation_statuses": result.telemetry.continuation_statuses,
+            "blocked_update_count": result.telemetry.blocked_update_count,
+            "guarded_update_count": result.telemetry.guarded_update_count,
+            "acceptance_required_count": result.telemetry.acceptance_required_count,
+            "low_coverage_mode": result.telemetry.low_coverage_mode,
+            "low_coverage_reasons": result.telemetry.low_coverage_reasons,
+            "ambiguity_reasons": result.telemetry.ambiguity_reasons,
+            "downstream_update_acceptor_absent": result.telemetry.downstream_update_acceptor_absent,
+            "repair_consumer_absent": result.telemetry.repair_consumer_absent,
+            "discourse_state_mutation_consumer_absent": result.telemetry.discourse_state_mutation_consumer_absent,
+            "legacy_g01_bypass_risk_present": result.telemetry.legacy_g01_bypass_risk_present,
+            "attempted_paths": result.telemetry.attempted_paths,
+            "downstream_gate": {
+                "accepted": result.telemetry.downstream_gate.accepted,
+                "usability_class": result.telemetry.downstream_gate.usability_class.value,
+                "restrictions": result.telemetry.downstream_gate.restrictions,
+                "reason": result.telemetry.downstream_gate.reason,
+                "accepted_proposal_ids": result.telemetry.downstream_gate.accepted_proposal_ids,
+                "rejected_proposal_ids": result.telemetry.downstream_gate.rejected_proposal_ids,
+            },
+            "causal_basis": result.telemetry.causal_basis,
+        },
+    }
