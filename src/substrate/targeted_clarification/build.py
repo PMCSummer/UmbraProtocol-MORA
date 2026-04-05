@@ -2,6 +2,13 @@ from __future__ import annotations
 
 from substrate.concept_framing.models import ConceptFramingBundle, ConceptFramingResult, FrameFamily, FramingStatus
 from substrate.contracts import RuntimeState, TransitionKind, TransitionRequest, TransitionResult, WriterIdentity
+from substrate.discourse_update.models import (
+    AcceptanceStatus,
+    ContinuationStatus,
+    DiscourseUpdateBundle,
+    DiscourseUpdateResult,
+    RepairClass,
+)
 from substrate.semantic_acquisition.models import (
     AcquisitionStatus,
     ProvisionalAcquisitionRecord,
@@ -28,7 +35,9 @@ from substrate.transition import execute_transition
 
 ATTEMPTED_PATHS: tuple[str, ...] = (
     "g07.validate_typed_inputs",
+    "g07.l06_upstream_binding",
     "g07.targeted_uncertainty_selection",
+    "g07.repair_localization_alignment",
     "g07.questionability_policy",
     "g07.minimal_question_spec_build",
     "g07.answer_binding_readiness",
@@ -40,23 +49,52 @@ ATTEMPTED_PATHS: tuple[str, ...] = (
 def build_targeted_clarification(
     semantic_acquisition_result_or_bundle: SemanticAcquisitionResult | SemanticAcquisitionBundle,
     concept_framing_result_or_bundle: ConceptFramingResult | ConceptFramingBundle,
+    discourse_update_result_or_bundle: DiscourseUpdateResult | DiscourseUpdateBundle,
 ) -> TargetedClarificationResult:
     acq_bundle, acq_lineage = _extract_acq_input(semantic_acquisition_result_or_bundle)
     frame_bundle, frame_lineage = _extract_frame_input(concept_framing_result_or_bundle)
+    discourse_bundle, discourse_lineage = _extract_discourse_update_input(discourse_update_result_or_bundle)
     if not acq_bundle.acquisition_records or not frame_bundle.framing_records:
-        return _abstain_result(acq_bundle, frame_bundle, tuple(dict.fromkeys((*acq_lineage, *frame_lineage))), "g05/g06 missing records")
+        return _abstain_result(
+            acq_bundle,
+            frame_bundle,
+            discourse_bundle,
+            tuple(dict.fromkeys((*acq_lineage, *frame_lineage, *discourse_lineage))),
+            "g05/g06 missing records",
+        )
 
     ambiguity = list(acq_bundle.ambiguity_reasons) + list(frame_bundle.ambiguity_reasons)
-    low_coverage = list(acq_bundle.low_coverage_reasons) + list(frame_bundle.low_coverage_reasons)
-    l06_update_proposal_absent = True
+    low_coverage = (
+        list(acq_bundle.low_coverage_reasons)
+        + list(frame_bundle.low_coverage_reasons)
+        + list(discourse_bundle.low_coverage_reasons)
+    )
+    l06_upstream_bound_here = True
+    l06_repair_basis_bound_here = bool(discourse_bundle.repair_triggers)
+    l06_update_proposal_absent = not bool(discourse_bundle.update_proposals)
+    l06_repair_localization_must_be_read = bool(discourse_bundle.repair_triggers)
+    l06_proposal_requires_acceptance_read = bool(discourse_bundle.update_proposals)
+    l06_update_not_accepted = all(
+        proposal.acceptance_status is not AcceptanceStatus.ACCEPTED
+        for proposal in discourse_bundle.update_proposals
+    )
+    intervention_not_discourse_acceptance = True
+    l06_block_or_guard_must_be_read = bool(discourse_bundle.continuation_states)
+    l06_continuation_topology_present = bool(discourse_bundle.continuation_states)
     response_realization_contract_absent = True
     answer_binding_consumer_absent = True
+    if l06_update_proposal_absent:
+        low_coverage.append("l06_update_proposal_absent")
+    if discourse_bundle.repair_consumer_absent:
+        low_coverage.append("l06_repair_consumer_absent")
+    if discourse_bundle.downstream_update_acceptor_absent:
+        low_coverage.append("l06_downstream_update_acceptor_absent")
+    if discourse_bundle.discourse_state_mutation_consumer_absent:
+        low_coverage.append("l06_discourse_state_mutation_consumer_absent")
+    if discourse_bundle.legacy_g01_bypass_risk_present:
+        low_coverage.append("legacy_g01_bypass_risk_present")
     low_coverage.extend(
-        [
-            "l06_update_proposal_absent",
-            "response_realization_contract_absent",
-            "answer_binding_consumer_absent",
-        ]
+        ["response_realization_contract_absent", "answer_binding_consumer_absent"]
     )
     if frame_bundle.source_perspective_chain_ref != acq_bundle.source_perspective_chain_ref:
         ambiguity.append("acquisition_framing_reference_mismatch")
@@ -64,6 +102,8 @@ def build_targeted_clarification(
 
     by_acq = {record.acquisition_id: record for record in acq_bundle.acquisition_records}
     records: list[InterventionRecord] = []
+    l06_target_drift_detected = False
+    l06_repair_localization_incompatible = False
     for idx, frame_record in enumerate(frame_bundle.framing_records, start=1):
         acq = by_acq.get(frame_record.acquisition_id)
         if acq is None:
@@ -71,19 +111,53 @@ def build_targeted_clarification(
             low_coverage.append("missing_acquisition_for_framing_record")
             continue
         uncertainty_class = _derive_uncertainty_class(acq, frame_record.framing_status)
+        l06_ctx = _l06_context_for_uncertainty(discourse_bundle, uncertainty_class)
+        if l06_ctx["target_alignment_required"] and not l06_ctx["target_alignment_ok"]:
+            l06_target_drift_detected = True
+            l06_repair_localization_incompatible = True
         target_id = (
             f"target:semantic-unit:{acq.semantic_unit_id}"
             if acq.semantic_unit_id
             else f"target:acquisition:{acq.acquisition_id}:frame:{frame_record.framing_id}"
         )
-        forbidden = _forbidden_presuppositions(acq, uncertainty_class, frame_record.frame_family)
-        question_spec = _question_spec(idx, target_id, uncertainty_class, frame_record.frame_family, forbidden)
+        forbidden = _forbidden_presuppositions(
+            acq,
+            uncertainty_class,
+            frame_record.frame_family,
+            include_l06_acceptance_boundary=l06_proposal_requires_acceptance_read,
+        )
+        question_spec = _question_spec(
+            idx,
+            target_id,
+            uncertainty_class,
+            frame_record.frame_family,
+            forbidden,
+            l06_ctx["repair_refs"],
+            l06_ctx["repair_classes"],
+        )
         gain = _expected_gain(acq, frame_record.framing_status, uncertainty_class)
-        status, basis, questionability = _select_status(acq, frame_record.framing_status, uncertainty_class, gain, l06_update_proposal_absent)
+        status, basis, questionability = _select_status(
+            acq,
+            frame_record.framing_status,
+            uncertainty_class,
+            gain,
+            l06_update_proposal_absent,
+            l06_blocked_for_target=l06_ctx["blocked_for_target"],
+            l06_guarded_for_target=l06_ctx["guarded_for_target"],
+            l06_withheld_for_target=l06_ctx["withheld_for_target"],
+            l06_target_alignment_ok=l06_ctx["target_alignment_ok"],
+            l06_target_alignment_required=l06_ctx["target_alignment_required"],
+        )
+        if l06_ctx["target_alignment_required"] and not l06_ctx["target_alignment_ok"]:
+            basis = tuple(dict.fromkeys((*basis, "l06_g07_target_drift_detected")))
         decision = InterventionDecision(
             selected_status=status,
             decision_basis=tuple(dict.fromkeys(basis)),
-            blocking_uncertainty=status in {InterventionStatus.ASK_NOW, InterventionStatus.BLOCKED_DUE_TO_INSUFFICIENT_QUESTIONABILITY},
+            blocking_uncertainty=status
+            in {
+                InterventionStatus.ASK_NOW,
+                InterventionStatus.BLOCKED_DUE_TO_INSUFFICIENT_QUESTIONABILITY,
+            },
             questionability_sufficient=questionability,
             cost_worthwhile=gain.worth_cost,
         )
@@ -116,18 +190,33 @@ def build_targeted_clarification(
                 minimal_question_spec=question_spec,
                 forbidden_presuppositions=forbidden,
                 expected_evidence_gain=gain,
-                downstream_lockouts=_lockouts(status, uncertainty_class, frame_record.vulnerability_profile.high_impact),
+                downstream_lockouts=_lockouts(
+                    status,
+                    uncertainty_class,
+                    frame_record.vulnerability_profile.high_impact,
+                    l06_ctx["blocked_for_target"],
+                    l06_ctx["guarded_for_target"],
+                    l06_ctx["withheld_for_target"],
+                ),
+                l06_repair_binding_refs=l06_ctx["repair_refs"],
+                l06_repair_classes=l06_ctx["repair_classes"],
+                l06_continuation_statuses=l06_ctx["continuation_statuses"],
+                l06_alignment_ok=l06_ctx["target_alignment_ok"],
                 reopen_conditions=_reopen_conditions(acq, frame_record),
                 decision=decision,
                 confidence=_record_confidence(acq.confidence, frame_record.confidence, status, gain.gain_score),
-                provenance="g07 targeted clarification from g05 acquisition + g06 framing",
+                provenance="g07 targeted clarification from g05 acquisition + g06 framing + l06 discourse update topology",
             )
         )
 
-    repair_trigger_basis_incomplete = frame_bundle.repair_trigger_basis_incomplete or any(
-        condition.startswith("g06:") and "repair" in condition
-        for record in records
-        for condition in record.reopen_conditions
+    repair_trigger_basis_incomplete = (
+        frame_bundle.repair_trigger_basis_incomplete
+        or not bool(discourse_bundle.repair_triggers)
+        or any(
+            condition.startswith("g06:") and "repair" in condition
+            for record in records
+            for condition in record.reopen_conditions
+        )
     )
     answer_binding_ready = bool(records) and all(
         record.uncertainty_target_id and record.reopen_conditions for record in records
@@ -138,6 +227,14 @@ def build_targeted_clarification(
         record.intervention_status is InterventionStatus.ASK_NOW for record in records
     ):
         low_coverage.append("ask_now_without_answer_binding_executor")
+    if l06_target_drift_detected:
+        low_coverage.append("l06_g07_target_drift_detected")
+    if l06_repair_localization_incompatible:
+        low_coverage.append("l06_repair_localization_incompatible")
+    if not l06_update_not_accepted:
+        low_coverage.append("l06_update_acceptance_state_unexpected")
+    if not l06_continuation_topology_present:
+        low_coverage.append("l06_continuation_topology_missing")
     degraded = bool(
         low_coverage
         or any(
@@ -157,6 +254,7 @@ def build_targeted_clarification(
     bundle = InterventionBundle(
         source_acquisition_ref=acq_bundle.source_perspective_chain_ref,
         source_framing_ref=frame_bundle.source_acquisition_ref,
+        source_discourse_update_ref=discourse_bundle.source_modus_ref,
         source_perspective_chain_ref=acq_bundle.source_perspective_chain_ref,
         source_applicability_ref=acq_bundle.source_applicability_ref,
         source_runtime_graph_ref=acq_bundle.source_runtime_graph_ref,
@@ -166,11 +264,24 @@ def build_targeted_clarification(
         source_surface_ref=acq_bundle.source_surface_ref,
         linked_acquisition_ids=tuple(record.acquisition_id for record in acq_bundle.acquisition_records),
         linked_framing_ids=tuple(record.framing_id for record in frame_bundle.framing_records),
+        linked_update_proposal_ids=tuple(proposal.proposal_id for proposal in discourse_bundle.update_proposals),
+        linked_repair_ids=tuple(repair.repair_id for repair in discourse_bundle.repair_triggers),
         intervention_records=tuple(records),
         ambiguity_reasons=tuple(dict.fromkeys(ambiguity)),
         low_coverage_mode=bool(low_coverage),
         low_coverage_reasons=tuple(dict.fromkeys(low_coverage)),
+        l06_upstream_bound_here=l06_upstream_bound_here,
+        l06_repair_basis_bound_here=l06_repair_basis_bound_here,
         l06_update_proposal_absent=l06_update_proposal_absent,
+        l06_repair_localization_must_be_read=l06_repair_localization_must_be_read,
+        l06_proposal_requires_acceptance_read=l06_proposal_requires_acceptance_read,
+        l06_update_not_accepted=l06_update_not_accepted,
+        intervention_not_discourse_acceptance=intervention_not_discourse_acceptance,
+        l06_block_or_guard_must_be_read=l06_block_or_guard_must_be_read,
+        l06_continuation_topology_present=l06_continuation_topology_present,
+        l06_g07_target_alignment_required=bool(discourse_bundle.repair_triggers),
+        l06_g07_target_drift_detected=l06_target_drift_detected,
+        l06_repair_localization_incompatible=l06_repair_localization_incompatible,
         repair_trigger_basis_incomplete=repair_trigger_basis_incomplete,
         response_realization_contract_absent=response_realization_contract_absent,
         answer_binding_consumer_absent=answer_binding_consumer_absent,
@@ -201,6 +312,8 @@ def build_targeted_clarification(
                 *((acq_bundle.source_surface_ref,) if acq_bundle.source_surface_ref else ()),
                 *acq_lineage,
                 *frame_lineage,
+                discourse_bundle.source_modus_ref,
+                *discourse_lineage,
             )
         )
     )
@@ -209,7 +322,7 @@ def build_targeted_clarification(
         source_lineage=source_lineage,
         attempted_paths=ATTEMPTED_PATHS,
         downstream_gate=gate,
-        causal_basis="g05 uncertainty + g06 framing drove target-bound intervention outcome",
+        causal_basis="g05 uncertainty + g06 framing + l06 proposal/repair/continuation topology drove target-bound intervention outcome",
     )
     partial_known_reason = "; ".join(bundle.ambiguity_reasons) if bundle.ambiguity_reasons else ("; ".join(bundle.low_coverage_reasons) if bundle.low_coverage_reasons else None)
     return TargetedClarificationResult(
@@ -267,6 +380,18 @@ def _extract_frame_input(inp: ConceptFramingResult | ConceptFramingBundle) -> tu
     raise TypeError("build_targeted_clarification requires ConceptFramingResult or ConceptFramingBundle")
 
 
+def _extract_discourse_update_input(
+    inp: DiscourseUpdateResult | DiscourseUpdateBundle,
+) -> tuple[DiscourseUpdateBundle, tuple[str, ...]]:
+    if isinstance(inp, DiscourseUpdateResult):
+        return inp.bundle, inp.telemetry.source_lineage
+    if isinstance(inp, DiscourseUpdateBundle):
+        return inp, ()
+    raise TypeError(
+        "build_targeted_clarification requires DiscourseUpdateResult or DiscourseUpdateBundle for l06 upstream"
+    )
+
+
 def _derive_uncertainty_class(acq: ProvisionalAcquisitionRecord, framing_status: FramingStatus) -> UncertaintyClass:
     unresolved = set(acq.support_conflict_profile.unresolved_slots)
     conflict = set(acq.support_conflict_profile.conflict_reasons)
@@ -289,6 +414,8 @@ def _forbidden_presuppositions(
     acq: ProvisionalAcquisitionRecord,
     uncertainty_class: UncertaintyClass,
     frame_family: FrameFamily,
+    *,
+    include_l06_acceptance_boundary: bool,
 ) -> tuple[str, ...]:
     forbidden: list[str] = ["do_not_assume_resolution_without_answer", "do_not_force_target_identity"]
     unresolved = set(acq.support_conflict_profile.unresolved_slots)
@@ -307,6 +434,8 @@ def _forbidden_presuppositions(
         forbidden.append("do_not_presuppose_threat_intent")
     if "source_scope" in unresolved or "source_scope_unknown" in conflict:
         forbidden.append("do_not_presuppose_reported_quote_identity")
+    if include_l06_acceptance_boundary:
+        forbidden.append("do_not_assume_l06_update_accepted")
     return tuple(dict.fromkeys(forbidden))
 
 
@@ -316,6 +445,8 @@ def _question_spec(
     uncertainty_class: UncertaintyClass,
     frame_family: FrameFamily,
     forbidden: tuple[str, ...],
+    l06_repair_refs: tuple[str, ...],
+    l06_repair_classes: tuple[str, ...],
 ) -> MinimalQuestionSpec:
     contrast = {
         UncertaintyClass.OWNER_SCOPE_AMBIGUITY: "owner_binding_A_vs_owner_binding_B",
@@ -326,6 +457,8 @@ def _question_spec(
         UncertaintyClass.REPAIR_TRIGGER_GAP: "repair_required_vs_no_repair",
         UncertaintyClass.RESIDUAL_UNCERTAINTY: "provisional_reading_vs_unresolved_gap",
     }[uncertainty_class]
+    l06_scope = tuple(f"l06_repair_ref:{repair_id}" for repair_id in l06_repair_refs)
+    l06_class_scope = tuple(f"l06_repair_class:{repair_class}" for repair_class in l06_repair_classes)
     return MinimalQuestionSpec(
         spec_id=f"question-spec-{idx}",
         clarification_intent=ClarificationIntent(
@@ -335,9 +468,11 @@ def _question_spec(
                 f"uncertainty_target:{target_id}",
                 f"frame_family:{frame_family.value}",
                 f"uncertainty_class:{uncertainty_class.value}",
+                *l06_scope,
+                *l06_class_scope,
             ),
             allowed_answer_form="bounded_choice_or_short_span",
-            conceptual_stretch_bound="must stay within linked g05/g06 target and declared contrast",
+            conceptual_stretch_bound="must stay within linked g05/g06 target and l06-localized repair topology when present",
         ),
         questionability_reason="targeted clarification spec is bounded and answer-injection forbidden",
         forbidden_assumptions=forbidden,
@@ -374,12 +509,126 @@ def _expected_gain(
     )
 
 
+def _l06_context_for_uncertainty(
+    discourse_bundle: DiscourseUpdateBundle,
+    uncertainty_class: UncertaintyClass,
+) -> dict[str, object]:
+    expected_classes = _expected_repair_classes_for_uncertainty(uncertainty_class)
+    repairs = tuple(
+        repair
+        for repair in discourse_bundle.repair_triggers
+        if repair.repair_class in expected_classes
+    )
+    if uncertainty_class is UncertaintyClass.REPAIR_TRIGGER_GAP and not repairs:
+        repairs = tuple(discourse_bundle.repair_triggers)
+    if uncertainty_class is UncertaintyClass.CONTEXT_ONLY_UNCERTAINTY:
+        repairs = ()
+
+    blocked_from_repairs = (
+        uncertainty_class in {UncertaintyClass.REPAIR_TRIGGER_GAP, UncertaintyClass.HIGH_IMPACT_BINDING_RISK}
+        and any(repair.guarded_continue_forbidden for repair in repairs)
+    )
+    guarded_from_repairs = any(repair.guarded_continue_allowed for repair in repairs)
+    continuation_blocked_present = any(
+        state.continuation_status is ContinuationStatus.BLOCKED_PENDING_REPAIR
+        for state in discourse_bundle.continuation_states
+    )
+    continuation_guarded_present = any(
+        state.continuation_status is ContinuationStatus.GUARDED_CONTINUE
+        for state in discourse_bundle.continuation_states
+    )
+    continuation_statuses = tuple(
+        state.continuation_status.value for state in discourse_bundle.continuation_states
+    )
+    blocked_for_target = blocked_from_repairs or (
+        not repairs
+        and continuation_blocked_present
+        and uncertainty_class in {UncertaintyClass.REPAIR_TRIGGER_GAP, UncertaintyClass.HIGH_IMPACT_BINDING_RISK}
+    )
+    guarded_for_target = guarded_from_repairs or (
+        not blocked_for_target and not repairs and continuation_guarded_present
+    )
+    withheld_for_target = (not repairs) and any(
+        state.continuation_status is ContinuationStatus.ABSTAIN_UPDATE_WITHHELD
+        for state in discourse_bundle.continuation_states
+    )
+    target_alignment_required = bool(discourse_bundle.repair_triggers) and uncertainty_class in {
+        UncertaintyClass.OWNER_SCOPE_AMBIGUITY,
+        UncertaintyClass.TEMPORAL_ANCHOR_AMBIGUITY,
+        UncertaintyClass.FRAME_COMPETITION,
+        UncertaintyClass.HIGH_IMPACT_BINDING_RISK,
+        UncertaintyClass.REPAIR_TRIGGER_GAP,
+    }
+    target_alignment_ok = (not target_alignment_required) or bool(repairs)
+    return {
+        "repair_refs": tuple(repair.repair_id for repair in repairs),
+        "repair_classes": tuple(repair.repair_class.value for repair in repairs),
+        "continuation_statuses": continuation_statuses,
+        "blocked_for_target": blocked_for_target,
+        "guarded_for_target": guarded_for_target,
+        "withheld_for_target": withheld_for_target,
+        "target_alignment_required": target_alignment_required,
+        "target_alignment_ok": target_alignment_ok,
+    }
+
+
+def _expected_repair_classes_for_uncertainty(
+    uncertainty_class: UncertaintyClass,
+) -> tuple[RepairClass, ...]:
+    if uncertainty_class is UncertaintyClass.OWNER_SCOPE_AMBIGUITY:
+        return (
+            RepairClass.REFERENCE_REPAIR,
+            RepairClass.FORCE_REPAIR,
+            RepairClass.SCOPE_REPAIR,
+            RepairClass.POLARITY_REPAIR,
+            RepairClass.MISSING_ARGUMENT_REPAIR,
+        )
+    if uncertainty_class is UncertaintyClass.TEMPORAL_ANCHOR_AMBIGUITY:
+        return (
+            RepairClass.SCOPE_REPAIR,
+            RepairClass.POLARITY_REPAIR,
+            RepairClass.MISSING_ARGUMENT_REPAIR,
+            RepairClass.FORCE_REPAIR,
+        )
+    if uncertainty_class is UncertaintyClass.FRAME_COMPETITION:
+        return (
+            RepairClass.FORCE_REPAIR,
+            RepairClass.SCOPE_REPAIR,
+            RepairClass.POLARITY_REPAIR,
+            RepairClass.REFERENCE_REPAIR,
+        )
+    if uncertainty_class is UncertaintyClass.HIGH_IMPACT_BINDING_RISK:
+        return (
+            RepairClass.FORCE_REPAIR,
+            RepairClass.POLARITY_REPAIR,
+            RepairClass.SCOPE_REPAIR,
+            RepairClass.MISSING_ARGUMENT_REPAIR,
+            RepairClass.TARGET_APPLICABILITY_REPAIR,
+        )
+    if uncertainty_class is UncertaintyClass.REPAIR_TRIGGER_GAP:
+        return (
+            RepairClass.REFERENCE_REPAIR,
+            RepairClass.FORCE_REPAIR,
+            RepairClass.SCOPE_REPAIR,
+            RepairClass.POLARITY_REPAIR,
+            RepairClass.MISSING_ARGUMENT_REPAIR,
+            RepairClass.TARGET_APPLICABILITY_REPAIR,
+        )
+    return (RepairClass.FORCE_REPAIR, RepairClass.SCOPE_REPAIR)
+
+
 def _select_status(
     acq: ProvisionalAcquisitionRecord,
     framing_status: FramingStatus,
     uncertainty_class: UncertaintyClass,
     gain: ExpectedEvidenceGain,
     l06_update_proposal_absent: bool,
+    *,
+    l06_blocked_for_target: bool,
+    l06_guarded_for_target: bool,
+    l06_withheld_for_target: bool,
+    l06_target_alignment_ok: bool,
+    l06_target_alignment_required: bool,
 ) -> tuple[InterventionStatus, tuple[str, ...], bool]:
     unresolved = set(acq.support_conflict_profile.unresolved_slots)
     questionability_blocked = bool(
@@ -404,6 +653,18 @@ def _select_status(
             ("questionability_blocked_by_unresolved_owner_source_or_repair_basis", "repair_trigger_basis_incomplete"),
             False,
         )
+    if l06_target_alignment_required and not l06_target_alignment_ok:
+        return (
+            InterventionStatus.BLOCKED_DUE_TO_INSUFFICIENT_QUESTIONABILITY,
+            ("l06_g07_target_alignment_required", "l06_repair_localization_incompatible"),
+            False,
+        )
+    if l06_blocked_for_target:
+        return (
+            InterventionStatus.BLOCKED_DUE_TO_INSUFFICIENT_QUESTIONABILITY,
+            ("l06_blocked_update_topology", "l06_block_or_guard_must_be_read"),
+            False,
+        )
     if uncertainty_class is UncertaintyClass.CONTEXT_ONLY_UNCERTAINTY and gain.gain_score < 0.4:
         return (InterventionStatus.CLARIFICATION_NOT_WORTH_COST, ("context_only_uncertainty_low_gain",), True)
     if gain.worth_cost and (
@@ -417,7 +678,23 @@ def _select_status(
             }
         )
     ):
-        return (InterventionStatus.ASK_NOW, ("high_value_targeted_clarification", "ask_now_not_equal_resolution"), True)
+        if l06_guarded_for_target:
+            return (
+                InterventionStatus.GUARDED_CONTINUE_WITH_LIMITS,
+                ("l06_guarded_continue_topology", "guarded_continue_not_acceptance"),
+                True,
+            )
+        if l06_withheld_for_target:
+            return (
+                InterventionStatus.DEFER_UNTIL_NEEDED,
+                ("l06_abstain_update_withheld_topology", "defer_until_needed_must_be_read"),
+                True,
+            )
+        return (
+            InterventionStatus.ASK_NOW,
+            ("high_value_targeted_clarification", "ask_now_not_equal_resolution"),
+            True,
+        )
     if gain.gain_score < 0.28:
         return (InterventionStatus.CLARIFICATION_NOT_WORTH_COST, ("low_evidence_gain",), True)
     if framing_status in {FramingStatus.UNDERFRAMED_MEANING, FramingStatus.COMPETING_FRAMES}:
@@ -427,7 +704,14 @@ def _select_status(
     return (InterventionStatus.ABSTAIN_WITHOUT_QUESTION, ("abstain_without_forced_question",), True)
 
 
-def _lockouts(status: InterventionStatus, uncertainty_class: UncertaintyClass, high_impact: bool) -> tuple[str, ...]:
+def _lockouts(
+    status: InterventionStatus,
+    uncertainty_class: UncertaintyClass,
+    high_impact: bool,
+    l06_blocked_for_target: bool,
+    l06_guarded_for_target: bool,
+    l06_withheld_for_target: bool,
+) -> tuple[str, ...]:
     lockouts: list[str] = ["narrative_commitment_forbidden", "closure_blocked_until_answer", "memory_uptake_deferred"]
     if uncertainty_class is UncertaintyClass.CONTEXT_ONLY_UNCERTAINTY:
         lockouts.append("appraisal_context_only")
@@ -447,6 +731,12 @@ def _lockouts(status: InterventionStatus, uncertainty_class: UncertaintyClass, h
         lockouts.append("clarification_not_worth_cost_must_be_read")
     else:
         lockouts.append("ask_now_requires_answer_binding")
+    if l06_blocked_for_target:
+        lockouts.append("l06_blocked_update_must_be_read")
+    if l06_guarded_for_target:
+        lockouts.append("l06_guarded_continue_must_be_read")
+    if l06_withheld_for_target:
+        lockouts.append("l06_abstain_update_withheld_must_be_read")
     return tuple(dict.fromkeys(lockouts))
 
 
@@ -521,6 +811,10 @@ def _missing_acquisition_record(framing_record_id: str, idx: int) -> Interventio
             "questionability_blocked_requires_repair_basis",
             "narrative_commitment_forbidden",
         ),
+        l06_repair_binding_refs=(),
+        l06_repair_classes=(),
+        l06_continuation_statuses=(),
+        l06_alignment_ok=False,
         reopen_conditions=("g07:reopen_on_missing_acquisition_rebind",),
         decision=InterventionDecision(
             selected_status=status,
@@ -537,12 +831,15 @@ def _missing_acquisition_record(framing_record_id: str, idx: int) -> Interventio
 def _abstain_result(
     acq_bundle: SemanticAcquisitionBundle,
     frame_bundle: ConceptFramingBundle,
+    discourse_bundle: DiscourseUpdateBundle,
     source_lineage: tuple[str, ...],
     reason: str,
 ) -> TargetedClarificationResult:
+    l06_update_proposal_absent = not bool(discourse_bundle.update_proposals)
     bundle = InterventionBundle(
         source_acquisition_ref=acq_bundle.source_perspective_chain_ref,
         source_framing_ref=frame_bundle.source_acquisition_ref,
+        source_discourse_update_ref=discourse_bundle.source_modus_ref,
         source_perspective_chain_ref=acq_bundle.source_perspective_chain_ref,
         source_applicability_ref=acq_bundle.source_applicability_ref,
         source_runtime_graph_ref=acq_bundle.source_runtime_graph_ref,
@@ -552,11 +849,39 @@ def _abstain_result(
         source_surface_ref=acq_bundle.source_surface_ref,
         linked_acquisition_ids=(),
         linked_framing_ids=(),
+        linked_update_proposal_ids=tuple(
+            proposal.proposal_id for proposal in discourse_bundle.update_proposals
+        ),
+        linked_repair_ids=tuple(repair.repair_id for repair in discourse_bundle.repair_triggers),
         intervention_records=(),
         ambiguity_reasons=(reason,),
         low_coverage_mode=True,
-        low_coverage_reasons=("abstain", "l06_update_proposal_absent", "response_realization_contract_absent", "answer_binding_consumer_absent"),
-        l06_update_proposal_absent=True,
+        low_coverage_reasons=tuple(
+            dict.fromkeys(
+                (
+                    "abstain",
+                    *(("l06_update_proposal_absent",) if l06_update_proposal_absent else ()),
+                    *(("l06_repair_basis_incomplete",) if not discourse_bundle.repair_triggers else ()),
+                    "response_realization_contract_absent",
+                    "answer_binding_consumer_absent",
+                )
+            )
+        ),
+        l06_upstream_bound_here=True,
+        l06_repair_basis_bound_here=bool(discourse_bundle.repair_triggers),
+        l06_update_proposal_absent=l06_update_proposal_absent,
+        l06_repair_localization_must_be_read=bool(discourse_bundle.repair_triggers),
+        l06_proposal_requires_acceptance_read=bool(discourse_bundle.update_proposals),
+        l06_update_not_accepted=all(
+            proposal.acceptance_status is not AcceptanceStatus.ACCEPTED
+            for proposal in discourse_bundle.update_proposals
+        ),
+        intervention_not_discourse_acceptance=True,
+        l06_block_or_guard_must_be_read=bool(discourse_bundle.continuation_states),
+        l06_continuation_topology_present=bool(discourse_bundle.continuation_states),
+        l06_g07_target_alignment_required=bool(discourse_bundle.repair_triggers),
+        l06_g07_target_drift_detected=False,
+        l06_repair_localization_incompatible=bool(discourse_bundle.repair_triggers),
         repair_trigger_basis_incomplete=True,
         response_realization_contract_absent=True,
         answer_binding_consumer_absent=True,

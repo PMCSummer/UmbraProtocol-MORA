@@ -19,6 +19,7 @@ def test_contrastive_intervention_not_collapsing_to_generic_single_path(g07_fact
                 for record in base.framing.bundle.framing_records
             ),
         ),
+        base.discourse_update,
     )
     abstain = build_targeted_clarification(
         replace(
@@ -45,6 +46,7 @@ def test_contrastive_intervention_not_collapsing_to_generic_single_path(g07_fact
                 for record in base.framing.bundle.framing_records
             ),
         ),
+        base.discourse_update,
     )
     guarded = build_targeted_clarification(
         replace(
@@ -70,6 +72,7 @@ def test_contrastive_intervention_not_collapsing_to_generic_single_path(g07_fact
                 for record in base.framing.bundle.framing_records
             ),
         ),
+        base.discourse_update,
     )
 
     ask_statuses = {record.intervention_status for record in ask_now.bundle.intervention_records}
@@ -92,6 +95,7 @@ def test_ask_now_requires_concrete_target_and_targeted_contrast(g07_factory) -> 
                 for record in base.framing.bundle.framing_records
             ),
         ),
+        base.discourse_update,
     )
     ask_records = [
         record for record in ask_now.bundle.intervention_records if record.intervention_status is InterventionStatus.ASK_NOW

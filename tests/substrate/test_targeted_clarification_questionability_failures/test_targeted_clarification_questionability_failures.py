@@ -31,6 +31,7 @@ def test_real_uncertainty_can_be_blocked_when_questionability_is_insufficient(g0
                 for record in base.framing.bundle.framing_records
             ),
         ),
+        base.discourse_update,
     )
     statuses = {record.intervention_status for record in blocked.bundle.intervention_records}
     assert InterventionStatus.ASK_NOW not in statuses
@@ -48,6 +49,7 @@ def test_low_value_uncertainty_goes_to_not_worth_or_defer_not_forced_ask(g07_fac
                 for record in base.framing.bundle.framing_records
             ),
         ),
+        base.discourse_update,
     )
     statuses = {record.intervention_status for record in low_value.bundle.intervention_records}
     assert InterventionStatus.ASK_NOW not in statuses

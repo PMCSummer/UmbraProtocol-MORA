@@ -1,11 +1,11 @@
 # ADR-G07: Targeted Clarification / Uncertainty Intervention
 
 ## Status
-Accepted as a bounded partial implementation of phase `G07` over implemented `G05` + `G06` seams.
+Accepted as a bounded partial implementation of phase `G07` over implemented `G05` + `G06` + `L06` seams.
 
 ## Canonical Seams
 - Canonical G07 seam:
-  - `build_targeted_clarification(semantic_acquisition_result_or_bundle, concept_framing_result_or_bundle) -> TargetedClarificationResult`
+  - `build_targeted_clarification(semantic_acquisition_result_or_bundle, concept_framing_result_or_bundle, discourse_update_result_or_bundle) -> TargetedClarificationResult`
 - Canonical downstream gate:
   - `evaluate_targeted_clarification_downstream_gate(targeted_clarification_result_or_bundle) -> InterventionGateDecision`
 - Canonical runtime write seam:
@@ -20,7 +20,7 @@ Accepted as a bounded partial implementation of phase `G07` over implemented `G0
 - Preserves answer-binding readiness and reopen hooks without simulating final response realization.
 
 ## What Is Mechanistic / Load-Bearing
-- G07 accepts only typed `G05` + typed `G06` artifacts.
+- G07 accepts only typed `G05` + typed `G06` + typed `L06` artifacts.
 - Decision-core fields are load-bearing:
   - `uncertainty_target_id`
   - `uncertainty_class`
@@ -35,6 +35,11 @@ Accepted as a bounded partial implementation of phase `G07` over implemented `G0
   - `reopen_conditions`
   - `confidence`
   - `provenance`
+- `L06` topology is load-bearing:
+  - localized repair classes/refs drive target-alignment legality
+  - blocked/guarded/withheld continuation signals constrain status selection
+  - acceptance-required proposal boundaries block acceptance-laundering
+  - target drift/incompatible localization becomes explicit degraded restrictions
 - G07 intervention statuses are load-bearing:
   - `ask_now`
   - `abstain_without_question`
@@ -57,17 +62,21 @@ Accepted as a bounded partial implementation of phase `G07` over implemented `G0
   - `intervention_record_contract_broken`
 
 ## Hardening Delta (This Pass)
-- Policy now validates lawful intervention record shape before acceptance:
+- Rewiring now makes `L06` a causal upstream in G07 runtime path (not seam-only promise).
+- Policy validates lawful intervention record shape before acceptance:
   - target-bound scope check (`uncertainty_target_id` + `uncertainty_class` in `allowed_semantic_scope`)
   - mandatory forbidden-presupposition presence
   - mandatory lockout presence (`closure_blocked_until_answer` at minimum)
   - status-policy alignment (`ask/abstain/guarded` flags must match selected status)
   - ask-now legality requires answer-binding readiness + hooks + worthwhile evidence gain
 - `accepted` now depends on lawful record shape, not object presence only.
+- `accepted` now also depends on lawful L06-alignment shape, not only G05/G06 target shape.
 - Contract view now exposes additional mandatory-read dimensions:
   - question-spec target binding
   - forbidden-presupposition readability
   - answer-binding readiness/hook-read obligations
+  - L06 repair-localization and continuation-topology read obligations
+  - acceptance-boundary obligations (`l06_update_not_accepted`, `intervention_not_discourse_acceptance`)
   - explicit anti-inflation marker: object presence is not permission.
 
 ## Explicit Authority Bounds
@@ -85,16 +94,17 @@ Accepted as a bounded partial implementation of phase `G07` over implemented `G0
 - `asked question != resolved ambiguity`
 - `intervention object != permission to continue strongly`
 - `targeted clarification != generic follow-up`
+- `clarification != accepted discourse update`
+- `accepted intervention != accepted update`
 
-## L06 / Missing Upstream Handling (Explicitly Bounded)
-- Current contour still lacks live operational L06 producer for:
-  - update-proposal basis
-  - repair-trigger basis
-  - discourse-repair grounding
-- G07 keeps this explicit with first-class markers:
-  - `l06_update_proposal_absent`
-  - `repair_trigger_basis_incomplete`
-- No hidden L06 simulation is performed inside G07.
+## L06 Rewiring (Explicitly Bounded)
+- G07 now reads typed L06 update/repair/continuation artifacts in production path.
+- L06 read obligations are first-class in gate/contract:
+  - `l06_repair_localization_must_be_read`
+  - `l06_proposal_requires_acceptance_read`
+  - `l06_block_or_guard_must_be_read`
+  - `l06_g07_target_alignment_required`
+- G07 still does not perform discourse acceptance/mutation; L06 proposals remain `acceptance_required` and `not_accepted`.
 
 ## Missing Downstream Handling (Explicitly Bounded)
 - Response realization consumer is absent:
@@ -113,8 +123,6 @@ Accepted as a bounded partial implementation of phase `G07` over implemented `G0
 - This pass is bounded partial and anti-inflation by design.
 
 ## Remaining Debts
-- L06 integration debt:
-  - explicit update-proposal/repair-trigger producer not yet connected.
 - Realization debt:
   - no consumer that turns minimal question spec into realized response while preserving forbidden presuppositions.
 - Answer consumer debt:

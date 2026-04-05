@@ -16,7 +16,11 @@ def test_answer_binding_hooks_are_first_class_and_typed(g07_factory) -> None:
 
 def test_targeted_answer_updates_same_targets_not_unrelated_new_records(g07_factory) -> None:
     base = g07_factory('he said "you are tired?"', "g07-answer-update")
-    initial = build_targeted_clarification(base.acquisition, base.framing)
+    initial = build_targeted_clarification(
+        base.acquisition,
+        base.framing,
+        base.discourse_update,
+    )
     resolved_acq = replace(
         base.acquisition.bundle,
         acquisition_records=tuple(
@@ -39,7 +43,11 @@ def test_targeted_answer_updates_same_targets_not_unrelated_new_records(g07_fact
             for record in base.framing.bundle.framing_records
         ),
     )
-    reopened = build_targeted_clarification(resolved_acq, resolved_framing)
+    reopened = build_targeted_clarification(
+        resolved_acq,
+        resolved_framing,
+        base.discourse_update,
+    )
 
     initial_by_target = {record.uncertainty_target_id: record for record in initial.bundle.intervention_records}
     reopened_by_target = {record.uncertainty_target_id: record for record in reopened.bundle.intervention_records}

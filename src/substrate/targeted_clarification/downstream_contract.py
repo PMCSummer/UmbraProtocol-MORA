@@ -31,6 +31,16 @@ class TargetedClarificationContractView:
     requires_lockouts_read: bool
     requires_question_spec_target_binding_read: bool
     requires_forbidden_presuppositions_read: bool
+    l06_upstream_bound_here: bool
+    l06_repair_localization_must_be_read: bool
+    l06_proposal_requires_acceptance_read: bool
+    l06_update_not_accepted: bool
+    intervention_not_discourse_acceptance: bool
+    l06_block_or_guard_must_be_read: bool
+    l06_continuation_topology_present: bool
+    l06_g07_target_alignment_required: bool
+    l06_g07_target_drift_detected: bool
+    l06_repair_localization_incompatible: bool
     answer_binding_ready: bool
     answer_binding_hooks_required: bool
     intervention_object_presence_not_permission: bool
@@ -83,6 +93,16 @@ def derive_targeted_clarification_contract_view(
         requires_lockouts_read=("downstream_lockouts_must_be_read" in gate.restrictions),
         requires_question_spec_target_binding_read=("minimal_question_spec_target_binding_must_be_read" in gate.restrictions),
         requires_forbidden_presuppositions_read=("forbidden_presuppositions_must_be_read" in gate.restrictions),
+        l06_upstream_bound_here=bundle.l06_upstream_bound_here,
+        l06_repair_localization_must_be_read=("l06_repair_localization_must_be_read" in gate.restrictions),
+        l06_proposal_requires_acceptance_read=("l06_proposal_requires_acceptance_read" in gate.restrictions),
+        l06_update_not_accepted=("l06_update_not_accepted" in gate.restrictions),
+        intervention_not_discourse_acceptance=("intervention_not_discourse_acceptance" in gate.restrictions),
+        l06_block_or_guard_must_be_read=("l06_block_or_guard_must_be_read" in gate.restrictions),
+        l06_continuation_topology_present=("l06_continuation_topology_present" in gate.restrictions),
+        l06_g07_target_alignment_required=("l06_g07_target_alignment_required" in gate.restrictions),
+        l06_g07_target_drift_detected=("l06_g07_target_drift_detected" in gate.restrictions),
+        l06_repair_localization_incompatible=("l06_repair_localization_incompatible" in gate.restrictions),
         answer_binding_ready=bundle.answer_binding_ready,
         answer_binding_hooks_required=("answer_binding_hooks_must_be_read" in gate.restrictions),
         intervention_object_presence_not_permission=("intervention_object_presence_not_permission" in gate.restrictions),

@@ -78,9 +78,13 @@ from substrate.targeted_clarification import build_targeted_clarification
     )
 def test_ablation_changes_intervention_outcome_or_degraded_surface(ablation_id: str, ablate, g07_factory) -> None:
     ctx = g07_factory('he said "you are not tired?"', f"g07-ablation-{ablation_id}")
-    baseline = build_targeted_clarification(ctx.acquisition, ctx.framing)
+    baseline = build_targeted_clarification(
+        ctx.acquisition,
+        ctx.framing,
+        ctx.discourse_update,
+    )
     acq, frame = ablate(ctx)
-    degraded = build_targeted_clarification(acq, frame)
+    degraded = build_targeted_clarification(acq, frame, ctx.discourse_update)
 
     baseline_sig = {
         (

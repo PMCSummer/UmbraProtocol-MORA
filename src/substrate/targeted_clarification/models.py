@@ -102,6 +102,10 @@ class InterventionRecord:
     forbidden_presuppositions: tuple[str, ...]
     expected_evidence_gain: ExpectedEvidenceGain
     downstream_lockouts: tuple[str, ...]
+    l06_repair_binding_refs: tuple[str, ...]
+    l06_repair_classes: tuple[str, ...]
+    l06_continuation_statuses: tuple[str, ...]
+    l06_alignment_ok: bool
     reopen_conditions: tuple[str, ...]
     decision: InterventionDecision
     confidence: float
@@ -112,6 +116,7 @@ class InterventionRecord:
 class InterventionBundle:
     source_acquisition_ref: str
     source_framing_ref: str
+    source_discourse_update_ref: str
     source_perspective_chain_ref: str
     source_applicability_ref: str
     source_runtime_graph_ref: str
@@ -121,11 +126,24 @@ class InterventionBundle:
     source_surface_ref: str | None
     linked_acquisition_ids: tuple[str, ...]
     linked_framing_ids: tuple[str, ...]
+    linked_update_proposal_ids: tuple[str, ...]
+    linked_repair_ids: tuple[str, ...]
     intervention_records: tuple[InterventionRecord, ...]
     ambiguity_reasons: tuple[str, ...]
     low_coverage_mode: bool
     low_coverage_reasons: tuple[str, ...]
+    l06_upstream_bound_here: bool
+    l06_repair_basis_bound_here: bool
     l06_update_proposal_absent: bool
+    l06_repair_localization_must_be_read: bool
+    l06_proposal_requires_acceptance_read: bool
+    l06_update_not_accepted: bool
+    intervention_not_discourse_acceptance: bool
+    l06_block_or_guard_must_be_read: bool
+    l06_continuation_topology_present: bool
+    l06_g07_target_alignment_required: bool
+    l06_g07_target_drift_detected: bool
+    l06_repair_localization_incompatible: bool
     repair_trigger_basis_incomplete: bool
     response_realization_contract_absent: bool
     answer_binding_consumer_absent: bool
@@ -156,6 +174,7 @@ class TargetedClarificationTelemetry:
     source_lineage: tuple[str, ...]
     source_acquisition_ref: str
     source_framing_ref: str
+    source_discourse_update_ref: str
     source_perspective_chain_ref: str
     source_applicability_ref: str
     source_runtime_graph_ref: str
@@ -169,7 +188,16 @@ class TargetedClarificationTelemetry:
     low_coverage_mode: bool
     low_coverage_reasons: tuple[str, ...]
     ambiguity_reasons: tuple[str, ...]
+    l06_upstream_bound_here: bool
+    l06_repair_basis_bound_here: bool
     l06_update_proposal_absent: bool
+    l06_repair_localization_must_be_read: bool
+    l06_proposal_requires_acceptance_read: bool
+    l06_update_not_accepted: bool
+    l06_block_or_guard_must_be_read: bool
+    l06_continuation_topology_present: bool
+    l06_g07_target_drift_detected: bool
+    l06_repair_localization_incompatible: bool
     repair_trigger_basis_incomplete: bool
     response_realization_contract_absent: bool
     answer_binding_consumer_absent: bool

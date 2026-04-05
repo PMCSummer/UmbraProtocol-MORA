@@ -24,6 +24,7 @@ def evaluate_targeted_clarification_downstream_gate(
     restrictions: list[str] = [
         "no_final_semantic_closure",
         "intervention_object_presence_not_permission",
+        "l06_object_presence_not_acceptance",
         "intervention_status_must_be_read",
         "uncertainty_target_id_must_be_read",
         "minimal_question_spec_must_be_read",
@@ -32,6 +33,17 @@ def evaluate_targeted_clarification_downstream_gate(
         "expected_evidence_gain_must_be_read",
         "intervention_requires_target_binding_read",
         "downstream_lockouts_must_be_read",
+        "l06_upstream_bound_here_must_be_read",
+        "l06_repair_localization_must_be_read",
+        "l06_proposal_requires_acceptance_read",
+        "l06_update_not_accepted",
+        "l06_update_not_authorized_yet",
+        "clarification_not_equal_accepted_update",
+        "intervention_not_discourse_acceptance",
+        "accepted_intervention_not_accepted_update",
+        "l06_block_or_guard_must_be_read",
+        "l06_continuation_topology_present",
+        "l06_g07_target_alignment_required",
         "clarification_not_equal_realized_question",
         "asked_question_not_equal_resolved_uncertainty",
         "accepted_intervention_not_resolution",
@@ -51,6 +63,9 @@ def evaluate_targeted_clarification_downstream_gate(
     has_invalid_status_policy_alignment = False
     has_unlawful_ask_without_binding = False
     has_high_impact_lockout_gap = False
+    has_l06_alignment_gap = False
+    has_l06_repair_binding_gap = False
+    has_l06_continuation_gap = False
 
     for record in bundle.intervention_records:
         status = record.intervention_status
@@ -61,6 +76,23 @@ def evaluate_targeted_clarification_downstream_gate(
         target_bound = target_scope_required in scope and class_scope_required in scope
         if not target_bound:
             has_target_drift_risk = True
+
+        l06_alignment_lawful = True
+        if bundle.l06_g07_target_alignment_required and not record.l06_alignment_ok:
+            l06_alignment_lawful = False
+            has_l06_alignment_gap = True
+
+        if (
+            bundle.l06_repair_localization_must_be_read
+            and status is InterventionStatus.ASK_NOW
+            and not record.l06_repair_binding_refs
+        ):
+            has_l06_repair_binding_gap = True
+            l06_alignment_lawful = False
+
+        if bundle.l06_block_or_guard_must_be_read and not record.l06_continuation_statuses:
+            has_l06_continuation_gap = True
+            l06_alignment_lawful = False
 
         presuppositions_present = bool(record.forbidden_presuppositions and record.minimal_question_spec.forbidden_assumptions)
         if not presuppositions_present:
@@ -109,6 +141,7 @@ def evaluate_targeted_clarification_downstream_gate(
 
         lawful = (
             target_bound
+            and l06_alignment_lawful
             and presuppositions_present
             and lockouts_present
             and status_policy_aligned
@@ -156,6 +189,13 @@ def evaluate_targeted_clarification_downstream_gate(
         restrictions.append("ask_now_without_answer_binding_forbidden")
     if has_high_impact_lockout_gap:
         restrictions.append("high_impact_lockout_gap_detected")
+    if has_l06_alignment_gap:
+        restrictions.append("l06_g07_target_drift_detected")
+        restrictions.append("l06_repair_localization_incompatible")
+    if has_l06_repair_binding_gap:
+        restrictions.append("l06_repair_binding_missing_for_ask_now")
+    if has_l06_continuation_gap:
+        restrictions.append("l06_continuation_status_unreadable")
     if bundle.answer_binding_ready:
         restrictions.append("answer_binding_ready_requires_targeted_reopen")
         restrictions.append("answer_binding_hooks_must_be_read")
@@ -163,6 +203,12 @@ def evaluate_targeted_clarification_downstream_gate(
         restrictions.append("answer_binding_not_ready")
     if bundle.l06_update_proposal_absent:
         restrictions.append("l06_update_proposal_absent")
+    if not bundle.l06_upstream_bound_here:
+        restrictions.append("l06_upstream_not_bound")
+    if bundle.l06_g07_target_drift_detected:
+        restrictions.append("l06_g07_target_drift_detected")
+    if bundle.l06_repair_localization_incompatible:
+        restrictions.append("l06_repair_localization_incompatible")
     if bundle.repair_trigger_basis_incomplete:
         restrictions.append("repair_trigger_basis_incomplete")
     if bundle.response_realization_contract_absent:
@@ -198,6 +244,11 @@ def evaluate_targeted_clarification_downstream_gate(
         or has_invalid_status_policy_alignment
         or has_unlawful_ask_without_binding
         or has_high_impact_lockout_gap
+        or has_l06_alignment_gap
+        or has_l06_repair_binding_gap
+        or has_l06_continuation_gap
+        or bundle.l06_g07_target_drift_detected
+        or bundle.l06_repair_localization_incompatible
     )
     if degraded:
         restrictions.append("downstream_authority_degraded")

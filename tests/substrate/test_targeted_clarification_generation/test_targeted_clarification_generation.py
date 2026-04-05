@@ -39,7 +39,9 @@ def test_g07_builds_typed_targeted_clarification_layer(case: CaseSpec, g07_facto
     assert isinstance(result, TargetedClarificationResult)
     assert result.bundle.intervention_records
     assert result.bundle.no_final_semantic_closure is True
-    assert result.bundle.l06_update_proposal_absent is True
+    assert result.bundle.l06_upstream_bound_here is True
+    assert result.bundle.l06_update_proposal_absent is False
+    assert result.bundle.l06_continuation_topology_present is True
     assert result.bundle.response_realization_contract_absent is True
     assert result.bundle.answer_binding_consumer_absent is True
     assert result.telemetry.attempted_paths

@@ -20,6 +20,7 @@ def test_lockout_propagation_materially_blocks_downstream_permissions(g07_factor
                 for record in base.framing.bundle.framing_records
             ),
         ),
+        base.discourse_update,
     )
     view = derive_targeted_clarification_contract_view(high_impact)
     assert view.closure_blocked_until_answer is True
@@ -40,6 +41,7 @@ def test_lockout_surface_differs_for_context_only_vs_high_impact(g07_factory) ->
                 for record in base.framing.bundle.framing_records
             ),
         ),
+        base.discourse_update,
     )
     high_impact = build_targeted_clarification(
         base.acquisition,
@@ -50,6 +52,7 @@ def test_lockout_surface_differs_for_context_only_vs_high_impact(g07_factory) ->
                 for record in base.framing.bundle.framing_records
             ),
         ),
+        base.discourse_update,
     )
     context_view = derive_targeted_clarification_contract_view(context_only)
     high_view = derive_targeted_clarification_contract_view(high_impact)

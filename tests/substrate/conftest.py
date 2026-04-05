@@ -7,6 +7,7 @@ import pytest
 from substrate.concept_framing import build_concept_framing
 from substrate.dictum_candidates import build_dictum_candidates
 from substrate.discourse_provenance import build_discourse_provenance_chain
+from substrate.discourse_update import build_discourse_update
 from substrate.epistemics import (
     ConfidenceLevel,
     InputMaterial,
@@ -19,6 +20,7 @@ from substrate.grounded_semantic import build_grounded_semantic_substrate_legacy
 from substrate.language_surface import build_utterance_surface
 from substrate.lexical_grounding import build_lexical_grounding_hypotheses
 from substrate.morphosyntax import build_morphosyntax_candidate_space
+from substrate.modus_hypotheses import build_modus_hypotheses
 from substrate.runtime_semantic_graph import build_runtime_semantic_graph
 from substrate.scope_attribution import build_scope_attribution
 from substrate.semantic_acquisition import build_semantic_acquisition
@@ -29,6 +31,7 @@ from substrate.targeted_clarification import build_targeted_clarification
 class G07Context:
     acquisition: object
     framing: object
+    discourse_update: object
     intervention: object
 
 
@@ -48,6 +51,8 @@ def g07_factory():
         syntax = build_morphosyntax_candidate_space(surface)
         lexical = build_lexical_grounding_hypotheses(syntax, utterance_surface=surface)
         dictum = build_dictum_candidates(lexical, syntax, utterance_surface=surface)
+        modus = build_modus_hypotheses(dictum)
+        discourse_update = build_discourse_update(modus)
         grounded = build_grounded_semantic_substrate_legacy_compatibility(
             dictum,
             utterance_surface=surface,
@@ -59,7 +64,12 @@ def g07_factory():
         perspective = build_discourse_provenance_chain(applicability)
         acquisition = build_semantic_acquisition(perspective)
         framing = build_concept_framing(acquisition)
-        intervention = build_targeted_clarification(acquisition, framing)
-        return G07Context(acquisition=acquisition, framing=framing, intervention=intervention)
+        intervention = build_targeted_clarification(acquisition, framing, discourse_update)
+        return G07Context(
+            acquisition=acquisition,
+            framing=framing,
+            discourse_update=discourse_update,
+            intervention=intervention,
+        )
 
     return _factory

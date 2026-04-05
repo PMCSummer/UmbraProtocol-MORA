@@ -46,6 +46,7 @@ def test_temporal_anchor_shift_changes_decision_causally(g07_factory) -> None:
                 for record in base.framing.bundle.framing_records
             ),
         ),
+        base.discourse_update,
     )
     temporal_shift = build_targeted_clarification(
         replace(
@@ -74,6 +75,7 @@ def test_temporal_anchor_shift_changes_decision_causally(g07_factory) -> None:
                 for record in base.framing.bundle.framing_records
             ),
         ),
+        base.discourse_update,
     )
     assert {
         (record.intervention_status.value, record.uncertainty_class.value)
@@ -86,7 +88,11 @@ def test_temporal_anchor_shift_changes_decision_causally(g07_factory) -> None:
 
 def test_modality_like_shift_changes_ask_vs_defer_surface(g07_factory) -> None:
     base = g07_factory("you are tired", "g07-meta-modality")
-    assertive = build_targeted_clarification(base.acquisition, base.framing)
+    assertive = build_targeted_clarification(
+        base.acquisition,
+        base.framing,
+        base.discourse_update,
+    )
     questioned = build_targeted_clarification(
         base.acquisition,
         replace(
@@ -96,6 +102,7 @@ def test_modality_like_shift_changes_ask_vs_defer_surface(g07_factory) -> None:
                 for record in base.framing.bundle.framing_records
             ),
         ),
+        base.discourse_update,
     )
     assert {
         record.intervention_status.value for record in assertive.bundle.intervention_records

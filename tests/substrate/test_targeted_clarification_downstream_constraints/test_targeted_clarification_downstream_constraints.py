@@ -61,7 +61,11 @@ def test_intervention_state_materially_differs_by_uncertainty_structure(g07_fact
             for record in base.framing.bundle.framing_records
         ),
     )
-    conservative = build_targeted_clarification(normalized_acq, conservative_framing)
+    conservative = build_targeted_clarification(
+        normalized_acq,
+        conservative_framing,
+        base.discourse_update,
+    )
 
     escalated_framing = replace(
         base.framing.bundle,
@@ -70,7 +74,11 @@ def test_intervention_state_materially_differs_by_uncertainty_structure(g07_fact
             for record in base.framing.bundle.framing_records
         ),
     )
-    escalated = build_targeted_clarification(normalized_acq, escalated_framing)
+    escalated = build_targeted_clarification(
+        normalized_acq,
+        escalated_framing,
+        base.discourse_update,
+    )
 
     conservative_sig = {
         (record.intervention_status.value, record.uncertainty_class.value, tuple(sorted(record.downstream_lockouts)))

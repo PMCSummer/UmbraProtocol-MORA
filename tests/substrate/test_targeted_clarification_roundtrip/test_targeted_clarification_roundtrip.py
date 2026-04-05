@@ -8,7 +8,11 @@ from substrate.targeted_clarification import (
 
 def test_snapshot_roundtrip_contains_load_bearing_intervention_fields(g07_factory) -> None:
     ctx = g07_factory('he said "you are tired?"', "g07-roundtrip")
-    result = build_targeted_clarification(ctx.acquisition, ctx.framing)
+    result = build_targeted_clarification(
+        ctx.acquisition,
+        ctx.framing,
+        ctx.discourse_update,
+    )
     payload = targeted_clarification_result_to_payload(result)
     assert payload["bundle"]["intervention_records"]
     first = payload["bundle"]["intervention_records"][0]
@@ -18,7 +22,8 @@ def test_snapshot_roundtrip_contains_load_bearing_intervention_fields(g07_factor
     assert "forbidden_presuppositions" in first
     assert "expected_evidence_gain" in first
     assert "downstream_lockouts" in first
-    assert payload["bundle"]["l06_update_proposal_absent"] is True
+    assert payload["bundle"]["l06_upstream_bound_here"] is True
+    assert payload["bundle"]["l06_update_proposal_absent"] is False
     assert payload["bundle"]["response_realization_contract_absent"] is True
     assert payload["bundle"]["answer_binding_consumer_absent"] is True
     assert payload["telemetry"]["downstream_gate"]["restrictions"]
