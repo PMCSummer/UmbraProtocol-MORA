@@ -23,8 +23,6 @@ Rectangle {
     property real structuralAsymmetry: 0.0
     property real densityLevel: 0.0
     property real echoLevel: 0.0
-    property real centerOffsetX: 0.0
-    property real centerOffsetY: 0.0
     property real orbitalActivity: 0.0
     property real speedScalar: 1.0
     property real driftIrregularity: 0.0
@@ -40,16 +38,23 @@ Rectangle {
     property real outerRotation: 0.0
     property real innerRotation: 0.0
     property real apertureRotation: 0.0
-    property real phaseSkew: 0.0
-    property real anomalyPulse: 0.0
+    property real phaseSkewTarget: 0.0
+    property real anomalyPulseTarget: 0.0
+    property real driftAxisTargetX: 0.42
+    property real driftAxisTargetY: -0.2
+    property real phaseSkew: phaseSkewTarget
+    property real anomalyPulse: anomalyPulseTarget
     property real coreScaleX: 1.0
     property real coreScaleY: 1.0
     property real ghostOpacity: 0.0
     property real detailOpacity: 0.58
+    property real offsetMagnitude: 0.0
+    property real centerOffsetX: driftAxisX * offsetMagnitude
+    property real centerOffsetY: driftAxisY * offsetMagnitude
     property real centerOffsetPxX: centerOffsetX * (reducedMotion() ? 0.36 : 0.72)
     property real centerOffsetPxY: centerOffsetY * (reducedMotion() ? 0.36 : 0.72)
-    property real driftAxisX: 0.42
-    property real driftAxisY: -0.2
+    property real driftAxisX: driftAxisTargetX
+    property real driftAxisY: driftAxisTargetY
     property real breathingPhase: 0.0
     property double lastMotionTickMs: 0.0
 
@@ -158,15 +163,13 @@ Rectangle {
             1.0
         )
 
-        var offsetMagnitude = clamp(
+        offsetMagnitude = clamp(
             c * root.theme.mirror_semantics.center_offset_conflict_scale
             + p * root.theme.mirror_semantics.center_offset_pressure_scale
             - r * root.theme.mirror_semantics.center_offset_recovery_damp * 10.0,
             0.0,
             14.0
         )
-        centerOffsetX = driftAxisX * offsetMagnitude
-        centerOffsetY = driftAxisY * offsetMagnitude
 
         orbitalActivity = clamp(
             (p * 0.62 + c * 0.5 + (1.0 - u) * 0.16) * root.theme.mirror_semantics.orbital_activity_scale - r * 0.24,
@@ -230,18 +233,18 @@ Rectangle {
         var axisTargetX = clamp(randomBetween(-0.86, 0.86), -0.86, 0.86)
         var axisTargetY = clamp(randomBetween(-0.74, 0.74), -0.74, 0.74)
 
-        phaseSkew = phaseSkew * 0.74 + phaseTarget * 0.26
-        anomalyPulse = anomalyPulse * 0.68 + pulseTarget * 0.32
-        var nextAxisX = driftAxisX * 0.78 + axisTargetX * 0.22
-        var nextAxisY = driftAxisY * 0.78 + axisTargetY * 0.22
+        phaseSkewTarget = phaseSkew * 0.76 + phaseTarget * 0.24
+        anomalyPulseTarget = anomalyPulse * 0.72 + pulseTarget * 0.28
+        var nextAxisX = driftAxisX * 0.84 + axisTargetX * 0.16
+        var nextAxisY = driftAxisY * 0.84 + axisTargetY * 0.16
         var axisLen = Math.sqrt(nextAxisX * nextAxisX + nextAxisY * nextAxisY)
         if (axisLen < 0.12) {
             nextAxisX = 0.42
             nextAxisY = -0.20
             axisLen = Math.sqrt(nextAxisX * nextAxisX + nextAxisY * nextAxisY)
         }
-        driftAxisX = clamp(nextAxisX / axisLen, -0.86, 0.86)
-        driftAxisY = clamp(nextAxisY / axisLen, -0.74, 0.74)
+        driftAxisTargetX = clamp(nextAxisX / axisLen, -0.86, 0.86)
+        driftAxisTargetY = clamp(nextAxisY / axisLen, -0.74, 0.74)
         recomputeSemanticCarrier()
     }
 
@@ -297,19 +300,49 @@ Rectangle {
         ColorAnimation { duration: root.motionDuration("fade_ms"); easing.type: root.easingForClass(root.theme.motion.easing_soft_standard) }
     }
     Behavior on centerOffsetX {
-        NumberAnimation { duration: root.motionDuration("shear_drift_ms"); easing.type: root.easingForClass(root.theme.motion.easing_slow_settle) }
+        SmoothedAnimation {
+            velocity: root.reducedMotion() ? 6 : 14
+            reversingMode: SmoothedAnimation.Eased
+            maximumEasingTime: Math.max(240, Math.round(root.motionDuration("shear_drift_ms") * 0.72))
+        }
     }
     Behavior on centerOffsetY {
-        NumberAnimation { duration: root.motionDuration("shear_drift_ms"); easing.type: root.easingForClass(root.theme.motion.easing_slow_settle) }
+        SmoothedAnimation {
+            velocity: root.reducedMotion() ? 6 : 14
+            reversingMode: SmoothedAnimation.Eased
+            maximumEasingTime: Math.max(240, Math.round(root.motionDuration("shear_drift_ms") * 0.72))
+        }
+    }
+    Behavior on driftAxisX {
+        SmoothedAnimation {
+            velocity: root.reducedMotion() ? 0.55 : 1.05
+            reversingMode: SmoothedAnimation.Eased
+            maximumEasingTime: Math.max(520, Math.round(root.motionDuration("shear_drift_ms") * 1.12))
+        }
+    }
+    Behavior on driftAxisY {
+        SmoothedAnimation {
+            velocity: root.reducedMotion() ? 0.55 : 1.05
+            reversingMode: SmoothedAnimation.Eased
+            maximumEasingTime: Math.max(520, Math.round(root.motionDuration("shear_drift_ms") * 1.12))
+        }
     }
     Behavior on ghostOpacity {
         NumberAnimation { duration: root.motionDuration("ghost_echo_ms"); easing.type: root.easingForClass(root.theme.motion.easing_soft_standard) }
     }
     Behavior on phaseSkew {
-        NumberAnimation { duration: Math.max(860, Math.round(root.motionDuration("shear_drift_ms") * 2.05)); easing.type: root.easingForClass(root.theme.motion.easing_slow_settle) }
+        SmoothedAnimation {
+            velocity: root.reducedMotion() ? 2.2 : 4.6
+            reversingMode: SmoothedAnimation.Eased
+            maximumEasingTime: Math.max(900, Math.round(root.motionDuration("shear_drift_ms") * 1.9))
+        }
     }
     Behavior on anomalyPulse {
-        NumberAnimation { duration: Math.max(780, Math.round(root.motionDuration("ghost_echo_ms") * 1.45)); easing.type: root.easingForClass(root.theme.motion.easing_soft_standard) }
+        SmoothedAnimation {
+            velocity: root.reducedMotion() ? 0.18 : 0.34
+            reversingMode: SmoothedAnimation.Eased
+            maximumEasingTime: Math.max(760, Math.round(root.motionDuration("ghost_echo_ms") * 1.34))
+        }
     }
     Behavior on coreScaleX {
         NumberAnimation { duration: root.motionDuration("shear_drift_ms"); easing.type: root.easingForClass(root.theme.motion.easing_slow_settle) }
@@ -349,7 +382,7 @@ Rectangle {
         Item {
             id: sigilRoot
             anchors.centerIn: parent
-            width: Math.min(parent.width, parent.height) * 0.84
+            width: Math.min(parent.width, parent.height) * 0.92
             height: width
             x: root.centerOffsetPxX
             y: root.centerOffsetPxY
@@ -379,8 +412,8 @@ Rectangle {
             property real localWarp: Math.sin(root.breathingPhase * 1.16) * 0.050 + seamFlux * 0.022 + root.anomalyPulse * 0.098
             property real echoShiftX: root.ghostOpacity * radius * (0.030 + root.anomalyPulse * 0.020) * root.driftAxisX
             property real echoShiftY: root.ghostOpacity * radius * (0.030 + root.anomalyPulse * 0.020) * root.driftAxisY
-            property real frontScale: 1.0 + root.structuralAsymmetry * 0.014
-            property real deepScale: 0.84 + root.densityLevel * 0.030
+            property real frontScale: 1.04 + root.structuralAsymmetry * 0.018 + root.densityLevel * 0.010
+            property real deepScale: 0.92 + root.densityLevel * 0.044 + root.echoLevel * 0.016
             property real centerFractureBias: root.phaseSkew * 0.22 + reflectionShear * 0.22 + root.anomalyPulse * radius * 0.008
 
             function pointAt(radiusNorm, degrees) {
@@ -570,18 +603,18 @@ Rectangle {
                     var w4 = Math.sin(t * 0.62 + index * 0.77 + 2.2) * rr * (0.020 + root.structuralAsymmetry * 0.10 + root.anomalyPulse * 0.06)
 
                     strokeChain(ctx, [
-                        [rr * 0.20, -rr * 0.012],
-                        [rr * 0.31, -rr * 0.10 - w1],
-                        [rr * 0.47, -rr * 0.17 - w2],
-                        [rr * 0.67, -rr * 0.11 - w3],
-                        [rr * 0.86, -rr * 0.05 - w4]
+                        [rr * 0.18, -rr * 0.012],
+                        [rr * 0.32, -rr * 0.11 - w1],
+                        [rr * 0.50, -rr * 0.19 - w2],
+                        [rr * 0.72, -rr * 0.12 - w3],
+                        [rr * 0.93, -rr * 0.05 - w4]
                     ], root.mainLineColor, sigilRoot.frameStroke, 0.96)
 
                     strokeChain(ctx, [
-                        [rr * 0.34, -rr * 0.11 - w1 * 0.2],
-                        [rr * 0.43, -rr * 0.24 - w2 * 0.4],
-                        [rr * 0.57, -rr * 0.31 - w3 * 0.3],
-                        [rr * 0.74, -rr * 0.26 - w4 * 0.5]
+                        [rr * 0.33, -rr * 0.12 - w1 * 0.2],
+                        [rr * 0.45, -rr * 0.26 - w2 * 0.4],
+                        [rr * 0.61, -rr * 0.33 - w3 * 0.3],
+                        [rr * 0.82, -rr * 0.28 - w4 * 0.5]
                     ], root.secondaryLineColor, sigilRoot.supportStroke, 0.82)
 
                     strokeChain(ctx, [
@@ -591,9 +624,9 @@ Rectangle {
                     ], root.secondaryLineColor, sigilRoot.webStroke, 0.72)
 
                     strokeChain(ctx, [
-                        [rr * 0.55, -rr * 0.18 - w1 * 0.22],
-                        [rr * 0.63, -rr * 0.07 - w2 * 0.2],
-                        [rr * 0.79, -rr * 0.028 - w3 * 0.18]
+                        [rr * 0.58, -rr * 0.19 - w1 * 0.22],
+                        [rr * 0.68, -rr * 0.08 - w2 * 0.2],
+                        [rr * 0.86, -rr * 0.028 - w3 * 0.18]
                     ], root.accentLineColor, sigilRoot.webStroke, 0.62)
                 }
 
@@ -601,7 +634,7 @@ Rectangle {
                     ctx.save()
                     ctx.translate(sigilRoot.cx, sigilRoot.cy)
                     ctx.rotate(axisDeg * Math.PI / 180.0)
-                    mirrorClip(ctx, 0.18, 0.96, spreadDeg)
+                    mirrorClip(ctx, 0.16, 1.02, spreadDeg + 1.6)
 
                     drawBundle(ctx, index, sigilRoot.frontSourcePhase + index * 11.0)
 
@@ -694,18 +727,18 @@ Rectangle {
                     var w3 = Math.sin(t * 0.58 + index * 1.27 + 0.7) * rr * (0.022 + root.anomalyPulse * 0.26)
 
                     strokeChain(ctx, [
-                        [rr * 0.26, -rr * 0.010],
-                        [rr * 0.35, -rr * 0.084 - w1],
-                        [rr * 0.47, -rr * 0.14 - w2],
-                        [rr * 0.60, -rr * 0.11 - w3],
-                        [rr * 0.71, -rr * 0.038]
+                        [rr * 0.24, -rr * 0.010],
+                        [rr * 0.36, -rr * 0.092 - w1],
+                        [rr * 0.50, -rr * 0.16 - w2],
+                        [rr * 0.66, -rr * 0.12 - w3],
+                        [rr * 0.80, -rr * 0.038]
                     ], root.secondaryLineColor, sigilRoot.supportStroke, 0.56)
 
                     strokeChain(ctx, [
-                        [rr * 0.31, -rr * 0.094],
-                        [rr * 0.42, -rr * 0.19 - w1 * 0.3],
-                        [rr * 0.54, -rr * 0.23 - w2 * 0.36],
-                        [rr * 0.62, -rr * 0.19 - w3 * 0.28]
+                        [rr * 0.30, -rr * 0.10],
+                        [rr * 0.44, -rr * 0.21 - w1 * 0.3],
+                        [rr * 0.58, -rr * 0.26 - w2 * 0.36],
+                        [rr * 0.70, -rr * 0.21 - w3 * 0.28]
                     ], root.accentLineColor, sigilRoot.webStroke, 0.34)
                 }
 
@@ -713,7 +746,7 @@ Rectangle {
                     ctx.save()
                     ctx.translate(sigilRoot.cx, sigilRoot.cy)
                     ctx.rotate(axisDeg * Math.PI / 180.0)
-                    mirrorClip(ctx, 0.24, 0.74, spreadDeg)
+                    mirrorClip(ctx, 0.22, 0.82, spreadDeg + 1.2)
 
                     drawBundle(ctx, index, sigilRoot.deepSourcePhase + index * 16.0)
 
