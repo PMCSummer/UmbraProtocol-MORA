@@ -65,3 +65,15 @@ def test_ablation_of_acceptance_marker_degrades_legality() -> None:
     assert gate.accepted is False
     assert "acceptance_laundering_detected" in gate.restrictions
     assert "no_usable_update_proposals" in gate.restrictions
+
+
+def test_source_ref_collapse_is_detected_as_relabeling_gap() -> None:
+    ctx = build_l06_context("you are tired", "l06-hardening-source-collapse")
+    malformed = replace(
+        ctx.discourse_update.bundle,
+        source_modus_ref=ctx.discourse_update.bundle.source_modus_lineage_ref,
+        source_modus_ref_kind="upstream_lineage_ref",
+    )
+    gate = evaluate_discourse_update_downstream_gate(malformed)
+    assert "source_ref_relabeling_without_notice" in gate.restrictions
+    assert "downstream_authority_degraded" in gate.restrictions

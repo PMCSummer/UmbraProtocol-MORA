@@ -46,6 +46,9 @@ def build_discourse_update(
             source_lineage=source_lineage,
             reason="l05 hypothesis records are empty",
         )
+    source_modus_ref = _derive_l05_bundle_ref(modus_bundle)
+    source_modus_ref_kind = "phase_native_derived_ref"
+    source_modus_lineage_ref = modus_bundle.source_dictum_ref
 
     proposals: list[UpdateProposal] = []
     repairs: list[RepairTrigger] = []
@@ -108,8 +111,12 @@ def build_discourse_update(
         ]
     )
 
+    bundle_ref = _derive_l06_bundle_ref(source_modus_ref, proposals, repairs, continuations)
     bundle = DiscourseUpdateBundle(
-        source_modus_ref=modus_bundle.source_dictum_ref,
+        bundle_ref=bundle_ref,
+        source_modus_ref=source_modus_ref,
+        source_modus_ref_kind=source_modus_ref_kind,
+        source_modus_lineage_ref=source_modus_lineage_ref,
         source_dictum_ref=modus_bundle.source_dictum_ref,
         source_syntax_ref=modus_bundle.source_syntax_ref,
         source_surface_ref=modus_bundle.source_surface_ref,
@@ -140,6 +147,9 @@ def build_discourse_update(
         source_lineage=tuple(
             dict.fromkeys(
                 (
+                    bundle_ref,
+                    source_modus_ref,
+                    source_modus_lineage_ref,
                     modus_bundle.source_dictum_ref,
                     modus_bundle.source_syntax_ref,
                     *((modus_bundle.source_surface_ref,) if modus_bundle.source_surface_ref else ()),
@@ -457,6 +467,26 @@ def _proposal_restrictions_for_continuation(
     return tuple(dict.fromkeys(restrictions))
 
 
+def _derive_l05_bundle_ref(modus_bundle: ModusHypothesisBundle) -> str:
+    head = modus_bundle.hypothesis_records[0].record_id if modus_bundle.hypothesis_records else "none"
+    return f"l05.bundle:{head}:n={len(modus_bundle.hypothesis_records)}"
+
+
+def _derive_l06_bundle_ref(
+    source_modus_ref: str,
+    proposals: list[UpdateProposal] | tuple[UpdateProposal, ...],
+    repairs: list[RepairTrigger] | tuple[RepairTrigger, ...],
+    continuations: list[GuardedContinuationState] | tuple[GuardedContinuationState, ...],
+) -> str:
+    proposal_head = proposals[0].proposal_id if proposals else "none"
+    repair_head = repairs[0].repair_id if repairs else "none"
+    continuation_head = continuations[0].continuation_id if continuations else "none"
+    return (
+        f"l06.bundle:{source_modus_ref}:{proposal_head}:{repair_head}:{continuation_head}:"
+        f"p={len(proposals)}:r={len(repairs)}:c={len(continuations)}"
+    )
+
+
 def _estimate_result_confidence(bundle: DiscourseUpdateBundle) -> float:
     base = 0.67
     base -= min(0.24, len(bundle.repair_triggers) * 0.02)
@@ -474,8 +504,15 @@ def _abstain_result(
     source_lineage: tuple[str, ...],
     reason: str,
 ) -> DiscourseUpdateResult:
+    source_modus_ref = _derive_l05_bundle_ref(modus_bundle)
+    source_modus_ref_kind = "phase_native_derived_ref"
+    source_modus_lineage_ref = modus_bundle.source_dictum_ref
+    bundle_ref = _derive_l06_bundle_ref(source_modus_ref, (), (), ())
     bundle = DiscourseUpdateBundle(
-        source_modus_ref=modus_bundle.source_dictum_ref,
+        bundle_ref=bundle_ref,
+        source_modus_ref=source_modus_ref,
+        source_modus_ref_kind=source_modus_ref_kind,
+        source_modus_lineage_ref=source_modus_lineage_ref,
         source_dictum_ref=modus_bundle.source_dictum_ref,
         source_syntax_ref=modus_bundle.source_syntax_ref,
         source_surface_ref=modus_bundle.source_surface_ref,

@@ -115,8 +115,14 @@ class InterventionRecord:
 @dataclass(frozen=True, slots=True)
 class InterventionBundle:
     source_acquisition_ref: str
+    source_acquisition_ref_kind: str
+    source_acquisition_lineage_ref: str
     source_framing_ref: str
+    source_framing_ref_kind: str
+    source_framing_lineage_ref: str
     source_discourse_update_ref: str
+    source_discourse_update_ref_kind: str
+    source_discourse_update_lineage_ref: str
     source_perspective_chain_ref: str
     source_applicability_ref: str
     source_runtime_graph_ref: str
@@ -173,8 +179,14 @@ class InterventionGateDecision:
 class TargetedClarificationTelemetry:
     source_lineage: tuple[str, ...]
     source_acquisition_ref: str
+    source_acquisition_ref_kind: str
+    source_acquisition_lineage_ref: str
     source_framing_ref: str
+    source_framing_ref_kind: str
+    source_framing_lineage_ref: str
     source_discourse_update_ref: str
+    source_discourse_update_ref_kind: str
+    source_discourse_update_lineage_ref: str
     source_perspective_chain_ref: str
     source_applicability_ref: str
     source_runtime_graph_ref: str

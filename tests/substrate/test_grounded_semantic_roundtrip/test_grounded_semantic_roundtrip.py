@@ -74,6 +74,8 @@ def test_grounded_semantic_payload_keeps_load_bearing_fields() -> None:
     assert payload["bundle"]["source_anchors"] is not None
     assert payload["bundle"]["uncertainty_markers"] is not None
     assert payload["bundle"]["no_final_semantic_resolution"] is True
+    assert payload["bundle"]["source_modus_ref_kind"] == "not_bound"
+    assert payload["bundle"]["source_discourse_update_ref_kind"] == "not_bound"
     assert payload["telemetry"]["downstream_gate"]["restrictions"]
     serialized = json.loads(json.dumps(payload))
     assert serialized["bundle"]["source_dictum_ref"]
@@ -94,6 +96,8 @@ def test_persist_reconstruct_continue_preserves_g01_scaffold_contract() -> None:
     assert snapshot["bundle"]["operator_carriers"] is not None
     assert snapshot["bundle"]["uncertainty_markers"] is not None
     assert snapshot["bundle"]["no_final_semantic_resolution"] is True
+    assert snapshot["bundle"]["source_modus_ref_kind"] == "not_bound"
+    assert snapshot["bundle"]["source_discourse_update_ref_kind"] == "not_bound"
     assert snapshot["telemetry"]["attempted_paths"]
 
     second = _g01_result("we do not track alpha", "m-g01-roundtrip-first")

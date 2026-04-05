@@ -34,6 +34,26 @@ def test_g07_requires_typed_l06_upstream_and_marks_l06_bound(g07_factory) -> Non
         build_targeted_clarification(ctx.acquisition, ctx.framing, "raw l06")
 
 
+def test_g07_preserves_phase_native_source_refs_and_lineage_distinction(g07_factory) -> None:
+    result = g07_factory('he said "you are tired?"', "g07-l06-rewire-source-refs").intervention
+    contract = derive_targeted_clarification_contract_view(result)
+    gate = evaluate_targeted_clarification_downstream_gate(result)
+
+    assert result.bundle.source_acquisition_ref_kind == "phase_native_derived_ref"
+    assert result.bundle.source_framing_ref_kind == "phase_native_derived_ref"
+    assert result.bundle.source_discourse_update_ref_kind == "phase_native_derived_ref"
+    assert result.bundle.source_acquisition_ref != result.bundle.source_acquisition_lineage_ref
+    assert result.bundle.source_framing_ref != result.bundle.source_framing_lineage_ref
+    assert result.bundle.source_discourse_update_ref != result.bundle.source_discourse_update_lineage_ref
+    assert contract.source_acquisition_ref_present is True
+    assert contract.source_framing_ref_present is True
+    assert contract.source_discourse_update_ref_present is True
+    assert contract.source_ref_kind_phase_native is True
+    assert contract.source_ref_distinct_from_lineage is True
+    assert contract.requires_source_ref_class_read is True
+    assert "source_ref_class_must_be_read" in gate.restrictions
+
+
 def test_l06_repair_localization_changes_g07_decision_surface(g07_factory) -> None:
     ctx = g07_factory('he said "you are tired?"', "g07-l06-rewire-localization")
     temporal_acq = replace(

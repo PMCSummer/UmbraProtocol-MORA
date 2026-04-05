@@ -92,5 +92,12 @@ def test_stage_contour_f01_f02_l01_l02_l03_l04_l05_l06_g07_normative_runtime_pat
     assert intervention_result.bundle.intervention_records
     assert intervention_result.bundle.l06_upstream_bound_here is True
     assert intervention_result.bundle.l06_continuation_topology_present is True
+    assert intervention_result.bundle.source_acquisition_ref_kind == "phase_native_derived_ref"
+    assert intervention_result.bundle.source_framing_ref_kind == "phase_native_derived_ref"
+    assert intervention_result.bundle.source_discourse_update_ref_kind == "phase_native_derived_ref"
+    assert (
+        intervention_result.bundle.source_discourse_update_ref
+        != intervention_result.bundle.source_discourse_update_lineage_ref
+    )
     assert "l06_proposal_requires_acceptance_read" in gate.restrictions
     assert "intervention_not_discourse_acceptance" in gate.restrictions

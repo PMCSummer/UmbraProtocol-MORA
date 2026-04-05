@@ -88,3 +88,16 @@ def test_high_impact_uncertainty_requires_high_impact_lockouts(g07_factory) -> N
     )
     gate = evaluate_targeted_clarification_downstream_gate(broken)
     assert "high_impact_lockout_gap_detected" in gate.restrictions
+
+
+def test_source_ref_relabeling_gap_degrades_intervention_authority(g07_factory) -> None:
+    result = g07_factory("you are tired", "g07-hardening-source-gap").intervention
+    malformed = replace(
+        result.bundle,
+        source_acquisition_ref=result.bundle.source_acquisition_lineage_ref,
+        source_acquisition_ref_kind="upstream_lineage_ref",
+    )
+    gate = evaluate_targeted_clarification_downstream_gate(malformed)
+    assert gate.accepted is False
+    assert "source_ref_relabeling_without_notice" in gate.restrictions
+    assert "lineage_identity_collapse_risk" in gate.restrictions

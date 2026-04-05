@@ -24,6 +24,10 @@ def evaluate_targeted_clarification_downstream_gate(
     restrictions: list[str] = [
         "no_final_semantic_closure",
         "intervention_object_presence_not_permission",
+        "source_acquisition_ref_must_be_read",
+        "source_framing_ref_must_be_read",
+        "source_discourse_update_ref_must_be_read",
+        "source_ref_class_must_be_read",
         "l06_object_presence_not_acceptance",
         "intervention_status_must_be_read",
         "uncertainty_target_id_must_be_read",
@@ -66,6 +70,20 @@ def evaluate_targeted_clarification_downstream_gate(
     has_l06_alignment_gap = False
     has_l06_repair_binding_gap = False
     has_l06_continuation_gap = False
+    has_source_ref_class_gap = False
+
+    if bundle.source_acquisition_ref_kind != "phase_native_derived_ref":
+        has_source_ref_class_gap = True
+    if bundle.source_framing_ref_kind != "phase_native_derived_ref":
+        has_source_ref_class_gap = True
+    if bundle.source_discourse_update_ref_kind != "phase_native_derived_ref":
+        has_source_ref_class_gap = True
+    if bundle.source_acquisition_ref == bundle.source_acquisition_lineage_ref:
+        has_source_ref_class_gap = True
+    if bundle.source_framing_ref == bundle.source_framing_lineage_ref:
+        has_source_ref_class_gap = True
+    if bundle.source_discourse_update_ref == bundle.source_discourse_update_lineage_ref:
+        has_source_ref_class_gap = True
 
     for record in bundle.intervention_records:
         status = record.intervention_status
@@ -196,6 +214,9 @@ def evaluate_targeted_clarification_downstream_gate(
         restrictions.append("l06_repair_binding_missing_for_ask_now")
     if has_l06_continuation_gap:
         restrictions.append("l06_continuation_status_unreadable")
+    if has_source_ref_class_gap:
+        restrictions.append("source_ref_relabeling_without_notice")
+        restrictions.append("lineage_identity_collapse_risk")
     if bundle.answer_binding_ready:
         restrictions.append("answer_binding_ready_requires_targeted_reopen")
         restrictions.append("answer_binding_hooks_must_be_read")
@@ -247,6 +268,7 @@ def evaluate_targeted_clarification_downstream_gate(
         or has_l06_alignment_gap
         or has_l06_repair_binding_gap
         or has_l06_continuation_gap
+        or has_source_ref_class_gap
         or bundle.l06_g07_target_drift_detected
         or bundle.l06_repair_localization_incompatible
     )

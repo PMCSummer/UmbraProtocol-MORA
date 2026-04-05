@@ -15,6 +15,12 @@ def test_snapshot_roundtrip_contains_load_bearing_intervention_fields(g07_factor
     )
     payload = targeted_clarification_result_to_payload(result)
     assert payload["bundle"]["intervention_records"]
+    assert payload["bundle"]["source_acquisition_ref_kind"] == "phase_native_derived_ref"
+    assert payload["bundle"]["source_framing_ref_kind"] == "phase_native_derived_ref"
+    assert payload["bundle"]["source_discourse_update_ref_kind"] == "phase_native_derived_ref"
+    assert payload["bundle"]["source_acquisition_ref"] != payload["bundle"]["source_acquisition_lineage_ref"]
+    assert payload["bundle"]["source_framing_ref"] != payload["bundle"]["source_framing_lineage_ref"]
+    assert payload["bundle"]["source_discourse_update_ref"] != payload["bundle"]["source_discourse_update_lineage_ref"]
     first = payload["bundle"]["intervention_records"][0]
     assert "uncertainty_target_id" in first
     assert "intervention_status" in first
@@ -26,4 +32,7 @@ def test_snapshot_roundtrip_contains_load_bearing_intervention_fields(g07_factor
     assert payload["bundle"]["l06_update_proposal_absent"] is False
     assert payload["bundle"]["response_realization_contract_absent"] is True
     assert payload["bundle"]["answer_binding_consumer_absent"] is True
+    assert payload["telemetry"]["source_acquisition_ref_kind"] == "phase_native_derived_ref"
+    assert payload["telemetry"]["source_framing_ref_kind"] == "phase_native_derived_ref"
+    assert payload["telemetry"]["source_discourse_update_ref_kind"] == "phase_native_derived_ref"
     assert payload["telemetry"]["downstream_gate"]["restrictions"]

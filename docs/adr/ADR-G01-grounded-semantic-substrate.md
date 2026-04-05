@@ -20,6 +20,10 @@ Accepted as a bounded partial implementation of phase `G01` over implemented `F0
 ## What G01 Now Claims
 - Builds typed, span-grounded substrate units from typed upstream artifacts (`L04` required carrier basis).
 - Supports normative typed intake from `L05 + L06` to project force/addressivity/update topology into G01 without inferring it from raw surface cues.
+- Preserves source-ref class distinction on normative route:
+  - phase-native refs (`source_modus_ref`, `source_discourse_update_ref`)
+  - upstream lineage refs (`source_modus_lineage_ref`, `source_discourse_update_lineage_ref`)
+  - ref classes are non-interchangeable and must be read downstream.
 - Builds typed phrase scaffolds with:
   - clause/phrase boundaries
   - operator attachments
@@ -43,6 +47,10 @@ Accepted as a bounded partial implementation of phase `G01` over implemented `F0
   - `l04_only_input_not_equivalent_to_l05_l06_route`
   - `legacy_fallback_requires_degraded_contract`
   - `discourse_update_not_inferred_from_surface_when_l06_available`
+  - `source_modus_ref_class_must_be_read`
+  - `source_discourse_update_ref_class_must_be_read`
+  - `phase_native_source_refs_required_on_normative_route`
+  - `source_ref_relabeling_without_notice`
 - Rejects typed-binding mismatch on normative entrypoint instead of silently downgrading to legacy fallback.
 - Provides a typed downstream role-contract surface so consumers can distinguish source/operator/uncertainty regimes without reparsing raw text.
 
@@ -60,6 +68,7 @@ Accepted as a bounded partial implementation of phase `G01` over implemented `F0
 - `GroundedSemanticTelemetry` includes:
   - source lineage
   - source dictum/syntax/surface refs
+  - source ref class markers (`*_ref_kind`) and lineage refs (`*_lineage_ref`)
   - substrate/scaffold/carrier/anchor/uncertainty counts
   - operator/uncertainty kind summaries
   - reversible span-map presence

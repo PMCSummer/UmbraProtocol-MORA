@@ -40,6 +40,9 @@ Accepted as a bounded partial implementation of phase `G07` over implemented `G0
   - blocked/guarded/withheld continuation signals constrain status selection
   - acceptance-required proposal boundaries block acceptance-laundering
   - target drift/incompatible localization becomes explicit degraded restrictions
+- Source/lineage class is load-bearing:
+  - phase-native refs for `G05`, `G06`, and `L06` are preserved separately from upstream lineage refs.
+  - source-ref class collapse/relabeling is explicitly degraded (`source_ref_relabeling_without_notice`, `lineage_identity_collapse_risk`).
 - G07 intervention statuses are load-bearing:
   - `ask_now`
   - `abstain_without_question`
@@ -60,6 +63,9 @@ Accepted as a bounded partial implementation of phase `G07` over implemented `G0
   - `ask_now_without_answer_binding_forbidden`
   - `target_drift_risk_detected`
   - `intervention_record_contract_broken`
+  - `source_ref_class_must_be_read`
+  - `source_ref_relabeling_without_notice`
+  - `lineage_identity_collapse_risk`
 
 ## Hardening Delta (This Pass)
 - Rewiring now makes `L06` a causal upstream in G07 runtime path (not seam-only promise).
@@ -78,6 +84,7 @@ Accepted as a bounded partial implementation of phase `G07` over implemented `G0
   - L06 repair-localization and continuation-topology read obligations
   - acceptance-boundary obligations (`l06_update_not_accepted`, `intervention_not_discourse_acceptance`)
   - explicit anti-inflation marker: object presence is not permission.
+  - source-ref class read obligations and distinction flags (`phase-native` vs `lineage`).
 
 ## Explicit Authority Bounds
 - G07 does not extract semantics from raw text.

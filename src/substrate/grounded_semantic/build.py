@@ -165,6 +165,12 @@ def build_grounded_semantic_substrate(
     discourse_update_not_inferred_from_surface_when_l06_available = False
     l06_blocked_update_present = False
     l06_guarded_continue_present = False
+    source_modus_ref = _derive_l05_bundle_ref(modus_bundle) if modus_bundle is not None else None
+    source_modus_ref_kind = "phase_native_derived_ref" if modus_bundle is not None else "not_bound"
+    source_modus_lineage_ref = modus_bundle.source_dictum_ref if modus_bundle is not None else None
+    source_discourse_update_ref = _derive_l06_bundle_ref(discourse_bundle) if discourse_bundle is not None else None
+    source_discourse_update_ref_kind = "phase_native_derived_ref" if discourse_bundle is not None else "not_bound"
+    source_discourse_update_lineage_ref = discourse_bundle.source_modus_lineage_ref if discourse_bundle is not None else None
 
     for candidate in dictum_bundle.dictum_candidates:
         clause_start = candidate.predicate_frame.predicate_span.start
@@ -441,8 +447,12 @@ def build_grounded_semantic_substrate(
         source_dictum_ref=dictum_bundle.source_lexical_grounding_ref,
         source_syntax_ref=dictum_bundle.source_syntax_ref,
         source_surface_ref=dictum_bundle.source_surface_ref,
-        source_modus_ref=modus_bundle.source_dictum_ref if modus_bundle is not None else None,
-        source_discourse_update_ref=discourse_bundle.source_modus_ref if discourse_bundle is not None else None,
+        source_modus_ref=source_modus_ref,
+        source_modus_ref_kind=source_modus_ref_kind,
+        source_modus_lineage_ref=source_modus_lineage_ref,
+        source_discourse_update_ref=source_discourse_update_ref,
+        source_discourse_update_ref_kind=source_discourse_update_ref_kind,
+        source_discourse_update_lineage_ref=source_discourse_update_lineage_ref,
         linked_dictum_candidate_ids=tuple(candidate.dictum_candidate_id for candidate in dictum_bundle.dictum_candidates),
         linked_modus_record_ids=tuple(record.record_id for record in modus_bundle.hypothesis_records) if modus_bundle is not None else (),
         linked_update_proposal_ids=tuple(proposal.proposal_id for proposal in discourse_bundle.update_proposals) if discourse_bundle is not None else (),
@@ -474,6 +484,10 @@ def build_grounded_semantic_substrate(
     source_lineage = tuple(
         dict.fromkeys(
             (
+                *((source_modus_ref,) if source_modus_ref else ()),
+                *((source_modus_lineage_ref,) if source_modus_lineage_ref else ()),
+                *((source_discourse_update_ref,) if source_discourse_update_ref else ()),
+                *((source_discourse_update_lineage_ref,) if source_discourse_update_lineage_ref else ()),
                 dictum_bundle.source_lexical_grounding_ref,
                 dictum_bundle.source_syntax_ref,
                 *((modus_bundle.source_dictum_ref,) if modus_bundle is not None else ()),
@@ -628,11 +642,21 @@ def _is_normative_binding_compatible(
         return False
     if modus_bundle.source_dictum_ref != dictum_bundle.source_lexical_grounding_ref:
         return False
-    if discourse_bundle.source_modus_ref != modus_bundle.source_dictum_ref:
+    if discourse_bundle.source_modus_lineage_ref != modus_bundle.source_dictum_ref:
         return False
     if not set(modus_bundle.linked_dictum_candidate_ids).intersection(dictum_ids):
         return False
     return True
+
+
+def _derive_l05_bundle_ref(modus_bundle: ModusHypothesisBundle) -> str:
+    head = modus_bundle.hypothesis_records[0].record_id if modus_bundle.hypothesis_records else "none"
+    return f"l05.bundle:{head}:n={len(modus_bundle.hypothesis_records)}"
+
+
+def _derive_l06_bundle_ref(discourse_bundle: DiscourseUpdateBundle) -> str:
+    head = discourse_bundle.update_proposals[0].proposal_id if discourse_bundle.update_proposals else "none"
+    return f"l06.bundle:{head}:p={len(discourse_bundle.update_proposals)}:r={len(discourse_bundle.repair_triggers)}:c={len(discourse_bundle.continuation_states)}"
 
 
 def _register_normative_l05_l06_cues(
@@ -1155,7 +1179,11 @@ def _abstain_result(
         source_syntax_ref=dictum_bundle.source_syntax_ref,
         source_surface_ref=dictum_bundle.source_surface_ref,
         source_modus_ref=None,
+        source_modus_ref_kind="not_bound",
+        source_modus_lineage_ref=None,
         source_discourse_update_ref=None,
+        source_discourse_update_ref_kind="not_bound",
+        source_discourse_update_lineage_ref=None,
         linked_dictum_candidate_ids=tuple(candidate.dictum_candidate_id for candidate in dictum_bundle.dictum_candidates),
         linked_modus_record_ids=(),
         linked_update_proposal_ids=(),

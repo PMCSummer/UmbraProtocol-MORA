@@ -54,6 +54,15 @@ def build_targeted_clarification(
     acq_bundle, acq_lineage = _extract_acq_input(semantic_acquisition_result_or_bundle)
     frame_bundle, frame_lineage = _extract_frame_input(concept_framing_result_or_bundle)
     discourse_bundle, discourse_lineage = _extract_discourse_update_input(discourse_update_result_or_bundle)
+    source_acquisition_ref = _derive_g05_bundle_ref(acq_bundle)
+    source_acquisition_ref_kind = "phase_native_derived_ref"
+    source_acquisition_lineage_ref = acq_bundle.source_perspective_chain_ref
+    source_framing_ref = _derive_g06_bundle_ref(frame_bundle)
+    source_framing_ref_kind = "phase_native_derived_ref"
+    source_framing_lineage_ref = frame_bundle.source_acquisition_ref
+    source_discourse_update_ref = discourse_bundle.bundle_ref
+    source_discourse_update_ref_kind = "phase_native_derived_ref"
+    source_discourse_update_lineage_ref = discourse_bundle.source_modus_lineage_ref
     if not acq_bundle.acquisition_records or not frame_bundle.framing_records:
         return _abstain_result(
             acq_bundle,
@@ -252,9 +261,15 @@ def build_targeted_clarification(
         low_coverage.append("downstream_authority_degraded")
 
     bundle = InterventionBundle(
-        source_acquisition_ref=acq_bundle.source_perspective_chain_ref,
-        source_framing_ref=frame_bundle.source_acquisition_ref,
-        source_discourse_update_ref=discourse_bundle.source_modus_ref,
+        source_acquisition_ref=source_acquisition_ref,
+        source_acquisition_ref_kind=source_acquisition_ref_kind,
+        source_acquisition_lineage_ref=source_acquisition_lineage_ref,
+        source_framing_ref=source_framing_ref,
+        source_framing_ref_kind=source_framing_ref_kind,
+        source_framing_lineage_ref=source_framing_lineage_ref,
+        source_discourse_update_ref=source_discourse_update_ref,
+        source_discourse_update_ref_kind=source_discourse_update_ref_kind,
+        source_discourse_update_lineage_ref=source_discourse_update_lineage_ref,
         source_perspective_chain_ref=acq_bundle.source_perspective_chain_ref,
         source_applicability_ref=acq_bundle.source_applicability_ref,
         source_runtime_graph_ref=acq_bundle.source_runtime_graph_ref,
@@ -310,6 +325,12 @@ def build_targeted_clarification(
                 acq_bundle.source_dictum_ref,
                 acq_bundle.source_syntax_ref,
                 *((acq_bundle.source_surface_ref,) if acq_bundle.source_surface_ref else ()),
+                source_acquisition_ref,
+                source_framing_ref,
+                source_discourse_update_ref,
+                source_acquisition_lineage_ref,
+                source_framing_lineage_ref,
+                source_discourse_update_lineage_ref,
                 *acq_lineage,
                 *frame_lineage,
                 discourse_bundle.source_modus_ref,
@@ -390,6 +411,16 @@ def _extract_discourse_update_input(
     raise TypeError(
         "build_targeted_clarification requires DiscourseUpdateResult or DiscourseUpdateBundle for l06 upstream"
     )
+
+
+def _derive_g05_bundle_ref(acq_bundle: SemanticAcquisitionBundle) -> str:
+    head = acq_bundle.acquisition_records[0].acquisition_id if acq_bundle.acquisition_records else "none"
+    return f"g05.bundle:{head}:n={len(acq_bundle.acquisition_records)}"
+
+
+def _derive_g06_bundle_ref(frame_bundle: ConceptFramingBundle) -> str:
+    head = frame_bundle.framing_records[0].framing_id if frame_bundle.framing_records else "none"
+    return f"g06.bundle:{head}:n={len(frame_bundle.framing_records)}"
 
 
 def _derive_uncertainty_class(acq: ProvisionalAcquisitionRecord, framing_status: FramingStatus) -> UncertaintyClass:
@@ -835,11 +866,19 @@ def _abstain_result(
     source_lineage: tuple[str, ...],
     reason: str,
 ) -> TargetedClarificationResult:
+    source_acquisition_ref = _derive_g05_bundle_ref(acq_bundle)
+    source_framing_ref = _derive_g06_bundle_ref(frame_bundle)
     l06_update_proposal_absent = not bool(discourse_bundle.update_proposals)
     bundle = InterventionBundle(
-        source_acquisition_ref=acq_bundle.source_perspective_chain_ref,
-        source_framing_ref=frame_bundle.source_acquisition_ref,
-        source_discourse_update_ref=discourse_bundle.source_modus_ref,
+        source_acquisition_ref=source_acquisition_ref,
+        source_acquisition_ref_kind="phase_native_derived_ref",
+        source_acquisition_lineage_ref=acq_bundle.source_perspective_chain_ref,
+        source_framing_ref=source_framing_ref,
+        source_framing_ref_kind="phase_native_derived_ref",
+        source_framing_lineage_ref=frame_bundle.source_acquisition_ref,
+        source_discourse_update_ref=discourse_bundle.bundle_ref,
+        source_discourse_update_ref_kind="phase_native_derived_ref",
+        source_discourse_update_lineage_ref=discourse_bundle.source_modus_lineage_ref,
         source_perspective_chain_ref=acq_bundle.source_perspective_chain_ref,
         source_applicability_ref=acq_bundle.source_applicability_ref,
         source_runtime_graph_ref=acq_bundle.source_runtime_graph_ref,

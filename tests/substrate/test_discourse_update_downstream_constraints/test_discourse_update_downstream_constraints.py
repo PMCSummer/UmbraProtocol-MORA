@@ -21,6 +21,10 @@ def test_contract_requires_acceptance_repair_and_block_reads() -> None:
     assert view.interpretation_not_yet_accepted is True
     assert view.accepted_proposal_not_accepted_update is True
     assert view.proposal_effects_not_yet_authorized is True
+    assert view.source_modus_ref_present is True
+    assert view.source_modus_ref_kind_phase_native is True
+    assert view.source_modus_lineage_ref_present is True
+    assert view.source_modus_ref_distinct_from_lineage_ref is True
     assert view.proposal_not_truth is True
     assert view.proposal_not_self_update is True
     assert view.update_record_not_state_mutation is True
@@ -38,6 +42,9 @@ def test_contract_requires_acceptance_repair_and_block_reads() -> None:
     assert "proposal_requires_acceptance" in gate.restrictions
     assert "interpretation_not_equal_accepted_update" in gate.restrictions
     assert "downstream_must_read_block_or_repair" in gate.restrictions
+    assert "l06_source_modus_ref_must_be_read" in gate.restrictions
+    assert "l06_source_modus_ref_kind_must_be_read" in gate.restrictions
+    assert "l06_source_modus_lineage_ref_must_be_read" in gate.restrictions
 
 
 def test_downstream_authority_is_degraded_without_consumers() -> None:

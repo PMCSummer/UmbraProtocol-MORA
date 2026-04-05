@@ -29,6 +29,14 @@ class GroundedAuthorityLevel(str, Enum):
 @dataclass(frozen=True, slots=True)
 class GroundedDownstreamContractView:
     source_mode: GroundedSourceMode
+    source_modus_ref_present: bool
+    source_modus_ref_kind_phase_native: bool
+    source_modus_ref_distinct_from_lineage_ref: bool
+    source_discourse_update_ref_present: bool
+    source_discourse_update_ref_kind_phase_native: bool
+    source_discourse_update_ref_distinct_from_lineage_ref: bool
+    requires_source_modus_ref_class_read: bool
+    requires_source_discourse_update_ref_class_read: bool
     negation_present: bool
     interrogation_or_modality_present: bool
     dictum_modus_split_present: bool
@@ -124,6 +132,24 @@ def derive_grounded_downstream_contract(
     )
     return GroundedDownstreamContractView(
         source_mode=source_mode,
+        source_modus_ref_present=bool(bundle.source_modus_ref),
+        source_modus_ref_kind_phase_native=(bundle.source_modus_ref_kind == "phase_native_derived_ref"),
+        source_modus_ref_distinct_from_lineage_ref=(
+            bundle.source_modus_ref is not None
+            and bundle.source_modus_ref != bundle.source_modus_lineage_ref
+        ),
+        source_discourse_update_ref_present=bool(bundle.source_discourse_update_ref),
+        source_discourse_update_ref_kind_phase_native=(
+            bundle.source_discourse_update_ref_kind == "phase_native_derived_ref"
+        ),
+        source_discourse_update_ref_distinct_from_lineage_ref=(
+            bundle.source_discourse_update_ref is not None
+            and bundle.source_discourse_update_ref != bundle.source_discourse_update_lineage_ref
+        ),
+        requires_source_modus_ref_class_read=("source_modus_ref_class_must_be_read" in gate.restrictions),
+        requires_source_discourse_update_ref_class_read=(
+            "source_discourse_update_ref_class_must_be_read" in gate.restrictions
+        ),
         negation_present=negation_present,
         interrogation_or_modality_present=interrogation_or_modality_present,
         dictum_modus_split_present=dictum_modus_split_present,

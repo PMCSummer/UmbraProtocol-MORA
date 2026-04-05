@@ -70,6 +70,37 @@ def test_g01_normative_typed_route_is_active_with_l05_and_l06_inputs() -> None:
     assert "legacy_surface_cue_fallback_used" not in gate.restrictions
 
 
+def test_g01_normative_route_preserves_phase_native_source_refs_with_lineage_distinction() -> None:
+    surface, dictum, modus, discourse_update = _pipeline(
+        'he said "alpha is stable?"',
+        "m-g01-rewire-source-refs",
+    )
+    result = build_grounded_semantic_substrate(
+        dictum,
+        utterance_surface=surface,
+        memory_anchor_ref="m03:g01-rewire-source-refs",
+        cooperation_anchor_ref="o03:g01-rewire-source-refs",
+        modus_hypotheses_result_or_bundle=modus,
+        discourse_update_result_or_bundle=discourse_update,
+    )
+    contract = derive_grounded_downstream_contract(result)
+
+    assert result.bundle.source_modus_ref is not None
+    assert result.bundle.source_discourse_update_ref is not None
+    assert result.bundle.source_modus_ref_kind == "phase_native_derived_ref"
+    assert result.bundle.source_discourse_update_ref_kind == "phase_native_derived_ref"
+    assert result.bundle.source_modus_ref != result.bundle.source_modus_lineage_ref
+    assert result.bundle.source_discourse_update_ref != result.bundle.source_discourse_update_lineage_ref
+    assert contract.source_modus_ref_present is True
+    assert contract.source_discourse_update_ref_present is True
+    assert contract.source_modus_ref_kind_phase_native is True
+    assert contract.source_discourse_update_ref_kind_phase_native is True
+    assert contract.source_modus_ref_distinct_from_lineage_ref is True
+    assert contract.source_discourse_update_ref_distinct_from_lineage_ref is True
+    assert contract.requires_source_modus_ref_class_read is True
+    assert contract.requires_source_discourse_update_ref_class_read is True
+
+
 def test_g01_legacy_l04_only_path_stays_explicit_degraded_fallback() -> None:
     surface, dictum, _, _ = _pipeline("alpha is stable?", "m-g01-rewire-legacy")
     result = build_grounded_semantic_substrate_legacy_compatibility(
@@ -87,6 +118,11 @@ def test_g01_legacy_l04_only_path_stays_explicit_degraded_fallback() -> None:
     assert "legacy_surface_cue_path_not_normative" in gate.restrictions
     assert "l04_only_input_not_equivalent_to_l05_l06_route" in gate.restrictions
     assert "downstream_authority_degraded" in gate.restrictions
+    contract = derive_grounded_downstream_contract(result)
+    assert contract.source_modus_ref_present is False
+    assert contract.source_discourse_update_ref_present is False
+    assert contract.source_modus_ref_kind_phase_native is False
+    assert contract.source_discourse_update_ref_kind_phase_native is False
 
 
 def test_same_dictum_different_l06_continuation_topology_changes_g01_contract_surface() -> None:

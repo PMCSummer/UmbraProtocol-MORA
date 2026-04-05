@@ -13,6 +13,10 @@ from substrate.discourse_update.policy import evaluate_discourse_update_downstre
 
 @dataclass(frozen=True, slots=True)
 class DiscourseUpdateContractView:
+    source_modus_ref_present: bool
+    source_modus_ref_kind_phase_native: bool
+    source_modus_lineage_ref_present: bool
+    source_modus_ref_distinct_from_lineage_ref: bool
     requires_acceptance_read: bool
     requires_acceptance_required_marker_read: bool
     requires_repair_read: bool
@@ -56,6 +60,10 @@ def derive_discourse_update_contract_view(
     continuation_statuses = {state.continuation_status for state in bundle.continuation_states}
     repair_localization_present = all(bool(trigger.localized_ref_ids) for trigger in bundle.repair_triggers) if bundle.repair_triggers else False
     return DiscourseUpdateContractView(
+        source_modus_ref_present=bool(bundle.source_modus_ref),
+        source_modus_ref_kind_phase_native=(bundle.source_modus_ref_kind == "phase_native_derived_ref"),
+        source_modus_lineage_ref_present=bool(bundle.source_modus_lineage_ref),
+        source_modus_ref_distinct_from_lineage_ref=(bundle.source_modus_ref != bundle.source_modus_lineage_ref),
         requires_acceptance_read=("proposal_requires_acceptance" in gate.restrictions),
         requires_acceptance_required_marker_read=("acceptance_required_must_be_read" in gate.restrictions),
         requires_repair_read=("repair_trigger_must_be_localized" in gate.restrictions),

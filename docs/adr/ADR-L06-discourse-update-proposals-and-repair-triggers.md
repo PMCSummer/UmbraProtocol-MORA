@@ -41,6 +41,10 @@ Accepted as a bounded partial implementation of phase `L06` over implemented `L0
   - `GuardedContinuationState`
   - `DiscourseUpdateBundle`
 - Load-bearing fields:
+  - `bundle_ref`
+  - `source_modus_ref` (phase-native `L05` bundle ref)
+  - `source_modus_ref_kind`
+  - `source_modus_lineage_ref` (upstream lineage ref, non-authority class)
   - `acceptance_required`
   - `acceptance_status`
   - `proposal_basis`
@@ -68,6 +72,10 @@ Accepted as a bounded partial implementation of phase `L06` over implemented `L0
   - `downstream_must_read_block_or_repair`
   - `l06_object_presence_not_acceptance`
   - `object_presence_not_permission`
+  - `l06_source_modus_ref_must_be_read`
+  - `l06_source_modus_ref_kind_must_be_read`
+  - `l06_source_modus_lineage_ref_must_be_read`
+  - `source_ref_relabeling_without_notice`
 
 ## Hardening Delta (Mini-Audit Pass)
 - Acceptance inflation hardening:
@@ -86,6 +94,9 @@ Accepted as a bounded partial implementation of phase `L06` over implemented `L0
     - `update_record_not_state_mutation`
 - Legacy bypass readability hardening:
   - `legacy_bypass_risk_must_be_read` added as explicit gate restriction.
+- Lineage/source hardening:
+  - phase-native source ref class is separated from upstream lineage ref class.
+  - relabeling/collapse (`source_modus_ref == source_modus_lineage_ref`) is treated as degraded contract state.
 
 ## Core Formulas
 - `interpretation != accepted update`
@@ -93,6 +104,7 @@ Accepted as a bounded partial implementation of phase `L06` over implemented `L0
 - `proposal != self-state mutation`
 - `repair trigger != generic clarification`
 - `guarded continue != acceptance`
+- `phase-native source ref != upstream lineage ref`
 
 ## Explicit Authority Bounds (Non-Claims)
 - L06 does not perform final acceptance.

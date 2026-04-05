@@ -34,8 +34,13 @@ def test_l06_roundtrip_persistence_snapshot_stable() -> None:
     assert persisted.provenance.writer == WriterIdentity.TRANSITION_ENGINE
     snapshot = persisted.state.trace.events[-1].payload["discourse_update_snapshot"]
     assert snapshot["bundle"]["update_proposals"]
+    assert snapshot["bundle"]["bundle_ref"].startswith("l06.bundle:")
+    assert snapshot["bundle"]["source_modus_ref"].startswith("l05.bundle:")
+    assert snapshot["bundle"]["source_modus_ref_kind"] == "phase_native_derived_ref"
+    assert snapshot["bundle"]["source_modus_ref"] != snapshot["bundle"]["source_modus_lineage_ref"]
     assert snapshot["bundle"]["interpretation_not_equal_accepted_update"] is True
     assert snapshot["bundle"]["downstream_update_acceptor_absent"] is True
     assert snapshot["bundle"]["repair_consumer_absent"] is True
     assert snapshot["bundle"]["legacy_g01_bypass_risk_present"] is True
+    assert snapshot["telemetry"]["source_modus_ref_kind"] == "phase_native_derived_ref"
     assert snapshot["telemetry"]["downstream_gate"]["restrictions"]

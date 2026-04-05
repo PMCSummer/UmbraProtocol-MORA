@@ -70,6 +70,10 @@ def test_stage_contour_f01_f02_l01_l02_l03_l04_l05_l06_g01_normative_route_is_ru
     assert grounded.bundle.normative_l05_l06_route_active is True
     assert grounded.bundle.legacy_surface_cue_fallback_used is False
     assert grounded.bundle.discourse_update_not_inferred_from_surface_when_l06_available is True
+    assert grounded.bundle.source_modus_ref_kind == "phase_native_derived_ref"
+    assert grounded.bundle.source_discourse_update_ref_kind == "phase_native_derived_ref"
+    assert grounded.bundle.source_modus_ref != grounded.bundle.source_modus_lineage_ref
+    assert grounded.bundle.source_discourse_update_ref != grounded.bundle.source_discourse_update_lineage_ref
     gate = evaluate_grounded_semantic_downstream_gate(grounded)
     assert "normative_l05_l06_route_active" in gate.restrictions
     assert "discourse_update_not_inferred_from_surface_when_l06_available" in gate.restrictions
@@ -87,6 +91,8 @@ def test_stage_contour_f01_f02_l01_l02_l03_l04_l05_l06_g01_normative_route_is_ru
     assert snapshot["bundle"]["normative_l05_l06_route_active"] is True
     assert snapshot["bundle"]["legacy_surface_cue_fallback_used"] is False
     assert snapshot["bundle"]["discourse_update_not_inferred_from_surface_when_l06_available"] is True
+    assert snapshot["bundle"]["source_modus_ref_kind"] == "phase_native_derived_ref"
+    assert snapshot["bundle"]["source_discourse_update_ref_kind"] == "phase_native_derived_ref"
 
 
 def test_stage_contour_g01_normative_route_requires_both_typed_l05_and_l06_inputs() -> None:

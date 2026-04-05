@@ -24,6 +24,9 @@ def evaluate_discourse_update_downstream_gate(
     restrictions: list[str] = [
         "l06_object_presence_not_acceptance",
         "object_presence_not_permission",
+        "l06_source_modus_ref_must_be_read",
+        "l06_source_modus_ref_kind_must_be_read",
+        "l06_source_modus_lineage_ref_must_be_read",
         "proposal_requires_acceptance",
         "acceptance_required_must_be_read",
         "accepted_proposal_not_accepted_update",
@@ -54,6 +57,12 @@ def evaluate_discourse_update_downstream_gate(
     has_proposal_restriction_gap = False
     has_proposal_permission_gap = False
     has_abstain_withheld = False
+    has_source_ref_collapse = False
+
+    if bundle.source_modus_ref == bundle.source_modus_lineage_ref:
+        has_source_ref_collapse = True
+    if bundle.source_modus_ref_kind != "phase_native_derived_ref":
+        has_source_ref_collapse = True
 
     blocked_ids = set(bundle.blocked_update_ids)
     guarded_ids = set(bundle.guarded_update_ids)
@@ -166,6 +175,8 @@ def evaluate_discourse_update_downstream_gate(
         restrictions.append("proposal_permission_shape_gap_detected")
     if has_abstain_withheld:
         restrictions.append("abstain_update_withheld_must_be_read")
+    if has_source_ref_collapse:
+        restrictions.append("source_ref_relabeling_without_notice")
 
     if bundle.downstream_update_acceptor_absent:
         restrictions.append("downstream_update_acceptor_absent")
@@ -203,6 +214,7 @@ def evaluate_discourse_update_downstream_gate(
         or has_proposal_restriction_gap
         or has_proposal_permission_gap
         or has_abstain_withheld
+        or has_source_ref_collapse
     )
     if degraded:
         restrictions.append("downstream_authority_degraded")
@@ -217,5 +229,5 @@ def evaluate_discourse_update_downstream_gate(
         reason=reason,
         accepted_proposal_ids=tuple(dict.fromkeys(accepted_proposals)),
         rejected_proposal_ids=tuple(dict.fromkeys(rejected_proposals)),
-        bundle_ref=bundle.source_modus_ref,
+        bundle_ref=bundle.bundle_ref,
     )

@@ -27,6 +27,12 @@ class TargetedClarificationContractView:
     safety_escalation_not_authorized_from_current_evidence: bool
     usability_class: InterventionUsabilityClass
     restrictions: tuple[str, ...]
+    source_acquisition_ref_present: bool
+    source_framing_ref_present: bool
+    source_discourse_update_ref_present: bool
+    source_ref_kind_phase_native: bool
+    source_ref_distinct_from_lineage: bool
+    requires_source_ref_class_read: bool
     requires_target_binding_read: bool
     requires_lockouts_read: bool
     requires_question_spec_target_binding_read: bool
@@ -89,6 +95,20 @@ def derive_targeted_clarification_contract_view(
         ),
         usability_class=gate.usability_class,
         restrictions=gate.restrictions,
+        source_acquisition_ref_present=bool(bundle.source_acquisition_ref),
+        source_framing_ref_present=bool(bundle.source_framing_ref),
+        source_discourse_update_ref_present=bool(bundle.source_discourse_update_ref),
+        source_ref_kind_phase_native=(
+            bundle.source_acquisition_ref_kind == "phase_native_derived_ref"
+            and bundle.source_framing_ref_kind == "phase_native_derived_ref"
+            and bundle.source_discourse_update_ref_kind == "phase_native_derived_ref"
+        ),
+        source_ref_distinct_from_lineage=(
+            bundle.source_acquisition_ref != bundle.source_acquisition_lineage_ref
+            and bundle.source_framing_ref != bundle.source_framing_lineage_ref
+            and bundle.source_discourse_update_ref != bundle.source_discourse_update_lineage_ref
+        ),
+        requires_source_ref_class_read=("source_ref_class_must_be_read" in gate.restrictions),
         requires_target_binding_read=("intervention_requires_target_binding_read" in gate.restrictions),
         requires_lockouts_read=("downstream_lockouts_must_be_read" in gate.restrictions),
         requires_question_spec_target_binding_read=("minimal_question_spec_target_binding_must_be_read" in gate.restrictions),

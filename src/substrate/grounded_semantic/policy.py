@@ -33,8 +33,12 @@ def evaluate_grounded_semantic_downstream_gate(
         restrictions.append("low_coverage_mode")
     if bundle.normative_l05_l06_route_active:
         restrictions.append("normative_l05_l06_route_active")
+        restrictions.append("source_modus_ref_class_must_be_read")
+        restrictions.append("source_discourse_update_ref_class_must_be_read")
+        restrictions.append("phase_native_source_refs_required_on_normative_route")
     if bundle.legacy_surface_cue_fallback_used:
         restrictions.append("legacy_surface_cue_fallback_used")
+        restrictions.append("legacy_source_lineage_mode")
     if bundle.legacy_surface_cue_path_not_normative:
         restrictions.append("legacy_surface_cue_path_not_normative")
     if bundle.l04_only_input_not_equivalent_to_l05_l06_route:
@@ -51,6 +55,30 @@ def evaluate_grounded_semantic_downstream_gate(
         restrictions.append("source_anchors_sparse")
     if not bundle.modus_carriers:
         restrictions.append("modus_carriers_sparse")
+
+    source_ref_shape_gap = False
+    if bundle.normative_l05_l06_route_active:
+        if not bundle.source_modus_ref or not bundle.source_discourse_update_ref:
+            source_ref_shape_gap = True
+        if bundle.source_modus_ref_kind != "phase_native_derived_ref":
+            source_ref_shape_gap = True
+        if bundle.source_discourse_update_ref_kind != "phase_native_derived_ref":
+            source_ref_shape_gap = True
+        if (
+            bundle.source_modus_lineage_ref
+            and bundle.source_modus_ref == bundle.source_modus_lineage_ref
+        ):
+            source_ref_shape_gap = True
+        if (
+            bundle.source_discourse_update_lineage_ref
+            and bundle.source_discourse_update_ref == bundle.source_discourse_update_lineage_ref
+        ):
+            source_ref_shape_gap = True
+    if bundle.legacy_surface_cue_fallback_used:
+        if bundle.source_modus_ref or bundle.source_discourse_update_ref:
+            source_ref_shape_gap = True
+    if source_ref_shape_gap:
+        restrictions.append("source_ref_relabeling_without_notice")
     if (
         bundle.low_coverage_mode
         or not bundle.operator_carriers
@@ -58,6 +86,7 @@ def evaluate_grounded_semantic_downstream_gate(
         or bundle.legacy_surface_cue_fallback_used
         or bundle.l06_blocked_update_present
         or bundle.l06_guarded_continue_present
+        or source_ref_shape_gap
     ):
         restrictions.append("downstream_authority_degraded")
     if bundle.legacy_surface_cue_fallback_used:

@@ -90,7 +90,10 @@ class GuardedContinuationState:
 
 @dataclass(frozen=True, slots=True)
 class DiscourseUpdateBundle:
+    bundle_ref: str
     source_modus_ref: str
+    source_modus_ref_kind: str
+    source_modus_lineage_ref: str
     source_dictum_ref: str
     source_syntax_ref: str
     source_surface_ref: str | None
@@ -130,7 +133,10 @@ class DiscourseUpdateGateDecision:
 @dataclass(frozen=True, slots=True)
 class DiscourseUpdateTelemetry:
     source_lineage: tuple[str, ...]
+    bundle_ref: str
     source_modus_ref: str
+    source_modus_ref_kind: str
+    source_modus_lineage_ref: str
     source_dictum_ref: str
     source_syntax_ref: str
     source_surface_ref: str | None

@@ -169,7 +169,11 @@ class GroundedSemanticBundle:
     source_syntax_ref: str
     source_surface_ref: str | None
     source_modus_ref: str | None
+    source_modus_ref_kind: str
+    source_modus_lineage_ref: str | None
     source_discourse_update_ref: str | None
+    source_discourse_update_ref_kind: str
+    source_discourse_update_lineage_ref: str | None
     linked_dictum_candidate_ids: tuple[str, ...]
     linked_modus_record_ids: tuple[str, ...]
     linked_update_proposal_ids: tuple[str, ...]
@@ -211,7 +215,11 @@ class GroundedSemanticTelemetry:
     source_syntax_ref: str
     source_surface_ref: str | None
     source_modus_ref: str | None
+    source_modus_ref_kind: str
+    source_modus_lineage_ref: str | None
     source_discourse_update_ref: str | None
+    source_discourse_update_ref_kind: str
+    source_discourse_update_lineage_ref: str | None
     substrate_unit_count: int
     phrase_scaffold_count: int
     operator_carrier_count: int
