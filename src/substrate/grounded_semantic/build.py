@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import re
 from collections import defaultdict
+from dataclasses import dataclass
 
 from substrate.contracts import (
     RuntimeState,
@@ -79,6 +80,16 @@ _CONDITIONAL_CUE_PATTERN = re.compile(r"\b(if|unless|если|когда\s+бы)
 _STANCE_PARTICLE_PATTERN = re.compile(r"\b(well|just|even|же|ведь|ли|уж)\b", re.IGNORECASE)
 _SPEAKER_PATTERN = re.compile(r"\b(i|we|я|мы)\b", re.IGNORECASE)
 _DEIXIS_PATTERN = re.compile(r"\b(this|that|here|there|now|then|это|там|здесь|сейчас|тогда)\b", re.IGNORECASE)
+
+
+@dataclass(frozen=True, slots=True)
+class _G01SourceRefs:
+    source_modus_ref: str | None
+    source_modus_ref_kind: str
+    source_modus_lineage_ref: str | None
+    source_discourse_update_ref: str | None
+    source_discourse_update_ref_kind: str
+    source_discourse_update_lineage_ref: str | None
 
 
 def build_grounded_semantic_substrate(
@@ -165,12 +176,7 @@ def build_grounded_semantic_substrate(
     discourse_update_not_inferred_from_surface_when_l06_available = False
     l06_blocked_update_present = False
     l06_guarded_continue_present = False
-    source_modus_ref = _derive_l05_bundle_ref(modus_bundle) if modus_bundle is not None else None
-    source_modus_ref_kind = "phase_native_derived_ref" if modus_bundle is not None else "not_bound"
-    source_modus_lineage_ref = modus_bundle.source_dictum_ref if modus_bundle is not None else None
-    source_discourse_update_ref = _derive_l06_bundle_ref(discourse_bundle) if discourse_bundle is not None else None
-    source_discourse_update_ref_kind = "phase_native_derived_ref" if discourse_bundle is not None else "not_bound"
-    source_discourse_update_lineage_ref = discourse_bundle.source_modus_lineage_ref if discourse_bundle is not None else None
+    source_refs = _derive_source_refs(modus_bundle=modus_bundle, discourse_bundle=discourse_bundle)
 
     for candidate in dictum_bundle.dictum_candidates:
         clause_start = candidate.predicate_frame.predicate_span.start
@@ -447,12 +453,12 @@ def build_grounded_semantic_substrate(
         source_dictum_ref=dictum_bundle.source_lexical_grounding_ref,
         source_syntax_ref=dictum_bundle.source_syntax_ref,
         source_surface_ref=dictum_bundle.source_surface_ref,
-        source_modus_ref=source_modus_ref,
-        source_modus_ref_kind=source_modus_ref_kind,
-        source_modus_lineage_ref=source_modus_lineage_ref,
-        source_discourse_update_ref=source_discourse_update_ref,
-        source_discourse_update_ref_kind=source_discourse_update_ref_kind,
-        source_discourse_update_lineage_ref=source_discourse_update_lineage_ref,
+        source_modus_ref=source_refs.source_modus_ref,
+        source_modus_ref_kind=source_refs.source_modus_ref_kind,
+        source_modus_lineage_ref=source_refs.source_modus_lineage_ref,
+        source_discourse_update_ref=source_refs.source_discourse_update_ref,
+        source_discourse_update_ref_kind=source_refs.source_discourse_update_ref_kind,
+        source_discourse_update_lineage_ref=source_refs.source_discourse_update_lineage_ref,
         linked_dictum_candidate_ids=tuple(candidate.dictum_candidate_id for candidate in dictum_bundle.dictum_candidates),
         linked_modus_record_ids=tuple(record.record_id for record in modus_bundle.hypothesis_records) if modus_bundle is not None else (),
         linked_update_proposal_ids=tuple(proposal.proposal_id for proposal in discourse_bundle.update_proposals) if discourse_bundle is not None else (),
@@ -481,24 +487,16 @@ def build_grounded_semantic_substrate(
         ),
     )
     gate = evaluate_grounded_semantic_downstream_gate(bundle)
-    source_lineage = tuple(
-        dict.fromkeys(
-            (
-                *((source_modus_ref,) if source_modus_ref else ()),
-                *((source_modus_lineage_ref,) if source_modus_lineage_ref else ()),
-                *((source_discourse_update_ref,) if source_discourse_update_ref else ()),
-                *((source_discourse_update_lineage_ref,) if source_discourse_update_lineage_ref else ()),
-                dictum_bundle.source_lexical_grounding_ref,
-                dictum_bundle.source_syntax_ref,
-                *((modus_bundle.source_dictum_ref,) if modus_bundle is not None else ()),
-                *((discourse_bundle.source_modus_ref,) if discourse_bundle is not None else ()),
-                *dictum_lineage,
-                *modus_lineage,
-                *discourse_lineage,
-                *((f"m03:{memory_anchor_ref}",) if memory_anchor_ref else ()),
-                *((f"o03:{cooperation_anchor_ref}",) if cooperation_anchor_ref else ()),
-            )
-        )
+    source_lineage = _compose_source_lineage(
+        dictum_bundle=dictum_bundle,
+        source_refs=source_refs,
+        modus_bundle=modus_bundle,
+        discourse_bundle=discourse_bundle,
+        dictum_lineage=dictum_lineage,
+        modus_lineage=modus_lineage,
+        discourse_lineage=discourse_lineage,
+        memory_anchor_ref=memory_anchor_ref,
+        cooperation_anchor_ref=cooperation_anchor_ref,
     )
     telemetry = build_grounded_semantic_telemetry(
         bundle=bundle,
@@ -647,6 +645,63 @@ def _is_normative_binding_compatible(
     if not set(modus_bundle.linked_dictum_candidate_ids).intersection(dictum_ids):
         return False
     return True
+
+
+def _derive_source_refs(
+    *,
+    modus_bundle: ModusHypothesisBundle | None,
+    discourse_bundle: DiscourseUpdateBundle | None,
+) -> _G01SourceRefs:
+    if modus_bundle is None or discourse_bundle is None:
+        return _G01SourceRefs(
+            source_modus_ref=None,
+            source_modus_ref_kind="not_bound",
+            source_modus_lineage_ref=None,
+            source_discourse_update_ref=None,
+            source_discourse_update_ref_kind="not_bound",
+            source_discourse_update_lineage_ref=None,
+        )
+    return _G01SourceRefs(
+        source_modus_ref=_derive_l05_bundle_ref(modus_bundle),
+        source_modus_ref_kind="phase_native_derived_ref",
+        source_modus_lineage_ref=modus_bundle.source_dictum_ref,
+        source_discourse_update_ref=_derive_l06_bundle_ref(discourse_bundle),
+        source_discourse_update_ref_kind="phase_native_derived_ref",
+        source_discourse_update_lineage_ref=discourse_bundle.source_modus_lineage_ref,
+    )
+
+
+def _compose_source_lineage(
+    *,
+    dictum_bundle: DictumCandidateBundle,
+    source_refs: _G01SourceRefs,
+    modus_bundle: ModusHypothesisBundle | None,
+    discourse_bundle: DiscourseUpdateBundle | None,
+    dictum_lineage: tuple[str, ...],
+    modus_lineage: tuple[str, ...],
+    discourse_lineage: tuple[str, ...],
+    memory_anchor_ref: str | None,
+    cooperation_anchor_ref: str | None,
+) -> tuple[str, ...]:
+    return tuple(
+        dict.fromkeys(
+            (
+                *((source_refs.source_modus_ref,) if source_refs.source_modus_ref else ()),
+                *((source_refs.source_modus_lineage_ref,) if source_refs.source_modus_lineage_ref else ()),
+                *((source_refs.source_discourse_update_ref,) if source_refs.source_discourse_update_ref else ()),
+                *((source_refs.source_discourse_update_lineage_ref,) if source_refs.source_discourse_update_lineage_ref else ()),
+                dictum_bundle.source_lexical_grounding_ref,
+                dictum_bundle.source_syntax_ref,
+                *((modus_bundle.source_dictum_ref,) if modus_bundle is not None else ()),
+                *((discourse_bundle.source_modus_ref,) if discourse_bundle is not None else ()),
+                *dictum_lineage,
+                *modus_lineage,
+                *discourse_lineage,
+                *((f"m03:{memory_anchor_ref}",) if memory_anchor_ref else ()),
+                *((f"o03:{cooperation_anchor_ref}",) if cooperation_anchor_ref else ()),
+            )
+        )
+    )
 
 
 def _derive_l05_bundle_ref(modus_bundle: ModusHypothesisBundle) -> str:
@@ -1174,16 +1229,17 @@ def _abstain_result(
     source_lineage: tuple[str, ...],
     reason: str,
 ) -> GroundedSemanticResult:
+    source_refs = _derive_source_refs(modus_bundle=None, discourse_bundle=None)
     bundle = GroundedSemanticBundle(
         source_dictum_ref=dictum_bundle.source_lexical_grounding_ref,
         source_syntax_ref=dictum_bundle.source_syntax_ref,
         source_surface_ref=dictum_bundle.source_surface_ref,
-        source_modus_ref=None,
-        source_modus_ref_kind="not_bound",
-        source_modus_lineage_ref=None,
-        source_discourse_update_ref=None,
-        source_discourse_update_ref_kind="not_bound",
-        source_discourse_update_lineage_ref=None,
+        source_modus_ref=source_refs.source_modus_ref,
+        source_modus_ref_kind=source_refs.source_modus_ref_kind,
+        source_modus_lineage_ref=source_refs.source_modus_lineage_ref,
+        source_discourse_update_ref=source_refs.source_discourse_update_ref,
+        source_discourse_update_ref_kind=source_refs.source_discourse_update_ref_kind,
+        source_discourse_update_lineage_ref=source_refs.source_discourse_update_lineage_ref,
         linked_dictum_candidate_ids=tuple(candidate.dictum_candidate_id for candidate in dictum_bundle.dictum_candidates),
         linked_modus_record_ids=(),
         linked_update_proposal_ids=(),

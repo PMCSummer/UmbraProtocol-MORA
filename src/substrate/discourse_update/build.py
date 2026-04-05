@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
+
 from substrate.contracts import RuntimeState, TransitionKind, TransitionRequest, TransitionResult, WriterIdentity
 from substrate.discourse_update.models import (
     AcceptanceStatus,
@@ -35,6 +37,30 @@ ATTEMPTED_PATHS: tuple[str, ...] = (
     "l06.downstream_gate",
 )
 
+_L06_DEFAULT_DOWNSTREAM_ABSENCE_REASONS: tuple[str, ...] = (
+    "downstream_update_acceptor_absent",
+    "repair_consumer_absent",
+    "discourse_state_mutation_consumer_absent",
+    "legacy_g01_bypass_risk_present",
+)
+
+
+@dataclass(frozen=True, slots=True)
+class _L06SourceRefs:
+    source_modus_ref: str
+    source_modus_ref_kind: str
+    source_modus_lineage_ref: str
+    bundle_ref: str
+
+
+@dataclass(frozen=True, slots=True)
+class _L06DownstreamAbsence:
+    downstream_update_acceptor_absent: bool
+    repair_consumer_absent: bool
+    discourse_state_mutation_consumer_absent: bool
+    legacy_g01_bypass_risk_present: bool
+    low_coverage_reasons: tuple[str, ...]
+
 
 def build_discourse_update(
     modus_result_or_bundle: ModusHypothesisResult | ModusHypothesisBundle,
@@ -46,10 +72,6 @@ def build_discourse_update(
             source_lineage=source_lineage,
             reason="l05 hypothesis records are empty",
         )
-    source_modus_ref = _derive_l05_bundle_ref(modus_bundle)
-    source_modus_ref_kind = "phase_native_derived_ref"
-    source_modus_lineage_ref = modus_bundle.source_dictum_ref
-
     proposals: list[UpdateProposal] = []
     repairs: list[RepairTrigger] = []
     continuations: list[GuardedContinuationState] = []
@@ -98,25 +120,20 @@ def build_discourse_update(
         elif continuation.continuation_status is ContinuationStatus.GUARDED_CONTINUE:
             guarded_update_ids.append(proposal_id)
 
-    downstream_update_acceptor_absent = True
-    repair_consumer_absent = True
-    discourse_state_mutation_consumer_absent = True
-    legacy_g01_bypass_risk_present = True
-    low_coverage_reasons.extend(
-        [
-            "downstream_update_acceptor_absent",
-            "repair_consumer_absent",
-            "discourse_state_mutation_consumer_absent",
-            "legacy_g01_bypass_risk_present",
-        ]
+    source_refs = _derive_source_refs(
+        modus_bundle=modus_bundle,
+        proposals=proposals,
+        repairs=repairs,
+        continuations=continuations,
     )
+    downstream_absence = _default_downstream_absence()
+    low_coverage_reasons.extend(downstream_absence.low_coverage_reasons)
 
-    bundle_ref = _derive_l06_bundle_ref(source_modus_ref, proposals, repairs, continuations)
     bundle = DiscourseUpdateBundle(
-        bundle_ref=bundle_ref,
-        source_modus_ref=source_modus_ref,
-        source_modus_ref_kind=source_modus_ref_kind,
-        source_modus_lineage_ref=source_modus_lineage_ref,
+        bundle_ref=source_refs.bundle_ref,
+        source_modus_ref=source_refs.source_modus_ref,
+        source_modus_ref_kind=source_refs.source_modus_ref_kind,
+        source_modus_lineage_ref=source_refs.source_modus_lineage_ref,
         source_dictum_ref=modus_bundle.source_dictum_ref,
         source_syntax_ref=modus_bundle.source_syntax_ref,
         source_surface_ref=modus_bundle.source_surface_ref,
@@ -134,10 +151,10 @@ def build_discourse_update(
         no_common_ground_mutation_performed=True,
         no_self_state_mutation_performed=True,
         no_final_acceptance_performed=True,
-        downstream_update_acceptor_absent=downstream_update_acceptor_absent,
-        repair_consumer_absent=repair_consumer_absent,
-        discourse_state_mutation_consumer_absent=discourse_state_mutation_consumer_absent,
-        legacy_g01_bypass_risk_present=legacy_g01_bypass_risk_present,
+        downstream_update_acceptor_absent=downstream_absence.downstream_update_acceptor_absent,
+        repair_consumer_absent=downstream_absence.repair_consumer_absent,
+        discourse_state_mutation_consumer_absent=downstream_absence.discourse_state_mutation_consumer_absent,
+        legacy_g01_bypass_risk_present=downstream_absence.legacy_g01_bypass_risk_present,
         downstream_authority_degraded=True,
         reason="l06 projected acceptance-required discourse updates with localized repair gating",
     )
@@ -147,9 +164,9 @@ def build_discourse_update(
         source_lineage=tuple(
             dict.fromkeys(
                 (
-                    bundle_ref,
-                    source_modus_ref,
-                    source_modus_lineage_ref,
+                    source_refs.bundle_ref,
+                    source_refs.source_modus_ref,
+                    source_refs.source_modus_lineage_ref,
                     modus_bundle.source_dictum_ref,
                     modus_bundle.source_syntax_ref,
                     *((modus_bundle.source_surface_ref,) if modus_bundle.source_surface_ref else ()),
@@ -487,6 +504,33 @@ def _derive_l06_bundle_ref(
     )
 
 
+def _derive_source_refs(
+    *,
+    modus_bundle: ModusHypothesisBundle,
+    proposals: list[UpdateProposal] | tuple[UpdateProposal, ...],
+    repairs: list[RepairTrigger] | tuple[RepairTrigger, ...],
+    continuations: list[GuardedContinuationState] | tuple[GuardedContinuationState, ...],
+) -> _L06SourceRefs:
+    source_modus_ref = _derive_l05_bundle_ref(modus_bundle)
+    source_modus_lineage_ref = modus_bundle.source_dictum_ref
+    return _L06SourceRefs(
+        source_modus_ref=source_modus_ref,
+        source_modus_ref_kind="phase_native_derived_ref",
+        source_modus_lineage_ref=source_modus_lineage_ref,
+        bundle_ref=_derive_l06_bundle_ref(source_modus_ref, proposals, repairs, continuations),
+    )
+
+
+def _default_downstream_absence() -> _L06DownstreamAbsence:
+    return _L06DownstreamAbsence(
+        downstream_update_acceptor_absent=True,
+        repair_consumer_absent=True,
+        discourse_state_mutation_consumer_absent=True,
+        legacy_g01_bypass_risk_present=True,
+        low_coverage_reasons=_L06_DEFAULT_DOWNSTREAM_ABSENCE_REASONS,
+    )
+
+
 def _estimate_result_confidence(bundle: DiscourseUpdateBundle) -> float:
     base = 0.67
     base -= min(0.24, len(bundle.repair_triggers) * 0.02)
@@ -504,15 +548,18 @@ def _abstain_result(
     source_lineage: tuple[str, ...],
     reason: str,
 ) -> DiscourseUpdateResult:
-    source_modus_ref = _derive_l05_bundle_ref(modus_bundle)
-    source_modus_ref_kind = "phase_native_derived_ref"
-    source_modus_lineage_ref = modus_bundle.source_dictum_ref
-    bundle_ref = _derive_l06_bundle_ref(source_modus_ref, (), (), ())
+    source_refs = _derive_source_refs(
+        modus_bundle=modus_bundle,
+        proposals=(),
+        repairs=(),
+        continuations=(),
+    )
+    downstream_absence = _default_downstream_absence()
     bundle = DiscourseUpdateBundle(
-        bundle_ref=bundle_ref,
-        source_modus_ref=source_modus_ref,
-        source_modus_ref_kind=source_modus_ref_kind,
-        source_modus_lineage_ref=source_modus_lineage_ref,
+        bundle_ref=source_refs.bundle_ref,
+        source_modus_ref=source_refs.source_modus_ref,
+        source_modus_ref_kind=source_refs.source_modus_ref_kind,
+        source_modus_lineage_ref=source_refs.source_modus_lineage_ref,
         source_dictum_ref=modus_bundle.source_dictum_ref,
         source_syntax_ref=modus_bundle.source_syntax_ref,
         source_surface_ref=modus_bundle.source_surface_ref,
@@ -527,19 +574,16 @@ def _abstain_result(
         low_coverage_mode=True,
         low_coverage_reasons=(
             "abstain",
-            "downstream_update_acceptor_absent",
-            "repair_consumer_absent",
-            "discourse_state_mutation_consumer_absent",
-            "legacy_g01_bypass_risk_present",
+            *downstream_absence.low_coverage_reasons,
         ),
         interpretation_not_equal_accepted_update=True,
         no_common_ground_mutation_performed=True,
         no_self_state_mutation_performed=True,
         no_final_acceptance_performed=True,
-        downstream_update_acceptor_absent=True,
-        repair_consumer_absent=True,
-        discourse_state_mutation_consumer_absent=True,
-        legacy_g01_bypass_risk_present=True,
+        downstream_update_acceptor_absent=downstream_absence.downstream_update_acceptor_absent,
+        repair_consumer_absent=downstream_absence.repair_consumer_absent,
+        discourse_state_mutation_consumer_absent=downstream_absence.discourse_state_mutation_consumer_absent,
+        legacy_g01_bypass_risk_present=downstream_absence.legacy_g01_bypass_risk_present,
         downstream_authority_degraded=True,
         reason="l06 abstained due to insufficient l05 basis",
     )

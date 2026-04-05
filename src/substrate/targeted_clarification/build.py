@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
+
 from substrate.concept_framing.models import ConceptFramingBundle, ConceptFramingResult, FrameFamily, FramingStatus
 from substrate.contracts import RuntimeState, TransitionKind, TransitionRequest, TransitionResult, WriterIdentity
 from substrate.discourse_update.models import (
@@ -46,6 +48,19 @@ ATTEMPTED_PATHS: tuple[str, ...] = (
 )
 
 
+@dataclass(frozen=True, slots=True)
+class _G07SourceRefs:
+    source_acquisition_ref: str
+    source_acquisition_ref_kind: str
+    source_acquisition_lineage_ref: str
+    source_framing_ref: str
+    source_framing_ref_kind: str
+    source_framing_lineage_ref: str
+    source_discourse_update_ref: str
+    source_discourse_update_ref_kind: str
+    source_discourse_update_lineage_ref: str
+
+
 def build_targeted_clarification(
     semantic_acquisition_result_or_bundle: SemanticAcquisitionResult | SemanticAcquisitionBundle,
     concept_framing_result_or_bundle: ConceptFramingResult | ConceptFramingBundle,
@@ -54,15 +69,11 @@ def build_targeted_clarification(
     acq_bundle, acq_lineage = _extract_acq_input(semantic_acquisition_result_or_bundle)
     frame_bundle, frame_lineage = _extract_frame_input(concept_framing_result_or_bundle)
     discourse_bundle, discourse_lineage = _extract_discourse_update_input(discourse_update_result_or_bundle)
-    source_acquisition_ref = _derive_g05_bundle_ref(acq_bundle)
-    source_acquisition_ref_kind = "phase_native_derived_ref"
-    source_acquisition_lineage_ref = acq_bundle.source_perspective_chain_ref
-    source_framing_ref = _derive_g06_bundle_ref(frame_bundle)
-    source_framing_ref_kind = "phase_native_derived_ref"
-    source_framing_lineage_ref = frame_bundle.source_acquisition_ref
-    source_discourse_update_ref = discourse_bundle.bundle_ref
-    source_discourse_update_ref_kind = "phase_native_derived_ref"
-    source_discourse_update_lineage_ref = discourse_bundle.source_modus_lineage_ref
+    source_refs = _derive_source_refs(
+        acq_bundle=acq_bundle,
+        frame_bundle=frame_bundle,
+        discourse_bundle=discourse_bundle,
+    )
     if not acq_bundle.acquisition_records or not frame_bundle.framing_records:
         return _abstain_result(
             acq_bundle,
@@ -261,15 +272,15 @@ def build_targeted_clarification(
         low_coverage.append("downstream_authority_degraded")
 
     bundle = InterventionBundle(
-        source_acquisition_ref=source_acquisition_ref,
-        source_acquisition_ref_kind=source_acquisition_ref_kind,
-        source_acquisition_lineage_ref=source_acquisition_lineage_ref,
-        source_framing_ref=source_framing_ref,
-        source_framing_ref_kind=source_framing_ref_kind,
-        source_framing_lineage_ref=source_framing_lineage_ref,
-        source_discourse_update_ref=source_discourse_update_ref,
-        source_discourse_update_ref_kind=source_discourse_update_ref_kind,
-        source_discourse_update_lineage_ref=source_discourse_update_lineage_ref,
+        source_acquisition_ref=source_refs.source_acquisition_ref,
+        source_acquisition_ref_kind=source_refs.source_acquisition_ref_kind,
+        source_acquisition_lineage_ref=source_refs.source_acquisition_lineage_ref,
+        source_framing_ref=source_refs.source_framing_ref,
+        source_framing_ref_kind=source_refs.source_framing_ref_kind,
+        source_framing_lineage_ref=source_refs.source_framing_lineage_ref,
+        source_discourse_update_ref=source_refs.source_discourse_update_ref,
+        source_discourse_update_ref_kind=source_refs.source_discourse_update_ref_kind,
+        source_discourse_update_lineage_ref=source_refs.source_discourse_update_lineage_ref,
         source_perspective_chain_ref=acq_bundle.source_perspective_chain_ref,
         source_applicability_ref=acq_bundle.source_applicability_ref,
         source_runtime_graph_ref=acq_bundle.source_runtime_graph_ref,
@@ -315,28 +326,13 @@ def build_targeted_clarification(
         reason="g07 converted uncertainty into targeted intervention decisions without closure simulation",
     )
     gate = evaluate_targeted_clarification_downstream_gate(bundle)
-    source_lineage = tuple(
-        dict.fromkeys(
-            (
-                acq_bundle.source_perspective_chain_ref,
-                acq_bundle.source_applicability_ref,
-                acq_bundle.source_runtime_graph_ref,
-                acq_bundle.source_grounded_ref,
-                acq_bundle.source_dictum_ref,
-                acq_bundle.source_syntax_ref,
-                *((acq_bundle.source_surface_ref,) if acq_bundle.source_surface_ref else ()),
-                source_acquisition_ref,
-                source_framing_ref,
-                source_discourse_update_ref,
-                source_acquisition_lineage_ref,
-                source_framing_lineage_ref,
-                source_discourse_update_lineage_ref,
-                *acq_lineage,
-                *frame_lineage,
-                discourse_bundle.source_modus_ref,
-                *discourse_lineage,
-            )
-        )
+    source_lineage = _compose_source_lineage(
+        acq_bundle=acq_bundle,
+        source_refs=source_refs,
+        acq_lineage=acq_lineage,
+        frame_lineage=frame_lineage,
+        discourse_bundle=discourse_bundle,
+        discourse_lineage=discourse_lineage,
     )
     telemetry = build_targeted_clarification_telemetry(
         bundle=bundle,
@@ -410,6 +406,59 @@ def _extract_discourse_update_input(
         return inp, ()
     raise TypeError(
         "build_targeted_clarification requires DiscourseUpdateResult or DiscourseUpdateBundle for l06 upstream"
+    )
+
+
+def _derive_source_refs(
+    *,
+    acq_bundle: SemanticAcquisitionBundle,
+    frame_bundle: ConceptFramingBundle,
+    discourse_bundle: DiscourseUpdateBundle,
+) -> _G07SourceRefs:
+    return _G07SourceRefs(
+        source_acquisition_ref=_derive_g05_bundle_ref(acq_bundle),
+        source_acquisition_ref_kind="phase_native_derived_ref",
+        source_acquisition_lineage_ref=acq_bundle.source_perspective_chain_ref,
+        source_framing_ref=_derive_g06_bundle_ref(frame_bundle),
+        source_framing_ref_kind="phase_native_derived_ref",
+        source_framing_lineage_ref=frame_bundle.source_acquisition_ref,
+        source_discourse_update_ref=discourse_bundle.bundle_ref,
+        source_discourse_update_ref_kind="phase_native_derived_ref",
+        source_discourse_update_lineage_ref=discourse_bundle.source_modus_lineage_ref,
+    )
+
+
+def _compose_source_lineage(
+    *,
+    acq_bundle: SemanticAcquisitionBundle,
+    source_refs: _G07SourceRefs,
+    acq_lineage: tuple[str, ...],
+    frame_lineage: tuple[str, ...],
+    discourse_bundle: DiscourseUpdateBundle,
+    discourse_lineage: tuple[str, ...],
+) -> tuple[str, ...]:
+    return tuple(
+        dict.fromkeys(
+            (
+                acq_bundle.source_perspective_chain_ref,
+                acq_bundle.source_applicability_ref,
+                acq_bundle.source_runtime_graph_ref,
+                acq_bundle.source_grounded_ref,
+                acq_bundle.source_dictum_ref,
+                acq_bundle.source_syntax_ref,
+                *((acq_bundle.source_surface_ref,) if acq_bundle.source_surface_ref else ()),
+                source_refs.source_acquisition_ref,
+                source_refs.source_framing_ref,
+                source_refs.source_discourse_update_ref,
+                source_refs.source_acquisition_lineage_ref,
+                source_refs.source_framing_lineage_ref,
+                source_refs.source_discourse_update_lineage_ref,
+                *acq_lineage,
+                *frame_lineage,
+                discourse_bundle.source_modus_ref,
+                *discourse_lineage,
+            )
+        )
     )
 
 
@@ -866,19 +915,22 @@ def _abstain_result(
     source_lineage: tuple[str, ...],
     reason: str,
 ) -> TargetedClarificationResult:
-    source_acquisition_ref = _derive_g05_bundle_ref(acq_bundle)
-    source_framing_ref = _derive_g06_bundle_ref(frame_bundle)
+    source_refs = _derive_source_refs(
+        acq_bundle=acq_bundle,
+        frame_bundle=frame_bundle,
+        discourse_bundle=discourse_bundle,
+    )
     l06_update_proposal_absent = not bool(discourse_bundle.update_proposals)
     bundle = InterventionBundle(
-        source_acquisition_ref=source_acquisition_ref,
-        source_acquisition_ref_kind="phase_native_derived_ref",
-        source_acquisition_lineage_ref=acq_bundle.source_perspective_chain_ref,
-        source_framing_ref=source_framing_ref,
-        source_framing_ref_kind="phase_native_derived_ref",
-        source_framing_lineage_ref=frame_bundle.source_acquisition_ref,
-        source_discourse_update_ref=discourse_bundle.bundle_ref,
-        source_discourse_update_ref_kind="phase_native_derived_ref",
-        source_discourse_update_lineage_ref=discourse_bundle.source_modus_lineage_ref,
+        source_acquisition_ref=source_refs.source_acquisition_ref,
+        source_acquisition_ref_kind=source_refs.source_acquisition_ref_kind,
+        source_acquisition_lineage_ref=source_refs.source_acquisition_lineage_ref,
+        source_framing_ref=source_refs.source_framing_ref,
+        source_framing_ref_kind=source_refs.source_framing_ref_kind,
+        source_framing_lineage_ref=source_refs.source_framing_lineage_ref,
+        source_discourse_update_ref=source_refs.source_discourse_update_ref,
+        source_discourse_update_ref_kind=source_refs.source_discourse_update_ref_kind,
+        source_discourse_update_lineage_ref=source_refs.source_discourse_update_lineage_ref,
         source_perspective_chain_ref=acq_bundle.source_perspective_chain_ref,
         source_applicability_ref=acq_bundle.source_applicability_ref,
         source_runtime_graph_ref=acq_bundle.source_runtime_graph_ref,
