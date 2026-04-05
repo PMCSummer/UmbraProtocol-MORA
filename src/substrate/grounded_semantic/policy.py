@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from substrate.grounded_semantic.models import (
+    G01RestrictionCode,
     GroundedSemanticBundle,
     GroundedSemanticGateDecision,
     GroundedSemanticResult,
@@ -24,37 +25,45 @@ def evaluate_grounded_semantic_downstream_gate(
     rejected_ids: list[str] = []
 
     if bundle.no_final_semantic_resolution:
-        restrictions.append("no_final_semantic_resolution")
+        restrictions.append(G01RestrictionCode.NO_FINAL_SEMANTIC_RESOLUTION)
     if bundle.uncertainty_markers:
-        restrictions.append("uncertainty_markers_present")
+        restrictions.append(G01RestrictionCode.UNCERTAINTY_MARKERS_PRESENT)
     if bundle.ambiguity_reasons:
-        restrictions.append("ambiguity_present")
+        restrictions.append(G01RestrictionCode.AMBIGUITY_PRESENT)
     if bundle.low_coverage_mode:
-        restrictions.append("low_coverage_mode")
+        restrictions.append(G01RestrictionCode.LOW_COVERAGE_MODE)
     if bundle.normative_l05_l06_route_active:
-        restrictions.append("normative_l05_l06_route_active")
-        restrictions.append("source_modus_ref_class_must_be_read")
-        restrictions.append("source_discourse_update_ref_class_must_be_read")
-        restrictions.append("phase_native_source_refs_required_on_normative_route")
+        restrictions.append(G01RestrictionCode.NORMATIVE_L05_L06_ROUTE_ACTIVE)
+        restrictions.append(G01RestrictionCode.SOURCE_MODUS_REF_CLASS_MUST_BE_READ)
+        restrictions.append(
+            G01RestrictionCode.SOURCE_DISCOURSE_UPDATE_REF_CLASS_MUST_BE_READ
+        )
+        restrictions.append(
+            G01RestrictionCode.PHASE_NATIVE_SOURCE_REFS_REQUIRED_ON_NORMATIVE_ROUTE
+        )
     if bundle.legacy_surface_cue_fallback_used:
-        restrictions.append("legacy_surface_cue_fallback_used")
-        restrictions.append("legacy_source_lineage_mode")
+        restrictions.append(G01RestrictionCode.LEGACY_SURFACE_CUE_FALLBACK_USED)
+        restrictions.append(G01RestrictionCode.LEGACY_SOURCE_LINEAGE_MODE)
     if bundle.legacy_surface_cue_path_not_normative:
-        restrictions.append("legacy_surface_cue_path_not_normative")
+        restrictions.append(G01RestrictionCode.LEGACY_SURFACE_CUE_PATH_NOT_NORMATIVE)
     if bundle.l04_only_input_not_equivalent_to_l05_l06_route:
-        restrictions.append("l04_only_input_not_equivalent_to_l05_l06_route")
+        restrictions.append(
+            G01RestrictionCode.L04_ONLY_INPUT_NOT_EQUIVALENT_TO_L05_L06_ROUTE
+        )
     if bundle.discourse_update_not_inferred_from_surface_when_l06_available:
-        restrictions.append("discourse_update_not_inferred_from_surface_when_l06_available")
+        restrictions.append(
+            G01RestrictionCode.DISCOURSE_UPDATE_NOT_INFERRED_FROM_SURFACE_WHEN_L06_AVAILABLE
+        )
     if bundle.l06_blocked_update_present:
-        restrictions.append("l06_blocked_update_present")
+        restrictions.append(G01RestrictionCode.L06_BLOCKED_UPDATE_PRESENT)
     if bundle.l06_guarded_continue_present:
-        restrictions.append("l06_guarded_continue_present")
+        restrictions.append(G01RestrictionCode.L06_GUARDED_CONTINUE_PRESENT)
     if not bundle.operator_carriers:
-        restrictions.append("operator_carriers_sparse")
+        restrictions.append(G01RestrictionCode.OPERATOR_CARRIERS_SPARSE)
     if not bundle.source_anchors:
-        restrictions.append("source_anchors_sparse")
+        restrictions.append(G01RestrictionCode.SOURCE_ANCHORS_SPARSE)
     if not bundle.modus_carriers:
-        restrictions.append("modus_carriers_sparse")
+        restrictions.append(G01RestrictionCode.MODUS_CARRIERS_SPARSE)
 
     source_ref_shape_gap = False
     if bundle.normative_l05_l06_route_active:
@@ -78,7 +87,7 @@ def evaluate_grounded_semantic_downstream_gate(
         if bundle.source_modus_ref or bundle.source_discourse_update_ref:
             source_ref_shape_gap = True
     if source_ref_shape_gap:
-        restrictions.append("source_ref_relabeling_without_notice")
+        restrictions.append(G01RestrictionCode.SOURCE_REF_RELABELING_WITHOUT_NOTICE)
     if (
         bundle.low_coverage_mode
         or not bundle.operator_carriers
@@ -88,9 +97,11 @@ def evaluate_grounded_semantic_downstream_gate(
         or bundle.l06_guarded_continue_present
         or source_ref_shape_gap
     ):
-        restrictions.append("downstream_authority_degraded")
+        restrictions.append(G01RestrictionCode.DOWNSTREAM_AUTHORITY_DEGRADED)
     if bundle.legacy_surface_cue_fallback_used:
-        restrictions.append("legacy_fallback_requires_degraded_contract")
+        restrictions.append(
+            G01RestrictionCode.LEGACY_FALLBACK_REQUIRES_DEGRADED_CONTRACT
+        )
 
     for scaffold in bundle.phrase_scaffolds:
         if scaffold.confidence >= 0.2:
@@ -100,7 +111,7 @@ def evaluate_grounded_semantic_downstream_gate(
 
     accepted = bool(bundle.phrase_scaffolds and bundle.dictum_carriers)
     if not accepted:
-        restrictions.append("no_usable_scaffold")
+        restrictions.append(G01RestrictionCode.NO_USABLE_SCAFFOLD)
         reason = "grounded semantic bundle has no usable phrase scaffold"
     else:
         reason = "typed grounded semantic scaffold emitted with bounded restrictions"

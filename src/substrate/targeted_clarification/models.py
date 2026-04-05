@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
-from enum import Enum
+from enum import Enum, StrEnum
 
 
 class InterventionStatus(str, Enum):
@@ -28,6 +28,170 @@ class InterventionUsabilityClass(str, Enum):
     USABLE_BOUNDED = "usable_bounded"
     DEGRADED_BOUNDED = "degraded_bounded"
     BLOCKED = "blocked"
+
+
+class G07RestrictionCode(StrEnum):
+    NO_FINAL_SEMANTIC_CLOSURE = "no_final_semantic_closure"
+    INTERVENTION_OBJECT_PRESENCE_NOT_PERMISSION = (
+        "intervention_object_presence_not_permission"
+    )
+    SOURCE_ACQUISITION_REF_MUST_BE_READ = "source_acquisition_ref_must_be_read"
+    SOURCE_FRAMING_REF_MUST_BE_READ = "source_framing_ref_must_be_read"
+    SOURCE_DISCOURSE_UPDATE_REF_MUST_BE_READ = "source_discourse_update_ref_must_be_read"
+    SOURCE_REF_CLASS_MUST_BE_READ = "source_ref_class_must_be_read"
+    L06_OBJECT_PRESENCE_NOT_ACCEPTANCE = "l06_object_presence_not_acceptance"
+    INTERVENTION_STATUS_MUST_BE_READ = "intervention_status_must_be_read"
+    UNCERTAINTY_TARGET_ID_MUST_BE_READ = "uncertainty_target_id_must_be_read"
+    MINIMAL_QUESTION_SPEC_MUST_BE_READ = "minimal_question_spec_must_be_read"
+    MINIMAL_QUESTION_SPEC_TARGET_BINDING_MUST_BE_READ = (
+        "minimal_question_spec_target_binding_must_be_read"
+    )
+    FORBIDDEN_PRESUPPOSITIONS_MUST_BE_READ = "forbidden_presuppositions_must_be_read"
+    EXPECTED_EVIDENCE_GAIN_MUST_BE_READ = "expected_evidence_gain_must_be_read"
+    INTERVENTION_REQUIRES_TARGET_BINDING_READ = (
+        "intervention_requires_target_binding_read"
+    )
+    DOWNSTREAM_LOCKOUTS_MUST_BE_READ = "downstream_lockouts_must_be_read"
+    L06_UPSTREAM_BOUND_HERE_MUST_BE_READ = "l06_upstream_bound_here_must_be_read"
+    L06_REPAIR_LOCALIZATION_MUST_BE_READ = "l06_repair_localization_must_be_read"
+    L06_PROPOSAL_REQUIRES_ACCEPTANCE_READ = "l06_proposal_requires_acceptance_read"
+    L06_UPDATE_NOT_ACCEPTED = "l06_update_not_accepted"
+    L06_UPDATE_NOT_AUTHORIZED_YET = "l06_update_not_authorized_yet"
+    CLARIFICATION_NOT_EQUAL_ACCEPTED_UPDATE = "clarification_not_equal_accepted_update"
+    INTERVENTION_NOT_DISCOURSE_ACCEPTANCE = "intervention_not_discourse_acceptance"
+    ACCEPTED_INTERVENTION_NOT_ACCEPTED_UPDATE = (
+        "accepted_intervention_not_accepted_update"
+    )
+    L06_BLOCK_OR_GUARD_MUST_BE_READ = "l06_block_or_guard_must_be_read"
+    L06_CONTINUATION_TOPOLOGY_PRESENT = "l06_continuation_topology_present"
+    L06_G07_TARGET_ALIGNMENT_REQUIRED = "l06_g07_target_alignment_required"
+    CLARIFICATION_NOT_EQUAL_REALIZED_QUESTION = (
+        "clarification_not_equal_realized_question"
+    )
+    ASKED_QUESTION_NOT_EQUAL_RESOLVED_UNCERTAINTY = (
+        "asked_question_not_equal_resolved_uncertainty"
+    )
+    ACCEPTED_INTERVENTION_NOT_RESOLUTION = "accepted_intervention_not_resolution"
+    ASK_NOW_REQUIRES_ANSWER_BINDING_FOLLOWUP = (
+        "ask_now_requires_answer_binding_followup"
+    )
+    GUARDED_CONTINUE_LIMITS_MUST_BE_READ = "guarded_continue_limits_must_be_read"
+    DEFER_UNTIL_NEEDED_MUST_BE_READ = "defer_until_needed_must_be_read"
+    ABSTAIN_WITHOUT_QUESTION_MUST_BE_READ = "abstain_without_question_must_be_read"
+    CLARIFICATION_NOT_WORTH_COST_MUST_BE_READ = (
+        "clarification_not_worth_cost_must_be_read"
+    )
+    BLOCKED_DUE_TO_INSUFFICIENT_QUESTIONABILITY = (
+        "blocked_due_to_insufficient_questionability"
+    )
+    TARGET_DRIFT_RISK_DETECTED = "target_drift_risk_detected"
+    FORBIDDEN_PRESUPPOSITIONS_MISSING_OR_UNREADABLE = (
+        "forbidden_presuppositions_missing_or_unreadable"
+    )
+    DOWNSTREAM_LOCKOUTS_MISSING_OR_UNREADABLE = (
+        "downstream_lockouts_missing_or_unreadable"
+    )
+    STATUS_POLICY_ALIGNMENT_BROKEN = "status_policy_alignment_broken"
+    ASK_NOW_WITHOUT_ANSWER_BINDING_FORBIDDEN = (
+        "ask_now_without_answer_binding_forbidden"
+    )
+    HIGH_IMPACT_LOCKOUT_GAP_DETECTED = "high_impact_lockout_gap_detected"
+    L06_G07_TARGET_DRIFT_DETECTED = "l06_g07_target_drift_detected"
+    L06_REPAIR_LOCALIZATION_INCOMPATIBLE = "l06_repair_localization_incompatible"
+    L06_REPAIR_BINDING_MISSING_FOR_ASK_NOW = "l06_repair_binding_missing_for_ask_now"
+    L06_CONTINUATION_STATUS_UNREADABLE = "l06_continuation_status_unreadable"
+    SOURCE_REF_RELABELING_WITHOUT_NOTICE = "source_ref_relabeling_without_notice"
+    LINEAGE_IDENTITY_COLLAPSE_RISK = "lineage_identity_collapse_risk"
+    ANSWER_BINDING_READY_REQUIRES_TARGETED_REOPEN = (
+        "answer_binding_ready_requires_targeted_reopen"
+    )
+    ANSWER_BINDING_HOOKS_MUST_BE_READ = "answer_binding_hooks_must_be_read"
+    ANSWER_BINDING_NOT_READY = "answer_binding_not_ready"
+    L06_UPDATE_PROPOSAL_ABSENT = "l06_update_proposal_absent"
+    L06_UPSTREAM_NOT_BOUND = "l06_upstream_not_bound"
+    REPAIR_TRIGGER_BASIS_INCOMPLETE = "repair_trigger_basis_incomplete"
+    RESPONSE_REALIZATION_CONTRACT_ABSENT = "response_realization_contract_absent"
+    ANSWER_BINDING_CONSUMER_ABSENT = "answer_binding_consumer_absent"
+    NO_USABLE_INTERVENTION_RECORDS = "no_usable_intervention_records"
+    INTERVENTION_RECORD_CONTRACT_BROKEN = "intervention_record_contract_broken"
+    DOWNSTREAM_AUTHORITY_DEGRADED = "downstream_authority_degraded"
+    DEGRADED_INTERVENTION_REQUIRES_RESTRICTIONS_READ = (
+        "degraded_intervention_requires_restrictions_read"
+    )
+
+
+class G07DecisionBasisCode(StrEnum):
+    QUESTIONABILITY_BLOCKED_UNRESOLVED_OWNER_SOURCE_OR_REPAIR_BASIS = (
+        "questionability_blocked_by_unresolved_owner_source_or_repair_basis"
+    )
+    REPAIR_TRIGGER_BASIS_INCOMPLETE = "repair_trigger_basis_incomplete"
+    L06_G07_TARGET_ALIGNMENT_REQUIRED = "l06_g07_target_alignment_required"
+    L06_REPAIR_LOCALIZATION_INCOMPATIBLE = "l06_repair_localization_incompatible"
+    L06_BLOCKED_UPDATE_TOPOLOGY = "l06_blocked_update_topology"
+    L06_BLOCK_OR_GUARD_MUST_BE_READ = "l06_block_or_guard_must_be_read"
+    CONTEXT_ONLY_UNCERTAINTY_LOW_GAIN = "context_only_uncertainty_low_gain"
+    HIGH_VALUE_TARGETED_CLARIFICATION = "high_value_targeted_clarification"
+    ASK_NOW_NOT_EQUAL_RESOLUTION = "ask_now_not_equal_resolution"
+    LOW_EVIDENCE_GAIN = "low_evidence_gain"
+    UNCERTAINTY_PRESERVED_WITH_DEFERRED_TARGETED_INTERVENTION = (
+        "uncertainty_preserved_with_deferred_targeted_intervention"
+    )
+    NONBLOCKING_UNCERTAINTY_GUARDED_CONTINUE = (
+        "nonblocking_uncertainty_guarded_continue"
+    )
+    ABSTAIN_WITHOUT_FORCED_QUESTION = "abstain_without_forced_question"
+    L06_GUARDED_CONTINUE_TOPOLOGY = "l06_guarded_continue_topology"
+    GUARDED_CONTINUE_NOT_ACCEPTANCE = "guarded_continue_not_acceptance"
+    L06_ABSTAIN_UPDATE_WITHHELD_TOPOLOGY = "l06_abstain_update_withheld_topology"
+    DEFER_UNTIL_NEEDED_MUST_BE_READ = "defer_until_needed_must_be_read"
+    L06_G07_TARGET_DRIFT_DETECTED = "l06_g07_target_drift_detected"
+    MISSING_G05_BASIS = "missing_g05_basis"
+
+
+class G07LockoutCode(StrEnum):
+    NARRATIVE_COMMITMENT_FORBIDDEN = "narrative_commitment_forbidden"
+    CLOSURE_BLOCKED_UNTIL_ANSWER = "closure_blocked_until_answer"
+    MEMORY_UPTAKE_DEFERRED = "memory_uptake_deferred"
+    APPRAISAL_CONTEXT_ONLY = "appraisal_context_only"
+    PLANNING_FORBIDDEN_ON_CURRENT_FRAME = "planning_forbidden_on_current_frame"
+    SAFETY_ESCALATION_NOT_AUTHORIZED_FROM_CURRENT_EVIDENCE = (
+        "safety_escalation_not_authorized_from_current_evidence"
+    )
+    GUARDED_CONTINUE_LIMITS_MUST_BE_READ = "guarded_continue_limits_must_be_read"
+    DEFER_UNTIL_NEEDED_MUST_BE_READ = "defer_until_needed_must_be_read"
+    ABSTAIN_WITHOUT_QUESTION_MUST_BE_READ = "abstain_without_question_must_be_read"
+    QUESTIONABILITY_BLOCKED_REQUIRES_REPAIR_BASIS = (
+        "questionability_blocked_requires_repair_basis"
+    )
+    CLARIFICATION_NOT_WORTH_COST_MUST_BE_READ = (
+        "clarification_not_worth_cost_must_be_read"
+    )
+    ASK_NOW_REQUIRES_ANSWER_BINDING = "ask_now_requires_answer_binding"
+    L06_BLOCKED_UPDATE_MUST_BE_READ = "l06_blocked_update_must_be_read"
+    L06_GUARDED_CONTINUE_MUST_BE_READ = "l06_guarded_continue_must_be_read"
+    L06_ABSTAIN_UPDATE_WITHHELD_MUST_BE_READ = (
+        "l06_abstain_update_withheld_must_be_read"
+    )
+
+
+class G07CoverageCode(StrEnum):
+    ABSTAIN = "abstain"
+    L06_UPDATE_PROPOSAL_ABSENT = "l06_update_proposal_absent"
+    L06_REPAIR_CONSUMER_ABSENT = "l06_repair_consumer_absent"
+    L06_DOWNSTREAM_UPDATE_ACCEPTOR_ABSENT = "l06_downstream_update_acceptor_absent"
+    L06_DISCOURSE_STATE_MUTATION_CONSUMER_ABSENT = (
+        "l06_discourse_state_mutation_consumer_absent"
+    )
+    LEGACY_G01_BYPASS_RISK_PRESENT = "legacy_g01_bypass_risk_present"
+    RESPONSE_REALIZATION_CONTRACT_ABSENT = "response_realization_contract_absent"
+    ANSWER_BINDING_CONSUMER_ABSENT = "answer_binding_consumer_absent"
+    ANSWER_BINDING_NOT_READY = "answer_binding_not_ready"
+    ASK_NOW_WITHOUT_ANSWER_BINDING_EXECUTOR = "ask_now_without_answer_binding_executor"
+    L06_G07_TARGET_DRIFT_DETECTED = "l06_g07_target_drift_detected"
+    L06_REPAIR_LOCALIZATION_INCOMPATIBLE = "l06_repair_localization_incompatible"
+    L06_UPDATE_ACCEPTANCE_STATE_UNEXPECTED = "l06_update_acceptance_state_unexpected"
+    L06_CONTINUATION_TOPOLOGY_MISSING = "l06_continuation_topology_missing"
+    DOWNSTREAM_AUTHORITY_DEGRADED = "downstream_authority_degraded"
 
 
 @dataclass(frozen=True, slots=True)

@@ -3,6 +3,8 @@ from __future__ import annotations
 from substrate.modus_hypotheses.models import (
     AddressivityKind,
     IllocutionKind,
+    L05CautionCode,
+    L05RestrictionCode,
     ModusHypothesisBundle,
     ModusHypothesisGateDecision,
     ModusHypothesisResult,
@@ -23,24 +25,24 @@ def evaluate_modus_hypothesis_downstream_gate(
         )
 
     restrictions: list[str] = [
-        "l05_object_presence_not_lawful_resolution",
-        "dictum_not_equal_force",
-        "likely_illocution_not_settled_intent",
-        "accepted_hypothesis_not_settled_intent",
-        "quoted_force_not_current_commitment",
-        "addressivity_not_self_applicability",
-        "punctuation_form_not_lawful_force_resolution",
-        "illocution_alternatives_must_be_read",
-        "uncertainty_entropy_must_be_read",
-        "modality_profile_must_be_read",
-        "evidentiality_profile_must_be_read",
-        "addressivity_hypotheses_must_be_read",
-        "downstream_cautions_must_be_read",
-        "l05_output_not_l06_update",
-        "l05_output_not_repair_plan",
-        "no_final_intent_selection",
-        "no_common_ground_update",
-        "no_repair_planning",
+        L05RestrictionCode.L05_OBJECT_PRESENCE_NOT_LAWFUL_RESOLUTION,
+        L05RestrictionCode.DICTUM_NOT_EQUAL_FORCE,
+        L05RestrictionCode.LIKELY_ILLOCUTION_NOT_SETTLED_INTENT,
+        L05RestrictionCode.ACCEPTED_HYPOTHESIS_NOT_SETTLED_INTENT,
+        L05RestrictionCode.QUOTED_FORCE_NOT_CURRENT_COMMITMENT,
+        L05RestrictionCode.ADDRESSIVITY_NOT_SELF_APPLICABILITY,
+        L05RestrictionCode.PUNCTUATION_FORM_NOT_LAWFUL_FORCE_RESOLUTION,
+        L05RestrictionCode.ILLOCUTION_ALTERNATIVES_MUST_BE_READ,
+        L05RestrictionCode.UNCERTAINTY_ENTROPY_MUST_BE_READ,
+        L05RestrictionCode.MODALITY_PROFILE_MUST_BE_READ,
+        L05RestrictionCode.EVIDENTIALITY_PROFILE_MUST_BE_READ,
+        L05RestrictionCode.ADDRESSIVITY_HYPOTHESES_MUST_BE_READ,
+        L05RestrictionCode.DOWNSTREAM_CAUTIONS_MUST_BE_READ,
+        L05RestrictionCode.L05_OUTPUT_NOT_L06_UPDATE,
+        L05RestrictionCode.L05_OUTPUT_NOT_REPAIR_PLAN,
+        L05RestrictionCode.NO_FINAL_INTENT_SELECTION,
+        L05RestrictionCode.NO_COMMON_GROUND_UPDATE,
+        L05RestrictionCode.NO_REPAIR_PLANNING,
     ]
 
     accepted_ids: list[str] = []
@@ -87,13 +89,14 @@ def evaluate_modus_hypothesis_downstream_gate(
             has_quote_commitment_leak = True
         if (
             record.quoted_speech_state.quote_or_echo_present
-            and "quoted_force_not_current_commitment" not in record.downstream_cautions
+            and L05CautionCode.QUOTED_FORCE_NOT_CURRENT_COMMITMENT
+            not in record.downstream_cautions
         ):
             has_quote_commitment_leak = True
         required_cautions = {
-            "likely_illocution_not_settled_intent",
-            "addressivity_not_self_applicability",
-            "dictum_not_equal_force",
+            L05CautionCode.LIKELY_ILLOCUTION_NOT_SETTLED_INTENT,
+            L05CautionCode.ADDRESSIVITY_NOT_SELF_APPLICABILITY,
+            L05CautionCode.DICTUM_NOT_EQUAL_FORCE,
         }
         if not required_cautions.issubset(set(record.downstream_cautions)):
             has_caution_gap = True
@@ -115,37 +118,41 @@ def evaluate_modus_hypothesis_downstream_gate(
             rejected_ids.append(record.record_id)
 
     if has_single_label_collapse:
-        restrictions.append("single_label_force_collapse_detected")
+        restrictions.append(L05RestrictionCode.SINGLE_LABEL_FORCE_COLLAPSE_DETECTED)
     if has_weight_shape_violation:
-        restrictions.append("illocution_weight_shape_violation")
+        restrictions.append(L05RestrictionCode.ILLOCUTION_WEIGHT_SHAPE_VIOLATION)
     if has_addressivity_gap:
-        restrictions.append("addressivity_hypothesis_gap_detected")
+        restrictions.append(L05RestrictionCode.ADDRESSIVITY_HYPOTHESIS_GAP_DETECTED)
     if has_quote_commitment_leak:
-        restrictions.append("quoted_force_commitment_leak_detected")
+        restrictions.append(L05RestrictionCode.QUOTED_FORCE_COMMITMENT_LEAK_DETECTED)
     if has_entropy_gap:
-        restrictions.append("entropy_contract_gap_detected")
+        restrictions.append(L05RestrictionCode.ENTROPY_CONTRACT_GAP_DETECTED)
     if has_caution_gap:
-        restrictions.append("downstream_cautions_contract_gap_detected")
+        restrictions.append(
+            L05RestrictionCode.DOWNSTREAM_CAUTIONS_CONTRACT_GAP_DETECTED
+        )
     if has_unresolved_slot_pressure:
-        restrictions.append("unresolved_slot_pressure_must_be_read")
+        restrictions.append(L05RestrictionCode.UNRESOLVED_SLOT_PRESSURE_MUST_BE_READ)
 
     if bundle.l06_downstream_not_bound_here:
-        restrictions.append("l06_downstream_not_bound_here")
+        restrictions.append(L05RestrictionCode.L06_DOWNSTREAM_NOT_BOUND_HERE)
     if bundle.l06_update_consumer_not_wired_here:
-        restrictions.append("l06_update_consumer_not_wired_here")
+        restrictions.append(L05RestrictionCode.L06_UPDATE_CONSUMER_NOT_WIRED_HERE)
     if bundle.l06_repair_consumer_not_wired_here:
-        restrictions.append("l06_repair_consumer_not_wired_here")
+        restrictions.append(L05RestrictionCode.L06_REPAIR_CONSUMER_NOT_WIRED_HERE)
     if bundle.legacy_l04_g01_shortcut_operational_debt:
-        restrictions.append("legacy_l04_g01_shortcut_operational_debt")
+        restrictions.append(
+            L05RestrictionCode.LEGACY_L04_G01_SHORTCUT_OPERATIONAL_DEBT
+        )
     if bundle.legacy_shortcut_bypass_risk:
-        restrictions.append("legacy_shortcut_bypass_risk")
-        restrictions.append("legacy_shortcut_bypass_forbidden")
+        restrictions.append(L05RestrictionCode.LEGACY_SHORTCUT_BYPASS_RISK)
+        restrictions.append(L05RestrictionCode.LEGACY_SHORTCUT_BYPASS_FORBIDDEN)
 
     accepted = bool(accepted_ids)
     if not accepted:
         usability_class = ModusUsabilityClass.BLOCKED
         reason = "l05 produced no lawful hypothesis records for downstream use"
-        restrictions.append("no_usable_l05_records")
+        restrictions.append(L05RestrictionCode.NO_USABLE_L05_RECORDS)
     else:
         usability_class = ModusUsabilityClass.USABLE_BOUNDED
         reason = "typed l05 hypothesis bundle emitted with bounded uncertainty restrictions"
@@ -166,8 +173,10 @@ def evaluate_modus_hypothesis_downstream_gate(
         or has_unresolved_slot_pressure
     )
     if degraded:
-        restrictions.append("downstream_authority_degraded")
-        restrictions.append("degraded_l05_requires_restrictions_read")
+        restrictions.append(L05RestrictionCode.DOWNSTREAM_AUTHORITY_DEGRADED)
+        restrictions.append(
+            L05RestrictionCode.DEGRADED_L05_REQUIRES_RESTRICTIONS_READ
+        )
     if degraded and accepted:
         usability_class = ModusUsabilityClass.DEGRADED_BOUNDED
 

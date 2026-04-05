@@ -26,6 +26,10 @@ from substrate.targeted_clarification.models import (
     InterventionBundle,
     InterventionDecision,
     InterventionRecord,
+    G07CoverageCode,
+    G07DecisionBasisCode,
+    G07LockoutCode,
+    G07RestrictionCode,
     InterventionStatus,
     MinimalQuestionSpec,
     TargetedClarificationResult,
@@ -104,17 +108,22 @@ def build_targeted_clarification(
     response_realization_contract_absent = True
     answer_binding_consumer_absent = True
     if l06_update_proposal_absent:
-        low_coverage.append("l06_update_proposal_absent")
+        low_coverage.append(G07CoverageCode.L06_UPDATE_PROPOSAL_ABSENT)
     if discourse_bundle.repair_consumer_absent:
-        low_coverage.append("l06_repair_consumer_absent")
+        low_coverage.append(G07CoverageCode.L06_REPAIR_CONSUMER_ABSENT)
     if discourse_bundle.downstream_update_acceptor_absent:
-        low_coverage.append("l06_downstream_update_acceptor_absent")
+        low_coverage.append(G07CoverageCode.L06_DOWNSTREAM_UPDATE_ACCEPTOR_ABSENT)
     if discourse_bundle.discourse_state_mutation_consumer_absent:
-        low_coverage.append("l06_discourse_state_mutation_consumer_absent")
+        low_coverage.append(
+            G07CoverageCode.L06_DISCOURSE_STATE_MUTATION_CONSUMER_ABSENT
+        )
     if discourse_bundle.legacy_g01_bypass_risk_present:
-        low_coverage.append("legacy_g01_bypass_risk_present")
+        low_coverage.append(G07CoverageCode.LEGACY_G01_BYPASS_RISK_PRESENT)
     low_coverage.extend(
-        ["response_realization_contract_absent", "answer_binding_consumer_absent"]
+        [
+            G07CoverageCode.RESPONSE_REALIZATION_CONTRACT_ABSENT,
+            G07CoverageCode.ANSWER_BINDING_CONSUMER_ABSENT,
+        ]
     )
     if frame_bundle.source_perspective_chain_ref != acq_bundle.source_perspective_chain_ref:
         ambiguity.append("acquisition_framing_reference_mismatch")
@@ -169,7 +178,9 @@ def build_targeted_clarification(
             l06_target_alignment_required=l06_ctx["target_alignment_required"],
         )
         if l06_ctx["target_alignment_required"] and not l06_ctx["target_alignment_ok"]:
-            basis = tuple(dict.fromkeys((*basis, "l06_g07_target_drift_detected")))
+            basis = tuple(
+                dict.fromkeys((*basis, G07DecisionBasisCode.L06_G07_TARGET_DRIFT_DETECTED))
+            )
         decision = InterventionDecision(
             selected_status=status,
             decision_basis=tuple(dict.fromkeys(basis)),
@@ -242,19 +253,19 @@ def build_targeted_clarification(
         record.uncertainty_target_id and record.reopen_conditions for record in records
     )
     if not answer_binding_ready:
-        low_coverage.append("answer_binding_not_ready")
+        low_coverage.append(G07CoverageCode.ANSWER_BINDING_NOT_READY)
     if answer_binding_consumer_absent and any(
         record.intervention_status is InterventionStatus.ASK_NOW for record in records
     ):
-        low_coverage.append("ask_now_without_answer_binding_executor")
+        low_coverage.append(G07CoverageCode.ASK_NOW_WITHOUT_ANSWER_BINDING_EXECUTOR)
     if l06_target_drift_detected:
-        low_coverage.append("l06_g07_target_drift_detected")
+        low_coverage.append(G07CoverageCode.L06_G07_TARGET_DRIFT_DETECTED)
     if l06_repair_localization_incompatible:
-        low_coverage.append("l06_repair_localization_incompatible")
+        low_coverage.append(G07CoverageCode.L06_REPAIR_LOCALIZATION_INCOMPATIBLE)
     if not l06_update_not_accepted:
-        low_coverage.append("l06_update_acceptance_state_unexpected")
+        low_coverage.append(G07CoverageCode.L06_UPDATE_ACCEPTANCE_STATE_UNEXPECTED)
     if not l06_continuation_topology_present:
-        low_coverage.append("l06_continuation_topology_missing")
+        low_coverage.append(G07CoverageCode.L06_CONTINUATION_TOPOLOGY_MISSING)
     degraded = bool(
         low_coverage
         or any(
@@ -269,7 +280,7 @@ def build_targeted_clarification(
         )
     )
     if degraded:
-        low_coverage.append("downstream_authority_degraded")
+        low_coverage.append(G07CoverageCode.DOWNSTREAM_AUTHORITY_DEGRADED)
 
     bundle = InterventionBundle(
         source_acquisition_ref=source_refs.source_acquisition_ref,
@@ -730,19 +741,28 @@ def _select_status(
     if questionability_blocked:
         return (
             InterventionStatus.BLOCKED_DUE_TO_INSUFFICIENT_QUESTIONABILITY,
-            ("questionability_blocked_by_unresolved_owner_source_or_repair_basis", "repair_trigger_basis_incomplete"),
+            (
+                G07DecisionBasisCode.QUESTIONABILITY_BLOCKED_UNRESOLVED_OWNER_SOURCE_OR_REPAIR_BASIS,
+                G07DecisionBasisCode.REPAIR_TRIGGER_BASIS_INCOMPLETE,
+            ),
             False,
         )
     if l06_target_alignment_required and not l06_target_alignment_ok:
         return (
             InterventionStatus.BLOCKED_DUE_TO_INSUFFICIENT_QUESTIONABILITY,
-            ("l06_g07_target_alignment_required", "l06_repair_localization_incompatible"),
+            (
+                G07DecisionBasisCode.L06_G07_TARGET_ALIGNMENT_REQUIRED,
+                G07DecisionBasisCode.L06_REPAIR_LOCALIZATION_INCOMPATIBLE,
+            ),
             False,
         )
     if l06_blocked_for_target:
         return (
             InterventionStatus.BLOCKED_DUE_TO_INSUFFICIENT_QUESTIONABILITY,
-            ("l06_blocked_update_topology", "l06_block_or_guard_must_be_read"),
+            (
+                G07DecisionBasisCode.L06_BLOCKED_UPDATE_TOPOLOGY,
+                G07DecisionBasisCode.L06_BLOCK_OR_GUARD_MUST_BE_READ,
+            ),
             False,
         )
     topology_forced = _select_topology_forced_status(
@@ -752,7 +772,11 @@ def _select_status(
     if topology_forced is not None:
         return topology_forced
     if uncertainty_class is UncertaintyClass.CONTEXT_ONLY_UNCERTAINTY and gain.gain_score < 0.4:
-        return (InterventionStatus.CLARIFICATION_NOT_WORTH_COST, ("context_only_uncertainty_low_gain",), True)
+        return (
+            InterventionStatus.CLARIFICATION_NOT_WORTH_COST,
+            (G07DecisionBasisCode.CONTEXT_ONLY_UNCERTAINTY_LOW_GAIN,),
+            True,
+        )
     if gain.worth_cost and (
         uncertainty_class in {UncertaintyClass.HIGH_IMPACT_BINDING_RISK, UncertaintyClass.FRAME_COMPETITION}
         or (
@@ -766,16 +790,37 @@ def _select_status(
     ):
         return (
             InterventionStatus.ASK_NOW,
-            ("high_value_targeted_clarification", "ask_now_not_equal_resolution"),
+            (
+                G07DecisionBasisCode.HIGH_VALUE_TARGETED_CLARIFICATION,
+                G07DecisionBasisCode.ASK_NOW_NOT_EQUAL_RESOLUTION,
+            ),
             True,
         )
     if gain.gain_score < 0.28:
-        return (InterventionStatus.CLARIFICATION_NOT_WORTH_COST, ("low_evidence_gain",), True)
+        return (
+            InterventionStatus.CLARIFICATION_NOT_WORTH_COST,
+            (G07DecisionBasisCode.LOW_EVIDENCE_GAIN,),
+            True,
+        )
     if framing_status in {FramingStatus.UNDERFRAMED_MEANING, FramingStatus.COMPETING_FRAMES}:
-        return (InterventionStatus.DEFER_UNTIL_NEEDED, ("uncertainty_preserved_with_deferred_targeted_intervention",), True)
+        return (
+            InterventionStatus.DEFER_UNTIL_NEEDED,
+            (
+                G07DecisionBasisCode.UNCERTAINTY_PRESERVED_WITH_DEFERRED_TARGETED_INTERVENTION,
+            ),
+            True,
+        )
     if acq.acquisition_status in {AcquisitionStatus.WEAK_PROVISIONAL, AcquisitionStatus.STABLE_PROVISIONAL}:
-        return (InterventionStatus.GUARDED_CONTINUE_WITH_LIMITS, ("nonblocking_uncertainty_guarded_continue",), True)
-    return (InterventionStatus.ABSTAIN_WITHOUT_QUESTION, ("abstain_without_forced_question",), True)
+        return (
+            InterventionStatus.GUARDED_CONTINUE_WITH_LIMITS,
+            (G07DecisionBasisCode.NONBLOCKING_UNCERTAINTY_GUARDED_CONTINUE,),
+            True,
+        )
+    return (
+        InterventionStatus.ABSTAIN_WITHOUT_QUESTION,
+        (G07DecisionBasisCode.ABSTAIN_WITHOUT_FORCED_QUESTION,),
+        True,
+    )
 
 
 def _select_topology_forced_status(
@@ -786,13 +831,19 @@ def _select_topology_forced_status(
     if l06_withheld_for_target:
         return (
             InterventionStatus.DEFER_UNTIL_NEEDED,
-            ("l06_abstain_update_withheld_topology", "defer_until_needed_must_be_read"),
+            (
+                G07DecisionBasisCode.L06_ABSTAIN_UPDATE_WITHHELD_TOPOLOGY,
+                G07DecisionBasisCode.DEFER_UNTIL_NEEDED_MUST_BE_READ,
+            ),
             True,
         )
     if l06_guarded_for_target:
         return (
             InterventionStatus.GUARDED_CONTINUE_WITH_LIMITS,
-            ("l06_guarded_continue_topology", "guarded_continue_not_acceptance"),
+            (
+                G07DecisionBasisCode.L06_GUARDED_CONTINUE_TOPOLOGY,
+                G07DecisionBasisCode.GUARDED_CONTINUE_NOT_ACCEPTANCE,
+            ),
             True,
         )
     return None
@@ -806,31 +857,40 @@ def _lockouts(
     l06_guarded_for_target: bool,
     l06_withheld_for_target: bool,
 ) -> tuple[str, ...]:
-    lockouts: list[str] = ["narrative_commitment_forbidden", "closure_blocked_until_answer", "memory_uptake_deferred"]
+    lockouts: list[str] = [
+        G07LockoutCode.NARRATIVE_COMMITMENT_FORBIDDEN,
+        G07LockoutCode.CLOSURE_BLOCKED_UNTIL_ANSWER,
+        G07LockoutCode.MEMORY_UPTAKE_DEFERRED,
+    ]
     if uncertainty_class is UncertaintyClass.CONTEXT_ONLY_UNCERTAINTY:
-        lockouts.append("appraisal_context_only")
+        lockouts.append(G07LockoutCode.APPRAISAL_CONTEXT_ONLY)
     if uncertainty_class is not UncertaintyClass.CONTEXT_ONLY_UNCERTAINTY and (
         high_impact or uncertainty_class in {UncertaintyClass.HIGH_IMPACT_BINDING_RISK, UncertaintyClass.FRAME_COMPETITION}
     ):
-        lockouts.extend(["planning_forbidden_on_current_frame", "safety_escalation_not_authorized_from_current_evidence"])
+        lockouts.extend(
+            [
+                G07LockoutCode.PLANNING_FORBIDDEN_ON_CURRENT_FRAME,
+                G07LockoutCode.SAFETY_ESCALATION_NOT_AUTHORIZED_FROM_CURRENT_EVIDENCE,
+            ]
+        )
     if status is InterventionStatus.GUARDED_CONTINUE_WITH_LIMITS:
-        lockouts.append("guarded_continue_limits_must_be_read")
+        lockouts.append(G07LockoutCode.GUARDED_CONTINUE_LIMITS_MUST_BE_READ)
     elif status is InterventionStatus.DEFER_UNTIL_NEEDED:
-        lockouts.append("defer_until_needed_must_be_read")
+        lockouts.append(G07LockoutCode.DEFER_UNTIL_NEEDED_MUST_BE_READ)
     elif status is InterventionStatus.ABSTAIN_WITHOUT_QUESTION:
-        lockouts.append("abstain_without_question_must_be_read")
+        lockouts.append(G07LockoutCode.ABSTAIN_WITHOUT_QUESTION_MUST_BE_READ)
     elif status is InterventionStatus.BLOCKED_DUE_TO_INSUFFICIENT_QUESTIONABILITY:
-        lockouts.append("questionability_blocked_requires_repair_basis")
+        lockouts.append(G07LockoutCode.QUESTIONABILITY_BLOCKED_REQUIRES_REPAIR_BASIS)
     elif status is InterventionStatus.CLARIFICATION_NOT_WORTH_COST:
-        lockouts.append("clarification_not_worth_cost_must_be_read")
+        lockouts.append(G07LockoutCode.CLARIFICATION_NOT_WORTH_COST_MUST_BE_READ)
     else:
-        lockouts.append("ask_now_requires_answer_binding")
+        lockouts.append(G07LockoutCode.ASK_NOW_REQUIRES_ANSWER_BINDING)
     if l06_blocked_for_target:
-        lockouts.append("l06_blocked_update_must_be_read")
+        lockouts.append(G07LockoutCode.L06_BLOCKED_UPDATE_MUST_BE_READ)
     if l06_guarded_for_target:
-        lockouts.append("l06_guarded_continue_must_be_read")
+        lockouts.append(G07LockoutCode.L06_GUARDED_CONTINUE_MUST_BE_READ)
     if l06_withheld_for_target:
-        lockouts.append("l06_abstain_update_withheld_must_be_read")
+        lockouts.append(G07LockoutCode.L06_ABSTAIN_UPDATE_WITHHELD_MUST_BE_READ)
     return tuple(dict.fromkeys(lockouts))
 
 
@@ -899,11 +959,11 @@ def _missing_acquisition_record(framing_record_id: str, idx: int) -> Interventio
             worth_cost=False,
         ),
         downstream_lockouts=(
-            "closure_blocked_until_answer",
-            "planning_forbidden_on_current_frame",
-            "memory_uptake_deferred",
-            "questionability_blocked_requires_repair_basis",
-            "narrative_commitment_forbidden",
+            G07LockoutCode.CLOSURE_BLOCKED_UNTIL_ANSWER,
+            G07LockoutCode.PLANNING_FORBIDDEN_ON_CURRENT_FRAME,
+            G07LockoutCode.MEMORY_UPTAKE_DEFERRED,
+            G07LockoutCode.QUESTIONABILITY_BLOCKED_REQUIRES_REPAIR_BASIS,
+            G07LockoutCode.NARRATIVE_COMMITMENT_FORBIDDEN,
         ),
         l06_repair_binding_refs=(),
         l06_repair_classes=(),
@@ -912,7 +972,7 @@ def _missing_acquisition_record(framing_record_id: str, idx: int) -> Interventio
         reopen_conditions=("g07:reopen_on_missing_acquisition_rebind",),
         decision=InterventionDecision(
             selected_status=status,
-            decision_basis=("missing_g05_basis",),
+            decision_basis=(G07DecisionBasisCode.MISSING_G05_BASIS,),
             blocking_uncertainty=True,
             questionability_sufficient=False,
             cost_worthwhile=False,
@@ -964,11 +1024,19 @@ def _abstain_result(
         low_coverage_reasons=tuple(
             dict.fromkeys(
                 (
-                    "abstain",
-                    *(("l06_update_proposal_absent",) if l06_update_proposal_absent else ()),
-                    *(("l06_repair_basis_incomplete",) if not discourse_bundle.repair_triggers else ()),
-                    "response_realization_contract_absent",
-                    "answer_binding_consumer_absent",
+                    G07CoverageCode.ABSTAIN,
+                    *(
+                        (G07CoverageCode.L06_UPDATE_PROPOSAL_ABSENT,)
+                        if l06_update_proposal_absent
+                        else ()
+                    ),
+                    *(
+                        (G07RestrictionCode.REPAIR_TRIGGER_BASIS_INCOMPLETE,)
+                        if not discourse_bundle.repair_triggers
+                        else ()
+                    ),
+                    G07CoverageCode.RESPONSE_REALIZATION_CONTRACT_ABSENT,
+                    G07CoverageCode.ANSWER_BINDING_CONSUMER_ABSENT,
                 )
             )
         ),

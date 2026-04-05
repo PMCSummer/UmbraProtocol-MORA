@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from substrate.modus_hypotheses.models import (
+    L05RestrictionCode,
     ModusHypothesisBundle,
     ModusHypothesisResult,
     ModusUsabilityClass,
@@ -85,7 +86,9 @@ def derive_modus_hypothesis_contract_view(
         quoted_force_separate_from_current_commitment=quoted_force_separate_from_current_commitment,
         uncertainty_entropy_present=uncertainty_entropy_present,
         unresolved_slot_pressure_present=unresolved_slot_pressure_present,
-        requires_cautions_read=("downstream_cautions_must_be_read" in gate.restrictions),
+        requires_cautions_read=(
+            L05RestrictionCode.DOWNSTREAM_CAUTIONS_MUST_BE_READ in gate.restrictions
+        ),
         l06_downstream_not_bound_here=bundle.l06_downstream_not_bound_here,
         l06_update_consumer_not_wired_here=bundle.l06_update_consumer_not_wired_here,
         l06_repair_consumer_not_wired_here=bundle.l06_repair_consumer_not_wired_here,

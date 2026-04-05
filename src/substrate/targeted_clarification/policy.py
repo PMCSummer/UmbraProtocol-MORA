@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 from substrate.targeted_clarification.models import (
+    G07LockoutCode,
+    G07RestrictionCode,
     InterventionBundle,
     InterventionGateDecision,
     InterventionStatus,
@@ -22,35 +24,35 @@ def evaluate_targeted_clarification_downstream_gate(
         )
 
     restrictions: list[str] = [
-        "no_final_semantic_closure",
-        "intervention_object_presence_not_permission",
-        "source_acquisition_ref_must_be_read",
-        "source_framing_ref_must_be_read",
-        "source_discourse_update_ref_must_be_read",
-        "source_ref_class_must_be_read",
-        "l06_object_presence_not_acceptance",
-        "intervention_status_must_be_read",
-        "uncertainty_target_id_must_be_read",
-        "minimal_question_spec_must_be_read",
-        "minimal_question_spec_target_binding_must_be_read",
-        "forbidden_presuppositions_must_be_read",
-        "expected_evidence_gain_must_be_read",
-        "intervention_requires_target_binding_read",
-        "downstream_lockouts_must_be_read",
-        "l06_upstream_bound_here_must_be_read",
-        "l06_repair_localization_must_be_read",
-        "l06_proposal_requires_acceptance_read",
-        "l06_update_not_accepted",
-        "l06_update_not_authorized_yet",
-        "clarification_not_equal_accepted_update",
-        "intervention_not_discourse_acceptance",
-        "accepted_intervention_not_accepted_update",
-        "l06_block_or_guard_must_be_read",
-        "l06_continuation_topology_present",
-        "l06_g07_target_alignment_required",
-        "clarification_not_equal_realized_question",
-        "asked_question_not_equal_resolved_uncertainty",
-        "accepted_intervention_not_resolution",
+        G07RestrictionCode.NO_FINAL_SEMANTIC_CLOSURE,
+        G07RestrictionCode.INTERVENTION_OBJECT_PRESENCE_NOT_PERMISSION,
+        G07RestrictionCode.SOURCE_ACQUISITION_REF_MUST_BE_READ,
+        G07RestrictionCode.SOURCE_FRAMING_REF_MUST_BE_READ,
+        G07RestrictionCode.SOURCE_DISCOURSE_UPDATE_REF_MUST_BE_READ,
+        G07RestrictionCode.SOURCE_REF_CLASS_MUST_BE_READ,
+        G07RestrictionCode.L06_OBJECT_PRESENCE_NOT_ACCEPTANCE,
+        G07RestrictionCode.INTERVENTION_STATUS_MUST_BE_READ,
+        G07RestrictionCode.UNCERTAINTY_TARGET_ID_MUST_BE_READ,
+        G07RestrictionCode.MINIMAL_QUESTION_SPEC_MUST_BE_READ,
+        G07RestrictionCode.MINIMAL_QUESTION_SPEC_TARGET_BINDING_MUST_BE_READ,
+        G07RestrictionCode.FORBIDDEN_PRESUPPOSITIONS_MUST_BE_READ,
+        G07RestrictionCode.EXPECTED_EVIDENCE_GAIN_MUST_BE_READ,
+        G07RestrictionCode.INTERVENTION_REQUIRES_TARGET_BINDING_READ,
+        G07RestrictionCode.DOWNSTREAM_LOCKOUTS_MUST_BE_READ,
+        G07RestrictionCode.L06_UPSTREAM_BOUND_HERE_MUST_BE_READ,
+        G07RestrictionCode.L06_REPAIR_LOCALIZATION_MUST_BE_READ,
+        G07RestrictionCode.L06_PROPOSAL_REQUIRES_ACCEPTANCE_READ,
+        G07RestrictionCode.L06_UPDATE_NOT_ACCEPTED,
+        G07RestrictionCode.L06_UPDATE_NOT_AUTHORIZED_YET,
+        G07RestrictionCode.CLARIFICATION_NOT_EQUAL_ACCEPTED_UPDATE,
+        G07RestrictionCode.INTERVENTION_NOT_DISCOURSE_ACCEPTANCE,
+        G07RestrictionCode.ACCEPTED_INTERVENTION_NOT_ACCEPTED_UPDATE,
+        G07RestrictionCode.L06_BLOCK_OR_GUARD_MUST_BE_READ,
+        G07RestrictionCode.L06_CONTINUATION_TOPOLOGY_PRESENT,
+        G07RestrictionCode.L06_G07_TARGET_ALIGNMENT_REQUIRED,
+        G07RestrictionCode.CLARIFICATION_NOT_EQUAL_REALIZED_QUESTION,
+        G07RestrictionCode.ASKED_QUESTION_NOT_EQUAL_RESOLVED_UNCERTAINTY,
+        G07RestrictionCode.ACCEPTED_INTERVENTION_NOT_RESOLUTION,
     ]
 
     accepted_ids: list[str] = []
@@ -116,7 +118,10 @@ def evaluate_targeted_clarification_downstream_gate(
         if not presuppositions_present:
             has_missing_presuppositions = True
 
-        lockouts_present = bool(record.downstream_lockouts and "closure_blocked_until_answer" in record.downstream_lockouts)
+        lockouts_present = bool(
+            record.downstream_lockouts
+            and G07LockoutCode.CLOSURE_BLOCKED_UNTIL_ANSWER in record.downstream_lockouts
+        )
         if not lockouts_present:
             has_missing_lockouts = True
 
@@ -148,12 +153,14 @@ def evaluate_targeted_clarification_downstream_gate(
                 has_unlawful_ask_without_binding = True
 
         if record.uncertainty_class.value in {
-            "high_impact_binding_risk",
-            "frame_competition",
+                "high_impact_binding_risk",
+                "frame_competition",
         }:
             if (
-                "planning_forbidden_on_current_frame" not in record.downstream_lockouts
-                or "safety_escalation_not_authorized_from_current_evidence" not in record.downstream_lockouts
+                G07LockoutCode.PLANNING_FORBIDDEN_ON_CURRENT_FRAME
+                not in record.downstream_lockouts
+                or G07LockoutCode.SAFETY_ESCALATION_NOT_AUTHORIZED_FROM_CURRENT_EVIDENCE
+                not in record.downstream_lockouts
             ):
                 has_high_impact_lockout_gap = True
 
@@ -184,65 +191,73 @@ def evaluate_targeted_clarification_downstream_gate(
             has_not_worth_cost = True
 
     if has_ask:
-        restrictions.append("ask_now_requires_answer_binding_followup")
+        restrictions.append(G07RestrictionCode.ASK_NOW_REQUIRES_ANSWER_BINDING_FOLLOWUP)
     if has_guarded:
-        restrictions.append("guarded_continue_limits_must_be_read")
+        restrictions.append(G07RestrictionCode.GUARDED_CONTINUE_LIMITS_MUST_BE_READ)
     if has_defer:
-        restrictions.append("defer_until_needed_must_be_read")
+        restrictions.append(G07RestrictionCode.DEFER_UNTIL_NEEDED_MUST_BE_READ)
     if has_abstain:
-        restrictions.append("abstain_without_question_must_be_read")
+        restrictions.append(G07RestrictionCode.ABSTAIN_WITHOUT_QUESTION_MUST_BE_READ)
     if has_not_worth_cost:
-        restrictions.append("clarification_not_worth_cost_must_be_read")
+        restrictions.append(
+            G07RestrictionCode.CLARIFICATION_NOT_WORTH_COST_MUST_BE_READ
+        )
     if has_blocked:
-        restrictions.append("blocked_due_to_insufficient_questionability")
+        restrictions.append(
+            G07RestrictionCode.BLOCKED_DUE_TO_INSUFFICIENT_QUESTIONABILITY
+        )
     if has_target_drift_risk:
-        restrictions.append("target_drift_risk_detected")
+        restrictions.append(G07RestrictionCode.TARGET_DRIFT_RISK_DETECTED)
     if has_missing_presuppositions:
-        restrictions.append("forbidden_presuppositions_missing_or_unreadable")
+        restrictions.append(
+            G07RestrictionCode.FORBIDDEN_PRESUPPOSITIONS_MISSING_OR_UNREADABLE
+        )
     if has_missing_lockouts:
-        restrictions.append("downstream_lockouts_missing_or_unreadable")
+        restrictions.append(G07RestrictionCode.DOWNSTREAM_LOCKOUTS_MISSING_OR_UNREADABLE)
     if has_invalid_status_policy_alignment:
-        restrictions.append("status_policy_alignment_broken")
+        restrictions.append(G07RestrictionCode.STATUS_POLICY_ALIGNMENT_BROKEN)
     if has_unlawful_ask_without_binding:
-        restrictions.append("ask_now_without_answer_binding_forbidden")
+        restrictions.append(G07RestrictionCode.ASK_NOW_WITHOUT_ANSWER_BINDING_FORBIDDEN)
     if has_high_impact_lockout_gap:
-        restrictions.append("high_impact_lockout_gap_detected")
+        restrictions.append(G07RestrictionCode.HIGH_IMPACT_LOCKOUT_GAP_DETECTED)
     if has_l06_alignment_gap:
-        restrictions.append("l06_g07_target_drift_detected")
-        restrictions.append("l06_repair_localization_incompatible")
+        restrictions.append(G07RestrictionCode.L06_G07_TARGET_DRIFT_DETECTED)
+        restrictions.append(G07RestrictionCode.L06_REPAIR_LOCALIZATION_INCOMPATIBLE)
     if has_l06_repair_binding_gap:
-        restrictions.append("l06_repair_binding_missing_for_ask_now")
+        restrictions.append(G07RestrictionCode.L06_REPAIR_BINDING_MISSING_FOR_ASK_NOW)
     if has_l06_continuation_gap:
-        restrictions.append("l06_continuation_status_unreadable")
+        restrictions.append(G07RestrictionCode.L06_CONTINUATION_STATUS_UNREADABLE)
     if has_source_ref_class_gap:
-        restrictions.append("source_ref_relabeling_without_notice")
-        restrictions.append("lineage_identity_collapse_risk")
+        restrictions.append(G07RestrictionCode.SOURCE_REF_RELABELING_WITHOUT_NOTICE)
+        restrictions.append(G07RestrictionCode.LINEAGE_IDENTITY_COLLAPSE_RISK)
     if bundle.answer_binding_ready:
-        restrictions.append("answer_binding_ready_requires_targeted_reopen")
-        restrictions.append("answer_binding_hooks_must_be_read")
+        restrictions.append(
+            G07RestrictionCode.ANSWER_BINDING_READY_REQUIRES_TARGETED_REOPEN
+        )
+        restrictions.append(G07RestrictionCode.ANSWER_BINDING_HOOKS_MUST_BE_READ)
     else:
-        restrictions.append("answer_binding_not_ready")
+        restrictions.append(G07RestrictionCode.ANSWER_BINDING_NOT_READY)
     if bundle.l06_update_proposal_absent:
-        restrictions.append("l06_update_proposal_absent")
+        restrictions.append(G07RestrictionCode.L06_UPDATE_PROPOSAL_ABSENT)
     if not bundle.l06_upstream_bound_here:
-        restrictions.append("l06_upstream_not_bound")
+        restrictions.append(G07RestrictionCode.L06_UPSTREAM_NOT_BOUND)
     if bundle.l06_g07_target_drift_detected:
-        restrictions.append("l06_g07_target_drift_detected")
+        restrictions.append(G07RestrictionCode.L06_G07_TARGET_DRIFT_DETECTED)
     if bundle.l06_repair_localization_incompatible:
-        restrictions.append("l06_repair_localization_incompatible")
+        restrictions.append(G07RestrictionCode.L06_REPAIR_LOCALIZATION_INCOMPATIBLE)
     if bundle.repair_trigger_basis_incomplete:
-        restrictions.append("repair_trigger_basis_incomplete")
+        restrictions.append(G07RestrictionCode.REPAIR_TRIGGER_BASIS_INCOMPLETE)
     if bundle.response_realization_contract_absent:
-        restrictions.append("response_realization_contract_absent")
+        restrictions.append(G07RestrictionCode.RESPONSE_REALIZATION_CONTRACT_ABSENT)
     if bundle.answer_binding_consumer_absent:
-        restrictions.append("answer_binding_consumer_absent")
+        restrictions.append(G07RestrictionCode.ANSWER_BINDING_CONSUMER_ABSENT)
 
     accepted = bool(accepted_ids)
     if not accepted:
         usability_class = InterventionUsabilityClass.BLOCKED
         reason = "targeted clarification produced no usable intervention records"
-        restrictions.append("no_usable_intervention_records")
-        restrictions.append("intervention_record_contract_broken")
+        restrictions.append(G07RestrictionCode.NO_USABLE_INTERVENTION_RECORDS)
+        restrictions.append(G07RestrictionCode.INTERVENTION_RECORD_CONTRACT_BROKEN)
     else:
         usability_class = InterventionUsabilityClass.USABLE_BOUNDED
         reason = "typed targeted clarification emitted with bounded intervention restrictions"
@@ -273,8 +288,10 @@ def evaluate_targeted_clarification_downstream_gate(
         or bundle.l06_repair_localization_incompatible
     )
     if degraded:
-        restrictions.append("downstream_authority_degraded")
-        restrictions.append("degraded_intervention_requires_restrictions_read")
+        restrictions.append(G07RestrictionCode.DOWNSTREAM_AUTHORITY_DEGRADED)
+        restrictions.append(
+            G07RestrictionCode.DEGRADED_INTERVENTION_REQUIRES_RESTRICTIONS_READ
+        )
     if degraded and accepted:
         usability_class = InterventionUsabilityClass.DEGRADED_BOUNDED
 

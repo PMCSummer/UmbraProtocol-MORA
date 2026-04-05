@@ -26,6 +26,8 @@ from substrate.grounded_semantic.models import (
     DictumCarrier,
     GroundedSemanticBundle,
     GroundedSemanticResult,
+    G01CoverageCode,
+    G01NormativeBindingFailureCode,
     GroundedSubstrateUnit,
     ModusCarrier,
     OperatorAttachment,
@@ -127,15 +129,17 @@ def build_grounded_semantic_substrate(
     if (
         modus_bundle is not None
         and discourse_bundle is not None
-        and not _is_normative_binding_compatible(
+        and (binding_failure := _normative_binding_failure_code(
             dictum_bundle=dictum_bundle,
             modus_bundle=modus_bundle,
             discourse_bundle=discourse_bundle,
-        )
+        ))
+        is not None
     ):
         raise TypeError(
             "typed L05/L06 bindings are incompatible with current L04 dictum basis; "
-            "g01 will not silently downgrade to legacy surface fallback on normative entrypoint"
+            "g01 will not silently downgrade to legacy surface fallback on normative entrypoint "
+            f"[{binding_failure.value}]"
         )
 
     if not dictum_bundle.dictum_candidates:
@@ -390,17 +394,17 @@ def build_grounded_semantic_substrate(
         )
         normative_l05_l06_route_active = True
         discourse_update_not_inferred_from_surface_when_l06_available = True
-        low_coverage_reasons.append("l05_l06_normative_route_active")
+        low_coverage_reasons.append(G01CoverageCode.L05_L06_NORMATIVE_ROUTE_ACTIVE)
         if l06_blocked_update_present:
-            low_coverage_reasons.append("l06_blocked_update_present")
+            low_coverage_reasons.append(G01CoverageCode.L06_BLOCKED_UPDATE_PRESENT)
         if l06_guarded_continue_present:
-            low_coverage_reasons.append("l06_guarded_continue_present")
+            low_coverage_reasons.append(G01CoverageCode.L06_GUARDED_CONTINUE_PRESENT)
     else:
         legacy_surface_cue_fallback_used = True
         low_coverage_reasons.extend(
             [
-                "legacy_surface_cue_fallback_used",
-                "l04_only_input_not_equivalent_to_l05_l06_route",
+                G01CoverageCode.LEGACY_SURFACE_CUE_FALLBACK_USED,
+                G01CoverageCode.L04_ONLY_INPUT_NOT_EQUIVALENT_TO_L05_L06_ROUTE,
             ]
         )
         anchor_index, carrier_index, uncertainty_index = _register_surface_cues(
@@ -436,15 +440,15 @@ def build_grounded_semantic_substrate(
         ambiguity_reasons.extend(amb.reason for amb in dictum_bundle.ambiguities)
 
     if surface is None:
-        low_coverage_reasons.append("surface_not_provided")
+        low_coverage_reasons.append(G01CoverageCode.SURFACE_NOT_PROVIDED)
     if not source_anchors:
-        low_coverage_reasons.append("source_anchors_sparse")
+        low_coverage_reasons.append(G01CoverageCode.SOURCE_ANCHORS_SPARSE)
     if not operator_carriers:
-        low_coverage_reasons.append("operator_carriers_sparse")
+        low_coverage_reasons.append(G01CoverageCode.OPERATOR_CARRIERS_SPARSE)
     if memory_anchor_ref is None:
-        low_coverage_reasons.append("m03_anchor_not_provided")
+        low_coverage_reasons.append(G01CoverageCode.M03_ANCHOR_NOT_PROVIDED)
     if cooperation_anchor_ref is None:
-        low_coverage_reasons.append("o03_anchor_not_provided")
+        low_coverage_reasons.append(G01CoverageCode.O03_ANCHOR_NOT_PROVIDED)
 
     low_coverage_mode = bool(low_coverage_reasons)
     reversible_span_mapping_present = bool(surface and surface.reversible_span_map_present)
@@ -631,41 +635,56 @@ def _is_normative_binding_compatible(
     modus_bundle: ModusHypothesisBundle,
     discourse_bundle: DiscourseUpdateBundle,
 ) -> bool:
+    return _normative_binding_failure_code(
+        dictum_bundle=dictum_bundle,
+        modus_bundle=modus_bundle,
+        discourse_bundle=discourse_bundle,
+    ) is None
+
+
+def _normative_binding_failure_code(
+    *,
+    dictum_bundle: DictumCandidateBundle,
+    modus_bundle: ModusHypothesisBundle,
+    discourse_bundle: DiscourseUpdateBundle,
+) -> G01NormativeBindingFailureCode | None:
     dictum_ids = {candidate.dictum_candidate_id for candidate in dictum_bundle.dictum_candidates}
     modus_record_ids = {record.record_id for record in modus_bundle.hypothesis_records}
     if not dictum_ids:
-        return False
+        return G01NormativeBindingFailureCode.EMPTY_DICTUM_CANDIDATE_IDS
     if not modus_record_ids:
-        return False
+        return G01NormativeBindingFailureCode.EMPTY_MODUS_RECORD_IDS
     if not discourse_bundle.update_proposals:
-        return False
+        return G01NormativeBindingFailureCode.EMPTY_DISCOURSE_UPDATE_PROPOSALS
     if modus_bundle.source_dictum_ref != dictum_bundle.source_lexical_grounding_ref:
-        return False
+        return G01NormativeBindingFailureCode.L05_SOURCE_DICTUM_REF_MISMATCH
     if discourse_bundle.source_modus_lineage_ref != modus_bundle.source_dictum_ref:
-        return False
+        return G01NormativeBindingFailureCode.L06_SOURCE_MODUS_LINEAGE_REF_MISMATCH
     if not set(modus_bundle.linked_dictum_candidate_ids).intersection(dictum_ids):
-        return False
+        return G01NormativeBindingFailureCode.L05_LINKED_DICTUM_IDS_NO_INTERSECTION
     proposal_source_record_ids = {
         proposal.source_record_ids[0]
         for proposal in discourse_bundle.update_proposals
         if proposal.source_record_ids
     }
     if not proposal_source_record_ids:
-        return False
+        return G01NormativeBindingFailureCode.L06_PROPOSAL_SOURCE_RECORD_IDS_EMPTY
     if not proposal_source_record_ids.issubset(modus_record_ids):
-        return False
+        return G01NormativeBindingFailureCode.L06_PROPOSAL_SOURCE_RECORD_IDS_NOT_SUBSET_L05
     continuation_source_record_ids = {
         continuation.source_record_id for continuation in discourse_bundle.continuation_states
     }
     if continuation_source_record_ids and not continuation_source_record_ids.issubset(
         modus_record_ids
     ):
-        return False
+        return (
+            G01NormativeBindingFailureCode.L06_CONTINUATION_SOURCE_RECORD_IDS_NOT_SUBSET_L05
+        )
     if discourse_bundle.linked_modus_record_ids and not set(
         discourse_bundle.linked_modus_record_ids
     ).issubset(modus_record_ids):
-        return False
-    return True
+        return G01NormativeBindingFailureCode.L06_LINKED_MODUS_RECORD_IDS_NOT_SUBSET_L05
+    return None
 
 
 def _derive_source_refs(
@@ -1282,9 +1301,9 @@ def _abstain_result(
         ambiguity_reasons=(reason,),
         low_coverage_mode=True,
         low_coverage_reasons=(
-            "abstain",
-            "legacy_surface_cue_fallback_used",
-            "l04_only_input_not_equivalent_to_l05_l06_route",
+            G01CoverageCode.ABSTAIN,
+            G01CoverageCode.LEGACY_SURFACE_CUE_FALLBACK_USED,
+            G01CoverageCode.L04_ONLY_INPUT_NOT_EQUIVALENT_TO_L05_L06_ROUTE,
         ),
         normative_l05_l06_route_active=False,
         legacy_surface_cue_fallback_used=True,

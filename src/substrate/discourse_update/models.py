@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
-from enum import Enum
+from enum import Enum, StrEnum
 
 
 class ProposalType(str, Enum):
@@ -41,6 +41,93 @@ class DiscourseUpdateUsabilityClass(str, Enum):
     USABLE_BOUNDED = "usable_bounded"
     DEGRADED_BOUNDED = "degraded_bounded"
     BLOCKED = "blocked"
+
+
+class L06RestrictionCode(StrEnum):
+    L06_OBJECT_PRESENCE_NOT_ACCEPTANCE = "l06_object_presence_not_acceptance"
+    OBJECT_PRESENCE_NOT_PERMISSION = "object_presence_not_permission"
+    L06_SOURCE_MODUS_REF_MUST_BE_READ = "l06_source_modus_ref_must_be_read"
+    L06_SOURCE_MODUS_REF_KIND_MUST_BE_READ = "l06_source_modus_ref_kind_must_be_read"
+    L06_SOURCE_MODUS_LINEAGE_REF_MUST_BE_READ = "l06_source_modus_lineage_ref_must_be_read"
+    PROPOSAL_REQUIRES_ACCEPTANCE = "proposal_requires_acceptance"
+    ACCEPTANCE_REQUIRED_MUST_BE_READ = "acceptance_required_must_be_read"
+    ACCEPTED_PROPOSAL_NOT_ACCEPTED_UPDATE = "accepted_proposal_not_accepted_update"
+    INTERPRETATION_NOT_EQUAL_ACCEPTED_UPDATE = "interpretation_not_equal_accepted_update"
+    PROPOSAL_EFFECTS_NOT_YET_AUTHORIZED = "proposal_effects_not_yet_authorized"
+    PROPOSAL_NOT_TRUTH = "proposal_not_truth"
+    PROPOSAL_NOT_SELF_UPDATE = "proposal_not_self_update"
+    UPDATE_RECORD_NOT_STATE_MUTATION = "update_record_not_state_mutation"
+    REPAIR_TRIGGER_MUST_BE_LOCALIZED = "repair_trigger_must_be_localized"
+    REPAIR_LOCALIZATION_MUST_BE_READ = "repair_localization_must_be_read"
+    GENERIC_CLARIFICATION_FORBIDDEN = "generic_clarification_forbidden"
+    BLOCKED_UPDATE_MUST_BE_READ = "blocked_update_must_be_read"
+    GUARDED_CONTINUE_NOT_ACCEPTANCE = "guarded_continue_not_acceptance"
+    GUARDED_CONTINUE_REQUIRES_LIMITS_READ = "guarded_continue_requires_limits_read"
+    DOWNSTREAM_MUST_READ_BLOCK_OR_REPAIR = "downstream_must_read_block_or_repair"
+    L06_OUTPUT_NOT_DIALOGUE_MANAGER = "l06_output_not_dialogue_manager"
+    L06_OUTPUT_NOT_PLANNER = "l06_output_not_planner"
+    L06_OUTPUT_NOT_COMMON_GROUND_MUTATOR = "l06_output_not_common_ground_mutator"
+    REPAIR_LOCALIZATION_GAP_DETECTED = "repair_localization_gap_detected"
+    GENERIC_CLARIFICATION_DETECTED = "generic_clarification_detected"
+    BLOCKED_UPDATE_CONTRACT_GAP_DETECTED = "blocked_update_contract_gap_detected"
+    ACCEPTANCE_LAUNDERING_DETECTED = "acceptance_laundering_detected"
+    REPAIR_GUARD_CONTRACT_GAP_DETECTED = "repair_guard_contract_gap_detected"
+    PROPOSAL_RESTRICTION_SHAPE_GAP_DETECTED = "proposal_restriction_shape_gap_detected"
+    PROPOSAL_PERMISSION_SHAPE_GAP_DETECTED = "proposal_permission_shape_gap_detected"
+    ABSTAIN_UPDATE_WITHHELD_MUST_BE_READ = "abstain_update_withheld_must_be_read"
+    SOURCE_REF_RELABELING_WITHOUT_NOTICE = "source_ref_relabeling_without_notice"
+    DOWNSTREAM_UPDATE_ACCEPTOR_ABSENT = "downstream_update_acceptor_absent"
+    REPAIR_CONSUMER_ABSENT = "repair_consumer_absent"
+    DISCOURSE_STATE_MUTATION_CONSUMER_ABSENT = "discourse_state_mutation_consumer_absent"
+    LEGACY_BYPASS_RISK_PRESENT = "legacy_bypass_risk_present"
+    LEGACY_BYPASS_RISK_MUST_BE_READ = "legacy_bypass_risk_must_be_read"
+    LEGACY_BYPASS_FORBIDDEN = "legacy_bypass_forbidden"
+    NO_USABLE_UPDATE_PROPOSALS = "no_usable_update_proposals"
+    DOWNSTREAM_AUTHORITY_DEGRADED = "downstream_authority_degraded"
+    DEGRADED_L06_REQUIRES_RESTRICTIONS_READ = "degraded_l06_requires_restrictions_read"
+
+
+class L06CoverageCode(StrEnum):
+    ABSTAIN = "abstain"
+    DOWNSTREAM_UPDATE_ACCEPTOR_ABSENT = "downstream_update_acceptor_absent"
+    REPAIR_CONSUMER_ABSENT = "repair_consumer_absent"
+    DISCOURSE_STATE_MUTATION_CONSUMER_ABSENT = "discourse_state_mutation_consumer_absent"
+    LEGACY_G01_BYPASS_RISK_PRESENT = "legacy_g01_bypass_risk_present"
+
+
+class L06ProposalPermissionCode(StrEnum):
+    PROPOSAL_WITHHELD_PENDING_REPAIR = "proposal_withheld_pending_repair"
+    PROPOSAL_GUARDED_FORWARDABLE_IF_LIMITS_READ = (
+        "proposal_guarded_forwardable_if_limits_read"
+    )
+    PROPOSAL_WITHHELD_NOT_FORWARDABLE = "proposal_withheld_not_forwardable"
+    PROPOSAL_FORWARDABLE_IF_ACCEPTOR_EXISTS = "proposal_forwardable_if_acceptor_exists"
+
+
+class L06ProposalRestrictionCode(StrEnum):
+    L06_OBJECT_PRESENCE_NOT_ACCEPTANCE = "l06_object_presence_not_acceptance"
+    PROPOSAL_REQUIRES_ACCEPTANCE = "proposal_requires_acceptance"
+    ACCEPTANCE_REQUIRED_MUST_BE_READ = "acceptance_required_must_be_read"
+    ACCEPTED_PROPOSAL_NOT_ACCEPTED_UPDATE = "accepted_proposal_not_accepted_update"
+    PROPOSAL_EFFECTS_NOT_YET_AUTHORIZED = "proposal_effects_not_yet_authorized"
+    PROPOSAL_NOT_TRUTH = "proposal_not_truth"
+    PROPOSAL_NOT_SELF_UPDATE = "proposal_not_self_update"
+    UPDATE_RECORD_NOT_STATE_MUTATION = "update_record_not_state_mutation"
+    INTERPRETATION_NOT_EQUAL_ACCEPTED_UPDATE = "interpretation_not_equal_accepted_update"
+    REPAIR_LOCALIZATION_MUST_BE_READ = "repair_localization_must_be_read"
+    BLOCKED_UPDATE_MUST_BE_READ = "blocked_update_must_be_read"
+    GUARDED_CONTINUE_REQUIRES_LIMITS_READ = "guarded_continue_requires_limits_read"
+    GUARDED_CONTINUE_NOT_ACCEPTANCE = "guarded_continue_not_acceptance"
+    ABSTAIN_UPDATE_WITHHELD_MUST_BE_READ = "abstain_update_withheld_must_be_read"
+
+
+class L06ContinuationReasonCode(StrEnum):
+    BLOCKED_PENDING_LOCALIZED_REPAIR = "blocked_pending_localized_repair"
+    GUARDED_WITH_LOCALIZED_REPAIR = "guarded_with_localized_repair"
+    REPAIR_REQUIRED_BEFORE_ACCEPTANCE = "repair_required_before_acceptance"
+    HIGH_ENTROPY_GUARDED_CONTINUE = "high_entropy_guarded_continue"
+    HIGH_ENTROPY_WITHHELD_UPDATE = "high_entropy_withheld_update"
+    PROPOSAL_ALLOWED_ACCEPTANCE_REQUIRED = "proposal_allowed_acceptance_required"
 
 
 @dataclass(frozen=True, slots=True)
@@ -84,6 +171,7 @@ class GuardedContinuationState:
     guarded_continue_allowed: bool
     guarded_continue_forbidden: bool
     acceptance_required: bool
+    block_or_guard_reason_code: L06ContinuationReasonCode
     block_or_guard_reason: str
     localized_repair_refs: tuple[str, ...]
 

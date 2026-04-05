@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
-from enum import Enum
+from enum import Enum, StrEnum
 
 
 class IllocutionKind(str, Enum):
@@ -37,6 +37,71 @@ class ModusUsabilityClass(str, Enum):
     USABLE_BOUNDED = "usable_bounded"
     DEGRADED_BOUNDED = "degraded_bounded"
     BLOCKED = "blocked"
+
+
+class L05RestrictionCode(StrEnum):
+    L05_OBJECT_PRESENCE_NOT_LAWFUL_RESOLUTION = "l05_object_presence_not_lawful_resolution"
+    DICTUM_NOT_EQUAL_FORCE = "dictum_not_equal_force"
+    LIKELY_ILLOCUTION_NOT_SETTLED_INTENT = "likely_illocution_not_settled_intent"
+    ACCEPTED_HYPOTHESIS_NOT_SETTLED_INTENT = "accepted_hypothesis_not_settled_intent"
+    QUOTED_FORCE_NOT_CURRENT_COMMITMENT = "quoted_force_not_current_commitment"
+    ADDRESSIVITY_NOT_SELF_APPLICABILITY = "addressivity_not_self_applicability"
+    PUNCTUATION_FORM_NOT_LAWFUL_FORCE_RESOLUTION = (
+        "punctuation_form_not_lawful_force_resolution"
+    )
+    ILLOCUTION_ALTERNATIVES_MUST_BE_READ = "illocution_alternatives_must_be_read"
+    UNCERTAINTY_ENTROPY_MUST_BE_READ = "uncertainty_entropy_must_be_read"
+    MODALITY_PROFILE_MUST_BE_READ = "modality_profile_must_be_read"
+    EVIDENTIALITY_PROFILE_MUST_BE_READ = "evidentiality_profile_must_be_read"
+    ADDRESSIVITY_HYPOTHESES_MUST_BE_READ = "addressivity_hypotheses_must_be_read"
+    DOWNSTREAM_CAUTIONS_MUST_BE_READ = "downstream_cautions_must_be_read"
+    L05_OUTPUT_NOT_L06_UPDATE = "l05_output_not_l06_update"
+    L05_OUTPUT_NOT_REPAIR_PLAN = "l05_output_not_repair_plan"
+    NO_FINAL_INTENT_SELECTION = "no_final_intent_selection"
+    NO_COMMON_GROUND_UPDATE = "no_common_ground_update"
+    NO_REPAIR_PLANNING = "no_repair_planning"
+    SINGLE_LABEL_FORCE_COLLAPSE_DETECTED = "single_label_force_collapse_detected"
+    ILLOCUTION_WEIGHT_SHAPE_VIOLATION = "illocution_weight_shape_violation"
+    ADDRESSIVITY_HYPOTHESIS_GAP_DETECTED = "addressivity_hypothesis_gap_detected"
+    QUOTED_FORCE_COMMITMENT_LEAK_DETECTED = "quoted_force_commitment_leak_detected"
+    ENTROPY_CONTRACT_GAP_DETECTED = "entropy_contract_gap_detected"
+    DOWNSTREAM_CAUTIONS_CONTRACT_GAP_DETECTED = (
+        "downstream_cautions_contract_gap_detected"
+    )
+    UNRESOLVED_SLOT_PRESSURE_MUST_BE_READ = "unresolved_slot_pressure_must_be_read"
+    L06_DOWNSTREAM_NOT_BOUND_HERE = "l06_downstream_not_bound_here"
+    L06_UPDATE_CONSUMER_NOT_WIRED_HERE = "l06_update_consumer_not_wired_here"
+    L06_REPAIR_CONSUMER_NOT_WIRED_HERE = "l06_repair_consumer_not_wired_here"
+    LEGACY_L04_G01_SHORTCUT_OPERATIONAL_DEBT = (
+        "legacy_l04_g01_shortcut_operational_debt"
+    )
+    LEGACY_SHORTCUT_BYPASS_RISK = "legacy_shortcut_bypass_risk"
+    LEGACY_SHORTCUT_BYPASS_FORBIDDEN = "legacy_shortcut_bypass_forbidden"
+    NO_USABLE_L05_RECORDS = "no_usable_l05_records"
+    DOWNSTREAM_AUTHORITY_DEGRADED = "downstream_authority_degraded"
+    DEGRADED_L05_REQUIRES_RESTRICTIONS_READ = (
+        "degraded_l05_requires_restrictions_read"
+    )
+
+
+class L05CautionCode(StrEnum):
+    LIKELY_ILLOCUTION_NOT_SETTLED_INTENT = "likely_illocution_not_settled_intent"
+    ADDRESSIVITY_NOT_SELF_APPLICABILITY = "addressivity_not_self_applicability"
+    DICTUM_NOT_EQUAL_FORCE = "dictum_not_equal_force"
+    FORCE_ALTERNATIVES_MUST_BE_READ = "force_alternatives_must_be_read"
+    QUOTED_FORCE_NOT_CURRENT_COMMITMENT = "quoted_force_not_current_commitment"
+    ADDRESSIVITY_TARGET_UNRESOLVED = "addressivity_target_unresolved"
+
+
+class L05CoverageCode(StrEnum):
+    ABSTAIN = "abstain"
+    L06_DOWNSTREAM_NOT_BOUND_HERE = "l06_downstream_not_bound_here"
+    L06_UPDATE_CONSUMER_NOT_WIRED_HERE = "l06_update_consumer_not_wired_here"
+    L06_REPAIR_CONSUMER_NOT_WIRED_HERE = "l06_repair_consumer_not_wired_here"
+    LEGACY_L04_G01_SHORTCUT_OPERATIONAL_DEBT = (
+        "legacy_l04_g01_shortcut_operational_debt"
+    )
+    LEGACY_SHORTCUT_BYPASS_RISK = "legacy_shortcut_bypass_risk"
 
 
 @dataclass(frozen=True, slots=True)

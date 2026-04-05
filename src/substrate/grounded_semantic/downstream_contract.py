@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from enum import Enum
 
 from substrate.grounded_semantic.models import (
+    G01RestrictionCode,
     GroundedSemanticBundle,
     GroundedSemanticResult,
     OperatorKind,
@@ -102,7 +103,7 @@ def derive_grounded_downstream_contract(
 
     degraded = bool(
         low_coverage_mode
-        or "downstream_authority_degraded" in gate.restrictions
+        or G01RestrictionCode.DOWNSTREAM_AUTHORITY_DEGRADED in gate.restrictions
         or not bundle.operator_carriers
         or not bundle.source_anchors
         or bundle.legacy_surface_cue_fallback_used
@@ -146,9 +147,13 @@ def derive_grounded_downstream_contract(
             bundle.source_discourse_update_ref is not None
             and bundle.source_discourse_update_ref != bundle.source_discourse_update_lineage_ref
         ),
-        requires_source_modus_ref_class_read=("source_modus_ref_class_must_be_read" in gate.restrictions),
+        requires_source_modus_ref_class_read=(
+            G01RestrictionCode.SOURCE_MODUS_REF_CLASS_MUST_BE_READ
+            in gate.restrictions
+        ),
         requires_source_discourse_update_ref_class_read=(
-            "source_discourse_update_ref_class_must_be_read" in gate.restrictions
+            G01RestrictionCode.SOURCE_DISCOURSE_UPDATE_REF_CLASS_MUST_BE_READ
+            in gate.restrictions
         ),
         negation_present=negation_present,
         interrogation_or_modality_present=interrogation_or_modality_present,

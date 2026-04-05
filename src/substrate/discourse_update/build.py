@@ -9,6 +9,10 @@ from substrate.discourse_update.models import (
     DiscourseUpdateBundle,
     DiscourseUpdateResult,
     GuardedContinuationState,
+    L06ContinuationReasonCode,
+    L06CoverageCode,
+    L06ProposalPermissionCode,
+    L06ProposalRestrictionCode,
     ProposalType,
     RepairClass,
     RepairTrigger,
@@ -38,10 +42,10 @@ ATTEMPTED_PATHS: tuple[str, ...] = (
 )
 
 _L06_DEFAULT_DOWNSTREAM_ABSENCE_REASONS: tuple[str, ...] = (
-    "downstream_update_acceptor_absent",
-    "repair_consumer_absent",
-    "discourse_state_mutation_consumer_absent",
-    "legacy_g01_bypass_risk_present",
+    L06CoverageCode.DOWNSTREAM_UPDATE_ACCEPTOR_ABSENT,
+    L06CoverageCode.REPAIR_CONSUMER_ABSENT,
+    L06CoverageCode.DISCOURSE_STATE_MUTATION_CONSUMER_ABSENT,
+    L06CoverageCode.LEGACY_G01_BYPASS_RISK_PRESENT,
 )
 
 
@@ -67,38 +71,68 @@ class _ContinuationDecision:
     status: ContinuationStatus
     guarded_allowed: bool
     guarded_forbidden: bool
+    reason_code: L06ContinuationReasonCode
     reason: str
 
 
 _PROPOSAL_BASE_RESTRICTIONS: tuple[str, ...] = (
-    "l06_object_presence_not_acceptance",
-    "proposal_requires_acceptance",
-    "acceptance_required_must_be_read",
-    "accepted_proposal_not_accepted_update",
-    "proposal_effects_not_yet_authorized",
-    "proposal_not_truth",
-    "proposal_not_self_update",
-    "update_record_not_state_mutation",
-    "interpretation_not_equal_accepted_update",
+    L06ProposalRestrictionCode.L06_OBJECT_PRESENCE_NOT_ACCEPTANCE,
+    L06ProposalRestrictionCode.PROPOSAL_REQUIRES_ACCEPTANCE,
+    L06ProposalRestrictionCode.ACCEPTANCE_REQUIRED_MUST_BE_READ,
+    L06ProposalRestrictionCode.ACCEPTED_PROPOSAL_NOT_ACCEPTED_UPDATE,
+    L06ProposalRestrictionCode.PROPOSAL_EFFECTS_NOT_YET_AUTHORIZED,
+    L06ProposalRestrictionCode.PROPOSAL_NOT_TRUTH,
+    L06ProposalRestrictionCode.PROPOSAL_NOT_SELF_UPDATE,
+    L06ProposalRestrictionCode.UPDATE_RECORD_NOT_STATE_MUTATION,
+    L06ProposalRestrictionCode.INTERPRETATION_NOT_EQUAL_ACCEPTED_UPDATE,
 )
 
 _CONTINUATION_STATUS_PERMISSIONS: dict[ContinuationStatus, tuple[str, ...]] = {
-    ContinuationStatus.BLOCKED_PENDING_REPAIR: ("proposal_withheld_pending_repair",),
-    ContinuationStatus.GUARDED_CONTINUE: ("proposal_guarded_forwardable_if_limits_read",),
-    ContinuationStatus.ABSTAIN_UPDATE_WITHHELD: ("proposal_withheld_not_forwardable",),
+    ContinuationStatus.BLOCKED_PENDING_REPAIR: (
+        L06ProposalPermissionCode.PROPOSAL_WITHHELD_PENDING_REPAIR,
+    ),
+    ContinuationStatus.GUARDED_CONTINUE: (
+        L06ProposalPermissionCode.PROPOSAL_GUARDED_FORWARDABLE_IF_LIMITS_READ,
+    ),
+    ContinuationStatus.ABSTAIN_UPDATE_WITHHELD: (
+        L06ProposalPermissionCode.PROPOSAL_WITHHELD_NOT_FORWARDABLE,
+    ),
     ContinuationStatus.PROPOSAL_ALLOWED_BUT_ACCEPTANCE_REQUIRED: (
-        "proposal_forwardable_if_acceptor_exists",
+        L06ProposalPermissionCode.PROPOSAL_FORWARDABLE_IF_ACCEPTOR_EXISTS,
     ),
 }
 
 _CONTINUATION_STATUS_RESTRICTIONS: dict[ContinuationStatus, tuple[str, ...]] = {
-    ContinuationStatus.BLOCKED_PENDING_REPAIR: ("blocked_update_must_be_read",),
-    ContinuationStatus.GUARDED_CONTINUE: (
-        "guarded_continue_requires_limits_read",
-        "guarded_continue_not_acceptance",
+    ContinuationStatus.BLOCKED_PENDING_REPAIR: (
+        L06ProposalRestrictionCode.BLOCKED_UPDATE_MUST_BE_READ,
     ),
-    ContinuationStatus.ABSTAIN_UPDATE_WITHHELD: ("abstain_update_withheld_must_be_read",),
+    ContinuationStatus.GUARDED_CONTINUE: (
+        L06ProposalRestrictionCode.GUARDED_CONTINUE_REQUIRES_LIMITS_READ,
+        L06ProposalRestrictionCode.GUARDED_CONTINUE_NOT_ACCEPTANCE,
+    ),
+    ContinuationStatus.ABSTAIN_UPDATE_WITHHELD: (
+        L06ProposalRestrictionCode.ABSTAIN_UPDATE_WITHHELD_MUST_BE_READ,
+    ),
     ContinuationStatus.PROPOSAL_ALLOWED_BUT_ACCEPTANCE_REQUIRED: (),
+}
+
+_CONTINUATION_REASON_TEXT: dict[L06ContinuationReasonCode, str] = {
+    L06ContinuationReasonCode.BLOCKED_PENDING_LOCALIZED_REPAIR: "blocked pending localized repair",
+    L06ContinuationReasonCode.GUARDED_WITH_LOCALIZED_REPAIR: (
+        "guarded continuation allowed with localized repair obligations"
+    ),
+    L06ContinuationReasonCode.REPAIR_REQUIRED_BEFORE_ACCEPTANCE: (
+        "repair required before update acceptance"
+    ),
+    L06ContinuationReasonCode.HIGH_ENTROPY_GUARDED_CONTINUE: (
+        "high entropy keeps continuation guarded despite no explicit repair class"
+    ),
+    L06ContinuationReasonCode.HIGH_ENTROPY_WITHHELD_UPDATE: (
+        "update withheld due to unresolved entropy without lawful repair-ready continuation"
+    ),
+    L06ContinuationReasonCode.PROPOSAL_ALLOWED_ACCEPTANCE_REQUIRED: (
+        "proposal allowed but acceptance is still required"
+    ),
 }
 
 
@@ -442,6 +476,7 @@ def _continuation_state(
         guarded_continue_allowed=decision.guarded_allowed,
         guarded_continue_forbidden=decision.guarded_forbidden,
         acceptance_required=True,
+        block_or_guard_reason_code=decision.reason_code,
         block_or_guard_reason=decision.reason,
         localized_repair_refs=tuple(trigger.repair_id for trigger in repairs_for_record),
     )
@@ -468,7 +503,10 @@ def _resolve_continuation_decision(
             status=ContinuationStatus.BLOCKED_PENDING_REPAIR,
             guarded_allowed=False,
             guarded_forbidden=True,
-            reason="blocked pending localized repair",
+            reason_code=L06ContinuationReasonCode.BLOCKED_PENDING_LOCALIZED_REPAIR,
+            reason=_CONTINUATION_REASON_TEXT[
+                L06ContinuationReasonCode.BLOCKED_PENDING_LOCALIZED_REPAIR
+            ],
         )
 
     guarded = any(trigger.guarded_continue_allowed for trigger in repairs_for_record)
@@ -477,7 +515,10 @@ def _resolve_continuation_decision(
             status=ContinuationStatus.GUARDED_CONTINUE,
             guarded_allowed=True,
             guarded_forbidden=False,
-            reason="guarded continuation allowed with localized repair obligations",
+            reason_code=L06ContinuationReasonCode.GUARDED_WITH_LOCALIZED_REPAIR,
+            reason=_CONTINUATION_REASON_TEXT[
+                L06ContinuationReasonCode.GUARDED_WITH_LOCALIZED_REPAIR
+            ],
         )
 
     if repairs_for_record:
@@ -485,7 +526,10 @@ def _resolve_continuation_decision(
             status=ContinuationStatus.BLOCKED_PENDING_REPAIR,
             guarded_allowed=False,
             guarded_forbidden=True,
-            reason="repair required before update acceptance",
+            reason_code=L06ContinuationReasonCode.REPAIR_REQUIRED_BEFORE_ACCEPTANCE,
+            reason=_CONTINUATION_REASON_TEXT[
+                L06ContinuationReasonCode.REPAIR_REQUIRED_BEFORE_ACCEPTANCE
+            ],
         )
 
     if record.uncertainty_entropy >= 0.85:
@@ -493,7 +537,10 @@ def _resolve_continuation_decision(
             status=ContinuationStatus.GUARDED_CONTINUE,
             guarded_allowed=True,
             guarded_forbidden=False,
-            reason="high entropy keeps continuation guarded despite no explicit repair class",
+            reason_code=L06ContinuationReasonCode.HIGH_ENTROPY_GUARDED_CONTINUE,
+            reason=_CONTINUATION_REASON_TEXT[
+                L06ContinuationReasonCode.HIGH_ENTROPY_GUARDED_CONTINUE
+            ],
         )
 
     if record.uncertainty_entropy >= 0.7:
@@ -501,14 +548,20 @@ def _resolve_continuation_decision(
             status=ContinuationStatus.ABSTAIN_UPDATE_WITHHELD,
             guarded_allowed=False,
             guarded_forbidden=True,
-            reason="update withheld due to unresolved entropy without lawful repair-ready continuation",
+            reason_code=L06ContinuationReasonCode.HIGH_ENTROPY_WITHHELD_UPDATE,
+            reason=_CONTINUATION_REASON_TEXT[
+                L06ContinuationReasonCode.HIGH_ENTROPY_WITHHELD_UPDATE
+            ],
         )
 
     return _ContinuationDecision(
         status=ContinuationStatus.PROPOSAL_ALLOWED_BUT_ACCEPTANCE_REQUIRED,
         guarded_allowed=False,
         guarded_forbidden=False,
-        reason="proposal allowed but acceptance is still required",
+        reason_code=L06ContinuationReasonCode.PROPOSAL_ALLOWED_ACCEPTANCE_REQUIRED,
+        reason=_CONTINUATION_REASON_TEXT[
+            L06ContinuationReasonCode.PROPOSAL_ALLOWED_ACCEPTANCE_REQUIRED
+        ],
     )
 
 
@@ -525,7 +578,7 @@ def _proposal_restrictions_for_continuation(
 ) -> tuple[str, ...]:
     restrictions = list(_PROPOSAL_BASE_RESTRICTIONS)
     if has_localized_repair:
-        restrictions.append("repair_localization_must_be_read")
+        restrictions.append(L06ProposalRestrictionCode.REPAIR_LOCALIZATION_MUST_BE_READ)
     restrictions.extend(_CONTINUATION_STATUS_RESTRICTIONS[continuation_status])
     return tuple(dict.fromkeys(restrictions))
 
@@ -619,7 +672,7 @@ def _abstain_result(
         ambiguity_reasons=(reason,),
         low_coverage_mode=True,
         low_coverage_reasons=(
-            "abstain",
+            L06CoverageCode.ABSTAIN,
             *downstream_absence.low_coverage_reasons,
         ),
         interpretation_not_equal_accepted_update=True,

@@ -4,6 +4,9 @@ from substrate.discourse_update.models import (
     ContinuationStatus,
     DiscourseUpdateBundle,
     DiscourseUpdateGateDecision,
+    L06ProposalPermissionCode,
+    L06ProposalRestrictionCode,
+    L06RestrictionCode,
     DiscourseUpdateResult,
     DiscourseUpdateUsabilityClass,
 )
@@ -22,29 +25,29 @@ def evaluate_discourse_update_downstream_gate(
         )
 
     restrictions: list[str] = [
-        "l06_object_presence_not_acceptance",
-        "object_presence_not_permission",
-        "l06_source_modus_ref_must_be_read",
-        "l06_source_modus_ref_kind_must_be_read",
-        "l06_source_modus_lineage_ref_must_be_read",
-        "proposal_requires_acceptance",
-        "acceptance_required_must_be_read",
-        "accepted_proposal_not_accepted_update",
-        "interpretation_not_equal_accepted_update",
-        "proposal_effects_not_yet_authorized",
-        "proposal_not_truth",
-        "proposal_not_self_update",
-        "update_record_not_state_mutation",
-        "repair_trigger_must_be_localized",
-        "repair_localization_must_be_read",
-        "generic_clarification_forbidden",
-        "blocked_update_must_be_read",
-        "guarded_continue_not_acceptance",
-        "guarded_continue_requires_limits_read",
-        "downstream_must_read_block_or_repair",
-        "l06_output_not_dialogue_manager",
-        "l06_output_not_planner",
-        "l06_output_not_common_ground_mutator",
+        L06RestrictionCode.L06_OBJECT_PRESENCE_NOT_ACCEPTANCE,
+        L06RestrictionCode.OBJECT_PRESENCE_NOT_PERMISSION,
+        L06RestrictionCode.L06_SOURCE_MODUS_REF_MUST_BE_READ,
+        L06RestrictionCode.L06_SOURCE_MODUS_REF_KIND_MUST_BE_READ,
+        L06RestrictionCode.L06_SOURCE_MODUS_LINEAGE_REF_MUST_BE_READ,
+        L06RestrictionCode.PROPOSAL_REQUIRES_ACCEPTANCE,
+        L06RestrictionCode.ACCEPTANCE_REQUIRED_MUST_BE_READ,
+        L06RestrictionCode.ACCEPTED_PROPOSAL_NOT_ACCEPTED_UPDATE,
+        L06RestrictionCode.INTERPRETATION_NOT_EQUAL_ACCEPTED_UPDATE,
+        L06RestrictionCode.PROPOSAL_EFFECTS_NOT_YET_AUTHORIZED,
+        L06RestrictionCode.PROPOSAL_NOT_TRUTH,
+        L06RestrictionCode.PROPOSAL_NOT_SELF_UPDATE,
+        L06RestrictionCode.UPDATE_RECORD_NOT_STATE_MUTATION,
+        L06RestrictionCode.REPAIR_TRIGGER_MUST_BE_LOCALIZED,
+        L06RestrictionCode.REPAIR_LOCALIZATION_MUST_BE_READ,
+        L06RestrictionCode.GENERIC_CLARIFICATION_FORBIDDEN,
+        L06RestrictionCode.BLOCKED_UPDATE_MUST_BE_READ,
+        L06RestrictionCode.GUARDED_CONTINUE_NOT_ACCEPTANCE,
+        L06RestrictionCode.GUARDED_CONTINUE_REQUIRES_LIMITS_READ,
+        L06RestrictionCode.DOWNSTREAM_MUST_READ_BLOCK_OR_REPAIR,
+        L06RestrictionCode.L06_OUTPUT_NOT_DIALOGUE_MANAGER,
+        L06RestrictionCode.L06_OUTPUT_NOT_PLANNER,
+        L06RestrictionCode.L06_OUTPUT_NOT_COMMON_GROUND_MUTATOR,
     ]
 
     accepted_proposals: list[str] = []
@@ -96,15 +99,15 @@ def evaluate_discourse_update_downstream_gate(
         source_id = proposal.source_record_ids[0] if proposal.source_record_ids else ""
         source_state = continuation_by_source.get(source_id)
         required_proposal_restrictions = {
-            "l06_object_presence_not_acceptance",
-            "proposal_requires_acceptance",
-            "acceptance_required_must_be_read",
-            "accepted_proposal_not_accepted_update",
-            "proposal_effects_not_yet_authorized",
-            "proposal_not_truth",
-            "proposal_not_self_update",
-            "update_record_not_state_mutation",
-            "interpretation_not_equal_accepted_update",
+            L06ProposalRestrictionCode.L06_OBJECT_PRESENCE_NOT_ACCEPTANCE,
+            L06ProposalRestrictionCode.PROPOSAL_REQUIRES_ACCEPTANCE,
+            L06ProposalRestrictionCode.ACCEPTANCE_REQUIRED_MUST_BE_READ,
+            L06ProposalRestrictionCode.ACCEPTED_PROPOSAL_NOT_ACCEPTED_UPDATE,
+            L06ProposalRestrictionCode.PROPOSAL_EFFECTS_NOT_YET_AUTHORIZED,
+            L06ProposalRestrictionCode.PROPOSAL_NOT_TRUTH,
+            L06ProposalRestrictionCode.PROPOSAL_NOT_SELF_UPDATE,
+            L06ProposalRestrictionCode.UPDATE_RECORD_NOT_STATE_MUTATION,
+            L06ProposalRestrictionCode.INTERPRETATION_NOT_EQUAL_ACCEPTED_UPDATE,
         }
         if not required_proposal_restrictions.issubset(set(proposal.downstream_restrictions)):
             has_proposal_restriction_gap = True
@@ -127,8 +130,10 @@ def evaluate_discourse_update_downstream_gate(
                 and bool(source_state.localized_repair_refs)
                 and all(ref in repair_ids for ref in source_state.localized_repair_refs)
                 and bool(repair_refs)
-                and "blocked_update_must_be_read" in proposal.downstream_restrictions
-                and proposal.downstream_permissions == ("proposal_withheld_pending_repair",)
+                and L06ProposalRestrictionCode.BLOCKED_UPDATE_MUST_BE_READ
+                in proposal.downstream_restrictions
+                and proposal.downstream_permissions
+                == (L06ProposalPermissionCode.PROPOSAL_WITHHELD_PENDING_REPAIR,)
             )
             if not blocked_lawful:
                 has_block_gap = True
@@ -139,17 +144,24 @@ def evaluate_discourse_update_downstream_gate(
                 proposal.proposal_id in guarded_ids
                 and source_state.guarded_continue_allowed
                 and not source_state.guarded_continue_forbidden
-                and "guarded_continue_requires_limits_read" in proposal.downstream_restrictions
-                and "guarded_continue_not_acceptance" in proposal.downstream_restrictions
-                and proposal.downstream_permissions == ("proposal_guarded_forwardable_if_limits_read",)
+                and L06ProposalRestrictionCode.GUARDED_CONTINUE_REQUIRES_LIMITS_READ
+                in proposal.downstream_restrictions
+                and L06ProposalRestrictionCode.GUARDED_CONTINUE_NOT_ACCEPTANCE
+                in proposal.downstream_restrictions
+                and proposal.downstream_permissions
+                == (
+                    L06ProposalPermissionCode.PROPOSAL_GUARDED_FORWARDABLE_IF_LIMITS_READ,
+                )
             )
             if not guarded_lawful:
                 has_repair_guard_gap = True
         if source_state.continuation_status is ContinuationStatus.ABSTAIN_UPDATE_WITHHELD:
             has_abstain_withheld = True
             if (
-                proposal.downstream_permissions != ("proposal_withheld_not_forwardable",)
-                or "abstain_update_withheld_must_be_read" not in proposal.downstream_restrictions
+                proposal.downstream_permissions
+                != (L06ProposalPermissionCode.PROPOSAL_WITHHELD_NOT_FORWARDABLE,)
+                or L06ProposalRestrictionCode.ABSTAIN_UPDATE_WITHHELD_MUST_BE_READ
+                not in proposal.downstream_restrictions
             ):
                 has_proposal_permission_gap = True
 
@@ -160,39 +172,41 @@ def evaluate_discourse_update_downstream_gate(
             rejected_proposals.append(proposal.proposal_id)
 
     if has_localization_gap:
-        restrictions.append("repair_localization_gap_detected")
+        restrictions.append(L06RestrictionCode.REPAIR_LOCALIZATION_GAP_DETECTED)
     if has_generic_clarification:
-        restrictions.append("generic_clarification_detected")
+        restrictions.append(L06RestrictionCode.GENERIC_CLARIFICATION_DETECTED)
     if has_block_gap:
-        restrictions.append("blocked_update_contract_gap_detected")
+        restrictions.append(L06RestrictionCode.BLOCKED_UPDATE_CONTRACT_GAP_DETECTED)
     if has_acceptance_laundering:
-        restrictions.append("acceptance_laundering_detected")
+        restrictions.append(L06RestrictionCode.ACCEPTANCE_LAUNDERING_DETECTED)
     if has_repair_guard_gap:
-        restrictions.append("repair_guard_contract_gap_detected")
+        restrictions.append(L06RestrictionCode.REPAIR_GUARD_CONTRACT_GAP_DETECTED)
     if has_proposal_restriction_gap:
-        restrictions.append("proposal_restriction_shape_gap_detected")
+        restrictions.append(L06RestrictionCode.PROPOSAL_RESTRICTION_SHAPE_GAP_DETECTED)
     if has_proposal_permission_gap:
-        restrictions.append("proposal_permission_shape_gap_detected")
+        restrictions.append(L06RestrictionCode.PROPOSAL_PERMISSION_SHAPE_GAP_DETECTED)
     if has_abstain_withheld:
-        restrictions.append("abstain_update_withheld_must_be_read")
+        restrictions.append(L06RestrictionCode.ABSTAIN_UPDATE_WITHHELD_MUST_BE_READ)
     if has_source_ref_collapse:
-        restrictions.append("source_ref_relabeling_without_notice")
+        restrictions.append(L06RestrictionCode.SOURCE_REF_RELABELING_WITHOUT_NOTICE)
 
     if bundle.downstream_update_acceptor_absent:
-        restrictions.append("downstream_update_acceptor_absent")
+        restrictions.append(L06RestrictionCode.DOWNSTREAM_UPDATE_ACCEPTOR_ABSENT)
     if bundle.repair_consumer_absent:
-        restrictions.append("repair_consumer_absent")
+        restrictions.append(L06RestrictionCode.REPAIR_CONSUMER_ABSENT)
     if bundle.discourse_state_mutation_consumer_absent:
-        restrictions.append("discourse_state_mutation_consumer_absent")
+        restrictions.append(
+            L06RestrictionCode.DISCOURSE_STATE_MUTATION_CONSUMER_ABSENT
+        )
     if bundle.legacy_g01_bypass_risk_present:
-        restrictions.append("legacy_bypass_risk_present")
-        restrictions.append("legacy_bypass_risk_must_be_read")
-        restrictions.append("legacy_bypass_forbidden")
+        restrictions.append(L06RestrictionCode.LEGACY_BYPASS_RISK_PRESENT)
+        restrictions.append(L06RestrictionCode.LEGACY_BYPASS_RISK_MUST_BE_READ)
+        restrictions.append(L06RestrictionCode.LEGACY_BYPASS_FORBIDDEN)
 
     accepted = bool(accepted_proposals)
     if not accepted:
         usability_class = DiscourseUpdateUsabilityClass.BLOCKED
-        restrictions.append("no_usable_update_proposals")
+        restrictions.append(L06RestrictionCode.NO_USABLE_UPDATE_PROPOSALS)
         reason = "l06 produced no lawful update proposals for downstream use"
     else:
         usability_class = DiscourseUpdateUsabilityClass.USABLE_BOUNDED
@@ -217,8 +231,10 @@ def evaluate_discourse_update_downstream_gate(
         or has_source_ref_collapse
     )
     if degraded:
-        restrictions.append("downstream_authority_degraded")
-        restrictions.append("degraded_l06_requires_restrictions_read")
+        restrictions.append(L06RestrictionCode.DOWNSTREAM_AUTHORITY_DEGRADED)
+        restrictions.append(
+            L06RestrictionCode.DEGRADED_L06_REQUIRES_RESTRICTIONS_READ
+        )
     if degraded and accepted:
         usability_class = DiscourseUpdateUsabilityClass.DEGRADED_BOUNDED
 

@@ -124,6 +124,7 @@ def discourse_update_result_snapshot(result: DiscourseUpdateResult) -> dict[str,
                     "guarded_continue_allowed": state.guarded_continue_allowed,
                     "guarded_continue_forbidden": state.guarded_continue_forbidden,
                     "acceptance_required": state.acceptance_required,
+                    "block_or_guard_reason_code": state.block_or_guard_reason_code,
                     "block_or_guard_reason": state.block_or_guard_reason,
                     "localized_repair_refs": state.localized_repair_refs,
                 }

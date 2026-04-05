@@ -15,6 +15,8 @@ from substrate.modus_hypotheses.models import (
     EvidentialityState,
     IllocutionHypothesis,
     IllocutionKind,
+    L05CautionCode,
+    L05CoverageCode,
     ModalityEvidentialityProfile,
     ModusHypothesisBundle,
     ModusHypothesisRecord,
@@ -80,11 +82,11 @@ def build_modus_hypotheses(
     legacy_shortcut_bypass_risk = True
     low_coverage_reasons.extend(
         [
-            "l06_downstream_not_bound_here",
-            "l06_update_consumer_not_wired_here",
-            "l06_repair_consumer_not_wired_here",
-            "legacy_l04_g01_shortcut_operational_debt",
-            "legacy_shortcut_bypass_risk",
+            L05CoverageCode.L06_DOWNSTREAM_NOT_BOUND_HERE,
+            L05CoverageCode.L06_UPDATE_CONSUMER_NOT_WIRED_HERE,
+            L05CoverageCode.L06_REPAIR_CONSUMER_NOT_WIRED_HERE,
+            L05CoverageCode.LEGACY_L04_G01_SHORTCUT_OPERATIONAL_DEBT,
+            L05CoverageCode.LEGACY_SHORTCUT_BYPASS_RISK,
         ]
     )
 
@@ -518,16 +520,16 @@ def _downstream_cautions(
     quote_state: QuotedSpeechState,
 ) -> tuple[str, ...]:
     cautions = [
-        "likely_illocution_not_settled_intent",
-        "addressivity_not_self_applicability",
-        "dictum_not_equal_force",
+        L05CautionCode.LIKELY_ILLOCUTION_NOT_SETTLED_INTENT,
+        L05CautionCode.ADDRESSIVITY_NOT_SELF_APPLICABILITY,
+        L05CautionCode.DICTUM_NOT_EQUAL_FORCE,
     ]
     if entropy >= 0.35:
-        cautions.append("force_alternatives_must_be_read")
+        cautions.append(L05CautionCode.FORCE_ALTERNATIVES_MUST_BE_READ)
     if quote_state.quote_or_echo_present:
-        cautions.append("quoted_force_not_current_commitment")
+        cautions.append(L05CautionCode.QUOTED_FORCE_NOT_CURRENT_COMMITMENT)
     if any(slot.unresolved for slot in candidate.argument_slots):
-        cautions.append("addressivity_target_unresolved")
+        cautions.append(L05CautionCode.ADDRESSIVITY_TARGET_UNRESOLVED)
     return tuple(dict.fromkeys(cautions))
 
 
@@ -667,12 +669,12 @@ def _abstain_result(
         ambiguity_reasons=(reason,),
         low_coverage_mode=True,
         low_coverage_reasons=(
-            "abstain",
-            "l06_downstream_not_bound_here",
-            "l06_update_consumer_not_wired_here",
-            "l06_repair_consumer_not_wired_here",
-            "legacy_l04_g01_shortcut_operational_debt",
-            "legacy_shortcut_bypass_risk",
+            L05CoverageCode.ABSTAIN,
+            L05CoverageCode.L06_DOWNSTREAM_NOT_BOUND_HERE,
+            L05CoverageCode.L06_UPDATE_CONSUMER_NOT_WIRED_HERE,
+            L05CoverageCode.L06_REPAIR_CONSUMER_NOT_WIRED_HERE,
+            L05CoverageCode.LEGACY_L04_G01_SHORTCUT_OPERATIONAL_DEBT,
+            L05CoverageCode.LEGACY_SHORTCUT_BYPASS_RISK,
         ),
         l06_downstream_not_bound_here=True,
         l06_update_consumer_not_wired_here=True,

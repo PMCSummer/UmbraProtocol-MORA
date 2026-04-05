@@ -7,6 +7,7 @@ from substrate.discourse_update.models import (
     DiscourseUpdateBundle,
     DiscourseUpdateResult,
     DiscourseUpdateUsabilityClass,
+    L06RestrictionCode,
 )
 from substrate.discourse_update.policy import evaluate_discourse_update_downstream_gate
 
@@ -64,27 +65,62 @@ def derive_discourse_update_contract_view(
         source_modus_ref_kind_phase_native=(bundle.source_modus_ref_kind == "phase_native_derived_ref"),
         source_modus_lineage_ref_present=bool(bundle.source_modus_lineage_ref),
         source_modus_ref_distinct_from_lineage_ref=(bundle.source_modus_ref != bundle.source_modus_lineage_ref),
-        requires_acceptance_read=("proposal_requires_acceptance" in gate.restrictions),
-        requires_acceptance_required_marker_read=("acceptance_required_must_be_read" in gate.restrictions),
-        requires_repair_read=("repair_trigger_must_be_localized" in gate.restrictions),
-        requires_block_read=("blocked_update_must_be_read" in gate.restrictions),
-        requires_guard_limits_read=("guarded_continue_requires_limits_read" in gate.restrictions),
+        requires_acceptance_read=(
+            L06RestrictionCode.PROPOSAL_REQUIRES_ACCEPTANCE in gate.restrictions
+        ),
+        requires_acceptance_required_marker_read=(
+            L06RestrictionCode.ACCEPTANCE_REQUIRED_MUST_BE_READ in gate.restrictions
+        ),
+        requires_repair_read=(
+            L06RestrictionCode.REPAIR_TRIGGER_MUST_BE_LOCALIZED in gate.restrictions
+        ),
+        requires_block_read=(
+            L06RestrictionCode.BLOCKED_UPDATE_MUST_BE_READ in gate.restrictions
+        ),
+        requires_guard_limits_read=(
+            L06RestrictionCode.GUARDED_CONTINUE_REQUIRES_LIMITS_READ
+            in gate.restrictions
+        ),
         proposal_requires_acceptance=all(proposal.acceptance_required for proposal in bundle.update_proposals) if bundle.update_proposals else True,
         repair_localization_present=repair_localization_present,
         blocked_update_present=ContinuationStatus.BLOCKED_PENDING_REPAIR in continuation_statuses,
         guarded_continue_present=ContinuationStatus.GUARDED_CONTINUE in continuation_statuses,
         abstain_update_withheld_present=ContinuationStatus.ABSTAIN_UPDATE_WITHHELD in continuation_statuses,
-        interpretation_not_yet_accepted=("interpretation_not_equal_accepted_update" in gate.restrictions),
-        accepted_proposal_not_accepted_update=("accepted_proposal_not_accepted_update" in gate.restrictions),
-        proposal_effects_not_yet_authorized=("proposal_effects_not_yet_authorized" in gate.restrictions),
-        proposal_not_truth=("proposal_not_truth" in gate.restrictions),
-        proposal_not_self_update=("proposal_not_self_update" in gate.restrictions),
-        update_record_not_state_mutation=("update_record_not_state_mutation" in gate.restrictions),
-        l06_object_presence_not_acceptance=("l06_object_presence_not_acceptance" in gate.restrictions),
-        generic_clarification_forbidden=("generic_clarification_forbidden" in gate.restrictions),
-        downstream_authority_degraded=("downstream_authority_degraded" in gate.restrictions),
-        legacy_bypass_risk_present=("legacy_bypass_risk_present" in gate.restrictions),
-        legacy_bypass_risk_must_be_read=("legacy_bypass_risk_must_be_read" in gate.restrictions),
+        interpretation_not_yet_accepted=(
+            L06RestrictionCode.INTERPRETATION_NOT_EQUAL_ACCEPTED_UPDATE
+            in gate.restrictions
+        ),
+        accepted_proposal_not_accepted_update=(
+            L06RestrictionCode.ACCEPTED_PROPOSAL_NOT_ACCEPTED_UPDATE
+            in gate.restrictions
+        ),
+        proposal_effects_not_yet_authorized=(
+            L06RestrictionCode.PROPOSAL_EFFECTS_NOT_YET_AUTHORIZED
+            in gate.restrictions
+        ),
+        proposal_not_truth=(L06RestrictionCode.PROPOSAL_NOT_TRUTH in gate.restrictions),
+        proposal_not_self_update=(
+            L06RestrictionCode.PROPOSAL_NOT_SELF_UPDATE in gate.restrictions
+        ),
+        update_record_not_state_mutation=(
+            L06RestrictionCode.UPDATE_RECORD_NOT_STATE_MUTATION in gate.restrictions
+        ),
+        l06_object_presence_not_acceptance=(
+            L06RestrictionCode.L06_OBJECT_PRESENCE_NOT_ACCEPTANCE
+            in gate.restrictions
+        ),
+        generic_clarification_forbidden=(
+            L06RestrictionCode.GENERIC_CLARIFICATION_FORBIDDEN in gate.restrictions
+        ),
+        downstream_authority_degraded=(
+            L06RestrictionCode.DOWNSTREAM_AUTHORITY_DEGRADED in gate.restrictions
+        ),
+        legacy_bypass_risk_present=(
+            L06RestrictionCode.LEGACY_BYPASS_RISK_PRESENT in gate.restrictions
+        ),
+        legacy_bypass_risk_must_be_read=(
+            L06RestrictionCode.LEGACY_BYPASS_RISK_MUST_BE_READ in gate.restrictions
+        ),
         usability_class=gate.usability_class,
         restrictions=gate.restrictions,
         strong_update_permission=False,

@@ -3,6 +3,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from substrate.targeted_clarification.models import (
+    G07LockoutCode,
+    G07RestrictionCode,
     InterventionBundle,
     InterventionStatus,
     InterventionUsabilityClass,
@@ -85,13 +87,18 @@ def derive_targeted_clarification_contract_view(
             InterventionStatus.BLOCKED_DUE_TO_INSUFFICIENT_QUESTIONABILITY in statuses
         ),
         clarification_not_worth_cost_present=InterventionStatus.CLARIFICATION_NOT_WORTH_COST in statuses,
-        closure_blocked_until_answer=("closure_blocked_until_answer" in lockouts),
-        planning_forbidden_on_current_frame=("planning_forbidden_on_current_frame" in lockouts),
-        memory_uptake_deferred=("memory_uptake_deferred" in lockouts),
-        appraisal_context_only=("appraisal_context_only" in lockouts),
-        narrative_commitment_forbidden=("narrative_commitment_forbidden" in lockouts),
+        closure_blocked_until_answer=(G07LockoutCode.CLOSURE_BLOCKED_UNTIL_ANSWER in lockouts),
+        planning_forbidden_on_current_frame=(
+            G07LockoutCode.PLANNING_FORBIDDEN_ON_CURRENT_FRAME in lockouts
+        ),
+        memory_uptake_deferred=(G07LockoutCode.MEMORY_UPTAKE_DEFERRED in lockouts),
+        appraisal_context_only=(G07LockoutCode.APPRAISAL_CONTEXT_ONLY in lockouts),
+        narrative_commitment_forbidden=(
+            G07LockoutCode.NARRATIVE_COMMITMENT_FORBIDDEN in lockouts
+        ),
         safety_escalation_not_authorized_from_current_evidence=(
-            "safety_escalation_not_authorized_from_current_evidence" in lockouts
+            G07LockoutCode.SAFETY_ESCALATION_NOT_AUTHORIZED_FROM_CURRENT_EVIDENCE
+            in lockouts
         ),
         usability_class=gate.usability_class,
         restrictions=gate.restrictions,
@@ -108,27 +115,70 @@ def derive_targeted_clarification_contract_view(
             and bundle.source_framing_ref != bundle.source_framing_lineage_ref
             and bundle.source_discourse_update_ref != bundle.source_discourse_update_lineage_ref
         ),
-        requires_source_ref_class_read=("source_ref_class_must_be_read" in gate.restrictions),
-        requires_target_binding_read=("intervention_requires_target_binding_read" in gate.restrictions),
-        requires_lockouts_read=("downstream_lockouts_must_be_read" in gate.restrictions),
-        requires_question_spec_target_binding_read=("minimal_question_spec_target_binding_must_be_read" in gate.restrictions),
-        requires_forbidden_presuppositions_read=("forbidden_presuppositions_must_be_read" in gate.restrictions),
+        requires_source_ref_class_read=(
+            G07RestrictionCode.SOURCE_REF_CLASS_MUST_BE_READ in gate.restrictions
+        ),
+        requires_target_binding_read=(
+            G07RestrictionCode.INTERVENTION_REQUIRES_TARGET_BINDING_READ
+            in gate.restrictions
+        ),
+        requires_lockouts_read=(
+            G07RestrictionCode.DOWNSTREAM_LOCKOUTS_MUST_BE_READ in gate.restrictions
+        ),
+        requires_question_spec_target_binding_read=(
+            G07RestrictionCode.MINIMAL_QUESTION_SPEC_TARGET_BINDING_MUST_BE_READ
+            in gate.restrictions
+        ),
+        requires_forbidden_presuppositions_read=(
+            G07RestrictionCode.FORBIDDEN_PRESUPPOSITIONS_MUST_BE_READ
+            in gate.restrictions
+        ),
         l06_upstream_bound_here=bundle.l06_upstream_bound_here,
-        l06_repair_localization_must_be_read=("l06_repair_localization_must_be_read" in gate.restrictions),
-        l06_proposal_requires_acceptance_read=("l06_proposal_requires_acceptance_read" in gate.restrictions),
-        l06_update_not_accepted=("l06_update_not_accepted" in gate.restrictions),
-        intervention_not_discourse_acceptance=("intervention_not_discourse_acceptance" in gate.restrictions),
-        l06_block_or_guard_must_be_read=("l06_block_or_guard_must_be_read" in gate.restrictions),
-        l06_continuation_topology_present=("l06_continuation_topology_present" in gate.restrictions),
-        l06_g07_target_alignment_required=("l06_g07_target_alignment_required" in gate.restrictions),
-        l06_g07_target_drift_detected=("l06_g07_target_drift_detected" in gate.restrictions),
-        l06_repair_localization_incompatible=("l06_repair_localization_incompatible" in gate.restrictions),
+        l06_repair_localization_must_be_read=(
+            G07RestrictionCode.L06_REPAIR_LOCALIZATION_MUST_BE_READ in gate.restrictions
+        ),
+        l06_proposal_requires_acceptance_read=(
+            G07RestrictionCode.L06_PROPOSAL_REQUIRES_ACCEPTANCE_READ
+            in gate.restrictions
+        ),
+        l06_update_not_accepted=(
+            G07RestrictionCode.L06_UPDATE_NOT_ACCEPTED in gate.restrictions
+        ),
+        intervention_not_discourse_acceptance=(
+            G07RestrictionCode.INTERVENTION_NOT_DISCOURSE_ACCEPTANCE
+            in gate.restrictions
+        ),
+        l06_block_or_guard_must_be_read=(
+            G07RestrictionCode.L06_BLOCK_OR_GUARD_MUST_BE_READ in gate.restrictions
+        ),
+        l06_continuation_topology_present=(
+            G07RestrictionCode.L06_CONTINUATION_TOPOLOGY_PRESENT in gate.restrictions
+        ),
+        l06_g07_target_alignment_required=(
+            G07RestrictionCode.L06_G07_TARGET_ALIGNMENT_REQUIRED
+            in gate.restrictions
+        ),
+        l06_g07_target_drift_detected=(
+            G07RestrictionCode.L06_G07_TARGET_DRIFT_DETECTED in gate.restrictions
+        ),
+        l06_repair_localization_incompatible=(
+            G07RestrictionCode.L06_REPAIR_LOCALIZATION_INCOMPATIBLE
+            in gate.restrictions
+        ),
         answer_binding_ready=bundle.answer_binding_ready,
-        answer_binding_hooks_required=("answer_binding_hooks_must_be_read" in gate.restrictions),
-        intervention_object_presence_not_permission=("intervention_object_presence_not_permission" in gate.restrictions),
-        accepted_intervention_not_resolution=("accepted_intervention_not_resolution" in gate.restrictions),
+        answer_binding_hooks_required=(
+            G07RestrictionCode.ANSWER_BINDING_HOOKS_MUST_BE_READ in gate.restrictions
+        ),
+        intervention_object_presence_not_permission=(
+            G07RestrictionCode.INTERVENTION_OBJECT_PRESENCE_NOT_PERMISSION
+            in gate.restrictions
+        ),
+        accepted_intervention_not_resolution=(
+            G07RestrictionCode.ACCEPTED_INTERVENTION_NOT_RESOLUTION in gate.restrictions
+        ),
         degraded_intervention_requires_restrictions_read=(
-            "degraded_intervention_requires_restrictions_read" in gate.restrictions
+            G07RestrictionCode.DEGRADED_INTERVENTION_REQUIRES_RESTRICTIONS_READ
+            in gate.restrictions
         ),
         strong_continue_permission=False,
         reason="g07 contract view enforces intervention-status and lockout-aware downstream obedience",
