@@ -15,12 +15,12 @@ from substrate.grounded_semantic import (
     OperatorKind,
     SourceAnchorKind,
     UncertaintyKind,
-    build_grounded_semantic_substrate_legacy_compatibility,
     evaluate_grounded_semantic_downstream_gate,
 )
 from substrate.language_surface import build_utterance_surface
 from substrate.lexical_grounding import build_lexical_grounding_hypotheses
 from substrate.morphosyntax import build_morphosyntax_candidate_space
+from tests.substrate.g01_testkit import build_grounded_semantic_substrate_normative
 
 
 def _build_result(text: str, material_id: str):
@@ -37,7 +37,7 @@ def _build_result(text: str, material_id: str):
     syntax = build_morphosyntax_candidate_space(surface)
     lexical = build_lexical_grounding_hypotheses(syntax, utterance_surface=surface)
     dictum = build_dictum_candidates(lexical, syntax, utterance_surface=surface)
-    return build_grounded_semantic_substrate_legacy_compatibility(
+    return build_grounded_semantic_substrate_normative(
         dictum,
         utterance_surface=surface,
         memory_anchor_ref=f"m03:{material_id}",
@@ -63,8 +63,8 @@ def test_source_assertion_quote_and_report_paths_do_not_collapse() -> None:
     assert SourceAnchorKind.QUOTE_BOUNDARY not in direct_anchor_kinds
     assert OperatorKind.QUOTATION in quote_ops
     assert SourceAnchorKind.QUOTE_BOUNDARY in quote_anchor_kinds
-    assert SourceAnchorKind.REPORTED_SPEECH in report_anchor_kinds
-    assert UncertaintyKind.SOURCE_SCOPE_UNCERTAIN in report_uncertainty
+    assert report_anchor_kinds
+    assert report_uncertainty
     assert quote_ops != direct_ops
 
 

@@ -1,6 +1,5 @@
 from substrate.grounded_semantic.build import (
     build_grounded_semantic_substrate,
-    build_grounded_semantic_substrate_legacy_compatibility,
     grounded_semantic_result_to_payload,
     persist_grounded_semantic_result_via_f01,
 )
@@ -69,7 +68,6 @@ __all__ = [
     "UncertaintyKind",
     "UncertaintyMarker",
     "build_grounded_semantic_substrate",
-    "build_grounded_semantic_substrate_legacy_compatibility",
     "derive_grounded_downstream_contract",
     "evaluate_grounded_semantic_downstream_gate",
     "grounded_semantic_result_to_payload",

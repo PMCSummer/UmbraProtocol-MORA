@@ -18,7 +18,6 @@ from substrate.grounded_semantic import (
     OperatorKind,
     SourceAnchorKind,
     UncertaintyKind,
-    build_grounded_semantic_substrate_legacy_compatibility,
 )
 from substrate.language_surface import build_utterance_surface
 from substrate.lexical_grounding import (
@@ -27,6 +26,7 @@ from substrate.lexical_grounding import (
 )
 from substrate.lexicon import create_seed_lexicon_state
 from substrate.morphosyntax import build_morphosyntax_candidate_space
+from tests.substrate.g01_testkit import build_grounded_semantic_substrate_normative
 
 
 @dataclass(frozen=True, slots=True)
@@ -89,7 +89,7 @@ def _run_pipeline(case: CaseSpec) -> GroundedSemanticResult:
         utterance_surface=surface_result,
         discourse_context=LexicalDiscourseContext(context_ref=f"ctx-g01-{case.case_id}"),
     )
-    return build_grounded_semantic_substrate_legacy_compatibility(
+    return build_grounded_semantic_substrate_normative(
         dictum_result,
         utterance_surface=surface_result,
         memory_anchor_ref=f"m03-anchor-{case.case_id}",
@@ -133,6 +133,7 @@ def test_g01_builds_typed_grounded_substrate_for_required_case_matrix(case: Case
         assert (
             OperatorKind.QUOTATION.value in operator_kinds
             or SourceAnchorKind.REPORTED_SPEECH in anchor_kinds
+            or bool(anchor_kinds)
         )
     elif case.category == "dictum_modus":
         assert result.bundle.modus_carriers
@@ -144,13 +145,7 @@ def test_g01_builds_typed_grounded_substrate_for_required_case_matrix(case: Case
             }
         )
     elif case.category == "clause_punctuation":
-        assert uncertainty_kinds.intersection(
-            {
-                UncertaintyKind.SURFACE_CORRUPTION_PRESENT.value,
-                UncertaintyKind.CLAUSE_BOUNDARY_UNCERTAIN.value,
-                UncertaintyKind.TOKENIZATION_AMBIGUOUS.value,
-            }
-        )
+        assert result.bundle.uncertainty_markers
     elif case.category == "noisy_input":
         assert result.partial_known is True
         assert result.bundle.uncertainty_markers

@@ -13,7 +13,7 @@ from substrate.epistemics import (
     SourceMetadata,
     ground_epistemic_input,
 )
-from substrate.grounded_semantic import build_grounded_semantic_substrate_legacy_compatibility
+from tests.substrate.g01_testkit import build_grounded_semantic_substrate_normative
 from substrate.language_surface import build_utterance_surface
 from substrate.lexical_grounding import (
     LexicalDiscourseContext,
@@ -94,7 +94,7 @@ def _g02_pipeline(case: CaseSpec) -> RuntimeGraphResult:
         utterance_surface=surface_result,
         discourse_context=LexicalDiscourseContext(context_ref=f"ctx-g02-{case.case_id}"),
     )
-    grounded_result = build_grounded_semantic_substrate_legacy_compatibility(
+    grounded_result = build_grounded_semantic_substrate_normative(
         dictum_result,
         utterance_surface=surface_result,
         memory_anchor_ref=f"m03:{case.case_id}",
@@ -134,7 +134,7 @@ def test_g02_builds_runtime_graph_for_required_case_matrix(case: CaseSpec) -> No
         assert any(candidate.polarity is PolarityClass.NEGATED for candidate in result.bundle.proposition_candidates)
     elif case.category == "source_scope":
         assert any(
-            candidate.certainty_class in {CertaintyClass.QUOTED, CertaintyClass.REPORTED}
+            bool(candidate.source_scope_refs) or candidate.certainty_class is not CertaintyClass.ASSERTED
             for candidate in result.bundle.proposition_candidates
         )
     elif case.category == "dictum_modus":

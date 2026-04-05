@@ -12,7 +12,7 @@ from substrate.epistemics import (
     SourceMetadata,
     ground_epistemic_input,
 )
-from substrate.grounded_semantic import build_grounded_semantic_substrate_legacy_compatibility
+from tests.substrate.g01_testkit import build_grounded_semantic_substrate_normative
 from substrate.language_surface import build_utterance_surface
 from substrate.lexical_grounding import build_lexical_grounding_hypotheses
 from substrate.modus_hypotheses import build_modus_hypotheses
@@ -46,7 +46,7 @@ def build_l06_context(text: str, case_id: str) -> L06Context:
     dictum = build_dictum_candidates(lexical, syntax, utterance_surface=surface)
     modus = build_modus_hypotheses(dictum)
     discourse_update = build_discourse_update(modus)
-    grounded = build_grounded_semantic_substrate_legacy_compatibility(
+    grounded = build_grounded_semantic_substrate_normative(
         dictum,
         utterance_surface=surface,
         memory_anchor_ref=f"m06:{case_id}",

@@ -11,7 +11,7 @@ from substrate.epistemics import (
     ground_epistemic_input,
 )
 from substrate.grounded_semantic import (
-    build_grounded_semantic_substrate_legacy_compatibility,
+    build_grounded_semantic_substrate,
     evaluate_grounded_semantic_downstream_gate,
     persist_grounded_semantic_result_via_f01,
 )
@@ -23,6 +23,7 @@ from substrate.lexical_grounding import (
 from substrate.morphosyntax import build_morphosyntax_candidate_space
 from substrate.state import create_empty_state
 from substrate.transition import execute_transition
+from tests.substrate.g01_testkit import build_grounded_semantic_substrate_normative
 
 
 def test_stage_contour_f01_f02_l01_l02_l03_l04_g01_preserves_single_write_seam() -> None:
@@ -64,7 +65,7 @@ def test_stage_contour_f01_f02_l01_l02_l03_l04_g01_preserves_single_write_seam()
         utterance_surface=surface_result,
         discourse_context=LexicalDiscourseContext(context_ref="ctx:g01-stage"),
     )
-    grounded_result = build_grounded_semantic_substrate_legacy_compatibility(
+    grounded_result = build_grounded_semantic_substrate_normative(
         dictum_result,
         utterance_surface=surface_result,
         memory_anchor_ref="m03:g01-stage",
@@ -75,16 +76,16 @@ def test_stage_contour_f01_f02_l01_l02_l03_l04_g01_preserves_single_write_seam()
     assert len(boot.state.trace.events) == start_events
     assert grounded_result.bundle.substrate_units
     assert grounded_result.bundle.phrase_scaffolds
-    assert grounded_result.bundle.normative_l05_l06_route_active is False
-    assert grounded_result.bundle.legacy_surface_cue_fallback_used is True
-    assert grounded_result.bundle.legacy_surface_cue_path_not_normative is True
+    assert grounded_result.bundle.normative_l05_l06_route_active is True
+    assert grounded_result.bundle.legacy_surface_cue_fallback_used is False
+    assert grounded_result.bundle.legacy_surface_cue_path_not_normative is False
     assert grounded_result.bundle.no_final_semantic_resolution is True
     assert grounded_result.no_final_semantic_resolution is True
     gate = evaluate_grounded_semantic_downstream_gate(grounded_result)
     assert "no_final_semantic_resolution" in gate.restrictions
-    assert "legacy_surface_cue_fallback_used" in gate.restrictions
-    assert "legacy_surface_cue_path_not_normative" in gate.restrictions
-    assert "l04_only_input_not_equivalent_to_l05_l06_route" in gate.restrictions
+    assert "legacy_surface_cue_fallback_used" not in gate.restrictions
+    assert "legacy_surface_cue_path_not_normative" not in gate.restrictions
+    assert "l04_only_input_not_equivalent_to_l05_l06_route" not in gate.restrictions
 
     persisted = persist_grounded_semantic_result_via_f01(
         result=grounded_result,
@@ -102,8 +103,8 @@ def test_stage_contour_f01_f02_l01_l02_l03_l04_g01_preserves_single_write_seam()
     assert snapshot["bundle"]["phrase_scaffolds"]
     assert snapshot["bundle"]["operator_carriers"] is not None
     assert snapshot["bundle"]["source_anchors"] is not None
-    assert snapshot["bundle"]["normative_l05_l06_route_active"] is False
-    assert snapshot["bundle"]["legacy_surface_cue_fallback_used"] is True
+    assert snapshot["bundle"]["normative_l05_l06_route_active"] is True
+    assert snapshot["bundle"]["legacy_surface_cue_fallback_used"] is False
     assert snapshot["bundle"]["no_final_semantic_resolution"] is True
     assert snapshot["telemetry"]["attempted_paths"]
     assert snapshot["telemetry"]["downstream_gate"]["restrictions"]
@@ -111,4 +112,4 @@ def test_stage_contour_f01_f02_l01_l02_l03_l04_g01_preserves_single_write_seam()
 
 def test_stage_contour_g01_typed_only_guards_no_raw_bypass() -> None:
     with pytest.raises(TypeError):
-        build_grounded_semantic_substrate_legacy_compatibility("raw dictum")
+        build_grounded_semantic_substrate("raw dictum")

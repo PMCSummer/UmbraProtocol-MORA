@@ -7,7 +7,6 @@ from substrate.discourse_update import (
     evaluate_discourse_update_downstream_gate,
 )
 from substrate.grounded_semantic import (
-    build_grounded_semantic_substrate_legacy_compatibility,
     derive_grounded_downstream_contract,
     evaluate_grounded_semantic_downstream_gate,
 )
@@ -79,19 +78,13 @@ def test_shortcut_clarification_object_presence_not_permission() -> None:
     assert contract.intervention_not_discourse_acceptance is True
 
 
-def test_shortcut_normative_and_compatibility_routes_remain_non_equivalent() -> None:
+def test_shortcut_legacy_route_retired_and_normative_route_is_only_runtime_path() -> None:
     ctx = build_phase_axis_context("alpha is stable?", "shortcut-route-contrast")
     normative = derive_grounded_downstream_contract(ctx.grounded_normative)
-    compatibility = derive_grounded_downstream_contract(ctx.grounded_compatibility)
     assert normative.normative_l05_l06_route_active is True
     assert normative.legacy_surface_cue_fallback_used is False
     assert normative.source_modus_ref_kind_phase_native is True
     assert normative.source_discourse_update_ref_kind_phase_native is True
-    assert compatibility.normative_l05_l06_route_active is False
-    assert compatibility.legacy_surface_cue_fallback_used is True
-    assert compatibility.source_modus_ref_present is False
-    assert compatibility.source_discourse_update_ref_present is False
-    assert normative.restrictions != compatibility.restrictions
 
 
 def test_shortcut_source_lineage_identity_collapse_is_gate_visible() -> None:

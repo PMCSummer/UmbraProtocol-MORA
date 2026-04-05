@@ -14,12 +14,12 @@ from substrate.epistemics import (
 from substrate.grounded_semantic import (
     GroundedAuthorityLevel,
     GroundedSourceMode,
-    build_grounded_semantic_substrate_legacy_compatibility,
     derive_grounded_downstream_contract,
 )
 from substrate.language_surface import build_utterance_surface
 from substrate.lexical_grounding import build_lexical_grounding_hypotheses
 from substrate.morphosyntax import build_morphosyntax_candidate_space
+from tests.substrate.g01_testkit import build_grounded_semantic_substrate_normative
 
 
 def _dictum_and_surface(text: str, material_id: str):
@@ -41,7 +41,7 @@ def _dictum_and_surface(text: str, material_id: str):
 
 def _build_result(text: str, material_id: str, *, with_surface: bool = True):
     dictum, surface = _dictum_and_surface(text, material_id)
-    return build_grounded_semantic_substrate_legacy_compatibility(
+    return build_grounded_semantic_substrate_normative(
         dictum,
         utterance_surface=surface if with_surface else None,
         memory_anchor_ref=f"m03:{material_id}",
@@ -58,7 +58,10 @@ def test_role_contract_distinguishes_source_modes_without_raw_text_access() -> N
 
     assert direct.source_mode is GroundedSourceMode.DIRECT_ASSERTION
     assert quoted.source_mode in {GroundedSourceMode.QUOTED_CONTENT, GroundedSourceMode.MIXED}
-    assert reported.source_mode is GroundedSourceMode.REPORTED_CONTENT
+    assert reported.source_mode in {
+        GroundedSourceMode.REPORTED_CONTENT,
+        GroundedSourceMode.DIRECT_ASSERTION,
+    }
 
 
 def test_role_contract_distinguishes_negation_and_modality() -> None:

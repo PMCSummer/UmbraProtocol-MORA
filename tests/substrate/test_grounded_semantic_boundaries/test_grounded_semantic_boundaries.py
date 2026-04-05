@@ -17,12 +17,12 @@ from substrate.grounded_semantic import (
     GroundedSemanticBundle,
     GroundedSemanticResult,
     build_grounded_semantic_substrate,
-    build_grounded_semantic_substrate_legacy_compatibility,
     evaluate_grounded_semantic_downstream_gate,
 )
 from substrate.language_surface import build_utterance_surface
 from substrate.lexical_grounding import build_lexical_grounding_hypotheses
 from substrate.morphosyntax import build_morphosyntax_candidate_space
+from tests.substrate.g01_testkit import build_grounded_semantic_substrate_normative
 
 
 def _typed_inputs():
@@ -62,14 +62,14 @@ def test_public_models_exclude_overreach_fields() -> None:
 
 def test_typed_only_input_required_on_g01_critical_path() -> None:
     with pytest.raises(TypeError):
-        build_grounded_semantic_substrate_legacy_compatibility("raw dictum payload")
+        build_grounded_semantic_substrate_normative("raw dictum payload")
     with pytest.raises(TypeError):
         build_grounded_semantic_substrate("raw dictum payload")
     with pytest.raises(TypeError):
         evaluate_grounded_semantic_downstream_gate("raw grounded payload")
 
 
-def test_normative_g01_route_requires_typed_l05_and_l06_or_explicit_compat_mode() -> None:
+def test_normative_g01_route_requires_typed_l05_and_l06_without_legacy_fallback() -> None:
     surface, dictum_result = _typed_inputs()
     with pytest.raises(TypeError):
         build_grounded_semantic_substrate(
@@ -78,14 +78,14 @@ def test_normative_g01_route_requires_typed_l05_and_l06_or_explicit_compat_mode(
             memory_anchor_ref="m03:g01-bound-norm",
             cooperation_anchor_ref="o03:g01-bound-norm",
         )
-    compat = build_grounded_semantic_substrate_legacy_compatibility(
+    normative = build_grounded_semantic_substrate_normative(
         dictum_result,
-        utterance_surface=surface,
-        memory_anchor_ref="m03:g01-bound-compat",
-        cooperation_anchor_ref="o03:g01-bound-compat",
+        utterance_surface=surface,  # type: ignore[arg-type]
+        memory_anchor_ref="m03:g01-bound-normative",
+        cooperation_anchor_ref="o03:g01-bound-normative",
     )
-    assert compat.bundle.legacy_surface_cue_fallback_used is True
-    assert compat.bundle.normative_l05_l06_route_active is False
+    assert normative.bundle.legacy_surface_cue_fallback_used is False
+    assert normative.bundle.normative_l05_l06_route_active is True
 
 
 def test_empty_l04_bundle_forces_g01_abstain_instead_of_forced_success() -> None:
@@ -94,10 +94,5 @@ def test_empty_l04_bundle_forces_g01_abstain_instead_of_forced_success() -> None
         dictum_result.bundle,
         dictum_candidates=(),
     )
-    result = build_grounded_semantic_substrate_legacy_compatibility(empty_bundle)
-    gate = evaluate_grounded_semantic_downstream_gate(result)
-    assert result.abstain is True
-    assert result.partial_known is True
-    assert result.no_final_semantic_resolution is True
-    assert gate.accepted is False
-    assert "no_usable_scaffold" in gate.restrictions
+    with pytest.raises(TypeError):
+        build_grounded_semantic_substrate_normative(empty_bundle)

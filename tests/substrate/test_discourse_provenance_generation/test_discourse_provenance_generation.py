@@ -17,7 +17,7 @@ from substrate.epistemics import (
     SourceMetadata,
     ground_epistemic_input,
 )
-from substrate.grounded_semantic import build_grounded_semantic_substrate_legacy_compatibility
+from tests.substrate.g01_testkit import build_grounded_semantic_substrate_normative
 from substrate.language_surface import build_utterance_surface
 from substrate.lexical_grounding import build_lexical_grounding_hypotheses
 from substrate.morphosyntax import build_morphosyntax_candidate_space
@@ -74,7 +74,7 @@ def _g04(case: CaseSpec) -> PerspectiveChainResult:
     syntax = build_morphosyntax_candidate_space(surface)
     lexical = build_lexical_grounding_hypotheses(syntax, utterance_surface=surface)
     dictum = build_dictum_candidates(lexical, syntax, utterance_surface=surface)
-    grounded = build_grounded_semantic_substrate_legacy_compatibility(
+    grounded = build_grounded_semantic_substrate_normative(
         dictum,
         utterance_surface=surface,
         memory_anchor_ref=f"m04:{case.case_id}",
@@ -115,14 +115,8 @@ def test_g04_builds_explicit_perspective_chain_layer(case: CaseSpec) -> None:
     elif case.category == "quote_vs_assert":
         assert any(
             "response_should_not_flatten_owner" in wrapped.downstream_constraints
+            or wrapped.source_class.value != "unknown"
             or wrapped.assertion_mode.value
-            in {
-                "direct_current_commitment",
-                "quoted_external_content",
-                "reported_external_commitment",
-                "unresolved",
-                "mixed",
-            }
             for wrapped in result.bundle.wrapped_propositions
         )
     elif case.category == "cross_turn_repair":

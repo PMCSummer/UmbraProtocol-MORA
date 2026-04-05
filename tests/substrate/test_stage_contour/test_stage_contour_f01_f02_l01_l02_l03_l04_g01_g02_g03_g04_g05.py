@@ -11,7 +11,7 @@ from substrate.epistemics import (
     SourceMetadata,
     ground_epistemic_input,
 )
-from substrate.grounded_semantic import build_grounded_semantic_substrate_legacy_compatibility
+from tests.substrate.g01_testkit import build_grounded_semantic_substrate_normative
 from substrate.language_surface import build_utterance_surface
 from substrate.lexical_grounding import (
     LexicalDiscourseContext,
@@ -69,7 +69,7 @@ def test_stage_contour_f01_f02_l01_l02_l03_l04_g01_g02_g03_g04_g05_preserves_sin
         utterance_surface=surface_result,
         discourse_context=LexicalDiscourseContext(context_ref="ctx:g05-stage"),
     )
-    grounded_result = build_grounded_semantic_substrate_legacy_compatibility(
+    grounded_result = build_grounded_semantic_substrate_normative(
         dictum_result,
         utterance_surface=surface_result,
         memory_anchor_ref="m05:g05-stage",

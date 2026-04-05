@@ -13,7 +13,6 @@ from substrate.epistemics import (
     ground_epistemic_input,
 )
 from substrate.grounded_semantic import (
-    build_grounded_semantic_substrate_legacy_compatibility,
     grounded_semantic_result_to_payload,
     persist_grounded_semantic_result_via_f01,
 )
@@ -22,6 +21,7 @@ from substrate.lexical_grounding import build_lexical_grounding_hypotheses
 from substrate.morphosyntax import build_morphosyntax_candidate_space
 from substrate.state import create_empty_state
 from substrate.transition import execute_transition
+from tests.substrate.g01_testkit import build_grounded_semantic_substrate_normative
 
 
 def _bootstrapped_state():
@@ -55,7 +55,7 @@ def _g01_result(text: str, material_id: str):
     syntax = build_morphosyntax_candidate_space(surface)
     lexical = build_lexical_grounding_hypotheses(syntax, utterance_surface=surface)
     dictum = build_dictum_candidates(lexical, syntax, utterance_surface=surface)
-    return build_grounded_semantic_substrate_legacy_compatibility(
+    return build_grounded_semantic_substrate_normative(
         dictum,
         utterance_surface=surface,
         memory_anchor_ref=f"m03:{material_id}",
@@ -74,8 +74,8 @@ def test_grounded_semantic_payload_keeps_load_bearing_fields() -> None:
     assert payload["bundle"]["source_anchors"] is not None
     assert payload["bundle"]["uncertainty_markers"] is not None
     assert payload["bundle"]["no_final_semantic_resolution"] is True
-    assert payload["bundle"]["source_modus_ref_kind"] == "not_bound"
-    assert payload["bundle"]["source_discourse_update_ref_kind"] == "not_bound"
+    assert payload["bundle"]["source_modus_ref_kind"] == "phase_native_derived_ref"
+    assert payload["bundle"]["source_discourse_update_ref_kind"] == "phase_native_derived_ref"
     assert payload["telemetry"]["downstream_gate"]["restrictions"]
     serialized = json.loads(json.dumps(payload))
     assert serialized["bundle"]["source_dictum_ref"]
@@ -96,8 +96,8 @@ def test_persist_reconstruct_continue_preserves_g01_scaffold_contract() -> None:
     assert snapshot["bundle"]["operator_carriers"] is not None
     assert snapshot["bundle"]["uncertainty_markers"] is not None
     assert snapshot["bundle"]["no_final_semantic_resolution"] is True
-    assert snapshot["bundle"]["source_modus_ref_kind"] == "not_bound"
-    assert snapshot["bundle"]["source_discourse_update_ref_kind"] == "not_bound"
+    assert snapshot["bundle"]["source_modus_ref_kind"] == "phase_native_derived_ref"
+    assert snapshot["bundle"]["source_discourse_update_ref_kind"] == "phase_native_derived_ref"
     assert snapshot["telemetry"]["attempted_paths"]
 
     second = _g01_result("we do not track alpha", "m-g01-roundtrip-first")

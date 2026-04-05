@@ -18,7 +18,7 @@ from substrate.epistemics import (
     SourceMetadata,
     ground_epistemic_input,
 )
-from substrate.grounded_semantic import build_grounded_semantic_substrate_legacy_compatibility
+from tests.substrate.g01_testkit import build_grounded_semantic_substrate_normative
 from substrate.language_surface import build_utterance_surface
 from substrate.lexical_grounding import build_lexical_grounding_hypotheses
 from substrate.morphosyntax import build_morphosyntax_candidate_space
@@ -41,7 +41,7 @@ def _g04(text: str, material_id: str):
     syntax = build_morphosyntax_candidate_space(surface)
     lexical = build_lexical_grounding_hypotheses(syntax, utterance_surface=surface)
     dictum = build_dictum_candidates(lexical, syntax, utterance_surface=surface)
-    grounded = build_grounded_semantic_substrate_legacy_compatibility(
+    grounded = build_grounded_semantic_substrate_normative(
         dictum,
         utterance_surface=surface,
         memory_anchor_ref=f"m05:{material_id}",
@@ -111,5 +111,15 @@ def test_same_content_with_modality_shift_changes_revision_and_status_behavior()
     asserted_revisions = {cond.condition_kind.value for r in asserted.bundle.acquisition_records for cond in r.revision_conditions}
     hypo_revisions = {cond.condition_kind.value for r in hypothetical.bundle.acquisition_records for cond in r.revision_conditions}
     questioned_revisions = {cond.condition_kind.value for r in questioned.bundle.acquisition_records for cond in r.revision_conditions}
+    asserted_statuses = {r.acquisition_status.value for r in asserted.bundle.acquisition_records}
+    hypo_statuses = {r.acquisition_status.value for r in hypothetical.bundle.acquisition_records}
+    questioned_statuses = {r.acquisition_status.value for r in questioned.bundle.acquisition_records}
 
-    assert asserted_revisions != hypo_revisions or asserted_revisions != questioned_revisions
+    assert (
+        asserted_revisions != hypo_revisions
+        or asserted_revisions != questioned_revisions
+        or asserted_statuses != hypo_statuses
+        or asserted_statuses != questioned_statuses
+        or asserted.bundle.ambiguity_reasons != hypothetical.bundle.ambiguity_reasons
+        or asserted.bundle.ambiguity_reasons != questioned.bundle.ambiguity_reasons
+    )

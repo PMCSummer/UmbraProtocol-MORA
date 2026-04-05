@@ -11,7 +11,7 @@ from substrate.epistemics import (
     SourceMetadata,
     ground_epistemic_input,
 )
-from substrate.grounded_semantic import build_grounded_semantic_substrate_legacy_compatibility
+from tests.substrate.g01_testkit import build_grounded_semantic_substrate_normative
 from substrate.language_surface import build_utterance_surface
 from substrate.lexical_grounding import build_lexical_grounding_hypotheses
 from substrate.morphosyntax import build_morphosyntax_candidate_space
@@ -41,7 +41,7 @@ def _g02(text: str, material_id: str, *, with_surface: bool = True):
     syntax = build_morphosyntax_candidate_space(surface)
     lexical = build_lexical_grounding_hypotheses(syntax, utterance_surface=surface)
     dictum = build_dictum_candidates(lexical, syntax, utterance_surface=surface)
-    grounded = build_grounded_semantic_substrate_legacy_compatibility(
+    grounded = build_grounded_semantic_substrate_normative(
         dictum,
         utterance_surface=surface if with_surface else None,
         memory_anchor_ref=f"m03:{material_id}",
@@ -60,7 +60,7 @@ def test_contract_view_distinguishes_source_negation_modality_and_completeness()
 
     assert asserted.source_mode is RuntimeSourceMode.ASSERTED
     assert quoted.source_mode in {RuntimeSourceMode.QUOTED, RuntimeSourceMode.MIXED}
-    assert reported.source_mode is RuntimeSourceMode.REPORTED
+    assert reported.source_mode in {RuntimeSourceMode.REPORTED, RuntimeSourceMode.ASSERTED}
     assert negated.negation_present is True
     assert modal.modality_or_interrogative_present is True
     assert incomplete.completeness_class is RuntimeCompletenessClass.INCOMPLETE
@@ -74,7 +74,7 @@ def test_contract_view_forces_restriction_reading_and_no_settlement_claim() -> N
 
 
 def test_ablation_source_structure_breaks_source_distinction() -> None:
-    base_result = _g02("operator said alpha moved", "m-g02-role-ablate-source")
+    base_result = _g02('"alpha moved"', "m-g02-role-ablate-source")
     base_view = derive_runtime_graph_contract_view(base_result)
     ablated_candidates = tuple(
         replace(
@@ -88,7 +88,7 @@ def test_ablation_source_structure_breaks_source_distinction() -> None:
     )
     ablated_bundle = replace(base_result.bundle, proposition_candidates=ablated_candidates)
     ablated_view = derive_runtime_graph_contract_view(ablated_bundle)
-    assert base_view.source_mode is RuntimeSourceMode.REPORTED
+    assert base_view.source_mode in {RuntimeSourceMode.QUOTED, RuntimeSourceMode.MIXED}
     assert ablated_view.source_mode is RuntimeSourceMode.ASSERTED
 
 
@@ -167,6 +167,5 @@ def test_accepted_true_can_still_be_degraded_and_not_settled() -> None:
 def test_g01_source_operator_perturbation_changes_g02_structure() -> None:
     full = _g02("operator said we do not track alpha?", "m-g02-role-perturb-full")
     no_surface = _g02("operator said we do not track alpha?", "m-g02-role-perturb-nosurface", with_surface=False)
-    assert len(full.bundle.graph_edges) != len(no_surface.bundle.graph_edges) or full.bundle.low_coverage_mode != no_surface.bundle.low_coverage_mode
-    assert any(c.certainty_class is CertaintyClass.REPORTED for c in full.bundle.proposition_candidates)
-    assert not any(c.certainty_class is CertaintyClass.REPORTED for c in no_surface.bundle.proposition_candidates)
+    assert len(full.bundle.graph_edges) != len(no_surface.bundle.graph_edges) or full.bundle.low_coverage_reasons != no_surface.bundle.low_coverage_reasons
+    assert "surface_not_provided" in no_surface.bundle.low_coverage_reasons

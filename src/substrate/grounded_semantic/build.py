@@ -64,7 +64,6 @@ from substrate.transition import execute_transition
 ATTEMPTED_PATHS: tuple[str, ...] = (
     "g01.validate_typed_inputs",
     "g01.normative_l05_l06_intake",
-    "g01.legacy_surface_cue_fallback",
     "g01.substrate_unit_projection",
     "g01.phrase_scaffold_building",
     "g01.operator_carrier_projection",
@@ -106,7 +105,6 @@ def build_grounded_semantic_substrate(
     cooperation_anchor_ref: str | None = None,
     modus_hypotheses_result_or_bundle: ModusHypothesisResult | ModusHypothesisBundle | None = None,
     discourse_update_result_or_bundle: DiscourseUpdateResult | DiscourseUpdateBundle | None = None,
-    compatibility_legacy_l04_only_mode: bool = False,
 ) -> GroundedSemanticResult:
     dictum_bundle, dictum_lineage = _extract_dictum_input(dictum_result_or_bundle)
     modus_bundle, modus_lineage = _extract_optional_modus_input(modus_hypotheses_result_or_bundle)
@@ -116,20 +114,14 @@ def build_grounded_semantic_substrate(
         raise TypeError("memory_anchor_ref must be str when provided")
     if cooperation_anchor_ref is not None and not isinstance(cooperation_anchor_ref, str):
         raise TypeError("cooperation_anchor_ref must be str when provided")
-    if not isinstance(compatibility_legacy_l04_only_mode, bool):
-        raise TypeError("compatibility_legacy_l04_only_mode must be bool")
     if (modus_bundle is None) ^ (discourse_bundle is None):
         raise TypeError(
             "normative g01 intake requires both typed L05 and typed L06 artifacts together, or neither"
         )
-    if modus_bundle is not None and discourse_bundle is not None and compatibility_legacy_l04_only_mode:
+    if modus_bundle is None and discourse_bundle is None:
         raise TypeError(
-            "compatibility_legacy_l04_only_mode cannot be enabled when typed L05+L06 normative inputs are present"
-        )
-    if modus_bundle is None and discourse_bundle is None and not compatibility_legacy_l04_only_mode:
-        raise TypeError(
-            "g01 normative route requires typed L05+L06 inputs; "
-            "set compatibility_legacy_l04_only_mode=True only for explicit degraded legacy compatibility"
+            "g01 construction requires typed L05+L06 inputs on canonical production route; "
+            "legacy L04-only compatibility route has been retired"
         )
     if (
         modus_bundle is not None
@@ -180,7 +172,6 @@ def build_grounded_semantic_substrate(
         )
         for candidate in dictum_bundle.dictum_candidates
     }
-    normative_route_requested = modus_bundle is not None and discourse_bundle is not None
     normative_route_binding_valid = False
     normative_l05_l06_route_active = False
     legacy_surface_cue_fallback_used = False
@@ -398,7 +389,7 @@ def build_grounded_semantic_substrate(
                 reason="quotation-sensitive dictum contributes unresolved modus carrier",
             )
 
-    if normative_route_requested and modus_bundle is not None and discourse_bundle is not None:
+    if modus_bundle is not None and discourse_bundle is not None:
         normative_route_binding_valid = True
         (
             anchor_index,
@@ -429,27 +420,6 @@ def build_grounded_semantic_substrate(
             low_coverage_reasons.append(G01CoverageCode.L06_BLOCKED_UPDATE_PRESENT)
         if l06_guarded_continue_present:
             low_coverage_reasons.append(G01CoverageCode.L06_GUARDED_CONTINUE_PRESENT)
-    else:
-        legacy_surface_cue_fallback_used = True
-        low_coverage_reasons.extend(
-            [
-                G01CoverageCode.LEGACY_SURFACE_CUE_FALLBACK_USED,
-                G01CoverageCode.L04_ONLY_INPUT_NOT_EQUIVALENT_TO_L05_L06_ROUTE,
-            ]
-        )
-        anchor_index, carrier_index, uncertainty_index, evidence_index = _register_surface_cues(
-            surface=surface,
-            linked_dictum_ids=tuple(candidate.dictum_candidate_id for candidate in dictum_bundle.dictum_candidates),
-            source_anchors=source_anchors,
-            operator_carriers=operator_carriers,
-            modus_carriers=modus_carriers,
-            uncertainty_markers=uncertainty_markers,
-            evidence_records=evidence_records,
-            start_anchor_index=anchor_index,
-            start_carrier_index=carrier_index,
-            start_uncertainty_index=uncertainty_index,
-            start_evidence_index=evidence_index,
-        )
 
     for clause_id, ranges in clause_ranges_by_id.items():
         if len(set(ranges)) > 1:
@@ -520,17 +490,13 @@ def build_grounded_semantic_substrate(
         low_coverage_reasons=tuple(dict.fromkeys(low_coverage_reasons)),
         normative_l05_l06_route_active=normative_l05_l06_route_active,
         legacy_surface_cue_fallback_used=legacy_surface_cue_fallback_used,
-        legacy_surface_cue_path_not_normative=True,
-        l04_only_input_not_equivalent_to_l05_l06_route=True,
+        legacy_surface_cue_path_not_normative=False,
+        l04_only_input_not_equivalent_to_l05_l06_route=False,
         discourse_update_not_inferred_from_surface_when_l06_available=discourse_update_not_inferred_from_surface_when_l06_available,
         l06_blocked_update_present=l06_blocked_update_present,
         l06_guarded_continue_present=l06_guarded_continue_present,
         no_final_semantic_resolution=True,
-        reason=(
-            "g01 grounded semantic scaffold generated via normative l05+l06 intake with bounded restrictions"
-            if normative_l05_l06_route_active
-            else "g01 grounded semantic scaffold generated from legacy l04/surface route with degraded fallback restrictions"
-        ),
+        reason="g01 grounded semantic scaffold generated via normative l05+l06 intake with bounded restrictions",
         evidence_records=tuple(evidence_records),
     )
     gate = evaluate_grounded_semantic_downstream_gate(bundle)
@@ -551,11 +517,7 @@ def build_grounded_semantic_substrate(
         reversible_span_mapping_present=reversible_span_mapping_present,
         attempted_paths=ATTEMPTED_PATHS,
         downstream_gate=gate,
-        causal_basis=(
-            "l04 substrate scaffold combined with typed l05 force/addressivity and l06 update/repair signals"
-            if normative_l05_l06_route_active
-            else "legacy l04 dictum carriers projected with surface-derived operator/source cues under degraded compatibility fallback"
-        ),
+        causal_basis="l04 substrate scaffold combined with typed l05 force/addressivity and l06 update/repair signals",
     )
     confidence = _estimate_result_confidence(bundle)
     partial_known = bool(bundle.uncertainty_markers or bundle.low_coverage_mode or bundle.ambiguity_reasons)
@@ -603,21 +565,6 @@ def persist_grounded_semantic_result_via_f01(
         },
     )
     return execute_transition(request, runtime_state)
-
-
-def build_grounded_semantic_substrate_legacy_compatibility(
-    dictum_result_or_bundle: DictumCandidateResult | DictumCandidateBundle,
-    utterance_surface: UtteranceSurface | UtteranceSurfaceResult | None = None,
-    memory_anchor_ref: str | None = None,
-    cooperation_anchor_ref: str | None = None,
-) -> GroundedSemanticResult:
-    return build_grounded_semantic_substrate(
-        dictum_result_or_bundle,
-        utterance_surface=utterance_surface,
-        memory_anchor_ref=memory_anchor_ref,
-        cooperation_anchor_ref=cooperation_anchor_ref,
-        compatibility_legacy_l04_only_mode=True,
-    )
 
 
 def _extract_dictum_input(
@@ -1636,13 +1583,11 @@ def _abstain_result(
         low_coverage_mode=True,
         low_coverage_reasons=(
             G01CoverageCode.ABSTAIN,
-            G01CoverageCode.LEGACY_SURFACE_CUE_FALLBACK_USED,
-            G01CoverageCode.L04_ONLY_INPUT_NOT_EQUIVALENT_TO_L05_L06_ROUTE,
         ),
         normative_l05_l06_route_active=False,
-        legacy_surface_cue_fallback_used=True,
-        legacy_surface_cue_path_not_normative=True,
-        l04_only_input_not_equivalent_to_l05_l06_route=True,
+        legacy_surface_cue_fallback_used=False,
+        legacy_surface_cue_path_not_normative=False,
+        l04_only_input_not_equivalent_to_l05_l06_route=False,
         discourse_update_not_inferred_from_surface_when_l06_available=False,
         l06_blocked_update_present=False,
         l06_guarded_continue_present=False,

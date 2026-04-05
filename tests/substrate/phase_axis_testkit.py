@@ -16,7 +16,6 @@ from substrate.epistemics import (
 )
 from substrate.grounded_semantic import (
     build_grounded_semantic_substrate,
-    build_grounded_semantic_substrate_legacy_compatibility,
 )
 from substrate.language_surface import build_utterance_surface
 from substrate.lexical_grounding import build_lexical_grounding_hypotheses
@@ -37,7 +36,6 @@ class PhaseAxisContext:
     modus: object
     discourse_update: object
     grounded_normative: object
-    grounded_compatibility: object
     runtime_graph: object
     applicability: object
     perspective: object
@@ -49,8 +47,6 @@ class PhaseAxisContext:
 def build_phase_axis_context(
     text: str,
     case_id: str,
-    *,
-    g07_from_normative_grounded: bool = False,
 ) -> PhaseAxisContext:
     epistemic = ground_epistemic_input(
         InputMaterial(material_id=f"m-axis-{case_id}", content=text),
@@ -75,14 +71,7 @@ def build_phase_axis_context(
         modus_hypotheses_result_or_bundle=modus,
         discourse_update_result_or_bundle=discourse_update,
     )
-    grounded_compatibility = build_grounded_semantic_substrate_legacy_compatibility(
-        dictum,
-        utterance_surface=surface,
-        memory_anchor_ref=f"m-axis:{case_id}",
-        cooperation_anchor_ref=f"o-axis:{case_id}",
-    )
-    grounded_for_g07 = grounded_normative if g07_from_normative_grounded else grounded_compatibility
-    runtime_graph = build_runtime_semantic_graph(grounded_for_g07)
+    runtime_graph = build_runtime_semantic_graph(grounded_normative)
     applicability = build_scope_attribution(runtime_graph)
     perspective = build_discourse_provenance_chain(applicability)
     acquisition = build_semantic_acquisition(perspective)
@@ -96,7 +85,6 @@ def build_phase_axis_context(
         modus=modus,
         discourse_update=discourse_update,
         grounded_normative=grounded_normative,
-        grounded_compatibility=grounded_compatibility,
         runtime_graph=runtime_graph,
         applicability=applicability,
         perspective=perspective,

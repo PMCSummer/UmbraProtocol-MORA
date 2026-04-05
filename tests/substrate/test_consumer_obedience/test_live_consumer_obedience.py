@@ -23,7 +23,6 @@ from substrate.epistemics import (
 from substrate.grounded_semantic import (
     OperatorKind,
     build_grounded_semantic_substrate,
-    build_grounded_semantic_substrate_legacy_compatibility,
 )
 from substrate.language_surface import build_utterance_surface
 from substrate.lexical_grounding import build_lexical_grounding_hypotheses
@@ -36,6 +35,7 @@ from substrate.targeted_clarification import (
     InterventionStatus,
     build_targeted_clarification,
 )
+from tests.substrate.g01_testkit import build_grounded_semantic_substrate_normative
 
 
 def _l04_l05_l06_pipeline(text: str, material_id: str):
@@ -396,7 +396,7 @@ def test_g06_to_g07_obedience_high_impact_vs_context_changes_lockouts(g07_factor
     assert G07LockoutCode.APPRAISAL_CONTEXT_ONLY in context_lockouts
 
 
-def test_g01_normative_vs_compatibility_routes_remain_non_equivalent(g07_factory) -> None:
+def test_g01_runtime_route_is_normative_only_after_legacy_retirement(g07_factory) -> None:
     ctx = g07_factory('he said "alpha is stable?"', "consumer-obedience-route-contrast")
     surface, dictum, modus, discourse_update = _l04_l05_l06_pipeline(
         'he said "alpha is stable?"',
@@ -410,7 +410,14 @@ def test_g01_normative_vs_compatibility_routes_remain_non_equivalent(g07_factory
         modus_hypotheses_result_or_bundle=modus,
         discourse_update_result_or_bundle=discourse_update,
     )
-    compatibility = build_grounded_semantic_substrate_legacy_compatibility(
+    with pytest.raises(TypeError):
+        build_grounded_semantic_substrate(
+            dictum,
+            utterance_surface=surface,
+            memory_anchor_ref="m03:consumer-obedience-route-compat",
+            cooperation_anchor_ref="o03:consumer-obedience-route-compat",
+        )
+    helper_result = build_grounded_semantic_substrate_normative(
         dictum,
         utterance_surface=surface,
         memory_anchor_ref="m03:consumer-obedience-route-compat",
@@ -418,6 +425,6 @@ def test_g01_normative_vs_compatibility_routes_remain_non_equivalent(g07_factory
     )
 
     assert normative.bundle.normative_l05_l06_route_active is True
-    assert compatibility.bundle.normative_l05_l06_route_active is False
+    assert helper_result.bundle.normative_l05_l06_route_active is True
     assert any(record.route_class == "normative" for record in normative.bundle.evidence_records)
-    assert any(record.route_class == "compatibility" for record in compatibility.bundle.evidence_records)
+    assert all(record.route_class != "compatibility" for record in helper_result.bundle.evidence_records)

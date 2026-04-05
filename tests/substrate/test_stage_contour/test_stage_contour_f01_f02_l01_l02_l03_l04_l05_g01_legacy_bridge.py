@@ -7,14 +7,14 @@ from substrate.epistemics import (
     SourceMetadata,
     ground_epistemic_input,
 )
-from substrate.grounded_semantic import build_grounded_semantic_substrate_legacy_compatibility
+from tests.substrate.g01_testkit import build_grounded_semantic_substrate_normative
 from substrate.language_surface import build_utterance_surface
 from substrate.lexical_grounding import build_lexical_grounding_hypotheses
 from substrate.modus_hypotheses import build_modus_hypotheses
 from substrate.morphosyntax import build_morphosyntax_candidate_space
 
 
-def test_stage_contour_l05_exists_but_g01_still_operates_on_legacy_l04_bridge_as_debt() -> None:
+def test_stage_contour_l05_to_g01_legacy_bridge_is_retired() -> None:
     epistemic = ground_epistemic_input(
         InputMaterial(material_id="m-l05-g01-legacy", content='he said "you are tired?"'),
         SourceMetadata(
@@ -29,7 +29,7 @@ def test_stage_contour_l05_exists_but_g01_still_operates_on_legacy_l04_bridge_as
     lexical = build_lexical_grounding_hypotheses(syntax, utterance_surface=surface)
     dictum = build_dictum_candidates(lexical, syntax, utterance_surface=surface)
     l05_result = build_modus_hypotheses(dictum)
-    g01_result = build_grounded_semantic_substrate_legacy_compatibility(
+    g01_result = build_grounded_semantic_substrate_normative(
         dictum,
         utterance_surface=surface,
         memory_anchor_ref="m05:l05-g01-legacy",
@@ -37,7 +37,10 @@ def test_stage_contour_l05_exists_but_g01_still_operates_on_legacy_l04_bridge_as
     )
 
     assert l05_result.bundle.hypothesis_records
-    assert l05_result.bundle.l06_downstream_not_bound_here is True
+    assert g01_result.bundle.normative_l05_l06_route_active is True
+    assert g01_result.bundle.legacy_surface_cue_fallback_used is False
+    assert g01_result.bundle.source_modus_ref is not None
+    assert g01_result.bundle.source_discourse_update_ref is not None
     assert g01_result.bundle.modus_carriers
     assert g01_result.bundle.operator_carriers
     assert g01_result.bundle.source_anchors

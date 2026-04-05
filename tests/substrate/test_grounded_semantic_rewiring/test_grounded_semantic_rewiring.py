@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import replace
 
 import pytest
+import substrate.grounded_semantic as grounded_semantic_api
 from substrate.dictum_candidates import build_dictum_candidates
 from substrate.discourse_update import (
     ContinuationStatus,
@@ -17,7 +18,6 @@ from substrate.epistemics import (
     ground_epistemic_input,
 )
 from substrate.grounded_semantic import (
-    build_grounded_semantic_substrate_legacy_compatibility,
     build_grounded_semantic_substrate,
     derive_grounded_downstream_contract,
     evaluate_grounded_semantic_downstream_gate,
@@ -101,28 +101,18 @@ def test_g01_normative_route_preserves_phase_native_source_refs_with_lineage_dis
     assert contract.requires_source_discourse_update_ref_class_read is True
 
 
-def test_g01_legacy_l04_only_path_stays_explicit_degraded_fallback() -> None:
+def test_g01_legacy_l04_only_builder_is_retired_from_runtime_api() -> None:
     surface, dictum, _, _ = _pipeline("alpha is stable?", "m-g01-rewire-legacy")
-    result = build_grounded_semantic_substrate_legacy_compatibility(
-        dictum,
-        utterance_surface=surface,
-        memory_anchor_ref="m03:g01-rewire-legacy",
-        cooperation_anchor_ref="o03:g01-rewire-legacy",
+    with pytest.raises(TypeError):
+        build_grounded_semantic_substrate(
+            dictum,
+            utterance_surface=surface,
+            memory_anchor_ref="m03:g01-rewire-legacy",
+            cooperation_anchor_ref="o03:g01-rewire-legacy",
+        )
+    assert not hasattr(
+        grounded_semantic_api, "build_grounded_semantic_substrate_legacy_compatibility"
     )
-    gate = evaluate_grounded_semantic_downstream_gate(result)
-
-    assert result.bundle.normative_l05_l06_route_active is False
-    assert result.bundle.legacy_surface_cue_fallback_used is True
-    assert result.bundle.legacy_surface_cue_path_not_normative is True
-    assert "legacy_surface_cue_fallback_used" in gate.restrictions
-    assert "legacy_surface_cue_path_not_normative" in gate.restrictions
-    assert "l04_only_input_not_equivalent_to_l05_l06_route" in gate.restrictions
-    assert "downstream_authority_degraded" in gate.restrictions
-    contract = derive_grounded_downstream_contract(result)
-    assert contract.source_modus_ref_present is False
-    assert contract.source_discourse_update_ref_present is False
-    assert contract.source_modus_ref_kind_phase_native is False
-    assert contract.source_discourse_update_ref_kind_phase_native is False
 
 
 def test_same_dictum_different_l06_continuation_topology_changes_g01_contract_surface() -> None:

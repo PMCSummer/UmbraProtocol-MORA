@@ -26,7 +26,7 @@ Accepted as a bounded partial implementation of phase `L05` over implemented `L0
 - Hidden L06-like load was partial, not full:
   - `G01` emitted source/scope uncertainty markers.
   - `G01` did not perform discourse update proposal generation, repair planning, or common-ground mutation.
-- Therefore legacy `L04 -> G01` remained operational shortcut bridge with mixed responsibilities.
+- Therefore legacy `L04 -> G01` was an operational shortcut bridge with mixed responsibilities (now retired from runtime path).
 
 ## What Is Mechanistic / Load-Bearing
 - L05 accepts only typed `L04` artifacts (`DictumCandidateResult|DictumCandidateBundle`).

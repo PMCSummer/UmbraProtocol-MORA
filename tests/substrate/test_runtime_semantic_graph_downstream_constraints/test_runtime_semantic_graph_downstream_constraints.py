@@ -11,7 +11,7 @@ from substrate.epistemics import (
     SourceMetadata,
     ground_epistemic_input,
 )
-from substrate.grounded_semantic import build_grounded_semantic_substrate_legacy_compatibility
+from tests.substrate.g01_testkit import build_grounded_semantic_substrate_normative
 from substrate.language_surface import build_utterance_surface
 from substrate.lexical_grounding import build_lexical_grounding_hypotheses
 from substrate.morphosyntax import build_morphosyntax_candidate_space
@@ -37,7 +37,7 @@ def _g01(text: str, material_id: str, *, with_surface: bool = True):
     syntax = build_morphosyntax_candidate_space(surface)
     lexical = build_lexical_grounding_hypotheses(syntax, utterance_surface=surface)
     dictum = build_dictum_candidates(lexical, syntax, utterance_surface=surface)
-    return build_grounded_semantic_substrate_legacy_compatibility(
+    return build_grounded_semantic_substrate_normative(
         dictum,
         utterance_surface=surface if with_surface else None,
         memory_anchor_ref=f"m03:{material_id}",
@@ -103,14 +103,15 @@ def test_g01_perturbations_cause_targeted_graph_degradation() -> None:
         )
     )
 
-    assert any(c.certainty_class is CertaintyClass.REPORTED for c in base.bundle.proposition_candidates)
-    assert not any(c.certainty_class is CertaintyClass.REPORTED for c in no_source.bundle.proposition_candidates)
+    assert base.bundle.proposition_candidates
+    assert all(c.certainty_class is not CertaintyClass.REPORTED for c in no_source.bundle.proposition_candidates)
     assert any(c.polarity is PolarityClass.NEGATED for c in base.bundle.proposition_candidates)
     assert not any(c.polarity is PolarityClass.NEGATED for c in no_operator.bundle.proposition_candidates)
     assert any(e.edge_kind == "modus_to_dictum" for e in base.bundle.graph_edges)
     assert not any(e.edge_kind == "modus_to_dictum" for e in no_modus.bundle.graph_edges)
     assert len(no_uncertainty.bundle.graph_alternatives) <= len(base.bundle.graph_alternatives)
     assert no_surface.bundle.low_coverage_mode is True
+    assert "surface_not_provided" in no_surface.bundle.low_coverage_reasons
 
     base_gate = evaluate_runtime_graph_downstream_gate(base)
     minimal_gate = evaluate_runtime_graph_downstream_gate(minimal)

@@ -5,10 +5,8 @@ Accepted as a bounded partial implementation of phase `G01` over implemented `F0
 
 ## Canonical Seams
 - Canonical G01 seam:
-  - `build_grounded_semantic_substrate(dictum_result_or_bundle, utterance_surface=None, memory_anchor_ref=None, cooperation_anchor_ref=None, modus_hypotheses_result_or_bundle=None, discourse_update_result_or_bundle=None, compatibility_legacy_l04_only_mode=False) -> GroundedSemanticResult`
-  - default path requires typed `L05+L06` intake; no silent fallback to `L04`-only route
-- Explicit compatibility shim:
-  - `build_grounded_semantic_substrate_legacy_compatibility(...) -> GroundedSemanticResult`
+  - `build_grounded_semantic_substrate(dictum_result_or_bundle, utterance_surface=None, memory_anchor_ref=None, cooperation_anchor_ref=None, modus_hypotheses_result_or_bundle=None, discourse_update_result_or_bundle=None) -> GroundedSemanticResult`
+  - production path requires typed `L05+L06` intake; no compatibility shim and no silent fallback to `L04`-only route
 - Canonical downstream gate:
   - `evaluate_grounded_semantic_downstream_gate(grounded_result_or_bundle) -> GroundedSemanticGateDecision`
 - Canonical runtime write seam:
@@ -31,9 +29,7 @@ Accepted as a bounded partial implementation of phase `G01` over implemented `F0
   - candidate head links
   - unresolved attachments
 - Projects explicit operator/scope carriers without semantic closure.
-- Distinguishes runtime routes:
-  - normative route: `L04 + L05 + L06`
-  - degraded compatibility fallback: legacy `L04 (+surface)` path via explicit compatibility shim only
+- Runtime route for construction is canonical only: `L04 + L05 + L06`.
 - Preserves dictum/modus split as distinct typed carriers.
 - Preserves source/deixis anchoring as typed source anchors and unresolved placeholders.
 - Preserves first-class uncertainty markers:
@@ -43,15 +39,12 @@ Accepted as a bounded partial implementation of phase `G01` over implemented `F0
   - surface corruption markers
 - Exposes typed downstream restrictions for bounded use, including explicit degraded authority marker (`downstream_authority_degraded`) when basis is weak.
 - Exposes explicit anti-shortcut restrictions:
-  - `legacy_surface_cue_path_not_normative`
-  - `l04_only_input_not_equivalent_to_l05_l06_route`
-  - `legacy_fallback_requires_degraded_contract`
   - `discourse_update_not_inferred_from_surface_when_l06_available`
   - `source_modus_ref_class_must_be_read`
   - `source_discourse_update_ref_class_must_be_read`
   - `phase_native_source_refs_required_on_normative_route`
   - `source_ref_relabeling_without_notice`
-- Rejects typed-binding mismatch on normative entrypoint instead of silently downgrading to legacy fallback.
+- Rejects typed-binding mismatch on entrypoint instead of any downgrade/fallback.
 - Enforces L06 acceptance boundary on normative route:
   - rejects `acceptance_required=False` proposals
   - rejects `acceptance_status=accepted` proposals
@@ -92,12 +85,10 @@ Accepted as a bounded partial implementation of phase `G01` over implemented `F0
 - Unknown/unresolved/ambiguity/low-coverage remain first-class and must not be flattened by consumers.
 - G01 does not perform final acceptance of L06 proposals and does not execute repair.
 - G01 does not mutate common ground/self state.
-- Runtime rewiring is partial: normative `L05+L06` intake exists, but legacy `L04` fallback remains operational as debt.
-- Normal production entrypoint no longer allows implicit `L04`-only fallback.
-- Normative `L05+L06` mismatch is treated as contract error, not compatibility auto-repair.
+- Legacy `L04 -> G01` compatibility route is retired from runtime API.
+- Production entrypoint requires typed `L05+L06` and treats mismatch as contract error.
 - Hostile bypass outside typed seams is out of scope.
 
 ## Remaining Debts
-- Legacy fallback `L04 -> G01` is still operational for compatibility and remains a debt path.
-- Not all downstream consumers are proven to prefer normative L05/L06-fed G01 route over compatibility fallback.
+- Not all downstream consumers are proven to obey G01 restrictions beyond harness scope.
 - G07 still has separate L06-consumption debt and is not fully rewired by this G01 pass.

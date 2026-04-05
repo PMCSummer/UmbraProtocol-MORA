@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import pytest
+
 from substrate.dictum_candidates import DictumEvidenceKind, build_dictum_candidates
 from substrate.discourse_update import build_discourse_update
 from substrate.epistemics import (
@@ -13,7 +15,6 @@ from substrate.epistemics import (
 from substrate.grounded_semantic import (
     G01EvidenceKind,
     build_grounded_semantic_substrate,
-    build_grounded_semantic_substrate_legacy_compatibility,
     derive_grounded_downstream_contract,
 )
 from substrate.language_surface import build_utterance_surface
@@ -23,6 +24,7 @@ from substrate.lexical_grounding import (
 )
 from substrate.modus_hypotheses import ModusEvidenceKind, build_modus_hypotheses
 from substrate.morphosyntax import build_morphosyntax_candidate_space
+from tests.substrate.g01_testkit import build_grounded_semantic_substrate_normative
 
 
 def _pipeline(text: str, material_id: str):
@@ -86,7 +88,7 @@ def test_l05_evidence_records_prevent_single_cue_force_addressivity_collapse() -
     assert ModusEvidenceKind.MODALITY_CUE in kinds
 
 
-def test_g01_normative_and_compatibility_routes_expose_non_equivalent_evidence_basis() -> None:
+def test_g01_normative_route_emits_only_normative_evidence_basis_after_legacy_retirement() -> None:
     surface, _, dictum, modus, discourse_update = _pipeline(
         'he said "alpha moved?"',
         "m-factor-g01-route",
@@ -99,19 +101,26 @@ def test_g01_normative_and_compatibility_routes_expose_non_equivalent_evidence_b
         modus_hypotheses_result_or_bundle=modus,
         discourse_update_result_or_bundle=discourse_update,
     )
-    compatibility = build_grounded_semantic_substrate_legacy_compatibility(
+    with pytest.raises(TypeError):
+        build_grounded_semantic_substrate(
+            dictum,
+            utterance_surface=surface,
+            memory_anchor_ref="m03:m-factor-g01-route",
+            cooperation_anchor_ref="o03:m-factor-g01-route",
+        )
+    normative_via_helper = build_grounded_semantic_substrate_normative(
         dictum,
-        utterance_surface=surface,
+        utterance_surface=surface,  # type: ignore[arg-type]
         memory_anchor_ref="m03:m-factor-g01-route",
         cooperation_anchor_ref="o03:m-factor-g01-route",
     )
     normative_kinds = {record.evidence_kind for record in normative.bundle.evidence_records}
-    compatibility_kinds = {record.evidence_kind for record in compatibility.bundle.evidence_records}
+    helper_kinds = {record.evidence_kind for record in normative_via_helper.bundle.evidence_records}
     assert G01EvidenceKind.NORMATIVE_L05_CUE in normative_kinds
     assert G01EvidenceKind.NORMATIVE_L06_CUE in normative_kinds
-    assert G01EvidenceKind.LEGACY_SURFACE_CUE in compatibility_kinds
-    assert G01EvidenceKind.NORMATIVE_L05_CUE not in compatibility_kinds
-    assert G01EvidenceKind.NORMATIVE_L06_CUE not in compatibility_kinds
+    assert G01EvidenceKind.LEGACY_SURFACE_CUE not in normative_kinds
+    assert G01EvidenceKind.NORMATIVE_L05_CUE in helper_kinds
+    assert G01EvidenceKind.NORMATIVE_L06_CUE in helper_kinds
 
 
 def test_g01_contract_requires_reading_factorized_route_specific_evidence() -> None:
@@ -127,17 +136,18 @@ def test_g01_contract_requires_reading_factorized_route_specific_evidence() -> N
         modus_hypotheses_result_or_bundle=modus,
         discourse_update_result_or_bundle=discourse_update,
     )
-    compatibility = build_grounded_semantic_substrate_legacy_compatibility(
-        dictum,
-        utterance_surface=surface,
-        memory_anchor_ref="m03:m-factor-g01-contract",
-        cooperation_anchor_ref="o03:m-factor-g01-contract",
-    )
     normative_contract = derive_grounded_downstream_contract(normative)
-    compatibility_contract = derive_grounded_downstream_contract(compatibility)
+    helper_contract = derive_grounded_downstream_contract(
+        build_grounded_semantic_substrate_normative(
+            dictum,
+            utterance_surface=surface,  # type: ignore[arg-type]
+            memory_anchor_ref="m03:m-factor-g01-contract",
+            cooperation_anchor_ref="o03:m-factor-g01-contract",
+        )
+    )
     assert normative_contract.factorized_evidence_present is True
     assert normative_contract.normative_factorized_evidence_present is True
     assert normative_contract.compatibility_factorized_evidence_present is False
-    assert compatibility_contract.factorized_evidence_present is True
-    assert compatibility_contract.normative_factorized_evidence_present is False
-    assert compatibility_contract.compatibility_factorized_evidence_present is True
+    assert helper_contract.factorized_evidence_present is True
+    assert helper_contract.normative_factorized_evidence_present is True
+    assert helper_contract.compatibility_factorized_evidence_present is False

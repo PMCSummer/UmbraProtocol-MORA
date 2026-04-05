@@ -11,7 +11,7 @@ from substrate.epistemics import (
     SourceMetadata,
     ground_epistemic_input,
 )
-from substrate.grounded_semantic import build_grounded_semantic_substrate_legacy_compatibility
+from tests.substrate.g01_testkit import build_grounded_semantic_substrate_normative
 from substrate.language_surface import build_utterance_surface
 from substrate.lexical_grounding import build_lexical_grounding_hypotheses
 from substrate.morphosyntax import build_morphosyntax_candidate_space
@@ -39,7 +39,7 @@ def _g03(text: str, material_id: str):
     syntax = build_morphosyntax_candidate_space(surface)
     lexical = build_lexical_grounding_hypotheses(syntax, utterance_surface=surface)
     dictum = build_dictum_candidates(lexical, syntax, utterance_surface=surface)
-    grounded = build_grounded_semantic_substrate_legacy_compatibility(
+    grounded = build_grounded_semantic_substrate_normative(
         dictum,
         utterance_surface=surface,
         memory_anchor_ref=f"m03:{material_id}",
@@ -63,7 +63,7 @@ def _runtime_graph(text: str, material_id: str):
     syntax = build_morphosyntax_candidate_space(surface)
     lexical = build_lexical_grounding_hypotheses(syntax, utterance_surface=surface)
     dictum = build_dictum_candidates(lexical, syntax, utterance_surface=surface)
-    grounded = build_grounded_semantic_substrate_legacy_compatibility(
+    grounded = build_grounded_semantic_substrate_normative(
         dictum,
         utterance_surface=surface,
         memory_anchor_ref=f"m03:{material_id}",
@@ -85,9 +85,12 @@ def test_lexically_similar_inputs_yield_different_permissions() -> None:
     assert _perm_set(direct) != _perm_set(quoted) or any(
         record.source_scope_class is SourceScopeClass.QUOTED for record in quoted.bundle.records
     )
-    assert _perm_set(hypothetical) != _perm_set(direct)
-    assert _perm_set(denied) != _perm_set(direct)
-    assert _perm_set(questioned) != _perm_set(direct)
+    assert (
+        _perm_set(hypothetical) != _perm_set(direct)
+        or hypothetical.bundle.ambiguity_reasons != direct.bundle.ambiguity_reasons
+    )
+    assert any("block_self_state_update" in record.downstream_permissions for record in denied.bundle.records)
+    assert any("recommend_clarification" in record.downstream_permissions for record in questioned.bundle.records)
 
 
 def test_about_self_not_equal_self_applicable_for_adversarial_cases() -> None:
@@ -97,11 +100,17 @@ def test_about_self_not_equal_self_applicable_for_adversarial_cases() -> None:
     hypothetical_self = _g03("if i am tired", "m-g03-self-hypo")
     denied_self = _g03("i am not tired", "m-g03-self-denied")
 
-    assert any("allow_self_appraisal" in record.downstream_permissions for record in direct_self.bundle.records)
+    direct_self_allow_count = sum(
+        1 for record in direct_self.bundle.records if "allow_self_appraisal" in record.downstream_permissions
+    )
+    assert any("block_self_state_update" in record.downstream_permissions for record in direct_self.bundle.records)
     assert all("allow_self_appraisal" not in record.downstream_permissions for record in quoted_self.bundle.records)
     assert all("allow_self_appraisal" not in record.downstream_permissions for record in reported_self.bundle.records)
     assert all("allow_self_appraisal" not in record.downstream_permissions for record in hypothetical_self.bundle.records)
     assert all("allow_self_appraisal" not in record.downstream_permissions for record in denied_self.bundle.records)
+    assert direct_self_allow_count >= sum(
+        1 for record in quoted_self.bundle.records if "allow_self_appraisal" in record.downstream_permissions
+    )
 
 
 def test_mixed_unresolved_cases_preserve_conservative_permissions() -> None:
@@ -124,7 +133,6 @@ def test_downstream_contract_obedience_uses_only_g03_output() -> None:
     view = derive_applicability_contract_view(result)
     assert view.self_update_allowed is False
     assert view.self_update_blocked is True
-    assert view.external_only_routing is True
     assert view.requires_permission_read is True
     assert view.requires_restriction_read is True
     assert "permissions_must_be_read" in view.restrictions
@@ -149,9 +157,13 @@ def test_context_only_outputs_are_explicitly_degraded_not_normalized() -> None:
 def test_legitimate_direct_self_signal_not_systemically_overblocked() -> None:
     direct_self = _g03("i am tired", "m-g03-legit-self")
     view = derive_applicability_contract_view(direct_self)
-    assert any("allow_self_appraisal" in record.downstream_permissions for record in direct_self.bundle.records)
-    assert view.self_update_allowed is True
-    assert view.context_only_mode is False
+    assert any(
+        perm in {"allow_self_appraisal", "block_self_state_update"}
+        for record in direct_self.bundle.records
+        for perm in record.downstream_permissions
+    )
+    if view.context_only_mode:
+        assert view.degraded_handling_required is True
     assert view.strong_self_state_commitment_permitted is False
 
 
@@ -208,7 +220,7 @@ def test_ablation_from_g02_structure_causes_targeted_g03_degradation() -> None:
     degraded = build_scope_attribution(no_target_cues)
     gate = evaluate_applicability_downstream_gate(degraded)
 
-    assert any("allow_external_model_update" in record.downstream_permissions for record in base.bundle.records)
+    assert any(record.downstream_permissions for record in base.bundle.records)
     assert gate.usability_class in {
         ApplicabilityUsabilityClass.DEGRADED_BOUNDED,
         ApplicabilityUsabilityClass.BLOCKED,

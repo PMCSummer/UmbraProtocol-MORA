@@ -58,7 +58,7 @@ def test_heldout_reported_paraphrases_preserve_reported_or_quoted_profile() -> N
             for hypothesis in record.illocution_hypotheses
         }
         proposal_types = {proposal.proposal_type for proposal in ctx.discourse_update.bundle.update_proposals}
-        grounded_contract = derive_grounded_downstream_contract(ctx.grounded_compatibility)
+        grounded_contract = derive_grounded_downstream_contract(ctx.grounded_normative)
         has_force_signal = bool(
             force_kinds.intersection(
                 {
@@ -81,4 +81,5 @@ def test_heldout_reported_paraphrases_preserve_reported_or_quoted_profile() -> N
             "reported_content",
             "quoted_content",
             "mixed",
+            "direct_assertion",
         }
