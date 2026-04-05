@@ -26,6 +26,8 @@ from substrate.discourse_update.telemetry import (
 from substrate.modus_hypotheses.models import (
     AddressivityKind,
     IllocutionKind,
+    L05CautionCode,
+    ModusEvidenceKind,
     ModusHypothesisBundle,
     ModusHypothesisRecord,
     ModusHypothesisResult,
@@ -73,6 +75,16 @@ class _ContinuationDecision:
     guarded_forbidden: bool
     reason_code: L06ContinuationReasonCode
     reason: str
+
+
+@dataclass(frozen=True, slots=True)
+class _L05ObedienceProfile:
+    quote_present: bool
+    has_force_evidence: bool
+    has_addressivity_evidence: bool
+    unresolved_slot_evidence_present: bool
+    quote_commitment_caution_present: bool
+    force_alternatives_caution_present: bool
 
 
 _PROPOSAL_BASE_RESTRICTIONS: tuple[str, ...] = (
@@ -157,7 +169,8 @@ def build_discourse_update(
     for index, record in enumerate(modus_bundle.hypothesis_records, start=1):
         proposal_type = _proposal_type_from_record(record)
         proposal_id = f"update-proposal-{index}"
-        localized_repairs = _localized_repairs(record, proposal_id)
+        obedience_profile = _derive_l05_obedience_profile(record)
+        localized_repairs = _localized_repairs(record, proposal_id, obedience_profile=obedience_profile)
         repairs.extend(localized_repairs)
         continuation = _continuation_state(
             record=record,
@@ -174,7 +187,7 @@ def build_discourse_update(
             proposed_effects=_proposed_effects_from_type(proposal_type),
             acceptance_required=True,
             acceptance_status=AcceptanceStatus.NOT_ACCEPTED,
-            commitment_candidate=_commitment_candidate(record),
+            commitment_candidate=_commitment_candidate(record, obedience_profile=obedience_profile),
             proposal_basis=(
                 f"dictum:{record.source_dictum_candidate_id}",
                 f"entropy:{record.uncertainty_entropy}",
@@ -335,15 +348,28 @@ def _proposed_effects_from_type(proposal_type: ProposalType) -> tuple[str, ...]:
     return ("interpret_as_assertive_candidate", "require_acceptance_before_update")
 
 
-def _commitment_candidate(record: ModusHypothesisRecord) -> bool:
+def _commitment_candidate(
+    record: ModusHypothesisRecord,
+    *,
+    obedience_profile: _L05ObedienceProfile,
+) -> bool:
     if record.quoted_speech_state.quote_or_echo_present:
         return False
-    if "addressivity_target_unresolved" in record.downstream_cautions:
+    if L05CautionCode.ADDRESSIVITY_TARGET_UNRESOLVED in record.downstream_cautions:
+        return False
+    if obedience_profile.quote_present and not obedience_profile.quote_commitment_caution_present:
+        return False
+    if not obedience_profile.has_addressivity_evidence:
         return False
     return True
 
 
-def _localized_repairs(record: ModusHypothesisRecord, proposal_id: str) -> tuple[RepairTrigger, ...]:
+def _localized_repairs(
+    record: ModusHypothesisRecord,
+    proposal_id: str,
+    *,
+    obedience_profile: _L05ObedienceProfile,
+) -> tuple[RepairTrigger, ...]:
     repairs: list[RepairTrigger] = []
     repair_index = 0
     for marker in record.uncertainty_markers:
@@ -356,6 +382,97 @@ def _localized_repairs(record: ModusHypothesisRecord, proposal_id: str) -> tuple
         )
         if repair is not None:
             repairs.append(repair)
+    if not obedience_profile.has_force_evidence:
+        repair_index += 1
+        repairs.append(
+            RepairTrigger(
+                repair_id=f"repair-{record.record_id}-{repair_index}",
+                repair_class=RepairClass.FORCE_REPAIR,
+                localized_trouble_source="l05_force_evidence_gap",
+                localized_ref_ids=(record.record_id,),
+                why_this_is_broken="l05 force evidence is missing; l06 cannot lawfully project update force topology",
+                suggested_clarification_type="bounded_force_evidence_recovery",
+                blocked_updates=(proposal_id,),
+                guarded_continue_allowed=False,
+                guarded_continue_forbidden=True,
+                repair_basis=("l05_force_evidence_missing",),
+                provenance="l06 repair from l05 force evidence obedience gap",
+            )
+        )
+    if not obedience_profile.has_addressivity_evidence:
+        repair_index += 1
+        repairs.append(
+            RepairTrigger(
+                repair_id=f"repair-{record.record_id}-{repair_index}",
+                repair_class=RepairClass.REFERENCE_REPAIR,
+                localized_trouble_source="l05_addressivity_evidence_gap",
+                localized_ref_ids=(record.record_id, record.source_dictum_candidate_id),
+                why_this_is_broken="l05 addressivity evidence is missing; update target ownership remains unbound",
+                suggested_clarification_type="bounded_addressivity_target_recovery",
+                blocked_updates=(proposal_id,),
+                guarded_continue_allowed=False,
+                guarded_continue_forbidden=True,
+                repair_basis=("l05_addressivity_evidence_missing",),
+                provenance="l06 repair from l05 addressivity evidence obedience gap",
+            )
+        )
+    if obedience_profile.quote_present and not obedience_profile.quote_commitment_caution_present:
+        repair_index += 1
+        repairs.append(
+            RepairTrigger(
+                repair_id=f"repair-{record.record_id}-{repair_index}",
+                repair_class=RepairClass.FORCE_REPAIR,
+                localized_trouble_source="l05_quote_commitment_caution_gap",
+                localized_ref_ids=(record.record_id, record.source_dictum_candidate_id),
+                why_this_is_broken="quoted force caution missing; current-speaker commitment transfer cannot be assumed safe",
+                suggested_clarification_type="bounded_quote_commitment_owner_disambiguation",
+                blocked_updates=(proposal_id,),
+                guarded_continue_allowed=False,
+                guarded_continue_forbidden=True,
+                repair_basis=("l05_quote_commitment_caution_missing",),
+                provenance="l06 repair from l05 quote commitment caution obedience gap",
+            )
+        )
+    if (
+        record.uncertainty_entropy >= 0.6
+        and not obedience_profile.force_alternatives_caution_present
+    ):
+        repair_index += 1
+        repairs.append(
+            RepairTrigger(
+                repair_id=f"repair-{record.record_id}-{repair_index}",
+                repair_class=RepairClass.FORCE_REPAIR,
+                localized_trouble_source="l05_force_alternative_caution_gap",
+                localized_ref_ids=(record.record_id,),
+                why_this_is_broken="high force entropy without force-alternatives caution risks downstream overcommitment",
+                suggested_clarification_type="bounded_force_alternative_read_recovery",
+                blocked_updates=(proposal_id,),
+                guarded_continue_allowed=False,
+                guarded_continue_forbidden=True,
+                repair_basis=("l05_force_alternatives_caution_missing",),
+                provenance="l06 repair from l05 caution obedience gap",
+            )
+        )
+    if (
+        "unresolved_argument_slots" in record.uncertainty_markers
+        and not obedience_profile.unresolved_slot_evidence_present
+    ):
+        repair_index += 1
+        repairs.append(
+            RepairTrigger(
+                repair_id=f"repair-{record.record_id}-{repair_index}",
+                repair_class=RepairClass.MISSING_ARGUMENT_REPAIR,
+                localized_trouble_source="l05_unresolved_slot_evidence_gap",
+                localized_ref_ids=(record.record_id, record.source_dictum_candidate_id),
+                why_this_is_broken="l05 unresolved slot pressure exists but typed unresolved-slot evidence is missing",
+                suggested_clarification_type="bounded_argument_slot_evidence_recovery",
+                blocked_updates=(proposal_id,),
+                guarded_continue_allowed=False,
+                guarded_continue_forbidden=True,
+                repair_basis=("l05_unresolved_slot_evidence_missing",),
+                provenance="l06 repair from l05 unresolved-slot evidence obedience gap",
+            )
+        )
     if not repairs and record.uncertainty_entropy >= 0.75:
         repairs.append(
             RepairTrigger(
@@ -373,6 +490,23 @@ def _localized_repairs(record: ModusHypothesisRecord, proposal_id: str) -> tuple
             )
         )
     return tuple(repairs)
+
+
+def _derive_l05_obedience_profile(record: ModusHypothesisRecord) -> _L05ObedienceProfile:
+    evidence_kinds = {evidence.evidence_kind for evidence in record.evidence_records}
+    return _L05ObedienceProfile(
+        quote_present=record.quoted_speech_state.quote_or_echo_present,
+        has_force_evidence=ModusEvidenceKind.FORCE_CUE in evidence_kinds,
+        has_addressivity_evidence=ModusEvidenceKind.ADDRESSIVITY_CUE in evidence_kinds,
+        unresolved_slot_evidence_present=ModusEvidenceKind.UNRESOLVED_SLOT_CUE in evidence_kinds,
+        quote_commitment_caution_present=(
+            L05CautionCode.QUOTED_FORCE_NOT_CURRENT_COMMITMENT
+            in record.downstream_cautions
+        ),
+        force_alternatives_caution_present=(
+            L05CautionCode.FORCE_ALTERNATIVES_MUST_BE_READ in record.downstream_cautions
+        ),
+    )
 
 
 def _repair_from_marker(

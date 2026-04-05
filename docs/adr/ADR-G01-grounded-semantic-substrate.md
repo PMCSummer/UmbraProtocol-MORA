@@ -52,6 +52,13 @@ Accepted as a bounded partial implementation of phase `G01` over implemented `F0
   - `phase_native_source_refs_required_on_normative_route`
   - `source_ref_relabeling_without_notice`
 - Rejects typed-binding mismatch on normative entrypoint instead of silently downgrading to legacy fallback.
+- Enforces L06 acceptance boundary on normative route:
+  - rejects `acceptance_required=False` proposals
+  - rejects `acceptance_status=accepted` proposals
+  - does not treat accepted-looking proposal objects as authorized update state.
+- Treats L05 factorized evidence as load-bearing on normative route:
+  - modality/quotation/addressivity projections require corresponding L05 evidence classes
+  - missing evidence classes are surfaced as explicit uncertainty/evidence-gap markers.
 - Provides a typed downstream role-contract surface so consumers can distinguish source/operator/uncertainty regimes without reparsing raw text.
 
 ## What G01 Does Not Claim

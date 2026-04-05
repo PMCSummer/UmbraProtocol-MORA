@@ -97,7 +97,9 @@ def build_targeted_clarification(
     l06_repair_basis_bound_here = bool(discourse_bundle.repair_triggers)
     l06_update_proposal_absent = not bool(discourse_bundle.update_proposals)
     l06_repair_localization_must_be_read = bool(discourse_bundle.repair_triggers)
-    l06_proposal_requires_acceptance_read = bool(discourse_bundle.update_proposals)
+    l06_proposal_requires_acceptance_read = bool(discourse_bundle.update_proposals) and all(
+        proposal.acceptance_required for proposal in discourse_bundle.update_proposals
+    )
     l06_update_not_accepted = all(
         proposal.acceptance_status is not AcceptanceStatus.ACCEPTED
         for proposal in discourse_bundle.update_proposals
@@ -171,6 +173,8 @@ def build_targeted_clarification(
             uncertainty_class,
             gain,
             l06_update_proposal_absent,
+            l06_proposal_requires_acceptance=l06_proposal_requires_acceptance_read,
+            l06_update_not_accepted=l06_update_not_accepted,
             l06_blocked_for_target=l06_ctx["blocked_for_target"],
             l06_guarded_for_target=l06_ctx["guarded_for_target"],
             l06_withheld_for_target=l06_ctx["withheld_for_target"],
@@ -262,6 +266,8 @@ def build_targeted_clarification(
         low_coverage.append(G07CoverageCode.L06_G07_TARGET_DRIFT_DETECTED)
     if l06_repair_localization_incompatible:
         low_coverage.append(G07CoverageCode.L06_REPAIR_LOCALIZATION_INCOMPATIBLE)
+    if not l06_proposal_requires_acceptance_read:
+        low_coverage.append(G07CoverageCode.L06_UPDATE_ACCEPTANCE_STATE_UNEXPECTED)
     if not l06_update_not_accepted:
         low_coverage.append(G07CoverageCode.L06_UPDATE_ACCEPTANCE_STATE_UNEXPECTED)
     if not l06_continuation_topology_present:
@@ -714,6 +720,8 @@ def _select_status(
     uncertainty_class: UncertaintyClass,
     gain: ExpectedEvidenceGain,
     l06_update_proposal_absent: bool,
+    l06_proposal_requires_acceptance: bool,
+    l06_update_not_accepted: bool,
     *,
     l06_blocked_for_target: bool,
     l06_guarded_for_target: bool,
@@ -721,6 +729,22 @@ def _select_status(
     l06_target_alignment_ok: bool,
     l06_target_alignment_required: bool,
 ) -> tuple[InterventionStatus, tuple[str, ...], bool]:
+    if not l06_proposal_requires_acceptance:
+        return (
+            InterventionStatus.BLOCKED_DUE_TO_INSUFFICIENT_QUESTIONABILITY,
+            (
+                G07DecisionBasisCode.L06_PROPOSAL_ACCEPTANCE_REQUIRED_BOUNDARY_VIOLATED,
+            ),
+            False,
+        )
+    if not l06_update_not_accepted:
+        return (
+            InterventionStatus.BLOCKED_DUE_TO_INSUFFICIENT_QUESTIONABILITY,
+            (
+                G07DecisionBasisCode.L06_UPDATE_ACCEPTANCE_BOUNDARY_VIOLATED,
+            ),
+            False,
+        )
     unresolved = set(acq.support_conflict_profile.unresolved_slots)
     questionability_blocked = bool(
         (

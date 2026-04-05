@@ -135,6 +135,8 @@ class G01NormativeBindingFailureCode(StrEnum):
     EMPTY_DICTUM_CANDIDATE_IDS = "empty_dictum_candidate_ids"
     EMPTY_MODUS_RECORD_IDS = "empty_modus_record_ids"
     EMPTY_DISCOURSE_UPDATE_PROPOSALS = "empty_discourse_update_proposals"
+    L06_PROPOSAL_ACCEPTANCE_REQUIRED_FALSE = "l06_proposal_acceptance_required_false"
+    L06_PROPOSAL_ACCEPTANCE_STATUS_ACCEPTED = "l06_proposal_acceptance_status_accepted"
     L05_SOURCE_DICTUM_REF_MISMATCH = "l05_source_dictum_ref_mismatch"
     L06_SOURCE_MODUS_LINEAGE_REF_MISMATCH = "l06_source_modus_lineage_ref_mismatch"
     L05_LINKED_DICTUM_IDS_NO_INTERSECTION = "l05_linked_dictum_ids_no_intersection"

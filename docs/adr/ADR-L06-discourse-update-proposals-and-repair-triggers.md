@@ -97,6 +97,11 @@ Accepted as a bounded partial implementation of phase `L06` over implemented `L0
 - Lineage/source hardening:
   - phase-native source ref class is separated from upstream lineage ref class.
   - relabeling/collapse (`source_modus_ref == source_modus_lineage_ref`) is treated as degraded contract state.
+- Consumer-obedience hardening on `L05 -> L06`:
+  - `L05` evidence/caution surfaces are now load-bearing in L06 build decisions.
+  - missing `L05` force/addressivity evidence now yields localized repair triggers and blocked continuation.
+  - missing quote-commitment caution under quoted force now yields localized force-owner repair.
+  - high-entropy force without `force_alternatives_must_be_read` caution now yields localized repair instead of soft carry-through.
 
 ## Core Formulas
 - `interpretation != accepted update`

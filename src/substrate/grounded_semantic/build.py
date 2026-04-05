@@ -13,6 +13,7 @@ from substrate.contracts import (
 )
 from substrate.dictum_candidates.models import DictumCandidateBundle, DictumCandidateResult
 from substrate.discourse_update.models import (
+    AcceptanceStatus,
     ContinuationStatus,
     DiscourseUpdateBundle,
     DiscourseUpdateResult,
@@ -52,6 +53,8 @@ from substrate.language_surface.models import UtteranceSurface, UtteranceSurface
 from substrate.modus_hypotheses.models import (
     AddressivityKind,
     IllocutionKind,
+    L05CautionCode,
+    ModusEvidenceKind,
     ModusHypothesisBundle,
     ModusHypothesisRecord,
     ModusHypothesisResult,
@@ -696,6 +699,13 @@ def _normative_binding_failure_code(
         return G01NormativeBindingFailureCode.EMPTY_MODUS_RECORD_IDS
     if not discourse_bundle.update_proposals:
         return G01NormativeBindingFailureCode.EMPTY_DISCOURSE_UPDATE_PROPOSALS
+    if any(not proposal.acceptance_required for proposal in discourse_bundle.update_proposals):
+        return G01NormativeBindingFailureCode.L06_PROPOSAL_ACCEPTANCE_REQUIRED_FALSE
+    if any(
+        proposal.acceptance_status is AcceptanceStatus.ACCEPTED
+        for proposal in discourse_bundle.update_proposals
+    ):
+        return G01NormativeBindingFailureCode.L06_PROPOSAL_ACCEPTANCE_STATUS_ACCEPTED
     if modus_bundle.source_dictum_ref != dictum_bundle.source_lexical_grounding_ref:
         return G01NormativeBindingFailureCode.L05_SOURCE_DICTUM_REF_MISMATCH
     if discourse_bundle.source_modus_lineage_ref != modus_bundle.source_dictum_ref:
@@ -825,6 +835,14 @@ def _register_normative_l05_l06_cues(
 
     for record in modus_bundle.hypothesis_records:
         anchor_span = dictum_span_by_id.get(record.source_dictum_candidate_id, (0, 0))
+        evidence_kinds = {evidence.evidence_kind for evidence in record.evidence_records}
+        has_force_evidence = ModusEvidenceKind.FORCE_CUE in evidence_kinds
+        has_modality_evidence = ModusEvidenceKind.MODALITY_CUE in evidence_kinds
+        has_quotation_evidence = ModusEvidenceKind.QUOTATION_CUE in evidence_kinds
+        has_addressivity_evidence = ModusEvidenceKind.ADDRESSIVITY_CUE in evidence_kinds
+        force_alternatives_must_read = (
+            L05CautionCode.FORCE_ALTERNATIVES_MUST_BE_READ in record.downstream_cautions
+        )
         sorted_hypotheses = sorted(
             record.illocution_hypotheses,
             key=lambda hypothesis: hypothesis.confidence_weight,
@@ -856,7 +874,7 @@ def _register_normative_l05_l06_cues(
             reason="typed l05 record bound into g01 normative route",
         )
 
-        if primary_kind is IllocutionKind.INTERROGATIVE_CANDIDATE:
+        if primary_kind is IllocutionKind.INTERROGATIVE_CANDIDATE and has_force_evidence:
             carrier_index += 1
             operator_carriers.append(
                 OperatorCarrier(
@@ -870,7 +888,7 @@ def _register_normative_l05_l06_cues(
                 )
             )
 
-        if record.modality_profile.modality_markers:
+        if record.modality_profile.modality_markers and has_modality_evidence:
             carrier_index += 1
             operator_carriers.append(
                 OperatorCarrier(
@@ -883,8 +901,29 @@ def _register_normative_l05_l06_cues(
                     provenance="g01 modality carrier from l05 modality profile",
                 )
             )
+        elif record.modality_profile.modality_markers and not has_modality_evidence:
+            uncertainty_index += 1
+            uncertainty_markers.append(
+                UncertaintyMarker(
+                    marker_id=f"uncertainty-{uncertainty_index}",
+                    uncertainty_kind=UncertaintyKind.OPERATOR_SCOPE_UNCERTAIN,
+                    related_refs=(record.record_id,),
+                    reason="l05 modality markers present without modality evidence record",
+                    confidence=0.42,
+                )
+            )
+            evidence_index = _append_g01_evidence(
+                evidence_records=evidence_records,
+                evidence_index=evidence_index,
+                evidence_kind=G01EvidenceKind.NORMATIVE_L05_CUE,
+                source_ref_ids=(record.record_id,),
+                supports_dimensions=("modality_evidence_gap",),
+                unresolved=True,
+                route_class="normative",
+                reason="l05 modality evidence gap degraded g01 normative intake",
+            )
 
-        if record.quoted_speech_state.quote_or_echo_present:
+        if record.quoted_speech_state.quote_or_echo_present and has_quotation_evidence:
             anchor_index += 1
             source_anchors.append(
                 SourceAnchor(
@@ -910,6 +949,27 @@ def _register_normative_l05_l06_cues(
                     provenance="g01 quotation carrier from l05 quoted speech state",
                 )
             )
+        elif record.quoted_speech_state.quote_or_echo_present and not has_quotation_evidence:
+            uncertainty_index += 1
+            uncertainty_markers.append(
+                UncertaintyMarker(
+                    marker_id=f"uncertainty-{uncertainty_index}",
+                    uncertainty_kind=UncertaintyKind.SOURCE_SCOPE_UNCERTAIN,
+                    related_refs=(record.record_id, record.source_dictum_candidate_id),
+                    reason="l05 quote state present without quotation evidence record",
+                    confidence=0.44,
+                )
+            )
+            evidence_index = _append_g01_evidence(
+                evidence_records=evidence_records,
+                evidence_index=evidence_index,
+                evidence_kind=G01EvidenceKind.NORMATIVE_L05_CUE,
+                source_ref_ids=(record.record_id, record.source_dictum_candidate_id),
+                supports_dimensions=("quotation_evidence_gap",),
+                unresolved=True,
+                route_class="normative",
+                reason="l05 quotation evidence gap degraded g01 normative intake",
+            )
 
         sorted_targets = sorted(
             record.addressivity_hypotheses,
@@ -917,7 +977,7 @@ def _register_normative_l05_l06_cues(
             reverse=True,
         )
         primary_target = sorted_targets[0] if sorted_targets else None
-        if primary_target is not None:
+        if primary_target is not None and has_addressivity_evidence:
             if primary_target.addressivity_kind is AddressivityKind.QUOTED_SPEAKER:
                 anchor_kind = SourceAnchorKind.QUOTE_BOUNDARY
             elif primary_target.addressivity_kind is AddressivityKind.REPORTED_PARTICIPANT:
@@ -939,15 +999,40 @@ def _register_normative_l05_l06_cues(
                     provenance="g01 source anchor from l05 addressivity hypotheses",
                 )
             )
+        elif primary_target is not None and not has_addressivity_evidence:
+            uncertainty_index += 1
+            uncertainty_markers.append(
+                UncertaintyMarker(
+                    marker_id=f"uncertainty-{uncertainty_index}",
+                    uncertainty_kind=UncertaintyKind.REFERENT_UNRESOLVED,
+                    related_refs=(record.record_id, record.source_dictum_candidate_id),
+                    reason="l05 addressivity hypothesis present without addressivity evidence record",
+                    confidence=0.41,
+                )
+            )
+            evidence_index = _append_g01_evidence(
+                evidence_records=evidence_records,
+                evidence_index=evidence_index,
+                evidence_kind=G01EvidenceKind.NORMATIVE_L05_CUE,
+                source_ref_ids=(record.record_id, record.source_dictum_candidate_id),
+                supports_dimensions=("addressivity_evidence_gap",),
+                unresolved=True,
+                route_class="normative",
+                reason="l05 addressivity evidence gap degraded g01 normative intake",
+            )
 
-        if record.uncertainty_entropy >= 0.72:
+        if record.uncertainty_entropy >= 0.72 or force_alternatives_must_read:
             uncertainty_index += 1
             uncertainty_markers.append(
                 UncertaintyMarker(
                     marker_id=f"uncertainty-{uncertainty_index}",
                     uncertainty_kind=UncertaintyKind.OPERATOR_SCOPE_UNCERTAIN,
                     related_refs=(record.record_id,),
-                    reason="l05 uncertainty entropy remains high for g01 grounding",
+                    reason=(
+                        "l05 uncertainty entropy remains high for g01 grounding"
+                        if record.uncertainty_entropy >= 0.72
+                        else "l05 force alternatives caution requires uncertainty carry-through"
+                    ),
                     confidence=min(0.78, max(0.2, record.uncertainty_entropy)),
                 )
             )

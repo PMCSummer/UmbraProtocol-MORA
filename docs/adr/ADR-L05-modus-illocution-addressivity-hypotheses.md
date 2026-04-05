@@ -88,7 +88,8 @@ Accepted as a bounded partial implementation of phase `L05` over implemented `L0
 ## Bounded Partial Status
 - L05 is a bounded hypothesis layer over L04 candidates.
 - Alternatives/entropy remain explicit; no single-label force closure is authorized.
-- Normative downstream (`L06`) exists in-repo, but this L05 path remains not-yet-bound and degrades authority by contract.
+- Normative downstream (`L06`) is now live as typed consumer path.
+- Bounded status remains because broader downstream-obedience proof outside live consumers is still partial.
 
 ## Legacy Coupling Note
 - Current operational contour still includes historical `L04 -> G01`.
@@ -98,15 +99,11 @@ Accepted as a bounded partial implementation of phase `L05` over implemented `L0
 - Until runtime rewiring is completed, historical coupling remains explicit seam debt.
 
 ## Remaining Debts
-- `L06` phase exists, but live L05->L06 consumer wiring is still absent on current runtime route.
 - Legacy `L04 -> G01` operational path still carries force/addressivity-like cues in G01.
-- No downstream consumer currently executes discourse update/repair using L05 outputs.
-- No full consumer-proof that later phases obey L05 restrictions instead of legacy shortcuts.
+- Downstream-obedience proof is still partial outside live edges (`L06`, normative `G01` route).
+- No full consumer-proof that all later phases obey L05 restrictions/evidence instead of local shortcuts.
 
 ## Open Integration Obligations
-- Bind existing `L06` runtime route to consume L05 typed hypotheses and produce:
-  - discourse update proposals
-  - repair triggers
-  - bounded repair grounding
+- Preserve and test consumer-obedience on the live `L05 -> L06` route so caution/evidence signals remain load-bearing.
 - Re-adapt `G01` upstream authority to consume normative `L06` outputs instead of absorbing L05-like responsibilities from `L04`/surface cues.
 - Downstream phases (`G03`, `G04`, `G05`, `G06`, `G07`, `T01`, `V01`, `V02`) must consume L05 typed outputs (or L06 integrations) rather than infer force from raw form.

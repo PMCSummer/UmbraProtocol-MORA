@@ -77,6 +77,8 @@ Accepted as a bounded partial implementation of phase `G07` over implemented `G0
   - ask-now legality requires answer-binding readiness + hooks + worthwhile evidence gain
 - `accepted` now depends on lawful record shape, not object presence only.
 - `accepted` now also depends on lawful L06-alignment shape, not only G05/G06 target shape.
+- `L06` acceptance boundary is now decision-core:
+  - if `L06` proposals violate acceptance-required/not-accepted boundary, G07 blocks intervention status instead of allowing ask/guarded continuation.
 - Contract view now exposes additional mandatory-read dimensions:
   - question-spec target binding
   - forbidden-presupposition readability

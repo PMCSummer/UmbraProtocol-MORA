@@ -145,6 +145,12 @@ class G07DecisionBasisCode(StrEnum):
     L06_ABSTAIN_UPDATE_WITHHELD_TOPOLOGY = "l06_abstain_update_withheld_topology"
     DEFER_UNTIL_NEEDED_MUST_BE_READ = "defer_until_needed_must_be_read"
     L06_G07_TARGET_DRIFT_DETECTED = "l06_g07_target_drift_detected"
+    L06_PROPOSAL_ACCEPTANCE_REQUIRED_BOUNDARY_VIOLATED = (
+        "l06_proposal_acceptance_required_boundary_violated"
+    )
+    L06_UPDATE_ACCEPTANCE_BOUNDARY_VIOLATED = (
+        "l06_update_acceptance_boundary_violated"
+    )
     MISSING_G05_BASIS = "missing_g05_basis"
 
 
