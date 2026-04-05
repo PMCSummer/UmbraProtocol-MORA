@@ -1,7 +1,6 @@
 pragma ComponentBehavior: Bound
 import QtQuick
 import QtQuick.Window
-import QtQuick.Shapes
 
 Rectangle {
     id: root
@@ -115,7 +114,8 @@ Rectangle {
             high = low + 0.35
         }
         var semanticCompression = clamp(1.14 - (speedScalar - 1.0) * 0.24, 0.84, 1.16)
-        return Math.max(2200, Math.round(randomBetween(low, high) * 1000.0 * semanticCompression))
+        var reflectionCompression = reducedMotion() ? 0.84 : 0.58
+        return Math.max(2200, Math.round(randomBetween(low, high) * 1000.0 * semanticCompression * reflectionCompression))
     }
 
     function syncSemanticInput() {
@@ -222,14 +222,26 @@ Rectangle {
     }
 
     function retargetAnomaly() {
-        var anomalyScale = reducedMotion() ? 0.34 : 1.0
-        var phaseAmp = clamp(semanticUncertainty * 8.0 + semanticConflict * 12.0 + semanticWarning * 7.0, 0.0, 16.0) * anomalyScale
-        var pulseAmp = clamp(semanticConflict * 0.42 + semanticWarning * 0.36 + semanticUncertainty * 0.22, 0.0, 0.74) * anomalyScale
+        var anomalyScale = reducedMotion() ? 0.30 : 1.0
+        var phaseAmp = clamp(semanticUncertainty * 8.0 + semanticConflict * 11.0 + semanticWarning * 6.5, 0.0, 13.0) * anomalyScale
+        var pulseAmp = clamp(semanticConflict * 0.56 + semanticWarning * 0.42 + semanticUncertainty * 0.34, 0.12, 0.88) * anomalyScale
+        var phaseTarget = randomBetween(-phaseAmp, phaseAmp)
+        var pulseTarget = randomBetween(0.08 * anomalyScale, Math.max(0.08 * anomalyScale, pulseAmp))
+        var axisTargetX = clamp(randomBetween(-0.86, 0.86), -0.86, 0.86)
+        var axisTargetY = clamp(randomBetween(-0.74, 0.74), -0.74, 0.74)
 
-        phaseSkew = randomBetween(-phaseAmp, phaseAmp)
-        anomalyPulse = randomBetween(0.04, pulseAmp)
-        driftAxisX = clamp(randomBetween(-0.86, 0.86), -0.86, 0.86)
-        driftAxisY = clamp(randomBetween(-0.74, 0.74), -0.74, 0.74)
+        phaseSkew = phaseSkew * 0.74 + phaseTarget * 0.26
+        anomalyPulse = anomalyPulse * 0.68 + pulseTarget * 0.32
+        var nextAxisX = driftAxisX * 0.78 + axisTargetX * 0.22
+        var nextAxisY = driftAxisY * 0.78 + axisTargetY * 0.22
+        var axisLen = Math.sqrt(nextAxisX * nextAxisX + nextAxisY * nextAxisY)
+        if (axisLen < 0.12) {
+            nextAxisX = 0.42
+            nextAxisY = -0.20
+            axisLen = Math.sqrt(nextAxisX * nextAxisX + nextAxisY * nextAxisY)
+        }
+        driftAxisX = clamp(nextAxisX / axisLen, -0.86, 0.86)
+        driftAxisY = clamp(nextAxisY / axisLen, -0.74, 0.74)
         recomputeSemanticCarrier()
     }
 
@@ -244,15 +256,15 @@ Rectangle {
 
         var motionGate = reducedMotion() ? 0.58 : 1.0
         var semanticVelocity = clamp(0.9 + (speedScalar - 1.0) * 0.3, 0.72, 1.18)
-        var outerDegPerSecond = 360.0 / (reducedMotion() ? 196.0 : 132.0)
-        var innerDegPerSecond = 360.0 / (reducedMotion() ? 248.0 : 168.0)
-        var apertureDegPerSecond = 360.0 / (reducedMotion() ? 308.0 : 224.0)
-        var driftGain = 1.0 + driftIrregularity * 0.18
+        var outerDegPerSecond = 360.0 / (reducedMotion() ? 176.0 : 92.0)
+        var innerDegPerSecond = 360.0 / (reducedMotion() ? 222.0 : 124.0)
+        var apertureDegPerSecond = 360.0 / (reducedMotion() ? 268.0 : 156.0)
+        var driftGain = 1.0 + driftIrregularity * 0.34
 
         outerRotation = (outerRotation + dt * outerDegPerSecond * semanticVelocity * driftGain * motionGate) % 360.0
-        innerRotation = (innerRotation - dt * innerDegPerSecond * (0.96 + densityLevel * 0.12) * motionGate) % 360.0
-        apertureRotation = (apertureRotation + dt * apertureDegPerSecond * (0.94 + semanticUncertainty * 0.08) * motionGate) % 360.0
-        breathingPhase = (breathingPhase + dt * (reducedMotion() ? 0.24 : 0.42) * (0.84 + semanticConflict * 0.18)) % (Math.PI * 2.0)
+        innerRotation = (innerRotation + dt * innerDegPerSecond * (0.98 + densityLevel * 0.16) * motionGate) % 360.0
+        apertureRotation = (apertureRotation + dt * apertureDegPerSecond * (0.98 + semanticUncertainty * 0.12 + orbitalActivity * 0.10) * motionGate) % 360.0
+        breathingPhase = (breathingPhase + dt * (reducedMotion() ? 0.28 : 0.64) * (0.86 + semanticConflict * 0.24)) % (Math.PI * 2.0)
     }
 
     function startRuntimeEngines() {
@@ -294,10 +306,10 @@ Rectangle {
         NumberAnimation { duration: root.motionDuration("ghost_echo_ms"); easing.type: root.easingForClass(root.theme.motion.easing_soft_standard) }
     }
     Behavior on phaseSkew {
-        NumberAnimation { duration: Math.max(1200, Math.round(root.motionDuration("shear_drift_ms") * 2.5)); easing.type: root.easingForClass(root.theme.motion.easing_slow_settle) }
+        NumberAnimation { duration: Math.max(860, Math.round(root.motionDuration("shear_drift_ms") * 2.05)); easing.type: root.easingForClass(root.theme.motion.easing_slow_settle) }
     }
     Behavior on anomalyPulse {
-        NumberAnimation { duration: Math.max(1100, Math.round(root.motionDuration("ghost_echo_ms") * 1.7)); easing.type: root.easingForClass(root.theme.motion.easing_soft_standard) }
+        NumberAnimation { duration: Math.max(780, Math.round(root.motionDuration("ghost_echo_ms") * 1.45)); easing.type: root.easingForClass(root.theme.motion.easing_soft_standard) }
     }
     Behavior on coreScaleX {
         NumberAnimation { duration: root.motionDuration("shear_drift_ms"); easing.type: root.easingForClass(root.theme.motion.easing_slow_settle) }
@@ -355,19 +367,21 @@ Rectangle {
             property real webStroke: root.lineWidth * 0.74
             property real phantomStroke: root.lineWidth * 0.60
             property real blindCoreRadius: radius * (0.118 + root.semanticConflict * 0.014 + root.anomalyPulse * 0.010)
-            property real frontPhase: root.outerRotation * 0.028 + root.phaseSkew * 0.34
-            property real deepPhase: 13 + root.innerRotation * -0.036 - root.phaseSkew * 0.20
-            property real frontSourcePhase: root.outerRotation * 1.10 + root.innerRotation * 0.18 + root.phaseSkew * 0.42
-            property real deepSourcePhase: 7 + root.innerRotation * -1.06 + root.outerRotation * 0.22 - root.phaseSkew * 0.26
-            property real webPhase: root.outerRotation * -0.08 + root.innerRotation * 0.12
-            property real localWarp: Math.sin(root.breathingPhase * 1.16) * 0.040 + root.anomalyPulse * 0.060
+            property real seamFlux: Math.sin(root.breathingPhase * 1.42 + root.apertureRotation * 0.031) * (1.0 + root.driftIrregularity * 0.74)
+            property real reflectionShear: root.phaseSkew * 0.15 + seamFlux * (0.86 + root.anomalyPulse * 2.1)
+            property int activeFrontDefectIndex: Math.floor((((root.outerRotation * 0.84 + root.apertureRotation * 0.62) % 360.0) + 360.0) / frontStep) % frontSeamCount
+            property int activeDeepDefectIndex: Math.floor((((180.0 + root.innerRotation * 0.62 + root.apertureRotation * 0.48) % 360.0) + 360.0) / deepStep) % deepSeamCount
+            property real frontPhase: root.outerRotation * 0.034 + root.apertureRotation * 0.014 + root.phaseSkew * 0.34 + seamFlux * 1.8
+            property real deepPhase: 13 + root.innerRotation * 0.040 + root.apertureRotation * 0.014 - root.phaseSkew * 0.16 + seamFlux * 0.8
+            property real frontSourcePhase: root.outerRotation * 1.20 + root.innerRotation * 0.24 + root.apertureRotation * 0.24 + root.phaseSkew * 0.42
+            property real deepSourcePhase: 7 + root.innerRotation * 1.08 + root.outerRotation * 0.22 + root.apertureRotation * 0.18 - root.phaseSkew * 0.20
+            property real webPhase: root.outerRotation * 0.10 + root.innerRotation * 0.18 + root.apertureRotation * 0.22
+            property real localWarp: Math.sin(root.breathingPhase * 1.16) * 0.050 + seamFlux * 0.022 + root.anomalyPulse * 0.098
             property real echoShiftX: root.ghostOpacity * radius * (0.030 + root.anomalyPulse * 0.020) * root.driftAxisX
             property real echoShiftY: root.ghostOpacity * radius * (0.030 + root.anomalyPulse * 0.020) * root.driftAxisY
             property real frontScale: 1.0 + root.structuralAsymmetry * 0.014
             property real deepScale: 0.84 + root.densityLevel * 0.030
-            property real centerFractureBias: root.phaseSkew * 0.22 + root.anomalyPulse * radius * 0.008
-            property int frontDefectIndex: 1
-            property int deepDefectIndex: 5
+            property real centerFractureBias: root.phaseSkew * 0.22 + reflectionShear * 0.22 + root.anomalyPulse * radius * 0.008
 
             function pointAt(radiusNorm, degrees) {
                 var rad = degrees * Math.PI / 180.0
@@ -379,8 +393,8 @@ Rectangle {
             }
 
             function frontBias(index) {
-                if (index === 1) {
-                    return 1.8 + root.structuralAsymmetry * 7.5 + root.anomalyPulse * 5.0
+                if (index === activeFrontDefectIndex) {
+                    return 1.8 + root.structuralAsymmetry * 8.2 + root.anomalyPulse * 7.2
                 }
                 if (index === 4) {
                     return -1.2 - root.structuralAsymmetry * 4.6
@@ -388,20 +402,20 @@ Rectangle {
                 if (index === 5) {
                     return 0.7 + root.semanticConflict * 2.8
                 }
-                return ((index % 2) === 0 ? 1 : -1) * root.phaseSkew * 0.035
+                return ((index % 2) === 0 ? 1 : -1) * (root.phaseSkew * 0.035 + seamFlux * 0.16)
             }
 
             function deepBias(index) {
                 if (index === 2) {
                     return 2.4 + root.echoLevel * 8.0
                 }
-                if (index === 6) {
-                    return -1.7 - root.anomalyPulse * 5.0
+                if (index === activeDeepDefectIndex) {
+                    return -1.7 - root.anomalyPulse * 7.0
                 }
                 if (index === 0) {
                     return 0.9 + root.phaseSkew * 0.16
                 }
-                return ((index % 2) === 0 ? 0.55 : -0.55) * root.phaseSkew * 0.12
+                return ((index % 2) === 0 ? 0.55 : -0.55) * (root.phaseSkew * 0.12 + seamFlux * 0.22)
             }
 
             function frontAngle(index) {
@@ -413,28 +427,28 @@ Rectangle {
             }
 
             function frontSpread(index) {
-                if (index === frontDefectIndex) {
-                    return 22.0 + root.structuralAsymmetry * 5.0
+                if (index === activeFrontDefectIndex) {
+                    return 20.4 + root.structuralAsymmetry * 5.0 + Math.abs(seamFlux) * 1.4 + root.anomalyPulse * 2.6
                 }
                 if (index === 4) {
                     return 24.8
                 }
-                return 24.0 + (index === 2 ? 1.5 : 0.0)
+                return 24.0 + (index === 2 ? 1.5 : 0.0) + Math.abs(seamFlux) * 0.55
             }
 
             function deepSpread(index) {
-                if (index === deepDefectIndex) {
-                    return 15.2 + root.echoLevel * 4.0
+                if (index === activeDeepDefectIndex) {
+                    return 14.0 + root.echoLevel * 4.4 + Math.abs(seamFlux) * 0.8 + root.anomalyPulse * 2.2
                 }
                 if (index === 2) {
                     return 16.6 + root.anomalyPulse * 2.2
                 }
-                return 15.0
+                return 15.0 + Math.abs(seamFlux) * 0.45
             }
 
             function seamLength(index) {
-                if (index === frontDefectIndex) {
-                    return 0.88
+                if (index === activeFrontDefectIndex) {
+                    return 0.86
                 }
                 return index === 4 ? 0.91 : 0.94
             }
@@ -486,9 +500,9 @@ Rectangle {
 
                     for (var i = 0; i < sigilRoot.frontSeamCount; ++i) {
                         var axis = sigilRoot.frontAngle(i)
-                        var alpha = i === sigilRoot.frontDefectIndex ? 0.56 : 0.88
+                        var alpha = i === sigilRoot.activeFrontDefectIndex ? 0.56 : 0.88
                         drawRadial(axis, 0.18, sigilRoot.seamLength(i), sigilRoot.seamStroke, root.mainLineColor, alpha)
-                        if (i === sigilRoot.frontDefectIndex) {
+                        if (i === sigilRoot.activeFrontDefectIndex) {
                             drawRadial(axis + 1.8, 0.30, 0.78, sigilRoot.supportStroke, root.secondaryLineColor, 0.28)
                         }
                     }
@@ -496,7 +510,7 @@ Rectangle {
                     for (var j = 0; j < sigilRoot.frontSeamCount; ++j) {
                         var left = sigilRoot.frontAngle(j) + sigilRoot.frontSpread(j) * 0.72
                         var right = sigilRoot.frontAngle((j + 1) % sigilRoot.frontSeamCount) - sigilRoot.frontSpread((j + 1) % sigilRoot.frontSeamCount) * 0.72
-                        if (j === sigilRoot.frontDefectIndex) {
+                        if (j === sigilRoot.activeFrontDefectIndex) {
                             right -= 5.0
                         }
                         drawArcSegment(0.92, left, right, sigilRoot.frameStroke, root.mainLineColor, 0.88)
@@ -504,7 +518,7 @@ Rectangle {
 
                     for (var k = 0; k < sigilRoot.deepSeamCount; ++k) {
                         var deepAxis = sigilRoot.deepAngle(k)
-                        drawRadial(deepAxis, 0.23, 0.74, sigilRoot.supportStroke, root.secondaryLineColor, k === sigilRoot.deepDefectIndex ? 0.26 : 0.34)
+                        drawRadial(deepAxis, 0.23, 0.74, sigilRoot.supportStroke, root.secondaryLineColor, k === sigilRoot.activeDeepDefectIndex ? 0.26 : 0.34)
                     }
 
                     drawArcSegment(0.28, sigilRoot.frontAngle(0) - 18, sigilRoot.frontAngle(2) + 11, sigilRoot.supportStroke, root.secondaryLineColor, 0.30)
@@ -518,7 +532,7 @@ Rectangle {
                 antialiasing: true
                 opacity: 0.96
                 scale: sigilRoot.frontScale
-                rotation: root.outerRotation * 0.006
+                rotation: root.outerRotation * 0.018
                 renderStrategy: Canvas.Cooperative
 
                 function mirrorClip(ctx, innerNorm, outerNorm, spreadDeg) {
@@ -552,8 +566,8 @@ Rectangle {
                     var t = layerPhase * Math.PI / 180.0
                     var w1 = Math.sin(t + index * 0.68) * rr * (0.030 + sigilRoot.localWarp * 0.18)
                     var w2 = Math.sin(t * 0.9 + index * 1.14 + 0.6) * rr * (0.038 + sigilRoot.localWarp * 0.16)
-                    var w3 = Math.sin(t * 1.2 + index * 0.49 + 1.4) * rr * (0.026 + root.anomalyPulse * 0.08)
-                    var w4 = Math.sin(t * 0.62 + index * 0.77 + 2.2) * rr * (0.020 + root.structuralAsymmetry * 0.10)
+                    var w3 = Math.sin(t * 1.2 + index * 0.49 + 1.4) * rr * (0.026 + root.anomalyPulse * 0.20)
+                    var w4 = Math.sin(t * 0.62 + index * 0.77 + 2.2) * rr * (0.020 + root.structuralAsymmetry * 0.10 + root.anomalyPulse * 0.06)
 
                     strokeChain(ctx, [
                         [rr * 0.20, -rr * 0.012],
@@ -592,7 +606,7 @@ Rectangle {
                     drawBundle(ctx, index, sigilRoot.frontSourcePhase + index * 11.0)
 
                     ctx.save()
-                    if (index === sigilRoot.frontDefectIndex) {
+                    if (index === sigilRoot.activeFrontDefectIndex) {
                         ctx.translate(sigilRoot.radius * 0.010, -sigilRoot.radius * 0.003)
                         ctx.rotate((1.6 + root.structuralAsymmetry * 2.2) * Math.PI / 180.0)
                     }
@@ -600,7 +614,17 @@ Rectangle {
                     drawBundle(ctx, index, sigilRoot.frontSourcePhase + index * 11.0 + 14.0)
                     ctx.restore()
 
-                    if (index === sigilRoot.frontDefectIndex) {
+                    if (!root.reducedMotion()) {
+                        ctx.save()
+                        var frontEchoKick = sigilRoot.radius * (0.004 + root.anomalyPulse * 0.016 + root.echoLevel * 0.008)
+                        ctx.translate(frontEchoKick, -frontEchoKick * 0.64)
+                        ctx.rotate((sigilRoot.reflectionShear * 0.9 + index * 0.24) * Math.PI / 180.0)
+                        ctx.scale(-1, -1)
+                        drawBundle(ctx, index, sigilRoot.frontSourcePhase + index * 11.0 + 22.0)
+                        ctx.restore()
+                    }
+
+                    if (index === sigilRoot.activeFrontDefectIndex) {
                         ctx.globalAlpha = 0.18 + root.anomalyPulse * 0.10
                         ctx.strokeStyle = root.accentLineColor
                         ctx.lineWidth = sigilRoot.phantomStroke
@@ -633,7 +657,7 @@ Rectangle {
                 antialiasing: true
                 opacity: 0.58 + root.detailOpacity * 0.12
                 scale: sigilRoot.deepScale
-                rotation: root.innerRotation * -0.008
+                rotation: root.innerRotation * 0.016
                 renderStrategy: Canvas.Cooperative
 
                 function mirrorClip(ctx, innerNorm, outerNorm, spreadDeg) {
@@ -667,7 +691,7 @@ Rectangle {
                     var t = layerPhase * Math.PI / 180.0
                     var w1 = Math.sin(t * 0.84 + index * 0.73) * rr * (0.024 + root.echoLevel * 0.040)
                     var w2 = Math.sin(t * 1.28 + index * 0.53 + 1.1) * rr * (0.032 + sigilRoot.localWarp * 0.10)
-                    var w3 = Math.sin(t * 0.58 + index * 1.27 + 0.7) * rr * (0.022 + root.anomalyPulse * 0.12)
+                    var w3 = Math.sin(t * 0.58 + index * 1.27 + 0.7) * rr * (0.022 + root.anomalyPulse * 0.26)
 
                     strokeChain(ctx, [
                         [rr * 0.26, -rr * 0.010],
@@ -694,13 +718,23 @@ Rectangle {
                     drawBundle(ctx, index, sigilRoot.deepSourcePhase + index * 16.0)
 
                     ctx.save()
-                    if (index === sigilRoot.deepDefectIndex) {
+                    if (index === sigilRoot.activeDeepDefectIndex) {
                         ctx.translate(-sigilRoot.radius * 0.006, sigilRoot.radius * 0.005)
                         ctx.rotate((-2.1 - root.echoLevel * 3.0) * Math.PI / 180.0)
                     }
                     ctx.scale(1, -1)
                     drawBundle(ctx, index, sigilRoot.deepSourcePhase + index * 16.0 + 19.0)
                     ctx.restore()
+
+                    if (!root.reducedMotion()) {
+                        ctx.save()
+                        var deepEchoKick = sigilRoot.radius * (0.003 + root.anomalyPulse * 0.014 + root.echoLevel * 0.010)
+                        ctx.translate(-deepEchoKick * 0.58, deepEchoKick)
+                        ctx.rotate((-sigilRoot.reflectionShear * 0.68 - index * 0.18) * Math.PI / 180.0)
+                        ctx.scale(-1, -1)
+                        drawBundle(ctx, index, sigilRoot.deepSourcePhase + index * 16.0 + 28.0)
+                        ctx.restore()
+                    }
 
                     ctx.restore()
                 }
@@ -752,14 +786,14 @@ Rectangle {
                             sigilRoot.pointAt(0.34, a0),
                             sigilRoot.pointAt(0.48, a1),
                             sigilRoot.pointAt(0.62, a2)
-                        ], sigilRoot.webStroke, root.secondaryLineColor, i === sigilRoot.frontDefectIndex ? 0.20 : 0.34)
+                        ], sigilRoot.webStroke, root.secondaryLineColor, i === sigilRoot.activeFrontDefectIndex ? 0.20 : 0.34)
                     }
 
                     for (var j = 0; j < sigilRoot.deepSeamCount; ++j) {
                         var left = sigilRoot.pointAt(0.46, sigilRoot.deepAngle(j) + 6)
                         var mid = sigilRoot.pointAt(0.56, sigilRoot.deepAngle(j) + 11 + Math.sin(sigilRoot.webPhase * 0.9 + j * 0.4) * 3.0)
                         var right = sigilRoot.pointAt(0.64, sigilRoot.deepAngle((j + 2) % sigilRoot.deepSeamCount) - 8)
-                        if (j !== sigilRoot.deepDefectIndex) {
+                        if (j !== sigilRoot.activeDeepDefectIndex) {
                             strokePoly([left, mid, right], sigilRoot.webStroke, root.accentLineColor, 0.16 + root.anomalyPulse * 0.08)
                         }
                     }
@@ -839,10 +873,10 @@ Rectangle {
                 anchors.fill: parent
                 antialiasing: true
                 visible: root.ghostOpacity > 0.01 || root.anomalyPulse > 0.03
-                opacity: root.ghostOpacity * 0.74 + root.anomalyPulse * 0.10
+                opacity: root.ghostOpacity * 0.74 + root.anomalyPulse * 0.18
                 x: sigilRoot.echoShiftX
                 y: sigilRoot.echoShiftY
-                rotation: sigilRoot.deepPhase * -0.028 + sigilRoot.frontPhase * 0.034
+                rotation: sigilRoot.deepPhase * 0.022 + sigilRoot.frontPhase * 0.032
                 scale: 0.995 + root.anomalyPulse * 0.016
                 renderStrategy: Canvas.Cooperative
 
@@ -894,7 +928,7 @@ Rectangle {
 
     Timer {
         id: driftTimer
-        interval: 10000
+        interval: 4200
         repeat: true
         running: false
         onTriggered: {
