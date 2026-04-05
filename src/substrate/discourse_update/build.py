@@ -87,6 +87,17 @@ class _L05ObedienceProfile:
     force_alternatives_caution_present: bool
 
 
+@dataclass(frozen=True, slots=True)
+class _L05GapRepairTemplate:
+    repair_class: RepairClass
+    localized_trouble_source: str
+    include_dictum_ref: bool
+    why_this_is_broken: str
+    clarification_type: str
+    repair_basis: str
+    provenance: str
+
+
 _PROPOSAL_BASE_RESTRICTIONS: tuple[str, ...] = (
     L06ProposalRestrictionCode.L06_OBJECT_PRESENCE_NOT_ACCEPTANCE,
     L06ProposalRestrictionCode.PROPOSAL_REQUIRES_ACCEPTANCE,
@@ -382,95 +393,14 @@ def _localized_repairs(
         )
         if repair is not None:
             repairs.append(repair)
-    if not obedience_profile.has_force_evidence:
+    for template in _l05_gap_repair_templates(record, obedience_profile):
         repair_index += 1
         repairs.append(
-            RepairTrigger(
+            _materialize_l05_gap_repair(
+                record=record,
+                proposal_id=proposal_id,
                 repair_id=f"repair-{record.record_id}-{repair_index}",
-                repair_class=RepairClass.FORCE_REPAIR,
-                localized_trouble_source="l05_force_evidence_gap",
-                localized_ref_ids=(record.record_id,),
-                why_this_is_broken="l05 force evidence is missing; l06 cannot lawfully project update force topology",
-                suggested_clarification_type="bounded_force_evidence_recovery",
-                blocked_updates=(proposal_id,),
-                guarded_continue_allowed=False,
-                guarded_continue_forbidden=True,
-                repair_basis=("l05_force_evidence_missing",),
-                provenance="l06 repair from l05 force evidence obedience gap",
-            )
-        )
-    if not obedience_profile.has_addressivity_evidence:
-        repair_index += 1
-        repairs.append(
-            RepairTrigger(
-                repair_id=f"repair-{record.record_id}-{repair_index}",
-                repair_class=RepairClass.REFERENCE_REPAIR,
-                localized_trouble_source="l05_addressivity_evidence_gap",
-                localized_ref_ids=(record.record_id, record.source_dictum_candidate_id),
-                why_this_is_broken="l05 addressivity evidence is missing; update target ownership remains unbound",
-                suggested_clarification_type="bounded_addressivity_target_recovery",
-                blocked_updates=(proposal_id,),
-                guarded_continue_allowed=False,
-                guarded_continue_forbidden=True,
-                repair_basis=("l05_addressivity_evidence_missing",),
-                provenance="l06 repair from l05 addressivity evidence obedience gap",
-            )
-        )
-    if obedience_profile.quote_present and not obedience_profile.quote_commitment_caution_present:
-        repair_index += 1
-        repairs.append(
-            RepairTrigger(
-                repair_id=f"repair-{record.record_id}-{repair_index}",
-                repair_class=RepairClass.FORCE_REPAIR,
-                localized_trouble_source="l05_quote_commitment_caution_gap",
-                localized_ref_ids=(record.record_id, record.source_dictum_candidate_id),
-                why_this_is_broken="quoted force caution missing; current-speaker commitment transfer cannot be assumed safe",
-                suggested_clarification_type="bounded_quote_commitment_owner_disambiguation",
-                blocked_updates=(proposal_id,),
-                guarded_continue_allowed=False,
-                guarded_continue_forbidden=True,
-                repair_basis=("l05_quote_commitment_caution_missing",),
-                provenance="l06 repair from l05 quote commitment caution obedience gap",
-            )
-        )
-    if (
-        record.uncertainty_entropy >= 0.6
-        and not obedience_profile.force_alternatives_caution_present
-    ):
-        repair_index += 1
-        repairs.append(
-            RepairTrigger(
-                repair_id=f"repair-{record.record_id}-{repair_index}",
-                repair_class=RepairClass.FORCE_REPAIR,
-                localized_trouble_source="l05_force_alternative_caution_gap",
-                localized_ref_ids=(record.record_id,),
-                why_this_is_broken="high force entropy without force-alternatives caution risks downstream overcommitment",
-                suggested_clarification_type="bounded_force_alternative_read_recovery",
-                blocked_updates=(proposal_id,),
-                guarded_continue_allowed=False,
-                guarded_continue_forbidden=True,
-                repair_basis=("l05_force_alternatives_caution_missing",),
-                provenance="l06 repair from l05 caution obedience gap",
-            )
-        )
-    if (
-        "unresolved_argument_slots" in record.uncertainty_markers
-        and not obedience_profile.unresolved_slot_evidence_present
-    ):
-        repair_index += 1
-        repairs.append(
-            RepairTrigger(
-                repair_id=f"repair-{record.record_id}-{repair_index}",
-                repair_class=RepairClass.MISSING_ARGUMENT_REPAIR,
-                localized_trouble_source="l05_unresolved_slot_evidence_gap",
-                localized_ref_ids=(record.record_id, record.source_dictum_candidate_id),
-                why_this_is_broken="l05 unresolved slot pressure exists but typed unresolved-slot evidence is missing",
-                suggested_clarification_type="bounded_argument_slot_evidence_recovery",
-                blocked_updates=(proposal_id,),
-                guarded_continue_allowed=False,
-                guarded_continue_forbidden=True,
-                repair_basis=("l05_unresolved_slot_evidence_missing",),
-                provenance="l06 repair from l05 unresolved-slot evidence obedience gap",
+                template=template,
             )
         )
     if not repairs and record.uncertainty_entropy >= 0.75:
@@ -506,6 +436,104 @@ def _derive_l05_obedience_profile(record: ModusHypothesisRecord) -> _L05Obedienc
         force_alternatives_caution_present=(
             L05CautionCode.FORCE_ALTERNATIVES_MUST_BE_READ in record.downstream_cautions
         ),
+    )
+
+
+def _l05_gap_repair_templates(
+    record: ModusHypothesisRecord,
+    profile: _L05ObedienceProfile,
+) -> tuple[_L05GapRepairTemplate, ...]:
+    templates: list[_L05GapRepairTemplate] = []
+    if not profile.has_force_evidence:
+        templates.append(
+            _L05GapRepairTemplate(
+                repair_class=RepairClass.FORCE_REPAIR,
+                localized_trouble_source="l05_force_evidence_gap",
+                include_dictum_ref=False,
+                why_this_is_broken="l05 force evidence is missing; l06 cannot lawfully project update force topology",
+                clarification_type="bounded_force_evidence_recovery",
+                repair_basis="l05_force_evidence_missing",
+                provenance="l06 repair from l05 force evidence obedience gap",
+            )
+        )
+    if not profile.has_addressivity_evidence:
+        templates.append(
+            _L05GapRepairTemplate(
+                repair_class=RepairClass.REFERENCE_REPAIR,
+                localized_trouble_source="l05_addressivity_evidence_gap",
+                include_dictum_ref=True,
+                why_this_is_broken="l05 addressivity evidence is missing; update target ownership remains unbound",
+                clarification_type="bounded_addressivity_target_recovery",
+                repair_basis="l05_addressivity_evidence_missing",
+                provenance="l06 repair from l05 addressivity evidence obedience gap",
+            )
+        )
+    if profile.quote_present and not profile.quote_commitment_caution_present:
+        templates.append(
+            _L05GapRepairTemplate(
+                repair_class=RepairClass.FORCE_REPAIR,
+                localized_trouble_source="l05_quote_commitment_caution_gap",
+                include_dictum_ref=True,
+                why_this_is_broken="quoted force caution missing; current-speaker commitment transfer cannot be assumed safe",
+                clarification_type="bounded_quote_commitment_owner_disambiguation",
+                repair_basis="l05_quote_commitment_caution_missing",
+                provenance="l06 repair from l05 quote commitment caution obedience gap",
+            )
+        )
+    if record.uncertainty_entropy >= 0.6 and not profile.force_alternatives_caution_present:
+        templates.append(
+            _L05GapRepairTemplate(
+                repair_class=RepairClass.FORCE_REPAIR,
+                localized_trouble_source="l05_force_alternative_caution_gap",
+                include_dictum_ref=False,
+                why_this_is_broken="high force entropy without force-alternatives caution risks downstream overcommitment",
+                clarification_type="bounded_force_alternative_read_recovery",
+                repair_basis="l05_force_alternatives_caution_missing",
+                provenance="l06 repair from l05 caution obedience gap",
+            )
+        )
+    if (
+        "unresolved_argument_slots" in record.uncertainty_markers
+        and not profile.unresolved_slot_evidence_present
+    ):
+        templates.append(
+            _L05GapRepairTemplate(
+                repair_class=RepairClass.MISSING_ARGUMENT_REPAIR,
+                localized_trouble_source="l05_unresolved_slot_evidence_gap",
+                include_dictum_ref=True,
+                why_this_is_broken="l05 unresolved slot pressure exists but typed unresolved-slot evidence is missing",
+                clarification_type="bounded_argument_slot_evidence_recovery",
+                repair_basis="l05_unresolved_slot_evidence_missing",
+                provenance="l06 repair from l05 unresolved-slot evidence obedience gap",
+            )
+        )
+    return tuple(templates)
+
+
+def _materialize_l05_gap_repair(
+    *,
+    record: ModusHypothesisRecord,
+    proposal_id: str,
+    repair_id: str,
+    template: _L05GapRepairTemplate,
+) -> RepairTrigger:
+    localized_refs = (
+        (record.record_id, record.source_dictum_candidate_id)
+        if template.include_dictum_ref
+        else (record.record_id,)
+    )
+    return RepairTrigger(
+        repair_id=repair_id,
+        repair_class=template.repair_class,
+        localized_trouble_source=template.localized_trouble_source,
+        localized_ref_ids=localized_refs,
+        why_this_is_broken=template.why_this_is_broken,
+        suggested_clarification_type=template.clarification_type,
+        blocked_updates=(proposal_id,),
+        guarded_continue_allowed=False,
+        guarded_continue_forbidden=True,
+        repair_basis=(template.repair_basis,),
+        provenance=template.provenance,
     )
 
 
@@ -621,17 +649,7 @@ def _resolve_continuation_decision(
     record: ModusHypothesisRecord,
     repairs_for_record: tuple[RepairTrigger, ...],
 ) -> _ContinuationDecision:
-    hard_block = any(
-        trigger.repair_class
-        in {
-            RepairClass.MISSING_ARGUMENT_REPAIR,
-            RepairClass.SCOPE_REPAIR,
-            RepairClass.POLARITY_REPAIR,
-            RepairClass.REFERENCE_REPAIR,
-        }
-        and trigger.guarded_continue_forbidden
-        for trigger in repairs_for_record
-    )
+    hard_block = any(trigger.guarded_continue_forbidden for trigger in repairs_for_record)
     if hard_block:
         return _ContinuationDecision(
             status=ContinuationStatus.BLOCKED_PENDING_REPAIR,

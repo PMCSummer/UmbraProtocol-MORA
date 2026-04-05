@@ -102,6 +102,10 @@ Accepted as a bounded partial implementation of phase `L06` over implemented `L0
   - missing `L05` force/addressivity evidence now yields localized repair triggers and blocked continuation.
   - missing quote-commitment caution under quoted force now yields localized force-owner repair.
   - high-entropy force without `force_alternatives_must_be_read` caution now yields localized repair instead of soft carry-through.
+- Weakest-edge hardening + bounded P6 code health:
+  - `L05 gap -> L06 repair` mapping is centralized through typed local templates instead of duplicated ad-hoc branches.
+  - hard-block precedence now keys on `guarded_continue_forbidden` directly, preventing guarded continuation from bypassing stronger L05 evidence/caution gaps.
+  - this refactor is behavior-preserving on lawful paths and reduces drift risk between repair localization and continuation legality.
 
 ## Core Formulas
 - `interpretation != accepted update`
