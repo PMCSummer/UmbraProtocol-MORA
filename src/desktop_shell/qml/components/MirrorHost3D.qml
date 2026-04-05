@@ -345,14 +345,29 @@ Rectangle {
             property real cx: width * 0.5
             property real cy: height * 0.5
             property real radius: width * 0.5
-            property real outerRadius: radius * 0.92
-            property real innerFrameRadius: radius * 0.74
-            property real glyphRadius: radius * 0.80
-            property real apertureBreath: 1.0 + (root.reducedMotion() ? 0.005 : 0.014)
-                                               * (0.35 + root.semanticPressure * 0.38 + root.anomalyPulse * 0.46)
-                                               * Math.sin(root.breathingPhase)
-            property real echoShiftX: root.ghostOpacity * radius * (0.03 + root.anomalyPulse * 0.02) * root.driftAxisX
-            property real echoShiftY: root.ghostOpacity * radius * (0.03 + root.anomalyPulse * 0.02) * root.driftAxisY
+            property int frontSeamCount: 6
+            property int deepSeamCount: 8
+            property real frontStep: 360 / frontSeamCount
+            property real deepStep: 360 / deepSeamCount
+            property real seamStroke: root.lineWidth * 1.54
+            property real frameStroke: root.lineWidth * 1.20
+            property real supportStroke: root.lineWidth * 0.96
+            property real webStroke: root.lineWidth * 0.74
+            property real phantomStroke: root.lineWidth * 0.60
+            property real blindCoreRadius: radius * (0.118 + root.semanticConflict * 0.014 + root.anomalyPulse * 0.010)
+            property real frontPhase: root.outerRotation * 0.028 + root.phaseSkew * 0.34
+            property real deepPhase: 13 + root.innerRotation * -0.036 - root.phaseSkew * 0.20
+            property real frontSourcePhase: root.outerRotation * 1.10 + root.innerRotation * 0.18 + root.phaseSkew * 0.42
+            property real deepSourcePhase: 7 + root.innerRotation * -1.06 + root.outerRotation * 0.22 - root.phaseSkew * 0.26
+            property real webPhase: root.outerRotation * -0.08 + root.innerRotation * 0.12
+            property real localWarp: Math.sin(root.breathingPhase * 1.16) * 0.040 + root.anomalyPulse * 0.060
+            property real echoShiftX: root.ghostOpacity * radius * (0.030 + root.anomalyPulse * 0.020) * root.driftAxisX
+            property real echoShiftY: root.ghostOpacity * radius * (0.030 + root.anomalyPulse * 0.020) * root.driftAxisY
+            property real frontScale: 1.0 + root.structuralAsymmetry * 0.014
+            property real deepScale: 0.84 + root.densityLevel * 0.030
+            property real centerFractureBias: root.phaseSkew * 0.22 + root.anomalyPulse * radius * 0.008
+            property int frontDefectIndex: 1
+            property int deepDefectIndex: 5
 
             function pointAt(radiusNorm, degrees) {
                 var rad = degrees * Math.PI / 180.0
@@ -363,471 +378,504 @@ Rectangle {
                 }
             }
 
-            Component {
-                id: masterSectorComponent
+            function frontBias(index) {
+                if (index === 1) {
+                    return 1.8 + root.structuralAsymmetry * 7.5 + root.anomalyPulse * 5.0
+                }
+                if (index === 4) {
+                    return -1.2 - root.structuralAsymmetry * 4.6
+                }
+                if (index === 5) {
+                    return 0.7 + root.semanticConflict * 2.8
+                }
+                return ((index % 2) === 0 ? 1 : -1) * root.phaseSkew * 0.035
+            }
 
-                Item {
-                    id: sectorMaster
-                    anchors.fill: parent
-                    property real strokeMain: root.lineWidth
-                    property real strokeMinor: root.lineWidth * 0.9
-                    property real strokeDense: root.lineWidth * 0.78
+            function deepBias(index) {
+                if (index === 2) {
+                    return 2.4 + root.echoLevel * 8.0
+                }
+                if (index === 6) {
+                    return -1.7 - root.anomalyPulse * 5.0
+                }
+                if (index === 0) {
+                    return 0.9 + root.phaseSkew * 0.16
+                }
+                return ((index % 2) === 0 ? 0.55 : -0.55) * root.phaseSkew * 0.12
+            }
 
-                    function pointAt(radiusNorm, degrees) {
-                        var rad = degrees * Math.PI / 180.0
-                        var r = Math.min(width, height) * 0.5 * radiusNorm
-                        return {
-                            x: width * 0.5 + Math.cos(rad) * r,
-                            y: height * 0.5 + Math.sin(rad) * r
+            function frontAngle(index) {
+                return frontPhase + index * frontStep + frontBias(index)
+            }
+
+            function deepAngle(index) {
+                return deepPhase + index * deepStep + deepBias(index)
+            }
+
+            function frontSpread(index) {
+                if (index === frontDefectIndex) {
+                    return 22.0 + root.structuralAsymmetry * 5.0
+                }
+                if (index === 4) {
+                    return 24.8
+                }
+                return 24.0 + (index === 2 ? 1.5 : 0.0)
+            }
+
+            function deepSpread(index) {
+                if (index === deepDefectIndex) {
+                    return 15.2 + root.echoLevel * 4.0
+                }
+                if (index === 2) {
+                    return 16.6 + root.anomalyPulse * 2.2
+                }
+                return 15.0
+            }
+
+            function seamLength(index) {
+                if (index === frontDefectIndex) {
+                    return 0.88
+                }
+                return index === 4 ? 0.91 : 0.94
+            }
+
+            function requestAllPaints() {
+                seamCanvas.requestPaint()
+                frontMirrorCanvas.requestPaint()
+                deepMirrorCanvas.requestPaint()
+                webCanvas.requestPaint()
+                coreCanvas.requestPaint()
+                phantomCanvas.requestPaint()
+            }
+
+            Canvas {
+                id: seamCanvas
+                anchors.fill: parent
+                antialiasing: true
+                opacity: 0.98
+                renderStrategy: Canvas.Cooperative
+
+                onPaint: {
+                    var ctx = getContext("2d")
+                    ctx.setTransform(1, 0, 0, 1, 0, 0)
+                    ctx.clearRect(0, 0, width, height)
+                    ctx.lineCap = "butt"
+                    ctx.lineJoin = "miter"
+
+                    function drawRadial(angleDeg, r0, r1, lineWidth, color, alpha) {
+                        var p0 = sigilRoot.pointAt(r0, angleDeg)
+                        var p1 = sigilRoot.pointAt(r1, angleDeg)
+                        ctx.globalAlpha = alpha
+                        ctx.strokeStyle = color
+                        ctx.lineWidth = lineWidth
+                        ctx.beginPath()
+                        ctx.moveTo(p0.x, p0.y)
+                        ctx.lineTo(p1.x, p1.y)
+                        ctx.stroke()
+                    }
+
+                    function drawArcSegment(rNorm, a0, a1, lineWidth, color, alpha) {
+                        var rr = sigilRoot.radius * rNorm
+                        ctx.globalAlpha = alpha
+                        ctx.strokeStyle = color
+                        ctx.lineWidth = lineWidth
+                        ctx.beginPath()
+                        ctx.arc(sigilRoot.cx, sigilRoot.cy, rr, a0 * Math.PI / 180.0, a1 * Math.PI / 180.0, false)
+                        ctx.stroke()
+                    }
+
+                    for (var i = 0; i < sigilRoot.frontSeamCount; ++i) {
+                        var axis = sigilRoot.frontAngle(i)
+                        var alpha = i === sigilRoot.frontDefectIndex ? 0.56 : 0.88
+                        drawRadial(axis, 0.18, sigilRoot.seamLength(i), sigilRoot.seamStroke, root.mainLineColor, alpha)
+                        if (i === sigilRoot.frontDefectIndex) {
+                            drawRadial(axis + 1.8, 0.30, 0.78, sigilRoot.supportStroke, root.secondaryLineColor, 0.28)
                         }
                     }
 
-                    property var nA: pointAt(0.17, 0)
-                    property var nB: pointAt(0.28, 0)
-                    property var nC: pointAt(0.42, 0)
-                    property var nD: pointAt(0.60, 0)
-                    property var nE: pointAt(0.31, -13.5)
-                    property var nF: pointAt(0.46, -17.0)
-                    property var nG: pointAt(0.31, 13.5)
-                    property var nH: pointAt(0.46, 17.0)
-                    property var nI: pointAt(0.66, -18.0)
-                    property var nJ: pointAt(0.66, 18.0)
-                    property var nK: pointAt(0.52, -6.6)
-                    property var nL: pointAt(0.52, 6.6)
-                    property var nM: pointAt(0.23, -10.0)
-                    property var nN: pointAt(0.23, 10.0)
-                    property var nO: pointAt(0.55, 0)
-
-                    Shape {
-                        anchors.fill: parent
-                        antialiasing: true
-                        opacity: 0.84 + root.detailOpacity * 0.16
-
-                        ShapePath {
-                            strokeWidth: sectorMaster.strokeMain
-                            strokeColor: root.mainLineColor
-                            fillColor: "transparent"
-                            capStyle: ShapePath.FlatCap
-                            joinStyle: ShapePath.MiterJoin
-                            startX: sectorMaster.nA.x
-                            startY: sectorMaster.nA.y
-                            PathLine { x: sectorMaster.nB.x; y: sectorMaster.nB.y }
-                            PathLine { x: sectorMaster.nC.x; y: sectorMaster.nC.y }
-                            PathLine { x: sectorMaster.nD.x; y: sectorMaster.nD.y }
+                    for (var j = 0; j < sigilRoot.frontSeamCount; ++j) {
+                        var left = sigilRoot.frontAngle(j) + sigilRoot.frontSpread(j) * 0.72
+                        var right = sigilRoot.frontAngle((j + 1) % sigilRoot.frontSeamCount) - sigilRoot.frontSpread((j + 1) % sigilRoot.frontSeamCount) * 0.72
+                        if (j === sigilRoot.frontDefectIndex) {
+                            right -= 5.0
                         }
-
-                        ShapePath {
-                            strokeWidth: sectorMaster.strokeMinor
-                            strokeColor: root.secondaryLineColor
-                            fillColor: "transparent"
-                            capStyle: ShapePath.FlatCap
-                            joinStyle: ShapePath.MiterJoin
-                            startX: sectorMaster.nB.x
-                            startY: sectorMaster.nB.y
-                            PathLine { x: sectorMaster.nE.x; y: sectorMaster.nE.y }
-                            PathLine { x: sectorMaster.nF.x; y: sectorMaster.nF.y }
-                            PathLine { x: sectorMaster.nI.x; y: sectorMaster.nI.y }
-                            PathLine { x: sectorMaster.nD.x; y: sectorMaster.nD.y }
-                        }
-
-                        ShapePath {
-                            strokeWidth: sectorMaster.strokeMinor
-                            strokeColor: root.secondaryLineColor
-                            fillColor: "transparent"
-                            capStyle: ShapePath.FlatCap
-                            joinStyle: ShapePath.MiterJoin
-                            startX: sectorMaster.nB.x
-                            startY: sectorMaster.nB.y
-                            PathLine { x: sectorMaster.nG.x; y: sectorMaster.nG.y }
-                            PathLine { x: sectorMaster.nH.x; y: sectorMaster.nH.y }
-                            PathLine { x: sectorMaster.nJ.x; y: sectorMaster.nJ.y }
-                            PathLine { x: sectorMaster.nD.x; y: sectorMaster.nD.y }
-                        }
-
-                        ShapePath {
-                            strokeWidth: sectorMaster.strokeMinor
-                            strokeColor: root.secondaryLineColor
-                            fillColor: "transparent"
-                            capStyle: ShapePath.FlatCap
-                            joinStyle: ShapePath.MiterJoin
-                            startX: sectorMaster.nE.x
-                            startY: sectorMaster.nE.y
-                            PathLine { x: sectorMaster.nC.x; y: sectorMaster.nC.y }
-                            PathLine { x: sectorMaster.nG.x; y: sectorMaster.nG.y }
-                        }
-
-                        ShapePath {
-                            strokeWidth: sectorMaster.strokeMinor
-                            strokeColor: root.accentLineColor
-                            fillColor: "transparent"
-                            capStyle: ShapePath.FlatCap
-                            joinStyle: ShapePath.MiterJoin
-                            startX: sectorMaster.nF.x
-                            startY: sectorMaster.nF.y
-                            PathLine { x: sectorMaster.nK.x; y: sectorMaster.nK.y }
-                            PathLine { x: sectorMaster.nO.x; y: sectorMaster.nO.y }
-                            PathLine { x: sectorMaster.nL.x; y: sectorMaster.nL.y }
-                            PathLine { x: sectorMaster.nH.x; y: sectorMaster.nH.y }
-                        }
+                        drawArcSegment(0.92, left, right, sigilRoot.frameStroke, root.mainLineColor, 0.88)
                     }
 
-                    Shape {
-                        anchors.fill: parent
-                        antialiasing: true
-                        visible: root.densityLevel > 0.18
-                        opacity: (0.16 + root.densityLevel * 0.42) * (root.reducedMotion() ? 0.92 : 1.0)
-
-                        ShapePath {
-                            strokeWidth: sectorMaster.strokeDense
-                            strokeColor: root.secondaryLineColor
-                            fillColor: "transparent"
-                            capStyle: ShapePath.FlatCap
-                            joinStyle: ShapePath.MiterJoin
-                            startX: sectorMaster.nM.x
-                            startY: sectorMaster.nM.y
-                            PathLine { x: sectorMaster.nE.x; y: sectorMaster.nE.y }
-                            PathLine { x: sectorMaster.nC.x; y: sectorMaster.nC.y }
-                            PathLine { x: sectorMaster.nG.x; y: sectorMaster.nG.y }
-                            PathLine { x: sectorMaster.nN.x; y: sectorMaster.nN.y }
-                        }
-
-                        ShapePath {
-                            strokeWidth: sectorMaster.strokeDense
-                            strokeColor: root.secondaryLineColor
-                            fillColor: "transparent"
-                            capStyle: ShapePath.FlatCap
-                            joinStyle: ShapePath.MiterJoin
-                            startX: sectorMaster.nK.x
-                            startY: sectorMaster.nK.y
-                            PathLine { x: sectorMaster.nD.x; y: sectorMaster.nD.y }
-                            PathLine { x: sectorMaster.nL.x; y: sectorMaster.nL.y }
-                        }
+                    for (var k = 0; k < sigilRoot.deepSeamCount; ++k) {
+                        var deepAxis = sigilRoot.deepAngle(k)
+                        drawRadial(deepAxis, 0.23, 0.74, sigilRoot.supportStroke, root.secondaryLineColor, k === sigilRoot.deepDefectIndex ? 0.26 : 0.34)
                     }
+
+                    drawArcSegment(0.28, sigilRoot.frontAngle(0) - 18, sigilRoot.frontAngle(2) + 11, sigilRoot.supportStroke, root.secondaryLineColor, 0.30)
+                    drawArcSegment(0.28, sigilRoot.frontAngle(3) - 12, sigilRoot.frontAngle(5) + 8, sigilRoot.supportStroke, root.secondaryLineColor, 0.24)
                 }
             }
 
-            Item {
-                id: outerFrameLayer
+            Canvas {
+                id: frontMirrorCanvas
                 anchors.fill: parent
-                rotation: root.outerRotation * 0.11 + root.phaseSkew * 0.12
+                antialiasing: true
                 opacity: 0.96
+                scale: sigilRoot.frontScale
+                rotation: root.outerRotation * 0.006
+                renderStrategy: Canvas.Cooperative
 
-                Shape {
-                    anchors.fill: parent
-                    antialiasing: true
-                    opacity: 0.92
-
-                    ShapePath {
-                        strokeWidth: root.lineWidth
-                        strokeColor: root.mainLineColor
-                        fillColor: "transparent"
-                        capStyle: ShapePath.FlatCap
-                        joinStyle: ShapePath.MiterJoin
-                        startX: sigilRoot.pointAt(0.92, -11.25).x
-                        startY: sigilRoot.pointAt(0.92, -11.25).y
-                        PathLine { x: sigilRoot.pointAt(0.86, 0.0).x; y: sigilRoot.pointAt(0.86, 0.0).y }
-                        PathLine { x: sigilRoot.pointAt(0.92, 11.25).x; y: sigilRoot.pointAt(0.92, 11.25).y }
-                        PathLine { x: sigilRoot.pointAt(0.86, 22.5).x; y: sigilRoot.pointAt(0.86, 22.5).y }
-                        PathLine { x: sigilRoot.pointAt(0.92, 33.75).x; y: sigilRoot.pointAt(0.92, 33.75).y }
-                        PathLine { x: sigilRoot.pointAt(0.86, 45.0).x; y: sigilRoot.pointAt(0.86, 45.0).y }
-                        PathLine { x: sigilRoot.pointAt(0.92, 56.25).x; y: sigilRoot.pointAt(0.92, 56.25).y }
-                        PathLine { x: sigilRoot.pointAt(0.86, 67.5).x; y: sigilRoot.pointAt(0.86, 67.5).y }
-                        PathLine { x: sigilRoot.pointAt(0.92, 78.75).x; y: sigilRoot.pointAt(0.92, 78.75).y }
-                        PathLine { x: sigilRoot.pointAt(0.86, 90.0).x; y: sigilRoot.pointAt(0.86, 90.0).y }
-                        PathLine { x: sigilRoot.pointAt(0.92, 101.25).x; y: sigilRoot.pointAt(0.92, 101.25).y }
-                        PathLine { x: sigilRoot.pointAt(0.86, 112.5).x; y: sigilRoot.pointAt(0.86, 112.5).y }
-                        PathLine { x: sigilRoot.pointAt(0.92, 123.75).x; y: sigilRoot.pointAt(0.92, 123.75).y }
-                        PathLine { x: sigilRoot.pointAt(0.86, 135.0).x; y: sigilRoot.pointAt(0.86, 135.0).y }
-                        PathLine { x: sigilRoot.pointAt(0.92, 146.25).x; y: sigilRoot.pointAt(0.92, 146.25).y }
-                        PathLine { x: sigilRoot.pointAt(0.86, 157.5).x; y: sigilRoot.pointAt(0.86, 157.5).y }
-                        PathLine { x: sigilRoot.pointAt(0.92, 168.75).x; y: sigilRoot.pointAt(0.92, 168.75).y }
-                        PathLine { x: sigilRoot.pointAt(0.86, 180.0).x; y: sigilRoot.pointAt(0.86, 180.0).y }
-                        PathLine { x: sigilRoot.pointAt(0.92, 191.25).x; y: sigilRoot.pointAt(0.92, 191.25).y }
-                        PathLine { x: sigilRoot.pointAt(0.86, 202.5).x; y: sigilRoot.pointAt(0.86, 202.5).y }
-                        PathLine { x: sigilRoot.pointAt(0.92, 213.75).x; y: sigilRoot.pointAt(0.92, 213.75).y }
-                        PathLine { x: sigilRoot.pointAt(0.86, 225.0).x; y: sigilRoot.pointAt(0.86, 225.0).y }
-                        PathLine { x: sigilRoot.pointAt(0.92, 236.25).x; y: sigilRoot.pointAt(0.92, 236.25).y }
-                        PathLine { x: sigilRoot.pointAt(0.86, 247.5).x; y: sigilRoot.pointAt(0.86, 247.5).y }
-                        PathLine { x: sigilRoot.pointAt(0.92, 258.75).x; y: sigilRoot.pointAt(0.92, 258.75).y }
-                        PathLine { x: sigilRoot.pointAt(0.86, 270.0).x; y: sigilRoot.pointAt(0.86, 270.0).y }
-                        PathLine { x: sigilRoot.pointAt(0.92, 281.25).x; y: sigilRoot.pointAt(0.92, 281.25).y }
-                        PathLine { x: sigilRoot.pointAt(0.86, 292.5).x; y: sigilRoot.pointAt(0.86, 292.5).y }
-                        PathLine { x: sigilRoot.pointAt(0.92, 303.75).x; y: sigilRoot.pointAt(0.92, 303.75).y }
-                        PathLine { x: sigilRoot.pointAt(0.86, 315.0).x; y: sigilRoot.pointAt(0.86, 315.0).y }
-                        PathLine { x: sigilRoot.pointAt(0.92, 326.25).x; y: sigilRoot.pointAt(0.92, 326.25).y }
-                        PathLine { x: sigilRoot.pointAt(0.86, 337.5).x; y: sigilRoot.pointAt(0.86, 337.5).y }
-                        PathLine { x: sigilRoot.pointAt(0.92, 348.75).x; y: sigilRoot.pointAt(0.92, 348.75).y }
-                        PathLine { x: sigilRoot.pointAt(0.92, -11.25).x; y: sigilRoot.pointAt(0.92, -11.25).y }
-                    }
-
-                    ShapePath {
-                        strokeWidth: root.lineWidth * 0.92
-                        strokeColor: root.secondaryLineColor
-                        fillColor: "transparent"
-                        capStyle: ShapePath.FlatCap
-                        joinStyle: ShapePath.MiterJoin
-                        startX: sigilRoot.pointAt(0.74, -10.0).x
-                        startY: sigilRoot.pointAt(0.74, -10.0).y
-                        PathLine { x: sigilRoot.pointAt(0.68, 0.0).x; y: sigilRoot.pointAt(0.68, 0.0).y }
-                        PathLine { x: sigilRoot.pointAt(0.74, 10.0).x; y: sigilRoot.pointAt(0.74, 10.0).y }
-                        PathLine { x: sigilRoot.pointAt(0.68, 22.5).x; y: sigilRoot.pointAt(0.68, 22.5).y }
-                        PathLine { x: sigilRoot.pointAt(0.74, 35.0).x; y: sigilRoot.pointAt(0.74, 35.0).y }
-                        PathLine { x: sigilRoot.pointAt(0.68, 45.0).x; y: sigilRoot.pointAt(0.68, 45.0).y }
-                        PathLine { x: sigilRoot.pointAt(0.74, 55.0).x; y: sigilRoot.pointAt(0.74, 55.0).y }
-                        PathLine { x: sigilRoot.pointAt(0.68, 67.5).x; y: sigilRoot.pointAt(0.68, 67.5).y }
-                        PathLine { x: sigilRoot.pointAt(0.74, 80.0).x; y: sigilRoot.pointAt(0.74, 80.0).y }
-                        PathLine { x: sigilRoot.pointAt(0.68, 90.0).x; y: sigilRoot.pointAt(0.68, 90.0).y }
-                        PathLine { x: sigilRoot.pointAt(0.74, 100.0).x; y: sigilRoot.pointAt(0.74, 100.0).y }
-                        PathLine { x: sigilRoot.pointAt(0.68, 112.5).x; y: sigilRoot.pointAt(0.68, 112.5).y }
-                        PathLine { x: sigilRoot.pointAt(0.74, 125.0).x; y: sigilRoot.pointAt(0.74, 125.0).y }
-                        PathLine { x: sigilRoot.pointAt(0.68, 135.0).x; y: sigilRoot.pointAt(0.68, 135.0).y }
-                        PathLine { x: sigilRoot.pointAt(0.74, 145.0).x; y: sigilRoot.pointAt(0.74, 145.0).y }
-                        PathLine { x: sigilRoot.pointAt(0.68, 157.5).x; y: sigilRoot.pointAt(0.68, 157.5).y }
-                        PathLine { x: sigilRoot.pointAt(0.74, 170.0).x; y: sigilRoot.pointAt(0.74, 170.0).y }
-                        PathLine { x: sigilRoot.pointAt(0.68, 180.0).x; y: sigilRoot.pointAt(0.68, 180.0).y }
-                        PathLine { x: sigilRoot.pointAt(0.74, 190.0).x; y: sigilRoot.pointAt(0.74, 190.0).y }
-                        PathLine { x: sigilRoot.pointAt(0.68, 202.5).x; y: sigilRoot.pointAt(0.68, 202.5).y }
-                        PathLine { x: sigilRoot.pointAt(0.74, 215.0).x; y: sigilRoot.pointAt(0.74, 215.0).y }
-                        PathLine { x: sigilRoot.pointAt(0.68, 225.0).x; y: sigilRoot.pointAt(0.68, 225.0).y }
-                        PathLine { x: sigilRoot.pointAt(0.74, 235.0).x; y: sigilRoot.pointAt(0.74, 235.0).y }
-                        PathLine { x: sigilRoot.pointAt(0.68, 247.5).x; y: sigilRoot.pointAt(0.68, 247.5).y }
-                        PathLine { x: sigilRoot.pointAt(0.74, 260.0).x; y: sigilRoot.pointAt(0.74, 260.0).y }
-                        PathLine { x: sigilRoot.pointAt(0.68, 270.0).x; y: sigilRoot.pointAt(0.68, 270.0).y }
-                        PathLine { x: sigilRoot.pointAt(0.74, 280.0).x; y: sigilRoot.pointAt(0.74, 280.0).y }
-                        PathLine { x: sigilRoot.pointAt(0.68, 292.5).x; y: sigilRoot.pointAt(0.68, 292.5).y }
-                        PathLine { x: sigilRoot.pointAt(0.74, 305.0).x; y: sigilRoot.pointAt(0.74, 305.0).y }
-                        PathLine { x: sigilRoot.pointAt(0.68, 315.0).x; y: sigilRoot.pointAt(0.68, 315.0).y }
-                        PathLine { x: sigilRoot.pointAt(0.74, 325.0).x; y: sigilRoot.pointAt(0.74, 325.0).y }
-                        PathLine { x: sigilRoot.pointAt(0.68, 337.5).x; y: sigilRoot.pointAt(0.68, 337.5).y }
-                        PathLine { x: sigilRoot.pointAt(0.74, 350.0).x; y: sigilRoot.pointAt(0.74, 350.0).y }
-                        PathLine { x: sigilRoot.pointAt(0.74, -10.0).x; y: sigilRoot.pointAt(0.74, -10.0).y }
-                    }
+                function mirrorClip(ctx, innerNorm, outerNorm, spreadDeg) {
+                    var rr0 = sigilRoot.radius * innerNorm
+                    var rr1 = sigilRoot.radius * outerNorm
+                    var s = spreadDeg * Math.PI / 180.0
+                    ctx.beginPath()
+                    ctx.moveTo(rr0 * Math.cos(-s), rr0 * Math.sin(-s))
+                    ctx.lineTo(rr1 * Math.cos(-s), rr1 * Math.sin(-s))
+                    ctx.arc(0, 0, rr1, -s, s, false)
+                    ctx.lineTo(rr0 * Math.cos(s), rr0 * Math.sin(s))
+                    ctx.arc(0, 0, rr0, s, -s, true)
+                    ctx.closePath()
+                    ctx.clip()
                 }
 
-                Repeater {
-                    model: root.sectorCount
-                    delegate: Item {
-                        required property int index
-                        anchors.fill: parent
-                        rotation: index * (360 / root.sectorCount)
+                function strokeChain(ctx, points, color, lineWidth, alpha) {
+                    ctx.globalAlpha = alpha
+                    ctx.strokeStyle = color
+                    ctx.lineWidth = lineWidth
+                    ctx.beginPath()
+                    ctx.moveTo(points[0][0], points[0][1])
+                    for (var p = 1; p < points.length; ++p) {
+                        ctx.lineTo(points[p][0], points[p][1])
+                    }
+                    ctx.stroke()
+                }
 
-                        Shape {
-                            anchors.fill: parent
-                            antialiasing: true
-                            opacity: 0.32 + root.orbitalActivity * 0.18 + (root.semanticBand >= 2 ? 0.05 : 0.0)
+                function drawBundle(ctx, index, layerPhase) {
+                    var rr = sigilRoot.radius
+                    var t = layerPhase * Math.PI / 180.0
+                    var w1 = Math.sin(t + index * 0.68) * rr * (0.030 + sigilRoot.localWarp * 0.18)
+                    var w2 = Math.sin(t * 0.9 + index * 1.14 + 0.6) * rr * (0.038 + sigilRoot.localWarp * 0.16)
+                    var w3 = Math.sin(t * 1.2 + index * 0.49 + 1.4) * rr * (0.026 + root.anomalyPulse * 0.08)
+                    var w4 = Math.sin(t * 0.62 + index * 0.77 + 2.2) * rr * (0.020 + root.structuralAsymmetry * 0.10)
 
-                            ShapePath {
-                                strokeWidth: root.lineWidth * 0.76
-                                strokeColor: root.accentLineColor
-                                fillColor: "transparent"
-                                capStyle: ShapePath.FlatCap
-                                joinStyle: ShapePath.MiterJoin
-                                startX: sigilRoot.pointAt(0.76, -4.0).x
-                                startY: sigilRoot.pointAt(0.76, -4.0).y
-                                PathLine { x: sigilRoot.pointAt(0.82, -4.0).x; y: sigilRoot.pointAt(0.82, -4.0).y }
-                                PathLine { x: sigilRoot.pointAt(0.84, 0.0).x; y: sigilRoot.pointAt(0.84, 0.0).y }
-                                PathLine { x: sigilRoot.pointAt(0.82, 4.0).x; y: sigilRoot.pointAt(0.82, 4.0).y }
-                            }
+                    strokeChain(ctx, [
+                        [rr * 0.20, -rr * 0.012],
+                        [rr * 0.31, -rr * 0.10 - w1],
+                        [rr * 0.47, -rr * 0.17 - w2],
+                        [rr * 0.67, -rr * 0.11 - w3],
+                        [rr * 0.86, -rr * 0.05 - w4]
+                    ], root.mainLineColor, sigilRoot.frameStroke, 0.96)
+
+                    strokeChain(ctx, [
+                        [rr * 0.34, -rr * 0.11 - w1 * 0.2],
+                        [rr * 0.43, -rr * 0.24 - w2 * 0.4],
+                        [rr * 0.57, -rr * 0.31 - w3 * 0.3],
+                        [rr * 0.74, -rr * 0.26 - w4 * 0.5]
+                    ], root.secondaryLineColor, sigilRoot.supportStroke, 0.82)
+
+                    strokeChain(ctx, [
+                        [rr * 0.23, -rr * 0.018],
+                        [rr * 0.28, -rr * 0.17 - w2 * 0.35],
+                        [rr * 0.34, -rr * 0.27 - w3 * 0.28]
+                    ], root.secondaryLineColor, sigilRoot.webStroke, 0.72)
+
+                    strokeChain(ctx, [
+                        [rr * 0.55, -rr * 0.18 - w1 * 0.22],
+                        [rr * 0.63, -rr * 0.07 - w2 * 0.2],
+                        [rr * 0.79, -rr * 0.028 - w3 * 0.18]
+                    ], root.accentLineColor, sigilRoot.webStroke, 0.62)
+                }
+
+                function drawMirroredWedge(ctx, index, axisDeg, spreadDeg) {
+                    ctx.save()
+                    ctx.translate(sigilRoot.cx, sigilRoot.cy)
+                    ctx.rotate(axisDeg * Math.PI / 180.0)
+                    mirrorClip(ctx, 0.18, 0.96, spreadDeg)
+
+                    drawBundle(ctx, index, sigilRoot.frontSourcePhase + index * 11.0)
+
+                    ctx.save()
+                    if (index === sigilRoot.frontDefectIndex) {
+                        ctx.translate(sigilRoot.radius * 0.010, -sigilRoot.radius * 0.003)
+                        ctx.rotate((1.6 + root.structuralAsymmetry * 2.2) * Math.PI / 180.0)
+                    }
+                    ctx.scale(1, -1)
+                    drawBundle(ctx, index, sigilRoot.frontSourcePhase + index * 11.0 + 14.0)
+                    ctx.restore()
+
+                    if (index === sigilRoot.frontDefectIndex) {
+                        ctx.globalAlpha = 0.18 + root.anomalyPulse * 0.10
+                        ctx.strokeStyle = root.accentLineColor
+                        ctx.lineWidth = sigilRoot.phantomStroke
+                        ctx.beginPath()
+                        ctx.moveTo(sigilRoot.radius * 0.30, -sigilRoot.radius * 0.008)
+                        ctx.lineTo(sigilRoot.radius * 0.44, sigilRoot.radius * 0.018)
+                        ctx.lineTo(sigilRoot.radius * 0.58, sigilRoot.radius * 0.010)
+                        ctx.stroke()
+                    }
+
+                    ctx.restore()
+                }
+
+                onPaint: {
+                    var ctx = getContext("2d")
+                    ctx.setTransform(1, 0, 0, 1, 0, 0)
+                    ctx.clearRect(0, 0, width, height)
+                    ctx.lineCap = "butt"
+                    ctx.lineJoin = "miter"
+
+                    for (var i = 0; i < sigilRoot.frontSeamCount; ++i) {
+                        drawMirroredWedge(ctx, i, sigilRoot.frontAngle(i), sigilRoot.frontSpread(i))
+                    }
+                }
+            }
+
+            Canvas {
+                id: deepMirrorCanvas
+                anchors.fill: parent
+                antialiasing: true
+                opacity: 0.58 + root.detailOpacity * 0.12
+                scale: sigilRoot.deepScale
+                rotation: root.innerRotation * -0.008
+                renderStrategy: Canvas.Cooperative
+
+                function mirrorClip(ctx, innerNorm, outerNorm, spreadDeg) {
+                    var rr0 = sigilRoot.radius * innerNorm
+                    var rr1 = sigilRoot.radius * outerNorm
+                    var s = spreadDeg * Math.PI / 180.0
+                    ctx.beginPath()
+                    ctx.moveTo(rr0 * Math.cos(-s), rr0 * Math.sin(-s))
+                    ctx.lineTo(rr1 * Math.cos(-s), rr1 * Math.sin(-s))
+                    ctx.arc(0, 0, rr1, -s, s, false)
+                    ctx.lineTo(rr0 * Math.cos(s), rr0 * Math.sin(s))
+                    ctx.arc(0, 0, rr0, s, -s, true)
+                    ctx.closePath()
+                    ctx.clip()
+                }
+
+                function strokeChain(ctx, points, color, lineWidth, alpha) {
+                    ctx.globalAlpha = alpha
+                    ctx.strokeStyle = color
+                    ctx.lineWidth = lineWidth
+                    ctx.beginPath()
+                    ctx.moveTo(points[0][0], points[0][1])
+                    for (var p = 1; p < points.length; ++p) {
+                        ctx.lineTo(points[p][0], points[p][1])
+                    }
+                    ctx.stroke()
+                }
+
+                function drawBundle(ctx, index, layerPhase) {
+                    var rr = sigilRoot.radius
+                    var t = layerPhase * Math.PI / 180.0
+                    var w1 = Math.sin(t * 0.84 + index * 0.73) * rr * (0.024 + root.echoLevel * 0.040)
+                    var w2 = Math.sin(t * 1.28 + index * 0.53 + 1.1) * rr * (0.032 + sigilRoot.localWarp * 0.10)
+                    var w3 = Math.sin(t * 0.58 + index * 1.27 + 0.7) * rr * (0.022 + root.anomalyPulse * 0.12)
+
+                    strokeChain(ctx, [
+                        [rr * 0.26, -rr * 0.010],
+                        [rr * 0.35, -rr * 0.084 - w1],
+                        [rr * 0.47, -rr * 0.14 - w2],
+                        [rr * 0.60, -rr * 0.11 - w3],
+                        [rr * 0.71, -rr * 0.038]
+                    ], root.secondaryLineColor, sigilRoot.supportStroke, 0.56)
+
+                    strokeChain(ctx, [
+                        [rr * 0.31, -rr * 0.094],
+                        [rr * 0.42, -rr * 0.19 - w1 * 0.3],
+                        [rr * 0.54, -rr * 0.23 - w2 * 0.36],
+                        [rr * 0.62, -rr * 0.19 - w3 * 0.28]
+                    ], root.accentLineColor, sigilRoot.webStroke, 0.34)
+                }
+
+                function drawMirroredWedge(ctx, index, axisDeg, spreadDeg) {
+                    ctx.save()
+                    ctx.translate(sigilRoot.cx, sigilRoot.cy)
+                    ctx.rotate(axisDeg * Math.PI / 180.0)
+                    mirrorClip(ctx, 0.24, 0.74, spreadDeg)
+
+                    drawBundle(ctx, index, sigilRoot.deepSourcePhase + index * 16.0)
+
+                    ctx.save()
+                    if (index === sigilRoot.deepDefectIndex) {
+                        ctx.translate(-sigilRoot.radius * 0.006, sigilRoot.radius * 0.005)
+                        ctx.rotate((-2.1 - root.echoLevel * 3.0) * Math.PI / 180.0)
+                    }
+                    ctx.scale(1, -1)
+                    drawBundle(ctx, index, sigilRoot.deepSourcePhase + index * 16.0 + 19.0)
+                    ctx.restore()
+
+                    ctx.restore()
+                }
+
+                onPaint: {
+                    var ctx = getContext("2d")
+                    ctx.setTransform(1, 0, 0, 1, 0, 0)
+                    ctx.clearRect(0, 0, width, height)
+                    ctx.lineCap = "butt"
+                    ctx.lineJoin = "miter"
+
+                    for (var i = 0; i < sigilRoot.deepSeamCount; ++i) {
+                        drawMirroredWedge(ctx, i, sigilRoot.deepAngle(i), sigilRoot.deepSpread(i))
+                    }
+                }
+            }
+
+            Canvas {
+                id: webCanvas
+                anchors.fill: parent
+                antialiasing: true
+                opacity: root.detailOpacity * 0.82
+                renderStrategy: Canvas.Cooperative
+
+                onPaint: {
+                    var ctx = getContext("2d")
+                    ctx.setTransform(1, 0, 0, 1, 0, 0)
+                    ctx.clearRect(0, 0, width, height)
+                    ctx.lineCap = "butt"
+                    ctx.lineJoin = "miter"
+
+                    function strokePoly(points, lineWidth, color, alpha) {
+                        ctx.globalAlpha = alpha
+                        ctx.strokeStyle = color
+                        ctx.lineWidth = lineWidth
+                        ctx.beginPath()
+                        ctx.moveTo(points[0].x, points[0].y)
+                        for (var a = 1; a < points.length; ++a) {
+                            ctx.lineTo(points[a].x, points[a].y)
+                        }
+                        ctx.stroke()
+                    }
+
+                    for (var i = 0; i < sigilRoot.frontSeamCount; ++i) {
+                        var a0 = sigilRoot.frontAngle(i) + 6 + Math.sin(sigilRoot.webPhase * Math.PI / 180.0 + i) * 2.4
+                        var a1 = sigilRoot.deepAngle((i + 1) % sigilRoot.deepSeamCount) - 5
+                        var a2 = sigilRoot.frontAngle((i + 1) % sigilRoot.frontSeamCount) - 6
+                        strokePoly([
+                            sigilRoot.pointAt(0.34, a0),
+                            sigilRoot.pointAt(0.48, a1),
+                            sigilRoot.pointAt(0.62, a2)
+                        ], sigilRoot.webStroke, root.secondaryLineColor, i === sigilRoot.frontDefectIndex ? 0.20 : 0.34)
+                    }
+
+                    for (var j = 0; j < sigilRoot.deepSeamCount; ++j) {
+                        var left = sigilRoot.pointAt(0.46, sigilRoot.deepAngle(j) + 6)
+                        var mid = sigilRoot.pointAt(0.56, sigilRoot.deepAngle(j) + 11 + Math.sin(sigilRoot.webPhase * 0.9 + j * 0.4) * 3.0)
+                        var right = sigilRoot.pointAt(0.64, sigilRoot.deepAngle((j + 2) % sigilRoot.deepSeamCount) - 8)
+                        if (j !== sigilRoot.deepDefectIndex) {
+                            strokePoly([left, mid, right], sigilRoot.webStroke, root.accentLineColor, 0.16 + root.anomalyPulse * 0.08)
                         }
                     }
                 }
             }
 
-            Item {
-                id: sectorGlyphLayer
+            Rectangle {
+                id: blindCore
+                width: sigilRoot.blindCoreRadius * 2
+                height: width
+                radius: width / 2
+                anchors.centerIn: parent
+                color: mirrorField.color
+                border.width: 0
+                opacity: 1.0
+            }
+
+            Canvas {
+                id: coreCanvas
                 anchors.fill: parent
-                rotation: root.outerRotation
-                opacity: 0.78 + root.detailOpacity * 0.18
+                antialiasing: true
+                opacity: 0.96
+                renderStrategy: Canvas.Cooperative
 
-                Repeater {
-                    model: root.sectorCount
-                    delegate: Item {
-                        id: sectorGlyphHost
-                        required property int index
-                        property bool mirrored: (index % 2) === 1
-                        anchors.fill: parent
-                        rotation: index * (360 / root.sectorCount)
-                                  + (mirrored ? -root.phaseSkew : root.phaseSkew) * 0.58
-                                  + root.anomalyPulse * (mirrored ? -1.0 : 1.0) * 1.9
-                        transform: Scale {
-                            origin.x: sectorGlyphHost.width / 2
-                            origin.y: sectorGlyphHost.height / 2
-                            xScale: 1.0 + root.structuralAsymmetry * 0.018
-                            yScale: sectorGlyphHost.mirrored ? -1.0 : 1.0
-                        }
+                onPaint: {
+                    var ctx = getContext("2d")
+                    ctx.setTransform(1, 0, 0, 1, 0, 0)
+                    ctx.clearRect(0, 0, width, height)
+                    ctx.lineCap = "butt"
+                    ctx.lineJoin = "miter"
 
-                        Loader {
-                            anchors.fill: parent
-                            sourceComponent: masterSectorComponent
+                    function strokePoly(points, lineWidth, color, alpha) {
+                        ctx.globalAlpha = alpha
+                        ctx.strokeStyle = color
+                        ctx.lineWidth = lineWidth
+                        ctx.beginPath()
+                        ctx.moveTo(points[0].x, points[0].y)
+                        for (var i = 1; i < points.length; ++i) {
+                            ctx.lineTo(points[i].x, points[i].y)
                         }
+                        ctx.stroke()
                     }
+
+                    var knot = [
+                        sigilRoot.pointAt(0.17, sigilRoot.frontAngle(0) - 5),
+                        sigilRoot.pointAt(0.21, sigilRoot.frontAngle(1) + 3),
+                        sigilRoot.pointAt(0.19, sigilRoot.frontAngle(2) + 7),
+                        sigilRoot.pointAt(0.16, sigilRoot.frontAngle(3) - 4),
+                        sigilRoot.pointAt(0.18, sigilRoot.frontAngle(4) + 5)
+                    ]
+                    strokePoly(knot, sigilRoot.frameStroke, root.mainLineColor, 0.86)
+
+                    strokePoly([
+                        { x: sigilRoot.cx - sigilRoot.radius * 0.084 + sigilRoot.centerFractureBias, y: sigilRoot.cy - sigilRoot.radius * 0.038 },
+                        { x: sigilRoot.cx - sigilRoot.radius * 0.020 + sigilRoot.centerFractureBias * 0.52, y: sigilRoot.cy - sigilRoot.radius * 0.012 },
+                        { x: sigilRoot.cx + sigilRoot.radius * 0.014 + sigilRoot.centerFractureBias * 0.16, y: sigilRoot.cy + sigilRoot.radius * 0.010 },
+                        { x: sigilRoot.cx + sigilRoot.radius * 0.052 - sigilRoot.centerFractureBias * 0.16, y: sigilRoot.cy + sigilRoot.radius * 0.032 },
+                        { x: sigilRoot.cx + sigilRoot.radius * 0.082 - sigilRoot.centerFractureBias * 0.34, y: sigilRoot.cy + sigilRoot.radius * 0.058 }
+                    ], sigilRoot.supportStroke, root.secondaryLineColor, 0.72)
+
+                    strokePoly([
+                        { x: sigilRoot.cx - sigilRoot.radius * 0.108, y: sigilRoot.cy + sigilRoot.radius * 0.006 },
+                        { x: sigilRoot.cx - sigilRoot.radius * 0.078, y: sigilRoot.cy + sigilRoot.radius * 0.006 },
+                        { x: sigilRoot.cx - sigilRoot.radius * 0.054, y: sigilRoot.cy - sigilRoot.radius * 0.015 }
+                    ], sigilRoot.webStroke, root.accentLineColor, 0.58)
+
+                    strokePoly([
+                        { x: sigilRoot.cx + sigilRoot.radius * 0.110, y: sigilRoot.cy - sigilRoot.radius * 0.010 },
+                        { x: sigilRoot.cx + sigilRoot.radius * 0.076, y: sigilRoot.cy - sigilRoot.radius * 0.010 },
+                        { x: sigilRoot.cx + sigilRoot.radius * 0.049, y: sigilRoot.cy + sigilRoot.radius * 0.014 }
+                    ], sigilRoot.webStroke, root.accentLineColor, 0.58)
                 }
             }
 
-            Item {
-                id: apertureLayer
+            Canvas {
+                id: phantomCanvas
                 anchors.fill: parent
-                rotation: root.innerRotation * 0.16 + root.apertureRotation * 0.26
-                transform: [
-                    Translate {
-                        x: root.phaseSkew * 0.06 + root.anomalyPulse * sigilRoot.radius * 0.01 * root.driftAxisX
-                        y: -root.phaseSkew * 0.025 + root.anomalyPulse * sigilRoot.radius * 0.01 * root.driftAxisY
-                    },
-                    Scale {
-                        origin.x: apertureLayer.width / 2
-                        origin.y: apertureLayer.height / 2
-                        xScale: root.coreScaleX
-                        yScale: root.coreScaleY * sigilRoot.apertureBreath
-                    }
-                ]
-
-                Shape {
-                    anchors.fill: parent
-                    antialiasing: true
-                    opacity: 0.94
-
-                    ShapePath {
-                        strokeWidth: root.lineWidth
-                        strokeColor: root.mainLineColor
-                        fillColor: "transparent"
-                        capStyle: ShapePath.FlatCap
-                        joinStyle: ShapePath.MiterJoin
-                        startX: sigilRoot.cx
-                        startY: sigilRoot.cy - sigilRoot.radius * 0.165
-                        PathLine { x: sigilRoot.cx + sigilRoot.radius * 0.09; y: sigilRoot.cy - sigilRoot.radius * 0.112 }
-                        PathLine { x: sigilRoot.cx + sigilRoot.radius * 0.114; y: sigilRoot.cy - sigilRoot.radius * 0.04 }
-                        PathLine { x: sigilRoot.cx + sigilRoot.radius * 0.114; y: sigilRoot.cy + sigilRoot.radius * 0.04 }
-                        PathLine { x: sigilRoot.cx + sigilRoot.radius * 0.09; y: sigilRoot.cy + sigilRoot.radius * 0.112 }
-                        PathLine { x: sigilRoot.cx; y: sigilRoot.cy + sigilRoot.radius * 0.165 }
-                        PathLine { x: sigilRoot.cx - sigilRoot.radius * 0.09; y: sigilRoot.cy + sigilRoot.radius * 0.112 }
-                        PathLine { x: sigilRoot.cx - sigilRoot.radius * 0.114; y: sigilRoot.cy + sigilRoot.radius * 0.04 }
-                        PathLine { x: sigilRoot.cx - sigilRoot.radius * 0.114; y: sigilRoot.cy - sigilRoot.radius * 0.04 }
-                        PathLine { x: sigilRoot.cx - sigilRoot.radius * 0.09; y: sigilRoot.cy - sigilRoot.radius * 0.112 }
-                        PathLine { x: sigilRoot.cx; y: sigilRoot.cy - sigilRoot.radius * 0.165 }
-                    }
-
-                    ShapePath {
-                        strokeWidth: root.lineWidth * 0.92
-                        strokeColor: root.secondaryLineColor
-                        fillColor: "transparent"
-                        capStyle: ShapePath.FlatCap
-                        joinStyle: ShapePath.MiterJoin
-                        startX: sigilRoot.cx
-                        startY: sigilRoot.cy - sigilRoot.radius * 0.105
-                        PathLine { x: sigilRoot.cx + sigilRoot.radius * 0.038; y: sigilRoot.cy - sigilRoot.radius * 0.073 }
-                        PathLine { x: sigilRoot.cx + sigilRoot.radius * 0.048; y: sigilRoot.cy - sigilRoot.radius * 0.018 }
-                        PathLine { x: sigilRoot.cx + sigilRoot.radius * 0.048; y: sigilRoot.cy + sigilRoot.radius * 0.018 }
-                        PathLine { x: sigilRoot.cx + sigilRoot.radius * 0.038; y: sigilRoot.cy + sigilRoot.radius * 0.073 }
-                        PathLine { x: sigilRoot.cx; y: sigilRoot.cy + sigilRoot.radius * 0.105 }
-                        PathLine { x: sigilRoot.cx - sigilRoot.radius * 0.038; y: sigilRoot.cy + sigilRoot.radius * 0.073 }
-                        PathLine { x: sigilRoot.cx - sigilRoot.radius * 0.048; y: sigilRoot.cy + sigilRoot.radius * 0.018 }
-                        PathLine { x: sigilRoot.cx - sigilRoot.radius * 0.048; y: sigilRoot.cy - sigilRoot.radius * 0.018 }
-                        PathLine { x: sigilRoot.cx - sigilRoot.radius * 0.038; y: sigilRoot.cy - sigilRoot.radius * 0.073 }
-                        PathLine { x: sigilRoot.cx; y: sigilRoot.cy - sigilRoot.radius * 0.105 }
-                    }
-
-                    ShapePath {
-                        strokeWidth: root.lineWidth * 0.88
-                        strokeColor: root.accentLineColor
-                        fillColor: "transparent"
-                        capStyle: ShapePath.FlatCap
-                        joinStyle: ShapePath.MiterJoin
-                        startX: sigilRoot.cx - sigilRoot.radius * 0.136
-                        startY: sigilRoot.cy
-                        PathLine { x: sigilRoot.cx - sigilRoot.radius * 0.09; y: sigilRoot.cy }
-                        PathLine { x: sigilRoot.cx - sigilRoot.radius * 0.066; y: sigilRoot.cy - sigilRoot.radius * 0.026 }
-                    }
-
-                    ShapePath {
-                        strokeWidth: root.lineWidth * 0.88
-                        strokeColor: root.accentLineColor
-                        fillColor: "transparent"
-                        capStyle: ShapePath.FlatCap
-                        joinStyle: ShapePath.MiterJoin
-                        startX: sigilRoot.cx - sigilRoot.radius * 0.136
-                        startY: sigilRoot.cy
-                        PathLine { x: sigilRoot.cx - sigilRoot.radius * 0.09; y: sigilRoot.cy }
-                        PathLine { x: sigilRoot.cx - sigilRoot.radius * 0.066; y: sigilRoot.cy + sigilRoot.radius * 0.026 }
-                    }
-
-                    ShapePath {
-                        strokeWidth: root.lineWidth * 0.88
-                        strokeColor: root.accentLineColor
-                        fillColor: "transparent"
-                        capStyle: ShapePath.FlatCap
-                        joinStyle: ShapePath.MiterJoin
-                        startX: sigilRoot.cx + sigilRoot.radius * 0.136
-                        startY: sigilRoot.cy
-                        PathLine { x: sigilRoot.cx + sigilRoot.radius * 0.09; y: sigilRoot.cy }
-                        PathLine { x: sigilRoot.cx + sigilRoot.radius * 0.066; y: sigilRoot.cy - sigilRoot.radius * 0.026 }
-                    }
-
-                    ShapePath {
-                        strokeWidth: root.lineWidth * 0.88
-                        strokeColor: root.accentLineColor
-                        fillColor: "transparent"
-                        capStyle: ShapePath.FlatCap
-                        joinStyle: ShapePath.MiterJoin
-                        startX: sigilRoot.cx + sigilRoot.radius * 0.136
-                        startY: sigilRoot.cy
-                        PathLine { x: sigilRoot.cx + sigilRoot.radius * 0.09; y: sigilRoot.cy }
-                        PathLine { x: sigilRoot.cx + sigilRoot.radius * 0.066; y: sigilRoot.cy + sigilRoot.radius * 0.026 }
-                    }
-
-                    ShapePath {
-                        strokeWidth: root.lineWidth * 0.86
-                        strokeColor: root.secondaryLineColor
-                        fillColor: "transparent"
-                        capStyle: ShapePath.FlatCap
-                        joinStyle: ShapePath.MiterJoin
-                        startX: sigilRoot.cx
-                        startY: sigilRoot.cy - sigilRoot.radius * 0.22
-                        PathLine { x: sigilRoot.cx; y: sigilRoot.cy - sigilRoot.radius * 0.165 }
-                    }
-
-                    ShapePath {
-                        strokeWidth: root.lineWidth * 0.86
-                        strokeColor: root.secondaryLineColor
-                        fillColor: "transparent"
-                        capStyle: ShapePath.FlatCap
-                        joinStyle: ShapePath.MiterJoin
-                        startX: sigilRoot.cx
-                        startY: sigilRoot.cy + sigilRoot.radius * 0.165
-                        PathLine { x: sigilRoot.cx; y: sigilRoot.cy + sigilRoot.radius * 0.22 }
-                    }
-                }
-            }
-
-            Item {
-                id: optionalEchoLayer
-                anchors.fill: parent
-                visible: root.ghostOpacity > 0.01
-                opacity: root.ghostOpacity
+                antialiasing: true
+                visible: root.ghostOpacity > 0.01 || root.anomalyPulse > 0.03
+                opacity: root.ghostOpacity * 0.74 + root.anomalyPulse * 0.10
                 x: sigilRoot.echoShiftX
                 y: sigilRoot.echoShiftY
-                rotation: root.innerRotation * -0.14 + root.phaseSkew * 0.35
-                scale: 1.002 + root.anomalyPulse * 0.012
+                rotation: sigilRoot.deepPhase * -0.028 + sigilRoot.frontPhase * 0.034
+                scale: 0.995 + root.anomalyPulse * 0.016
+                renderStrategy: Canvas.Cooperative
 
-                Repeater {
-                    model: root.sectorCount
-                    delegate: Item {
-                        id: echoSectorHost
-                        required property int index
-                        property bool mirrored: (index % 2) === 1
-                        anchors.fill: parent
-                        rotation: index * (360 / root.sectorCount)
-                                  + (mirrored ? root.phaseSkew : -root.phaseSkew) * 0.4
-                        transform: Scale {
-                            origin.x: echoSectorHost.width / 2
-                            origin.y: echoSectorHost.height / 2
-                            yScale: echoSectorHost.mirrored ? -1.0 : 1.0
-                        }
+                onPaint: {
+                    var ctx = getContext("2d")
+                    ctx.setTransform(1, 0, 0, 1, 0, 0)
+                    ctx.clearRect(0, 0, width, height)
+                    ctx.lineCap = "butt"
+                    ctx.lineJoin = "miter"
 
-                        Loader {
-                            anchors.fill: parent
-                            sourceComponent: masterSectorComponent
+                    function strokePoly(points, lineWidth, color, alpha) {
+                        ctx.globalAlpha = alpha
+                        ctx.strokeStyle = color
+                        ctx.lineWidth = lineWidth
+                        ctx.beginPath()
+                        ctx.moveTo(points[0].x, points[0].y)
+                        for (var i = 1; i < points.length; ++i) {
+                            ctx.lineTo(points[i].x, points[i].y)
                         }
+                        ctx.stroke()
                     }
+
+                    strokePoly([
+                        sigilRoot.pointAt(0.30, sigilRoot.deepAngle(2) - 10),
+                        sigilRoot.pointAt(0.46, sigilRoot.deepAngle(2) + 2),
+                        sigilRoot.pointAt(0.67, sigilRoot.deepAngle(2) + 4)
+                    ], sigilRoot.phantomStroke, root.accentLineColor, 0.24)
+
+                    strokePoly([
+                        sigilRoot.pointAt(0.46, sigilRoot.frontAngle(4) + 16),
+                        sigilRoot.pointAt(0.62, sigilRoot.frontAngle(4) + 12),
+                        sigilRoot.pointAt(0.74, sigilRoot.frontAngle(4) + 7)
+                    ], sigilRoot.phantomStroke, root.secondaryLineColor, 0.20)
                 }
             }
         }
@@ -836,7 +884,7 @@ Rectangle {
             anchors.horizontalCenter: parent.horizontalCenter
             anchors.bottom: parent.bottom
             anchors.bottomMargin: root.theme.spacing.sm
-            text: "octagonal mirror lattice / aperture-aligned monolith"
+            text: "stratified mirror lattice / sealed blind core"
             color: root.theme.colors.text_secondary
             font.family: root.theme.typography.secondary_text.families[0]
             font.pixelSize: root.theme.typography.secondary_text.size
@@ -852,6 +900,7 @@ Rectangle {
         onTriggered: {
             root.retargetAnomaly()
             interval = root.nextDriftIntervalMs()
+            sigilRoot.requestAllPaints()
         }
     }
 
@@ -860,7 +909,10 @@ Rectangle {
         interval: root.reducedMotion() ? 33 : 16
         repeat: true
         running: false
-        onTriggered: root.advanceMotion(Date.now())
+        onTriggered: {
+            root.advanceMotion(Date.now())
+            sigilRoot.requestAllPaints()
+        }
     }
 
     Connections {
@@ -870,11 +922,13 @@ Rectangle {
             if (root.runtimeActive) {
                 root.retargetAnomaly()
             }
+            sigilRoot.requestAllPaints()
         }
     }
 
     Component.onCompleted: {
         syncSemanticInput()
+        sigilRoot.requestAllPaints()
         if (runtimeActive) {
             startRuntimeEngines()
         }
