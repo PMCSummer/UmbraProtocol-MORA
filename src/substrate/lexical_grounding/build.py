@@ -27,6 +27,8 @@ from substrate.lexical_grounding.models import (
     LexicalBasisClass,
     LexicalCandidateType,
     LexicalDiscourseContext,
+    LexicalEvidenceKind,
+    LexicalEvidenceRecord,
     LexicalGroundingBundle,
     LexicalGroundingResult,
     MentionLexicalBasis,
@@ -480,6 +482,15 @@ def build_lexical_grounding_hypotheses(
     if no_strong_lexical_claim_without_lexicon:
         ambiguity_reasons.append("no_strong_lexical_claim_without_lexicon")
 
+    evidence_records = _build_lexical_evidence_records(
+        mentions=mentions,
+        lexical_basis_records=lexical_basis_records,
+        sense_candidates=sense_candidates,
+        entity_candidates=entity_candidates,
+        reference_hypotheses=reference_hypotheses,
+        deixis_candidates=deixis_candidates,
+    )
+
     bundle = LexicalGroundingBundle(
         source_syntax_ref=hypothesis_set.source_surface_ref,
         source_surface_ref=surface.epistemic_unit_ref if surface else None,
@@ -508,6 +519,7 @@ def build_lexical_grounding_hypotheses(
         lexicon_handoff_missing=lexicon_handoff_missing,
         lexical_basis_degraded=lexical_basis_degraded,
         no_strong_lexical_claim_without_lexicon=no_strong_lexical_claim_without_lexicon,
+        evidence_records=evidence_records,
     )
     gate = evaluate_lexical_grounding_downstream_gate(bundle)
     source_lineage = tuple(
@@ -748,6 +760,139 @@ def _derive_mentions(
             )
         )
     return tuple(mention_anchors)
+
+
+def _build_lexical_evidence_records(
+    *,
+    mentions: tuple[MentionAnchor, ...],
+    lexical_basis_records: list[MentionLexicalBasis],
+    sense_candidates: list[SenseCandidate],
+    entity_candidates: list[EntityCandidate],
+    reference_hypotheses: list[ReferenceHypothesis],
+    deixis_candidates: list[DeixisCandidate],
+) -> tuple[LexicalEvidenceRecord, ...]:
+    records: list[LexicalEvidenceRecord] = []
+    evidence_index = 0
+    basis_by_mention = {basis.mention_id: basis for basis in lexical_basis_records}
+    mention_by_id = {mention.mention_id: mention for mention in mentions}
+
+    for mention in mentions:
+        evidence_index += 1
+        records.append(
+            LexicalEvidenceRecord(
+                evidence_id=f"l03-evidence-{evidence_index}",
+                mention_id=mention.mention_id,
+                token_id=mention.token_id,
+                evidence_kind=LexicalEvidenceKind.MENTION_ANCHOR,
+                source_ref_ids=(mention.syntax_hypothesis_ref, *mention.supporting_syntax_hypothesis_refs),
+                supports_dimensions=("mention", "token_anchor"),
+                unresolved=False,
+                reason="mention anchor derived from typed l02 token span topology",
+            )
+        )
+        basis = basis_by_mention.get(mention.mention_id)
+        if basis is None:
+            continue
+        evidence_index += 1
+        records.append(
+            LexicalEvidenceRecord(
+                evidence_id=f"l03-evidence-{evidence_index}",
+                mention_id=mention.mention_id,
+                token_id=mention.token_id,
+                evidence_kind=LexicalEvidenceKind.BASIS_CLASS,
+                source_ref_ids=(mention.token_id,),
+                supports_dimensions=("lexical_basis",),
+                unresolved=(
+                    basis.basis_class
+                    in {
+                        LexicalBasisClass.LEXICON_CAPPED_UNKNOWN,
+                        LexicalBasisClass.NO_USABLE_LEXICAL_BASIS,
+                    }
+                ),
+                reason=f"basis_class:{basis.basis_class.value}",
+            )
+        )
+
+    for candidate in sense_candidates:
+        evidence_index += 1
+        mention = mention_by_id.get(candidate.mention_id)
+        records.append(
+            LexicalEvidenceRecord(
+                evidence_id=f"l03-evidence-{evidence_index}",
+                mention_id=candidate.mention_id,
+                token_id=candidate.token_id,
+                evidence_kind=LexicalEvidenceKind.SENSE_CUE,
+                source_ref_ids=(candidate.candidate_id,),
+                supports_dimensions=("sense",),
+                unresolved=candidate.entropy >= 0.9,
+                reason=candidate.evidence,
+            )
+        )
+        if mention is not None and mention.inside_quote:
+            evidence_index += 1
+            records.append(
+                LexicalEvidenceRecord(
+                    evidence_id=f"l03-evidence-{evidence_index}",
+                    mention_id=candidate.mention_id,
+                    token_id=candidate.token_id,
+                    evidence_kind=LexicalEvidenceKind.SENSE_CUE,
+                    source_ref_ids=(candidate.candidate_id, mention.syntax_hypothesis_ref),
+                    supports_dimensions=("sense", "quote_sensitivity"),
+                    unresolved=True,
+                    reason="quoted mention keeps lexical sense candidate provisional",
+                )
+            )
+
+    for candidate in entity_candidates:
+        evidence_index += 1
+        records.append(
+            LexicalEvidenceRecord(
+                evidence_id=f"l03-evidence-{evidence_index}",
+                mention_id=candidate.mention_id,
+                token_id=candidate.token_id,
+                evidence_kind=LexicalEvidenceKind.ENTITY_CUE,
+                source_ref_ids=(candidate.candidate_id,),
+                supports_dimensions=("entity",),
+                unresolved=candidate.confidence < 0.6,
+                reason=candidate.evidence,
+            )
+        )
+
+    for hypothesis in reference_hypotheses:
+        evidence_index += 1
+        records.append(
+            LexicalEvidenceRecord(
+                evidence_id=f"l03-evidence-{evidence_index}",
+                mention_id=hypothesis.mention_id,
+                token_id=hypothesis.token_id,
+                evidence_kind=LexicalEvidenceKind.REFERENCE_CUE,
+                source_ref_ids=(hypothesis.reference_id, *hypothesis.candidate_ref_ids),
+                supports_dimensions=("reference",),
+                unresolved=hypothesis.unresolved,
+                reason=hypothesis.evidence,
+            )
+        )
+
+    for candidate in deixis_candidates:
+        evidence_index += 1
+        records.append(
+            LexicalEvidenceRecord(
+                evidence_id=f"l03-evidence-{evidence_index}",
+                mention_id=candidate.mention_id,
+                token_id=candidate.token_id,
+                evidence_kind=LexicalEvidenceKind.DEIXIS_CUE,
+                source_ref_ids=tuple(
+                    item
+                    for item in (candidate.candidate_id, candidate.target_ref)
+                    if item is not None
+                ),
+                supports_dimensions=("deixis",),
+                unresolved=candidate.unresolved,
+                reason=candidate.evidence,
+            )
+        )
+
+    return tuple(records)
 
 
 def _sense_candidates_for_mention(

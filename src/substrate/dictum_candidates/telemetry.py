@@ -194,6 +194,17 @@ def dictum_result_snapshot(result: DictumCandidateResult) -> dict[str, object]:
                         }
                         for slot in candidate.underspecified_slots
                     ),
+                    "evidence_records": tuple(
+                        {
+                            "evidence_id": evidence.evidence_id,
+                            "evidence_kind": evidence.evidence_kind.value,
+                            "source_ref_ids": evidence.source_ref_ids,
+                            "supports_dimensions": evidence.supports_dimensions,
+                            "unresolved": evidence.unresolved,
+                            "reason": evidence.reason,
+                        }
+                        for evidence in candidate.evidence_records
+                    ),
                     "ambiguity_reasons": candidate.ambiguity_reasons,
                     "quotation_sensitive": candidate.quotation_sensitive,
                     "confidence": candidate.confidence,

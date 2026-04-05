@@ -24,6 +24,8 @@ from substrate.grounded_semantic.models import (
     CarrierKind,
     ChannelOrigin,
     DictumCarrier,
+    G01EvidenceKind,
+    G01EvidenceRecord,
     GroundedSemanticBundle,
     GroundedSemanticResult,
     G01CoverageCode,
@@ -155,6 +157,7 @@ def build_grounded_semantic_substrate(
     anchor_index = 0
     uncertainty_index = 0
     scaffold_index = 0
+    evidence_index = 0
 
     substrate_units: list[GroundedSubstrateUnit] = []
     phrase_scaffolds: list[PhraseScaffold] = []
@@ -163,6 +166,7 @@ def build_grounded_semantic_substrate(
     modus_carriers: list[ModusCarrier] = []
     source_anchors: list[SourceAnchor] = []
     uncertainty_markers: list[UncertaintyMarker] = []
+    evidence_records: list[G01EvidenceRecord] = []
     ambiguity_reasons: list[str] = []
     low_coverage_reasons: list[str] = []
     clause_ranges_by_id: dict[str, list[tuple[int, int]]] = defaultdict(list)
@@ -356,6 +360,16 @@ def build_grounded_semantic_substrate(
                 provenance="g01 dictum content carrier from l04 candidate",
             )
         )
+        evidence_index = _append_g01_evidence(
+            evidence_records=evidence_records,
+            evidence_index=evidence_index,
+            evidence_kind=G01EvidenceKind.DICTUM_CARRIER,
+            source_ref_ids=(candidate.dictum_candidate_id, candidate.predicate_frame.frame_id),
+            supports_dimensions=("dictum_content",),
+            unresolved=bool(candidate.underspecified_slots or candidate.ambiguity_reasons),
+            route_class="shared",
+            reason="dictum carrier assembled from l04 candidate basis",
+        )
 
         if candidate.quotation_sensitive:
             carrier_index += 1
@@ -370,6 +384,16 @@ def build_grounded_semantic_substrate(
                     provenance="g01 modus carrier from quotation-sensitive dictum marker",
                 )
             )
+            evidence_index = _append_g01_evidence(
+                evidence_records=evidence_records,
+                evidence_index=evidence_index,
+                evidence_kind=G01EvidenceKind.MODUS_CARRIER,
+                source_ref_ids=(candidate.dictum_candidate_id, "quotation_sensitive"),
+                supports_dimensions=("modus_stance", "quotation"),
+                unresolved=True,
+                route_class="shared",
+                reason="quotation-sensitive dictum contributes unresolved modus carrier",
+            )
 
     if normative_route_requested and modus_bundle is not None and discourse_bundle is not None:
         normative_route_binding_valid = True
@@ -377,6 +401,7 @@ def build_grounded_semantic_substrate(
             anchor_index,
             carrier_index,
             uncertainty_index,
+            evidence_index,
             l06_blocked_update_present,
             l06_guarded_continue_present,
         ) = _register_normative_l05_l06_cues(
@@ -388,9 +413,11 @@ def build_grounded_semantic_substrate(
             operator_carriers=operator_carriers,
             modus_carriers=modus_carriers,
             uncertainty_markers=uncertainty_markers,
+            evidence_records=evidence_records,
             start_anchor_index=anchor_index,
             start_carrier_index=carrier_index,
             start_uncertainty_index=uncertainty_index,
+            start_evidence_index=evidence_index,
         )
         normative_l05_l06_route_active = True
         discourse_update_not_inferred_from_surface_when_l06_available = True
@@ -407,16 +434,18 @@ def build_grounded_semantic_substrate(
                 G01CoverageCode.L04_ONLY_INPUT_NOT_EQUIVALENT_TO_L05_L06_ROUTE,
             ]
         )
-        anchor_index, carrier_index, uncertainty_index = _register_surface_cues(
+        anchor_index, carrier_index, uncertainty_index, evidence_index = _register_surface_cues(
             surface=surface,
             linked_dictum_ids=tuple(candidate.dictum_candidate_id for candidate in dictum_bundle.dictum_candidates),
             source_anchors=source_anchors,
             operator_carriers=operator_carriers,
             modus_carriers=modus_carriers,
             uncertainty_markers=uncertainty_markers,
+            evidence_records=evidence_records,
             start_anchor_index=anchor_index,
             start_carrier_index=carrier_index,
             start_uncertainty_index=uncertainty_index,
+            start_evidence_index=evidence_index,
         )
 
     for clause_id, ranges in clause_ranges_by_id.items():
@@ -430,6 +459,16 @@ def build_grounded_semantic_substrate(
                     reason="competing clause boundaries detected across dictum candidates",
                     confidence=0.38,
                 )
+            )
+            evidence_index = _append_g01_evidence(
+                evidence_records=evidence_records,
+                evidence_index=evidence_index,
+                evidence_kind=G01EvidenceKind.UNCERTAINTY_CUE,
+                source_ref_ids=(clause_id,),
+                supports_dimensions=("clause_boundary",),
+                unresolved=True,
+                route_class="shared",
+                reason="competing clause boundaries preserved as uncertainty cue",
             )
 
     if dictum_bundle.conflicts:
@@ -489,6 +528,7 @@ def build_grounded_semantic_substrate(
             if normative_l05_l06_route_active
             else "g01 grounded semantic scaffold generated from legacy l04/surface route with degraded fallback restrictions"
         ),
+        evidence_records=tuple(evidence_records),
     )
     gate = evaluate_grounded_semantic_downstream_gate(bundle)
     source_lineage = _compose_source_lineage(
@@ -764,13 +804,16 @@ def _register_normative_l05_l06_cues(
     operator_carriers: list[OperatorCarrier],
     modus_carriers: list[ModusCarrier],
     uncertainty_markers: list[UncertaintyMarker],
+    evidence_records: list[G01EvidenceRecord],
     start_anchor_index: int,
     start_carrier_index: int,
     start_uncertainty_index: int,
-) -> tuple[int, int, int, bool, bool]:
+    start_evidence_index: int,
+) -> tuple[int, int, int, int, bool, bool]:
     anchor_index = start_anchor_index
     carrier_index = start_carrier_index
     uncertainty_index = start_uncertainty_index
+    evidence_index = start_evidence_index
     l06_blocked_update_present = False
     l06_guarded_continue_present = False
 
@@ -801,6 +844,16 @@ def _register_normative_l05_l06_cues(
                 confidence=min(0.92, max(0.18, record.confidence)),
                 provenance="g01 normative modus carrier from l05 hypothesis topology",
             )
+        )
+        evidence_index = _append_g01_evidence(
+            evidence_records=evidence_records,
+            evidence_index=evidence_index,
+            evidence_kind=G01EvidenceKind.NORMATIVE_L05_CUE,
+            source_ref_ids=(record.record_id, record.source_dictum_candidate_id),
+            supports_dimensions=("modus_force", "addressivity"),
+            unresolved=record.uncertainty_entropy >= 0.7,
+            route_class="normative",
+            reason="typed l05 record bound into g01 normative route",
         )
 
         if primary_kind is IllocutionKind.INTERROGATIVE_CANDIDATE:
@@ -898,6 +951,16 @@ def _register_normative_l05_l06_cues(
                     confidence=min(0.78, max(0.2, record.uncertainty_entropy)),
                 )
             )
+            evidence_index = _append_g01_evidence(
+                evidence_records=evidence_records,
+                evidence_index=evidence_index,
+                evidence_kind=G01EvidenceKind.UNCERTAINTY_CUE,
+                source_ref_ids=(record.record_id,),
+                supports_dimensions=("entropy_pressure",),
+                unresolved=True,
+                route_class="normative",
+                reason="l05 high entropy preserved as explicit uncertainty cue",
+            )
 
     proposal_ids_by_continuation = {
         continuation.source_record_id: proposal_by_record_id.get(continuation.source_record_id, ())
@@ -924,6 +987,24 @@ def _register_normative_l05_l06_cues(
                     confidence=0.52,
                 )
             )
+            evidence_index = _append_g01_evidence(
+                evidence_records=evidence_records,
+                evidence_index=evidence_index,
+                evidence_kind=G01EvidenceKind.NORMATIVE_L06_CUE,
+                source_ref_ids=tuple(
+                    dict.fromkeys(
+                        (
+                            continuation.continuation_id,
+                            *proposal_ids_by_continuation.get(continuation.source_record_id, ()),
+                            *continuation.localized_repair_refs,
+                        )
+                    )
+                ),
+                supports_dimensions=("discourse_update_continuation",),
+                unresolved=True,
+                route_class="normative",
+                reason="l06 blocked continuation propagated into g01 normative topology",
+            )
         elif continuation.continuation_status is ContinuationStatus.GUARDED_CONTINUE:
             l06_guarded_continue_present = True
             uncertainty_index += 1
@@ -943,6 +1024,24 @@ def _register_normative_l05_l06_cues(
                     reason="l06 guarded continuation requires limits before strong downstream use",
                     confidence=0.48,
                 )
+            )
+            evidence_index = _append_g01_evidence(
+                evidence_records=evidence_records,
+                evidence_index=evidence_index,
+                evidence_kind=G01EvidenceKind.NORMATIVE_L06_CUE,
+                source_ref_ids=tuple(
+                    dict.fromkeys(
+                        (
+                            continuation.continuation_id,
+                            *proposal_ids_by_continuation.get(continuation.source_record_id, ()),
+                            *continuation.localized_repair_refs,
+                        )
+                    )
+                ),
+                supports_dimensions=("discourse_update_continuation",),
+                unresolved=True,
+                route_class="normative",
+                reason="l06 guarded continuation propagated into g01 normative topology",
             )
 
     for repair in discourse_bundle.repair_triggers:
@@ -966,6 +1065,16 @@ def _register_normative_l05_l06_cues(
                 confidence=0.47,
             )
         )
+        evidence_index = _append_g01_evidence(
+            evidence_records=evidence_records,
+            evidence_index=evidence_index,
+            evidence_kind=G01EvidenceKind.NORMATIVE_L06_CUE,
+            source_ref_ids=tuple(dict.fromkeys((repair.repair_id, *repair.localized_ref_ids))),
+            supports_dimensions=("repair_localization",),
+            unresolved=True,
+            route_class="normative",
+            reason=f"l06 repair class propagated to g01 uncertainty topology:{repair.repair_class.value}",
+        )
 
     for proposal in discourse_bundle.update_proposals:
         if proposal.proposal_type is ProposalType.QUESTION_INTERPRETATION_UPDATE:
@@ -980,6 +1089,16 @@ def _register_normative_l05_l06_cues(
                     confidence=0.52,
                     provenance="g01 interrogation carrier from l06 proposal topology",
                 )
+            )
+            evidence_index = _append_g01_evidence(
+                evidence_records=evidence_records,
+                evidence_index=evidence_index,
+                evidence_kind=G01EvidenceKind.NORMATIVE_L06_CUE,
+                source_ref_ids=(proposal.proposal_id,),
+                supports_dimensions=("update_proposal_topology",),
+                unresolved=True,
+                route_class="normative",
+                reason="l06 question interpretation proposal emitted interrogation operator",
             )
         elif proposal.proposal_type in {
             ProposalType.REPORTED_CONTENT_UPDATE,
@@ -998,11 +1117,22 @@ def _register_normative_l05_l06_cues(
                     provenance="g01 quotation carrier from l06 proposal topology",
                 )
             )
+            evidence_index = _append_g01_evidence(
+                evidence_records=evidence_records,
+                evidence_index=evidence_index,
+                evidence_kind=G01EvidenceKind.NORMATIVE_L06_CUE,
+                source_ref_ids=(proposal.proposal_id,),
+                supports_dimensions=("update_proposal_topology", "source_mode"),
+                unresolved=True,
+                route_class="normative",
+                reason="l06 reported/quoted proposal emitted quotation operator",
+            )
 
     return (
         anchor_index,
         carrier_index,
         uncertainty_index,
+        evidence_index,
         l06_blocked_update_present,
         l06_guarded_continue_present,
     )
@@ -1016,16 +1146,19 @@ def _register_surface_cues(
     operator_carriers: list[OperatorCarrier],
     modus_carriers: list[ModusCarrier],
     uncertainty_markers: list[UncertaintyMarker],
+    evidence_records: list[G01EvidenceRecord],
     start_anchor_index: int,
     start_carrier_index: int,
     start_uncertainty_index: int,
-) -> tuple[int, int, int]:
+    start_evidence_index: int,
+) -> tuple[int, int, int, int]:
     if surface is None:
-        return start_anchor_index, start_carrier_index, start_uncertainty_index
+        return start_anchor_index, start_carrier_index, start_uncertainty_index, start_evidence_index
 
     anchor_index = start_anchor_index
     carrier_index = start_carrier_index
     uncertainty_index = start_uncertainty_index
+    evidence_index = start_evidence_index
     raw_text = surface.raw_text
 
     for quote in surface.quotes:
@@ -1054,6 +1187,16 @@ def _register_surface_cues(
                 provenance="g01 quotation operator carrier from l01 quote boundaries",
             )
         )
+        evidence_index = _append_g01_evidence(
+            evidence_records=evidence_records,
+            evidence_index=evidence_index,
+            evidence_kind=G01EvidenceKind.LEGACY_SURFACE_CUE,
+            source_ref_ids=(f"source-{anchor_index}",),
+            supports_dimensions=("source_mode", "quotation"),
+            unresolved=False,
+            route_class="compatibility",
+            reason="legacy compatibility quote boundary cue from l01 surface",
+        )
 
     for pattern, kind in (
         (_MODAL_CUE_PATTERN, OperatorKind.MODALITY),
@@ -1074,6 +1217,16 @@ def _register_surface_cues(
                     provenance="g01 operator carrier from surface lexical cue",
                 )
             )
+            evidence_index = _append_g01_evidence(
+                evidence_records=evidence_records,
+                evidence_index=evidence_index,
+                evidence_kind=G01EvidenceKind.LEGACY_SURFACE_CUE,
+                source_ref_ids=(f"surface-cue:{match.group(0).lower()}",),
+                supports_dimensions=("operator_projection",),
+                unresolved=False,
+                route_class="compatibility",
+                reason=f"legacy compatibility operator cue:{kind.value}",
+            )
             if kind in {OperatorKind.MODALITY, OperatorKind.DISCOURSE_PARTICLE}:
                 carrier_index += 1
                 modus_carriers.append(
@@ -1086,6 +1239,16 @@ def _register_surface_cues(
                         confidence=0.49,
                         provenance="g01 modus carrier from stance/modality cue",
                     )
+                )
+                evidence_index = _append_g01_evidence(
+                    evidence_records=evidence_records,
+                    evidence_index=evidence_index,
+                    evidence_kind=G01EvidenceKind.LEGACY_SURFACE_CUE,
+                    source_ref_ids=(f"surface-cue:{match.group(0).lower()}",),
+                    supports_dimensions=("modus_stance",),
+                    unresolved=True,
+                    route_class="compatibility",
+                    reason="legacy compatibility modality/stance cue into modus carrier",
                 )
 
     for match in _REPORT_CUE_PATTERN.finditer(raw_text):
@@ -1124,6 +1287,16 @@ def _register_surface_cues(
                 confidence=0.44,
             )
         )
+        evidence_index = _append_g01_evidence(
+            evidence_records=evidence_records,
+            evidence_index=evidence_index,
+            evidence_kind=G01EvidenceKind.LEGACY_SURFACE_CUE,
+            source_ref_ids=(f"source-{anchor_index}",),
+            supports_dimensions=("source_mode", "reporting"),
+            unresolved=True,
+            route_class="compatibility",
+            reason="legacy compatibility report cue anchors unresolved source scope",
+        )
 
     for match in _SPEAKER_PATTERN.finditer(raw_text):
         anchor_index += 1
@@ -1138,6 +1311,16 @@ def _register_surface_cues(
                 confidence=0.5,
                 provenance="g01 speaker marker from surface cue",
             )
+        )
+        evidence_index = _append_g01_evidence(
+            evidence_records=evidence_records,
+            evidence_index=evidence_index,
+            evidence_kind=G01EvidenceKind.LEGACY_SURFACE_CUE,
+            source_ref_ids=(f"source-{anchor_index}",),
+            supports_dimensions=("source_mode",),
+            unresolved=True,
+            route_class="compatibility",
+            reason="legacy compatibility speaker cue anchor",
         )
 
     for match in _DEIXIS_PATTERN.finditer(raw_text):
@@ -1163,6 +1346,16 @@ def _register_surface_cues(
                 reason="deictic cue preserved as unresolved placeholder",
                 confidence=0.38,
             )
+        )
+        evidence_index = _append_g01_evidence(
+            evidence_records=evidence_records,
+            evidence_index=evidence_index,
+            evidence_kind=G01EvidenceKind.LEGACY_SURFACE_CUE,
+            source_ref_ids=(f"source-{anchor_index}",),
+            supports_dimensions=("deixis_placeholder",),
+            unresolved=True,
+            route_class="compatibility",
+            reason="legacy compatibility deixis cue preserved as unresolved placeholder",
         )
 
     if "?" in raw_text:
@@ -1190,6 +1383,16 @@ def _register_surface_cues(
                 provenance="g01 modus carrier from interrogation cue",
             )
         )
+        evidence_index = _append_g01_evidence(
+            evidence_records=evidence_records,
+            evidence_index=evidence_index,
+            evidence_kind=G01EvidenceKind.LEGACY_SURFACE_CUE,
+            source_ref_ids=("surface:question_mark",),
+            supports_dimensions=("interrogation", "modus_stance"),
+            unresolved=True,
+            route_class="compatibility",
+            reason="legacy compatibility punctuation cue projects interrogative carrier",
+        )
 
     if "..." in raw_text or "??" in raw_text:
         uncertainty_index += 1
@@ -1201,6 +1404,16 @@ def _register_surface_cues(
                 reason="surface punctuation perturbation suggests corruption/noise",
                 confidence=0.45,
             )
+        )
+        evidence_index = _append_g01_evidence(
+            evidence_records=evidence_records,
+            evidence_index=evidence_index,
+            evidence_kind=G01EvidenceKind.LEGACY_SURFACE_CUE,
+            source_ref_ids=("surface:noisy_punctuation",),
+            supports_dimensions=("surface_noise",),
+            unresolved=True,
+            route_class="compatibility",
+            reason="legacy compatibility noisy punctuation cue",
         )
 
     for ambiguity in surface.ambiguities:
@@ -1217,8 +1430,44 @@ def _register_surface_cues(
                 confidence=ambiguity.confidence,
             )
         )
+        evidence_index = _append_g01_evidence(
+            evidence_records=evidence_records,
+            evidence_index=evidence_index,
+            evidence_kind=G01EvidenceKind.LEGACY_SURFACE_CUE,
+            source_ref_ids=(f"surface-span:{ambiguity.affected_span.start}:{ambiguity.affected_span.end}",),
+            supports_dimensions=("surface_ambiguity",),
+            unresolved=True,
+            route_class="compatibility",
+            reason=f"legacy compatibility surface ambiguity:{ambiguity.ambiguity_kind.value}",
+        )
 
-    return anchor_index, carrier_index, uncertainty_index
+    return anchor_index, carrier_index, uncertainty_index, evidence_index
+
+
+def _append_g01_evidence(
+    *,
+    evidence_records: list[G01EvidenceRecord],
+    evidence_index: int,
+    evidence_kind: G01EvidenceKind,
+    source_ref_ids: tuple[str, ...],
+    supports_dimensions: tuple[str, ...],
+    unresolved: bool,
+    route_class: str,
+    reason: str,
+) -> int:
+    next_index = evidence_index + 1
+    evidence_records.append(
+        G01EvidenceRecord(
+            evidence_id=f"g01-evidence-{next_index}",
+            evidence_kind=evidence_kind,
+            source_ref_ids=source_ref_ids,
+            supports_dimensions=supports_dimensions,
+            unresolved=unresolved,
+            route_class=route_class,
+            reason=reason,
+        )
+    )
+    return next_index
 
 
 def _operator_kind_from_scope_marker(marker_kind: str) -> OperatorKind:

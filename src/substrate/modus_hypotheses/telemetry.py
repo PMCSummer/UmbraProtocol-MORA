@@ -92,6 +92,18 @@ def modus_hypothesis_result_snapshot(result: ModusHypothesisResult) -> dict[str,
                     "uncertainty_entropy": record.uncertainty_entropy,
                     "uncertainty_markers": record.uncertainty_markers,
                     "downstream_cautions": record.downstream_cautions,
+                    "evidence_records": tuple(
+                        {
+                            "evidence_id": evidence.evidence_id,
+                            "source_dictum_candidate_id": evidence.source_dictum_candidate_id,
+                            "evidence_kind": evidence.evidence_kind.value,
+                            "source_ref_ids": evidence.source_ref_ids,
+                            "supports_dimensions": evidence.supports_dimensions,
+                            "unresolved": evidence.unresolved,
+                            "reason": evidence.reason,
+                        }
+                        for evidence in record.evidence_records
+                    ),
                     "confidence": record.confidence,
                     "provenance": record.provenance,
                     "illocution_hypotheses": tuple(

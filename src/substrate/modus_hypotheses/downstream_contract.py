@@ -20,6 +20,7 @@ class ModusHypothesisContractView:
     quoted_force_separate_from_current_commitment: bool
     uncertainty_entropy_present: bool
     unresolved_slot_pressure_present: bool
+    factorized_evidence_present: bool
     requires_cautions_read: bool
     l06_downstream_not_bound_here: bool
     l06_update_consumer_not_wired_here: bool
@@ -77,6 +78,9 @@ def derive_modus_hypothesis_contract_view(
         "unresolved_argument_slots" in record.uncertainty_markers
         for record in bundle.hypothesis_records
     )
+    factorized_evidence_present = all(
+        bool(record.evidence_records) for record in bundle.hypothesis_records
+    ) if bundle.hypothesis_records else False
 
     return ModusHypothesisContractView(
         multi_hypothesis_present=multi_hypothesis_present,
@@ -86,6 +90,7 @@ def derive_modus_hypothesis_contract_view(
         quoted_force_separate_from_current_commitment=quoted_force_separate_from_current_commitment,
         uncertainty_entropy_present=uncertainty_entropy_present,
         unresolved_slot_pressure_present=unresolved_slot_pressure_present,
+        factorized_evidence_present=factorized_evidence_present,
         requires_cautions_read=(
             L05RestrictionCode.DOWNSTREAM_CAUTIONS_MUST_BE_READ in gate.restrictions
         ),

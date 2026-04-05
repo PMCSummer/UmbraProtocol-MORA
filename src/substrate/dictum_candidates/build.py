@@ -17,6 +17,8 @@ from substrate.dictum_candidates.models import (
     DictumCandidateBundle,
     DictumCandidateResult,
     DictumConflict,
+    DictumEvidenceKind,
+    DictumEvidenceRecord,
     DictumPolarity,
     DictumUnknown,
     MagnitudeMarker,
@@ -345,6 +347,17 @@ def build_dictum_candidates(
                     scope_ambiguity_count=sum(1 for marker in scope_markers if marker.ambiguous),
                     quotation_sensitive=quotation_sensitive,
                 )
+                evidence_records = _build_dictum_evidence_records(
+                    candidate_id=candidate_id,
+                    predicate_frame=predicate_frame,
+                    argument_slots=tuple(argument_slots),
+                    scope_markers=tuple(scope_markers),
+                    negation_markers=tuple(negation_markers),
+                    temporal_markers=tuple(temporal_markers),
+                    magnitude_markers=tuple(magnitude_markers),
+                    underspecified_slots=tuple(underspecified),
+                    quotation_sensitive=quotation_sensitive,
+                )
                 candidate = DictumCandidate(
                     dictum_candidate_id=candidate_id,
                     source_syntax_hypothesis_ref=hypothesis.hypothesis_id,
@@ -363,6 +376,7 @@ def build_dictum_candidates(
                     confidence=confidence,
                     provenance="L04 dictum skeleton from L03 lexical/reference candidates + L02 syntax frame",
                     no_final_resolution_performed=True,
+                    evidence_records=evidence_records,
                 )
                 dictum_candidates.append(candidate)
 
@@ -776,6 +790,126 @@ def _estimate_candidate_confidence(
     if quotation_sensitive:
         score -= 0.05
     return max(0.1, min(0.94, round(score, 4)))
+
+
+def _build_dictum_evidence_records(
+    *,
+    candidate_id: str,
+    predicate_frame: PredicateFrame,
+    argument_slots: tuple[ArgumentSlot, ...],
+    scope_markers: tuple[ScopeMarker, ...],
+    negation_markers: tuple[NegationMarker, ...],
+    temporal_markers: tuple[TemporalMarker, ...],
+    magnitude_markers: tuple[MagnitudeMarker, ...],
+    underspecified_slots: tuple[UnderspecifiedSlot, ...],
+    quotation_sensitive: bool,
+) -> tuple[DictumEvidenceRecord, ...]:
+    records: list[DictumEvidenceRecord] = []
+    evidence_index = 0
+
+    evidence_index += 1
+    records.append(
+        DictumEvidenceRecord(
+            evidence_id=f"{candidate_id}-evidence-{evidence_index}",
+            evidence_kind=DictumEvidenceKind.PREDICATE_SHELL,
+            source_ref_ids=(predicate_frame.frame_id, predicate_frame.predicate_token_id),
+            supports_dimensions=("dictum_predicate",),
+            unresolved=predicate_frame.confidence < 0.6,
+            reason=predicate_frame.provenance,
+        )
+    )
+    if quotation_sensitive:
+        evidence_index += 1
+        records.append(
+            DictumEvidenceRecord(
+                evidence_id=f"{candidate_id}-evidence-{evidence_index}",
+                evidence_kind=DictumEvidenceKind.QUOTATION_CUE,
+                source_ref_ids=(predicate_frame.frame_id,),
+                supports_dimensions=("quotation_sensitivity",),
+                unresolved=True,
+                reason="quotation-sensitive dictum content remains bounded and unresolved",
+            )
+        )
+
+    for slot in argument_slots:
+        evidence_index += 1
+        records.append(
+            DictumEvidenceRecord(
+                evidence_id=f"{candidate_id}-evidence-{evidence_index}",
+                evidence_kind=DictumEvidenceKind.ARGUMENT_SLOT,
+                source_ref_ids=(slot.slot_id, slot.token_id, *slot.reference_candidate_ids),
+                supports_dimensions=("argument_binding",),
+                unresolved=slot.unresolved,
+                reason=slot.unresolved_reason or slot.provenance,
+            )
+        )
+
+    for marker in scope_markers:
+        evidence_index += 1
+        records.append(
+            DictumEvidenceRecord(
+                evidence_id=f"{candidate_id}-evidence-{evidence_index}",
+                evidence_kind=DictumEvidenceKind.SCOPE_CUE,
+                source_ref_ids=(marker.scope_marker_id, *marker.affected_slot_ids),
+                supports_dimensions=("scope_attachment",),
+                unresolved=marker.ambiguous,
+                reason=marker.reason,
+            )
+        )
+
+    for marker in negation_markers:
+        evidence_index += 1
+        records.append(
+            DictumEvidenceRecord(
+                evidence_id=f"{candidate_id}-evidence-{evidence_index}",
+                evidence_kind=DictumEvidenceKind.NEGATION_CUE,
+                source_ref_ids=(marker.negation_marker_id, *marker.carrier_token_ids),
+                supports_dimensions=("polarity", "scope_attachment"),
+                unresolved=marker.scope_ambiguous,
+                reason=marker.reason,
+            )
+        )
+
+    for marker in temporal_markers:
+        evidence_index += 1
+        records.append(
+            DictumEvidenceRecord(
+                evidence_id=f"{candidate_id}-evidence-{evidence_index}",
+                evidence_kind=DictumEvidenceKind.TEMPORAL_CUE,
+                source_ref_ids=(marker.temporal_marker_id, *marker.token_ids),
+                supports_dimensions=("temporal_anchor",),
+                unresolved=marker.unresolved,
+                reason=marker.reason,
+            )
+        )
+
+    for marker in magnitude_markers:
+        evidence_index += 1
+        records.append(
+            DictumEvidenceRecord(
+                evidence_id=f"{candidate_id}-evidence-{evidence_index}",
+                evidence_kind=DictumEvidenceKind.MAGNITUDE_CUE,
+                source_ref_ids=(marker.magnitude_marker_id, *marker.token_ids),
+                supports_dimensions=("magnitude_packaging",),
+                unresolved=marker.unresolved,
+                reason=marker.reason,
+            )
+        )
+
+    for slot in underspecified_slots:
+        evidence_index += 1
+        records.append(
+            DictumEvidenceRecord(
+                evidence_id=f"{candidate_id}-evidence-{evidence_index}",
+                evidence_kind=DictumEvidenceKind.UNDERSPECIFICATION,
+                source_ref_ids=(slot.underspecified_id, *slot.source_ref_ids),
+                supports_dimensions=("underspecification",),
+                unresolved=True,
+                reason=slot.reason,
+            )
+        )
+
+    return tuple(records)
 
 
 def _estimate_result_confidence(bundle: DictumCandidateBundle) -> float:

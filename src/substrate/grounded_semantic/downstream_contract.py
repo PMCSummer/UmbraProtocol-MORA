@@ -42,6 +42,9 @@ class GroundedDownstreamContractView:
     interrogation_or_modality_present: bool
     dictum_modus_split_present: bool
     uncertainty_elevated: bool
+    factorized_evidence_present: bool
+    normative_factorized_evidence_present: bool
+    compatibility_factorized_evidence_present: bool
     low_coverage_mode: bool
     normative_l05_l06_route_active: bool
     legacy_surface_cue_fallback_used: bool
@@ -99,6 +102,13 @@ def derive_grounded_downstream_contract(
     )
     dictum_modus_split_present = bool(bundle.dictum_carriers and bundle.modus_carriers)
     uncertainty_elevated = bool(bundle.uncertainty_markers)
+    factorized_evidence_present = bool(bundle.evidence_records)
+    normative_factorized_evidence_present = any(
+        record.route_class == "normative" for record in bundle.evidence_records
+    )
+    compatibility_factorized_evidence_present = any(
+        record.route_class == "compatibility" for record in bundle.evidence_records
+    )
     low_coverage_mode = bundle.low_coverage_mode
 
     degraded = bool(
@@ -159,6 +169,9 @@ def derive_grounded_downstream_contract(
         interrogation_or_modality_present=interrogation_or_modality_present,
         dictum_modus_split_present=dictum_modus_split_present,
         uncertainty_elevated=uncertainty_elevated,
+        factorized_evidence_present=factorized_evidence_present,
+        normative_factorized_evidence_present=normative_factorized_evidence_present,
+        compatibility_factorized_evidence_present=compatibility_factorized_evidence_present,
         low_coverage_mode=low_coverage_mode,
         normative_l05_l06_route_active=bundle.normative_l05_l06_route_active,
         legacy_surface_cue_fallback_used=bundle.legacy_surface_cue_fallback_used,

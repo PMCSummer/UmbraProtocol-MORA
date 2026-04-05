@@ -35,8 +35,10 @@ def build_grounded_semantic_telemetry(
         modus_carrier_count=len(bundle.modus_carriers),
         source_anchor_count=len(bundle.source_anchors),
         uncertainty_marker_count=len(bundle.uncertainty_markers),
+        evidence_record_count=len(bundle.evidence_records),
         operator_kinds=tuple(dict.fromkeys(carrier.operator_kind.value for carrier in bundle.operator_carriers)),
         uncertainty_kinds=tuple(dict.fromkeys(marker.uncertainty_kind.value for marker in bundle.uncertainty_markers)),
+        evidence_kinds=tuple(dict.fromkeys(record.evidence_kind.value for record in bundle.evidence_records)),
         reversible_span_mapping_present=reversible_span_mapping_present,
         low_coverage_mode=bundle.low_coverage_mode,
         low_coverage_reasons=bundle.low_coverage_reasons,
@@ -181,6 +183,18 @@ def grounded_semantic_result_snapshot(result: GroundedSemanticResult) -> dict[st
                 }
                 for marker in bundle.uncertainty_markers
             ),
+            "evidence_records": tuple(
+                {
+                    "evidence_id": record.evidence_id,
+                    "evidence_kind": record.evidence_kind.value,
+                    "source_ref_ids": record.source_ref_ids,
+                    "supports_dimensions": record.supports_dimensions,
+                    "unresolved": record.unresolved,
+                    "route_class": record.route_class,
+                    "reason": record.reason,
+                }
+                for record in bundle.evidence_records
+            ),
         },
         "telemetry": {
             "source_lineage": result.telemetry.source_lineage,
@@ -200,8 +214,10 @@ def grounded_semantic_result_snapshot(result: GroundedSemanticResult) -> dict[st
             "modus_carrier_count": result.telemetry.modus_carrier_count,
             "source_anchor_count": result.telemetry.source_anchor_count,
             "uncertainty_marker_count": result.telemetry.uncertainty_marker_count,
+            "evidence_record_count": result.telemetry.evidence_record_count,
             "operator_kinds": result.telemetry.operator_kinds,
             "uncertainty_kinds": result.telemetry.uncertainty_kinds,
+            "evidence_kinds": result.telemetry.evidence_kinds,
             "reversible_span_mapping_present": result.telemetry.reversible_span_mapping_present,
             "low_coverage_mode": result.telemetry.low_coverage_mode,
             "low_coverage_reasons": result.telemetry.low_coverage_reasons,

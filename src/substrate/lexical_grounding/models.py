@@ -38,6 +38,15 @@ class LexicalBasisClass(str, Enum):
     NO_USABLE_LEXICAL_BASIS = "no_usable_lexical_basis"
 
 
+class LexicalEvidenceKind(str, Enum):
+    MENTION_ANCHOR = "mention_anchor"
+    BASIS_CLASS = "basis_class"
+    SENSE_CUE = "sense_cue"
+    ENTITY_CUE = "entity_cue"
+    REFERENCE_CUE = "reference_cue"
+    DEIXIS_CUE = "deixis_cue"
+
+
 @dataclass(frozen=True, slots=True)
 class MentionAnchor:
     mention_id: str
@@ -65,6 +74,18 @@ class MentionLexicalBasis:
     heuristic_fallback_used: bool
     heuristic_fallback_reason: str | None
     no_strong_lexical_claim_from_fallback: bool
+
+
+@dataclass(frozen=True, slots=True)
+class LexicalEvidenceRecord:
+    evidence_id: str
+    mention_id: str | None
+    token_id: str | None
+    evidence_kind: LexicalEvidenceKind
+    source_ref_ids: tuple[str, ...]
+    supports_dimensions: tuple[str, ...]
+    unresolved: bool
+    reason: str
 
 
 @dataclass(frozen=True, slots=True)
@@ -184,6 +205,7 @@ class LexicalGroundingBundle:
     lexicon_handoff_missing: bool = False
     lexical_basis_degraded: bool = False
     no_strong_lexical_claim_without_lexicon: bool = False
+    evidence_records: tuple[LexicalEvidenceRecord, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)

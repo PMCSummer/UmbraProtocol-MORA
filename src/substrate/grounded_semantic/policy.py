@@ -66,6 +66,7 @@ def evaluate_grounded_semantic_downstream_gate(
         restrictions.append(G01RestrictionCode.MODUS_CARRIERS_SPARSE)
 
     source_ref_shape_gap = False
+    evidence_factorization_gap = False
     if bundle.normative_l05_l06_route_active:
         if not bundle.source_modus_ref or not bundle.source_discourse_update_ref:
             source_ref_shape_gap = True
@@ -86,8 +87,20 @@ def evaluate_grounded_semantic_downstream_gate(
     if bundle.legacy_surface_cue_fallback_used:
         if bundle.source_modus_ref or bundle.source_discourse_update_ref:
             source_ref_shape_gap = True
+    if not bundle.evidence_records:
+        evidence_factorization_gap = True
+    if bundle.normative_l05_l06_route_active and not any(
+        record.route_class == "normative" for record in bundle.evidence_records
+    ):
+        evidence_factorization_gap = True
+    if bundle.legacy_surface_cue_fallback_used and not any(
+        record.route_class == "compatibility" for record in bundle.evidence_records
+    ):
+        evidence_factorization_gap = True
     if source_ref_shape_gap:
         restrictions.append(G01RestrictionCode.SOURCE_REF_RELABELING_WITHOUT_NOTICE)
+    if evidence_factorization_gap:
+        restrictions.append(G01RestrictionCode.EVIDENCE_FACTORIZATION_GAP)
     if (
         bundle.low_coverage_mode
         or not bundle.operator_carriers
@@ -96,6 +109,7 @@ def evaluate_grounded_semantic_downstream_gate(
         or bundle.l06_blocked_update_present
         or bundle.l06_guarded_continue_present
         or source_ref_shape_gap
+        or evidence_factorization_gap
     ):
         restrictions.append(G01RestrictionCode.DOWNSTREAM_AUTHORITY_DEGRADED)
     if bundle.legacy_surface_cue_fallback_used:

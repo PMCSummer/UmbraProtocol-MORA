@@ -68,6 +68,17 @@ class UncertaintyKind(str, Enum):
     SURFACE_CORRUPTION_PRESENT = "surface_corruption_present"
 
 
+class G01EvidenceKind(str, Enum):
+    DICTUM_CARRIER = "dictum_carrier"
+    MODUS_CARRIER = "modus_carrier"
+    SOURCE_ANCHOR = "source_anchor"
+    OPERATOR_CARRIER = "operator_carrier"
+    UNCERTAINTY_CUE = "uncertainty_cue"
+    NORMATIVE_L05_CUE = "normative_l05_cue"
+    NORMATIVE_L06_CUE = "normative_l06_cue"
+    LEGACY_SURFACE_CUE = "legacy_surface_cue"
+
+
 class G01RestrictionCode(StrEnum):
     NO_FINAL_SEMANTIC_RESOLUTION = "no_final_semantic_resolution"
     UNCERTAINTY_MARKERS_PRESENT = "uncertainty_markers_present"
@@ -96,6 +107,7 @@ class G01RestrictionCode(StrEnum):
     SOURCE_ANCHORS_SPARSE = "source_anchors_sparse"
     MODUS_CARRIERS_SPARSE = "modus_carriers_sparse"
     SOURCE_REF_RELABELING_WITHOUT_NOTICE = "source_ref_relabeling_without_notice"
+    EVIDENCE_FACTORIZATION_GAP = "evidence_factorization_gap"
     DOWNSTREAM_AUTHORITY_DEGRADED = "downstream_authority_degraded"
     LEGACY_FALLBACK_REQUIRES_DEGRADED_CONTRACT = (
         "legacy_fallback_requires_degraded_contract"
@@ -234,6 +246,17 @@ class UncertaintyMarker:
 
 
 @dataclass(frozen=True, slots=True)
+class G01EvidenceRecord:
+    evidence_id: str
+    evidence_kind: G01EvidenceKind
+    source_ref_ids: tuple[str, ...]
+    supports_dimensions: tuple[str, ...]
+    unresolved: bool
+    route_class: str
+    reason: str
+
+
+@dataclass(frozen=True, slots=True)
 class GroundedSemanticBundle:
     source_dictum_ref: str
     source_syntax_ref: str
@@ -266,6 +289,7 @@ class GroundedSemanticBundle:
     l06_guarded_continue_present: bool
     no_final_semantic_resolution: bool
     reason: str
+    evidence_records: tuple[G01EvidenceRecord, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -297,8 +321,10 @@ class GroundedSemanticTelemetry:
     modus_carrier_count: int
     source_anchor_count: int
     uncertainty_marker_count: int
+    evidence_record_count: int
     operator_kinds: tuple[str, ...]
     uncertainty_kinds: tuple[str, ...]
+    evidence_kinds: tuple[str, ...]
     reversible_span_mapping_present: bool
     low_coverage_mode: bool
     low_coverage_reasons: tuple[str, ...]

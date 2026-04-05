@@ -23,6 +23,17 @@ class TemporalAnchorKind(str, Enum):
     UNRESOLVED = "unresolved"
 
 
+class DictumEvidenceKind(str, Enum):
+    PREDICATE_SHELL = "predicate_shell"
+    ARGUMENT_SLOT = "argument_slot"
+    SCOPE_CUE = "scope_cue"
+    NEGATION_CUE = "negation_cue"
+    TEMPORAL_CUE = "temporal_cue"
+    MAGNITUDE_CUE = "magnitude_cue"
+    UNDERSPECIFICATION = "underspecification"
+    QUOTATION_CUE = "quotation_cue"
+
+
 @dataclass(frozen=True, slots=True)
 class PredicateFrame:
     frame_id: str
@@ -100,6 +111,16 @@ class UnderspecifiedSlot:
 
 
 @dataclass(frozen=True, slots=True)
+class DictumEvidenceRecord:
+    evidence_id: str
+    evidence_kind: DictumEvidenceKind
+    source_ref_ids: tuple[str, ...]
+    supports_dimensions: tuple[str, ...]
+    unresolved: bool
+    reason: str
+
+
+@dataclass(frozen=True, slots=True)
 class DictumAmbiguity:
     ambiguity_id: str
     dictum_candidate_id: str
@@ -144,6 +165,7 @@ class DictumCandidate:
     confidence: float
     provenance: str
     no_final_resolution_performed: bool
+    evidence_records: tuple[DictumEvidenceRecord, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)

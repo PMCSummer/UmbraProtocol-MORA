@@ -68,6 +68,7 @@ class L05RestrictionCode(StrEnum):
     DOWNSTREAM_CAUTIONS_CONTRACT_GAP_DETECTED = (
         "downstream_cautions_contract_gap_detected"
     )
+    EVIDENCE_FACTORIZATION_GAP_DETECTED = "evidence_factorization_gap_detected"
     UNRESOLVED_SLOT_PRESSURE_MUST_BE_READ = "unresolved_slot_pressure_must_be_read"
     L06_DOWNSTREAM_NOT_BOUND_HERE = "l06_downstream_not_bound_here"
     L06_UPDATE_CONSUMER_NOT_WIRED_HERE = "l06_update_consumer_not_wired_here"
@@ -102,6 +103,27 @@ class L05CoverageCode(StrEnum):
         "legacy_l04_g01_shortcut_operational_debt"
     )
     LEGACY_SHORTCUT_BYPASS_RISK = "legacy_shortcut_bypass_risk"
+
+
+class ModusEvidenceKind(StrEnum):
+    FORCE_CUE = "force_cue"
+    ADDRESSIVITY_CUE = "addressivity_cue"
+    QUOTATION_CUE = "quotation_cue"
+    MODALITY_CUE = "modality_cue"
+    SCOPE_CUE = "scope_cue"
+    POLARITY_CUE = "polarity_cue"
+    UNRESOLVED_SLOT_CUE = "unresolved_slot_cue"
+
+
+@dataclass(frozen=True, slots=True)
+class ModusEvidenceRecord:
+    evidence_id: str
+    source_dictum_candidate_id: str
+    evidence_kind: ModusEvidenceKind
+    source_ref_ids: tuple[str, ...]
+    supports_dimensions: tuple[str, ...]
+    unresolved: bool
+    reason: str
 
 
 @dataclass(frozen=True, slots=True)
@@ -157,6 +179,7 @@ class ModusHypothesisRecord:
     uncertainty_entropy: float
     uncertainty_markers: tuple[str, ...]
     downstream_cautions: tuple[str, ...]
+    evidence_records: tuple[ModusEvidenceRecord, ...]
     confidence: float
     provenance: str
 

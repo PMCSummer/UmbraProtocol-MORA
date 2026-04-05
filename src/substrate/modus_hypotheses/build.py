@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import math
+from dataclasses import dataclass
 
 from substrate.contracts import RuntimeState, TransitionKind, TransitionRequest, TransitionResult, WriterIdentity
 from substrate.dictum_candidates.models import (
@@ -18,6 +19,8 @@ from substrate.modus_hypotheses.models import (
     L05CautionCode,
     L05CoverageCode,
     ModalityEvidentialityProfile,
+    ModusEvidenceKind,
+    ModusEvidenceRecord,
     ModusHypothesisBundle,
     ModusHypothesisRecord,
     ModusHypothesisResult,
@@ -39,6 +42,18 @@ ATTEMPTED_PATHS: tuple[str, ...] = (
     "l05.ambiguity_entropy_preservation",
     "l05.downstream_gate",
 )
+
+
+@dataclass(frozen=True, slots=True)
+class _L05CueProfile:
+    question_like: bool
+    conditional_like: bool
+    deontic_like: bool
+    quote_or_echo: bool
+    unresolved: bool
+    negation_like: bool
+    source_scope_ambiguity: bool
+    unresolved_target: bool
 
 
 def build_modus_hypotheses(
@@ -186,13 +201,20 @@ def _extract_dictum_input(
 
 
 def _build_record(*, record_index: int, candidate: DictumCandidate) -> ModusHypothesisRecord:
-    illocution_hypotheses = _illocution_hypotheses(candidate, record_index)
-    modality_profile = _modality_profile(candidate, record_index)
-    addressivity_hypotheses = _addressivity_hypotheses(candidate, record_index)
-    quote_state = _quoted_speech_state(candidate)
+    cues = _derive_candidate_cues(candidate)
+    illocution_hypotheses = _illocution_hypotheses(candidate, record_index, cues)
+    modality_profile = _modality_profile(candidate, record_index, cues)
+    addressivity_hypotheses = _addressivity_hypotheses(candidate, record_index, cues)
+    quote_state = _quoted_speech_state(cues)
     entropy = _entropy(illocution_hypotheses)
     uncertainty_markers = _uncertainty_markers(candidate, entropy)
-    cautions = _downstream_cautions(candidate, entropy, quote_state)
+    cautions = _downstream_cautions(candidate, entropy, cues.quote_or_echo)
+    evidence_records = _record_evidence_records(
+        candidate=candidate,
+        cues=cues,
+        modality_profile=modality_profile,
+        entropy=entropy,
+    )
 
     return ModusHypothesisRecord(
         record_id=f"modus-record-{record_index}",
@@ -204,6 +226,7 @@ def _build_record(*, record_index: int, candidate: DictumCandidate) -> ModusHypo
         uncertainty_entropy=entropy,
         uncertainty_markers=uncertainty_markers,
         downstream_cautions=cautions,
+        evidence_records=evidence_records,
         confidence=_record_confidence(candidate.confidence, entropy, modality_profile.unresolved),
         provenance="l05 force/addressivity hypothesis layer over l04 dictum candidate",
     )
@@ -230,29 +253,37 @@ def _has_source_scope_ambiguity(candidate: DictumCandidate) -> bool:
     return any("source" in reason.lower() for reason in candidate.ambiguity_reasons)
 
 
+def _derive_candidate_cues(candidate: DictumCandidate) -> _L05CueProfile:
+    return _L05CueProfile(
+        question_like=any("interrog" in marker.marker_kind.lower() for marker in candidate.scope_markers),
+        conditional_like=any("conditional" in marker.marker_kind.lower() for marker in candidate.scope_markers),
+        deontic_like=any(
+            "obligation" in marker.marker_kind.lower() or "deontic" in marker.marker_kind.lower()
+            for marker in candidate.scope_markers
+        ),
+        quote_or_echo=_has_quote_or_echo_signal(candidate),
+        unresolved=(
+            any(slot.unresolved for slot in candidate.argument_slots)
+            or any(marker.ambiguous for marker in candidate.scope_markers)
+        ),
+        negation_like=bool(candidate.negation_markers) or candidate.polarity is DictumPolarity.NEGATED,
+        source_scope_ambiguity=_has_source_scope_ambiguity(candidate),
+        unresolved_target=_has_unresolved_reference_or_deixis_slot(candidate),
+    )
+
+
 def _illocution_hypotheses(
     candidate: DictumCandidate,
     record_index: int,
+    cues: _L05CueProfile,
 ) -> tuple[IllocutionHypothesis, ...]:
-    question_like = any("interrog" in marker.marker_kind.lower() for marker in candidate.scope_markers)
-    conditional_like = any("conditional" in marker.marker_kind.lower() for marker in candidate.scope_markers)
-    deontic_like = any(
-        "obligation" in marker.marker_kind.lower() or "deontic" in marker.marker_kind.lower()
-        for marker in candidate.scope_markers
-    )
-    quote_or_echo = _has_quote_or_echo_signal(candidate)
-    unresolved = any(slot.unresolved for slot in candidate.argument_slots) or any(
-        marker.ambiguous for marker in candidate.scope_markers
-    )
-    negation_like = bool(candidate.negation_markers) or candidate.polarity is DictumPolarity.NEGATED
-
     weighted: list[tuple[IllocutionKind, float, str, tuple[str, ...], bool]] = [
         (
             IllocutionKind.ASSERTIVE_CANDIDATE,
             0.34,
             "default dictum-candidate force remains assertive-like but provisional",
             (candidate.predicate_frame.frame_id,),
-            unresolved,
+            cues.unresolved,
         ),
         (
             IllocutionKind.UNKNOWN_FORCE_CANDIDATE,
@@ -262,7 +293,7 @@ def _illocution_hypotheses(
             True,
         ),
     ]
-    if question_like:
+    if cues.question_like:
         weighted.append(
             (
                 IllocutionKind.INTERROGATIVE_CANDIDATE,
@@ -272,7 +303,7 @@ def _illocution_hypotheses(
                 True,
             )
         )
-    if deontic_like:
+    if cues.deontic_like:
         weighted.append(
             (
                 IllocutionKind.DIRECTIVE_CANDIDATE,
@@ -282,7 +313,7 @@ def _illocution_hypotheses(
                 True,
             )
         )
-    if conditional_like:
+    if cues.conditional_like:
         weighted.append(
             (
                 IllocutionKind.COMMISSIVE_CANDIDATE,
@@ -292,7 +323,7 @@ def _illocution_hypotheses(
                 True,
             )
         )
-    if negation_like:
+    if cues.negation_like:
         weighted.append(
             (
                 IllocutionKind.EXPRESSIVE_CANDIDATE,
@@ -302,7 +333,7 @@ def _illocution_hypotheses(
                 True,
             )
         )
-    if unresolved:
+    if cues.unresolved:
         weighted.append(
             (
                 IllocutionKind.UNKNOWN_FORCE_CANDIDATE,
@@ -322,7 +353,7 @@ def _illocution_hypotheses(
                 True,
             )
         )
-    if quote_or_echo:
+    if cues.quote_or_echo:
         weighted.append(
             (
                 IllocutionKind.REPORTED_FORCE_CANDIDATE,
@@ -365,7 +396,11 @@ def _illocution_hypotheses(
     )
 
 
-def _modality_profile(candidate: DictumCandidate, record_index: int) -> ModalityEvidentialityProfile:
+def _modality_profile(
+    candidate: DictumCandidate,
+    record_index: int,
+    cues: _L05CueProfile,
+) -> ModalityEvidentialityProfile:
     modality_markers: list[str] = []
     if candidate.negation_markers or candidate.polarity is DictumPolarity.NEGATED:
         modality_markers.append("negation_carrier")
@@ -378,12 +413,11 @@ def _modality_profile(candidate: DictumCandidate, record_index: int) -> Modality
     if not modality_markers:
         modality_markers.append("modality_not_resolved_from_l04")
 
-    has_quote = _has_quote_or_echo_signal(candidate)
-    if has_quote and _has_source_scope_ambiguity(candidate):
+    if cues.quote_or_echo and cues.source_scope_ambiguity:
         evidentiality = EvidentialityState.MIXED
-    elif has_quote:
+    elif cues.quote_or_echo:
         evidentiality = EvidentialityState.QUOTED
-    elif _has_unresolved_reference_or_deixis_slot(candidate):
+    elif cues.unresolved_target:
         evidentiality = EvidentialityState.UNRESOLVED
     else:
         evidentiality = EvidentialityState.DIRECT
@@ -415,15 +449,14 @@ def _modality_profile(candidate: DictumCandidate, record_index: int) -> Modality
 def _addressivity_hypotheses(
     candidate: DictumCandidate,
     record_index: int,
+    cues: _L05CueProfile,
 ) -> tuple[AddressivityHypothesis, ...]:
-    unresolved_target = _has_unresolved_reference_or_deixis_slot(candidate)
-    quote_or_echo = _has_quote_or_echo_signal(candidate)
     weighted: list[tuple[AddressivityKind, float, tuple[str, ...], bool, bool, str]] = [
         (
             AddressivityKind.CURRENT_INTERLOCUTOR,
-            0.36 if not quote_or_echo else 0.18,
+            0.36 if not cues.quote_or_echo else 0.18,
             (candidate.predicate_frame.frame_id,),
-            quote_or_echo,
+            cues.quote_or_echo,
             True,
             "current-interlocutor reading remains provisional",
         ),
@@ -436,7 +469,7 @@ def _addressivity_hypotheses(
             "addressivity can remain audience-unspecified at l05",
         ),
     ]
-    if quote_or_echo:
+    if cues.quote_or_echo:
         weighted.append(
             (
                 AddressivityKind.REPORTED_PARTICIPANT,
@@ -457,13 +490,13 @@ def _addressivity_hypotheses(
                 "quoted-speaker target remains separate from current speaker commitment",
             )
         )
-    if unresolved_target:
+    if cues.unresolved_target:
         weighted.append(
             (
                 AddressivityKind.UNKNOWN_TARGET,
                 0.34,
                 tuple(slot.slot_id for slot in candidate.argument_slots if slot.unresolved),
-                quote_or_echo,
+                cues.quote_or_echo,
                 True,
                 "target remains unresolved from l04 unresolved reference/deixis signals",
             )
@@ -484,13 +517,12 @@ def _addressivity_hypotheses(
     )
 
 
-def _quoted_speech_state(candidate: DictumCandidate) -> QuotedSpeechState:
-    quote_or_echo = _has_quote_or_echo_signal(candidate)
-    unresolved_source = quote_or_echo or _has_source_scope_ambiguity(candidate)
+def _quoted_speech_state(cues: _L05CueProfile) -> QuotedSpeechState:
+    unresolved_source = cues.quote_or_echo or cues.source_scope_ambiguity
     return QuotedSpeechState(
-        quote_or_echo_present=quote_or_echo,
-        reported_force_candidate_present=quote_or_echo,
-        quoted_force_not_current_commitment=quote_or_echo,
+        quote_or_echo_present=cues.quote_or_echo,
+        reported_force_candidate_present=cues.quote_or_echo,
+        quoted_force_not_current_commitment=cues.quote_or_echo,
         commitment_transfer_forbidden=True,
         unresolved_source_scope=unresolved_source,
         reason="quoted/echoic force remains separable from current-speaker commitment at l05",
@@ -517,7 +549,7 @@ def _uncertainty_markers(candidate: DictumCandidate, entropy: float) -> tuple[st
 def _downstream_cautions(
     candidate: DictumCandidate,
     entropy: float,
-    quote_state: QuotedSpeechState,
+    quote_or_echo: bool,
 ) -> tuple[str, ...]:
     cautions = [
         L05CautionCode.LIKELY_ILLOCUTION_NOT_SETTLED_INTENT,
@@ -526,11 +558,109 @@ def _downstream_cautions(
     ]
     if entropy >= 0.35:
         cautions.append(L05CautionCode.FORCE_ALTERNATIVES_MUST_BE_READ)
-    if quote_state.quote_or_echo_present:
+    if quote_or_echo:
         cautions.append(L05CautionCode.QUOTED_FORCE_NOT_CURRENT_COMMITMENT)
     if any(slot.unresolved for slot in candidate.argument_slots):
         cautions.append(L05CautionCode.ADDRESSIVITY_TARGET_UNRESOLVED)
     return tuple(dict.fromkeys(cautions))
+
+
+def _record_evidence_records(
+    *,
+    candidate: DictumCandidate,
+    cues: _L05CueProfile,
+    modality_profile: ModalityEvidentialityProfile,
+    entropy: float,
+) -> tuple[ModusEvidenceRecord, ...]:
+    records: list[ModusEvidenceRecord] = []
+    evidence_index = 0
+
+    def add(
+        kind: ModusEvidenceKind,
+        source_ref_ids: tuple[str, ...],
+        supports_dimensions: tuple[str, ...],
+        unresolved: bool,
+        reason: str,
+    ) -> None:
+        nonlocal evidence_index
+        evidence_index += 1
+        records.append(
+            ModusEvidenceRecord(
+                evidence_id=f"l05-evidence-{candidate.dictum_candidate_id}-{evidence_index}",
+                source_dictum_candidate_id=candidate.dictum_candidate_id,
+                evidence_kind=kind,
+                source_ref_ids=source_ref_ids,
+                supports_dimensions=supports_dimensions,
+                unresolved=unresolved,
+                reason=reason,
+            )
+        )
+
+    add(
+        ModusEvidenceKind.FORCE_CUE,
+        tuple(marker.scope_marker_id for marker in candidate.scope_markers) or (candidate.predicate_frame.frame_id,),
+        ("illocution",),
+        cues.unresolved,
+        (
+            "scope-derived force cues from l04 markers"
+            if (cues.question_like or cues.deontic_like or cues.conditional_like)
+            else "default assertive-like force cue from l04 predicate frame"
+        ),
+    )
+    if cues.negation_like:
+        add(
+            ModusEvidenceKind.POLARITY_CUE,
+            tuple(marker.negation_marker_id for marker in candidate.negation_markers),
+            ("polarity", "illocution"),
+            any(marker.scope_ambiguous for marker in candidate.negation_markers),
+            "negation/polarity packaging cue preserved for l05 force projection",
+        )
+    if cues.quote_or_echo:
+        add(
+            ModusEvidenceKind.QUOTATION_CUE,
+            (candidate.predicate_frame.frame_id,),
+            ("illocution", "addressivity", "evidentiality"),
+            True,
+            "quoted/report/echoic cue keeps alternatives active",
+        )
+    if modality_profile.modality_markers:
+        add(
+            ModusEvidenceKind.MODALITY_CUE,
+            tuple(modality_profile.modality_markers),
+            ("modality", "evidentiality"),
+            modality_profile.unresolved,
+            "modality/evidentiality profile derived from l04 carrier markers",
+        )
+    if cues.source_scope_ambiguity:
+        add(
+            ModusEvidenceKind.SCOPE_CUE,
+            tuple(marker.scope_marker_id for marker in candidate.scope_markers),
+            ("source_scope",),
+            True,
+            "source/scope ambiguity preserved as first-class l05 evidence",
+        )
+    add(
+        ModusEvidenceKind.ADDRESSIVITY_CUE,
+        tuple(slot.slot_id for slot in candidate.argument_slots if slot.unresolved)
+        or (candidate.predicate_frame.frame_id,),
+        ("addressivity",),
+        cues.unresolved_target,
+        (
+            "addressivity target unresolved due to l04 reference/deixis uncertainty"
+            if cues.unresolved_target
+            else "addressivity target remains provisional without final addressee commitment"
+        ),
+    )
+    if entropy >= 0.35:
+        add(
+            ModusEvidenceKind.UNRESOLVED_SLOT_CUE,
+            tuple(slot.slot_id for slot in candidate.argument_slots if slot.unresolved),
+            ("uncertainty_entropy",),
+            True,
+            "high entropy from unresolved slot/scope pressure",
+        )
+
+    return tuple(records)
 
 
 def _normalize_weighted_hypotheses(

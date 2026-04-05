@@ -4,6 +4,7 @@ from substrate.modus_hypotheses.models import (
     AddressivityKind,
     IllocutionKind,
     L05CautionCode,
+    ModusEvidenceKind,
     L05RestrictionCode,
     ModusHypothesisBundle,
     ModusHypothesisGateDecision,
@@ -53,6 +54,7 @@ def evaluate_modus_hypothesis_downstream_gate(
     has_quote_commitment_leak = False
     has_entropy_gap = False
     has_caution_gap = False
+    has_evidence_factorization_gap = False
     has_unresolved_slot_pressure = False
 
     for record in bundle.hypothesis_records:
@@ -100,6 +102,15 @@ def evaluate_modus_hypothesis_downstream_gate(
         }
         if not required_cautions.issubset(set(record.downstream_cautions)):
             has_caution_gap = True
+        evidence_kinds = {evidence.evidence_kind for evidence in record.evidence_records}
+        if not evidence_kinds:
+            has_evidence_factorization_gap = True
+        if record.quoted_speech_state.quote_or_echo_present and ModusEvidenceKind.QUOTATION_CUE not in evidence_kinds:
+            has_evidence_factorization_gap = True
+        if "unresolved_argument_slots" in record.uncertainty_markers and ModusEvidenceKind.UNRESOLVED_SLOT_CUE not in evidence_kinds:
+            has_evidence_factorization_gap = True
+        if record.modality_profile.modality_markers and ModusEvidenceKind.MODALITY_CUE not in evidence_kinds:
+            has_evidence_factorization_gap = True
 
         lawful = not any(
             (
@@ -110,6 +121,7 @@ def evaluate_modus_hypothesis_downstream_gate(
                 not record.addressivity_hypotheses,
                 record.uncertainty_entropy <= 0.0,
                 not required_cautions.issubset(set(record.downstream_cautions)),
+                not evidence_kinds,
             )
         )
         if lawful and record.confidence >= 0.2:
@@ -131,6 +143,8 @@ def evaluate_modus_hypothesis_downstream_gate(
         restrictions.append(
             L05RestrictionCode.DOWNSTREAM_CAUTIONS_CONTRACT_GAP_DETECTED
         )
+    if has_evidence_factorization_gap:
+        restrictions.append(L05RestrictionCode.EVIDENCE_FACTORIZATION_GAP_DETECTED)
     if has_unresolved_slot_pressure:
         restrictions.append(L05RestrictionCode.UNRESOLVED_SLOT_PRESSURE_MUST_BE_READ)
 
@@ -170,6 +184,7 @@ def evaluate_modus_hypothesis_downstream_gate(
         or has_quote_commitment_leak
         or has_entropy_gap
         or has_caution_gap
+        or has_evidence_factorization_gap
         or has_unresolved_slot_pressure
     )
     if degraded:

@@ -147,6 +147,19 @@ def lexical_grounding_result_snapshot(result: LexicalGroundingResult) -> dict[st
                 }
                 for basis in bundle.lexical_basis_records
             ),
+            "evidence_records": tuple(
+                {
+                    "evidence_id": evidence.evidence_id,
+                    "mention_id": evidence.mention_id,
+                    "token_id": evidence.token_id,
+                    "evidence_kind": evidence.evidence_kind.value,
+                    "source_ref_ids": evidence.source_ref_ids,
+                    "supports_dimensions": evidence.supports_dimensions,
+                    "unresolved": evidence.unresolved,
+                    "reason": evidence.reason,
+                }
+                for evidence in bundle.evidence_records
+            ),
             "lexeme_candidates": tuple(
                 {
                     "candidate_id": candidate.candidate_id,
