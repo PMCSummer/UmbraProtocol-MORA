@@ -212,6 +212,32 @@ def test_normative_route_does_not_project_surface_modus_shortcuts_when_typed_l05
     assert any("from l05" in provenance or "from l06" in provenance for provenance in operator_provenance)
 
 
+def test_normative_route_rejects_l06_proposal_source_record_drift() -> None:
+    surface, dictum, modus, discourse_update = _pipeline(
+        "alpha is stable",
+        "m-g01-rewire-proposal-source-drift",
+    )
+    drifted_bundle = replace(
+        discourse_update.bundle,
+        update_proposals=tuple(
+            replace(
+                proposal,
+                source_record_ids=("modus-record-nonexistent", *proposal.source_record_ids[1:]),
+            )
+            for proposal in discourse_update.bundle.update_proposals
+        ),
+    )
+    with pytest.raises(TypeError):
+        build_grounded_semantic_substrate(
+            dictum,
+            utterance_surface=surface,
+            memory_anchor_ref="m03:g01-rewire-proposal-source-drift",
+            cooperation_anchor_ref="o03:g01-rewire-proposal-source-drift",
+            modus_hypotheses_result_or_bundle=modus,
+            discourse_update_result_or_bundle=drifted_bundle,
+        )
+
+
 def test_normative_route_rejects_l05_l06_binding_mismatch_without_silent_legacy_fallback() -> None:
     surface_a, dictum_a, _, _ = _pipeline("alpha is stable", "m-g01-rewire-mismatch-a")
     _, dictum_b, modus_b, discourse_b = _pipeline("beta is stable", "m-g01-rewire-mismatch-b")

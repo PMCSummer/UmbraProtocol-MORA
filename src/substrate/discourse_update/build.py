@@ -62,6 +62,46 @@ class _L06DownstreamAbsence:
     low_coverage_reasons: tuple[str, ...]
 
 
+@dataclass(frozen=True, slots=True)
+class _ContinuationDecision:
+    status: ContinuationStatus
+    guarded_allowed: bool
+    guarded_forbidden: bool
+    reason: str
+
+
+_PROPOSAL_BASE_RESTRICTIONS: tuple[str, ...] = (
+    "l06_object_presence_not_acceptance",
+    "proposal_requires_acceptance",
+    "acceptance_required_must_be_read",
+    "accepted_proposal_not_accepted_update",
+    "proposal_effects_not_yet_authorized",
+    "proposal_not_truth",
+    "proposal_not_self_update",
+    "update_record_not_state_mutation",
+    "interpretation_not_equal_accepted_update",
+)
+
+_CONTINUATION_STATUS_PERMISSIONS: dict[ContinuationStatus, tuple[str, ...]] = {
+    ContinuationStatus.BLOCKED_PENDING_REPAIR: ("proposal_withheld_pending_repair",),
+    ContinuationStatus.GUARDED_CONTINUE: ("proposal_guarded_forwardable_if_limits_read",),
+    ContinuationStatus.ABSTAIN_UPDATE_WITHHELD: ("proposal_withheld_not_forwardable",),
+    ContinuationStatus.PROPOSAL_ALLOWED_BUT_ACCEPTANCE_REQUIRED: (
+        "proposal_forwardable_if_acceptor_exists",
+    ),
+}
+
+_CONTINUATION_STATUS_RESTRICTIONS: dict[ContinuationStatus, tuple[str, ...]] = {
+    ContinuationStatus.BLOCKED_PENDING_REPAIR: ("blocked_update_must_be_read",),
+    ContinuationStatus.GUARDED_CONTINUE: (
+        "guarded_continue_requires_limits_read",
+        "guarded_continue_not_acceptance",
+    ),
+    ContinuationStatus.ABSTAIN_UPDATE_WITHHELD: ("abstain_update_withheld_must_be_read",),
+    ContinuationStatus.PROPOSAL_ALLOWED_BUT_ACCEPTANCE_REQUIRED: (),
+}
+
+
 def build_discourse_update(
     modus_result_or_bundle: ModusHypothesisResult | ModusHypothesisBundle,
 ) -> DiscourseUpdateResult:
@@ -388,6 +428,30 @@ def _continuation_state(
     repairs_for_record: tuple[RepairTrigger, ...],
     continuation_index: int,
 ) -> GuardedContinuationState:
+    decision = _resolve_continuation_decision(
+        record=record,
+        repairs_for_record=repairs_for_record,
+    )
+    status = decision.status
+
+    return GuardedContinuationState(
+        continuation_id=f"continuation-{continuation_index}",
+        source_record_id=record.record_id,
+        continuation_status=status,
+        blocked_update_ids=(proposal_id,) if status is ContinuationStatus.BLOCKED_PENDING_REPAIR else (),
+        guarded_continue_allowed=decision.guarded_allowed,
+        guarded_continue_forbidden=decision.guarded_forbidden,
+        acceptance_required=True,
+        block_or_guard_reason=decision.reason,
+        localized_repair_refs=tuple(trigger.repair_id for trigger in repairs_for_record),
+    )
+
+
+def _resolve_continuation_decision(
+    *,
+    record: ModusHypothesisRecord,
+    repairs_for_record: tuple[RepairTrigger, ...],
+) -> _ContinuationDecision:
     hard_block = any(
         trigger.repair_class
         in {
@@ -399,61 +463,59 @@ def _continuation_state(
         and trigger.guarded_continue_forbidden
         for trigger in repairs_for_record
     )
-    guarded = any(trigger.guarded_continue_allowed for trigger in repairs_for_record)
     if hard_block:
-        status = ContinuationStatus.BLOCKED_PENDING_REPAIR
-        guarded_allowed = False
-        guarded_forbidden = True
-        reason = "blocked pending localized repair"
-    elif guarded:
-        status = ContinuationStatus.GUARDED_CONTINUE
-        guarded_allowed = True
-        guarded_forbidden = False
-        reason = "guarded continuation allowed with localized repair obligations"
-    elif repairs_for_record:
-        status = ContinuationStatus.BLOCKED_PENDING_REPAIR
-        guarded_allowed = False
-        guarded_forbidden = True
-        reason = "repair required before update acceptance"
-    elif record.uncertainty_entropy >= 0.85:
-        status = ContinuationStatus.GUARDED_CONTINUE
-        guarded_allowed = True
-        guarded_forbidden = False
-        reason = "high entropy keeps continuation guarded despite no explicit repair class"
-    elif record.uncertainty_entropy >= 0.7:
-        status = ContinuationStatus.ABSTAIN_UPDATE_WITHHELD
-        guarded_allowed = False
-        guarded_forbidden = True
-        reason = "update withheld due to unresolved entropy without lawful repair-ready continuation"
-    else:
-        status = ContinuationStatus.PROPOSAL_ALLOWED_BUT_ACCEPTANCE_REQUIRED
-        guarded_allowed = False
-        guarded_forbidden = False
-        reason = "proposal allowed but acceptance is still required"
+        return _ContinuationDecision(
+            status=ContinuationStatus.BLOCKED_PENDING_REPAIR,
+            guarded_allowed=False,
+            guarded_forbidden=True,
+            reason="blocked pending localized repair",
+        )
 
-    return GuardedContinuationState(
-        continuation_id=f"continuation-{continuation_index}",
-        source_record_id=record.record_id,
-        continuation_status=status,
-        blocked_update_ids=(proposal_id,) if status is ContinuationStatus.BLOCKED_PENDING_REPAIR else (),
-        guarded_continue_allowed=guarded_allowed,
-        guarded_continue_forbidden=guarded_forbidden,
-        acceptance_required=True,
-        block_or_guard_reason=reason,
-        localized_repair_refs=tuple(trigger.repair_id for trigger in repairs_for_record),
+    guarded = any(trigger.guarded_continue_allowed for trigger in repairs_for_record)
+    if guarded:
+        return _ContinuationDecision(
+            status=ContinuationStatus.GUARDED_CONTINUE,
+            guarded_allowed=True,
+            guarded_forbidden=False,
+            reason="guarded continuation allowed with localized repair obligations",
+        )
+
+    if repairs_for_record:
+        return _ContinuationDecision(
+            status=ContinuationStatus.BLOCKED_PENDING_REPAIR,
+            guarded_allowed=False,
+            guarded_forbidden=True,
+            reason="repair required before update acceptance",
+        )
+
+    if record.uncertainty_entropy >= 0.85:
+        return _ContinuationDecision(
+            status=ContinuationStatus.GUARDED_CONTINUE,
+            guarded_allowed=True,
+            guarded_forbidden=False,
+            reason="high entropy keeps continuation guarded despite no explicit repair class",
+        )
+
+    if record.uncertainty_entropy >= 0.7:
+        return _ContinuationDecision(
+            status=ContinuationStatus.ABSTAIN_UPDATE_WITHHELD,
+            guarded_allowed=False,
+            guarded_forbidden=True,
+            reason="update withheld due to unresolved entropy without lawful repair-ready continuation",
+        )
+
+    return _ContinuationDecision(
+        status=ContinuationStatus.PROPOSAL_ALLOWED_BUT_ACCEPTANCE_REQUIRED,
+        guarded_allowed=False,
+        guarded_forbidden=False,
+        reason="proposal allowed but acceptance is still required",
     )
 
 
 def _proposal_permissions_for_continuation(
     continuation_status: ContinuationStatus,
 ) -> tuple[str, ...]:
-    if continuation_status is ContinuationStatus.BLOCKED_PENDING_REPAIR:
-        return ("proposal_withheld_pending_repair",)
-    if continuation_status is ContinuationStatus.GUARDED_CONTINUE:
-        return ("proposal_guarded_forwardable_if_limits_read",)
-    if continuation_status is ContinuationStatus.ABSTAIN_UPDATE_WITHHELD:
-        return ("proposal_withheld_not_forwardable",)
-    return ("proposal_forwardable_if_acceptor_exists",)
+    return _CONTINUATION_STATUS_PERMISSIONS[continuation_status]
 
 
 def _proposal_restrictions_for_continuation(
@@ -461,26 +523,10 @@ def _proposal_restrictions_for_continuation(
     continuation_status: ContinuationStatus,
     has_localized_repair: bool,
 ) -> tuple[str, ...]:
-    restrictions = [
-        "l06_object_presence_not_acceptance",
-        "proposal_requires_acceptance",
-        "acceptance_required_must_be_read",
-        "accepted_proposal_not_accepted_update",
-        "proposal_effects_not_yet_authorized",
-        "proposal_not_truth",
-        "proposal_not_self_update",
-        "update_record_not_state_mutation",
-        "interpretation_not_equal_accepted_update",
-    ]
+    restrictions = list(_PROPOSAL_BASE_RESTRICTIONS)
     if has_localized_repair:
         restrictions.append("repair_localization_must_be_read")
-    if continuation_status is ContinuationStatus.BLOCKED_PENDING_REPAIR:
-        restrictions.append("blocked_update_must_be_read")
-    elif continuation_status is ContinuationStatus.GUARDED_CONTINUE:
-        restrictions.append("guarded_continue_requires_limits_read")
-        restrictions.append("guarded_continue_not_acceptance")
-    elif continuation_status is ContinuationStatus.ABSTAIN_UPDATE_WITHHELD:
-        restrictions.append("abstain_update_withheld_must_be_read")
+    restrictions.extend(_CONTINUATION_STATUS_RESTRICTIONS[continuation_status])
     return tuple(dict.fromkeys(restrictions))
 
 

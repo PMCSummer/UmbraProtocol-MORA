@@ -632,9 +632,10 @@ def _is_normative_binding_compatible(
     discourse_bundle: DiscourseUpdateBundle,
 ) -> bool:
     dictum_ids = {candidate.dictum_candidate_id for candidate in dictum_bundle.dictum_candidates}
+    modus_record_ids = {record.record_id for record in modus_bundle.hypothesis_records}
     if not dictum_ids:
         return False
-    if not modus_bundle.hypothesis_records:
+    if not modus_record_ids:
         return False
     if not discourse_bundle.update_proposals:
         return False
@@ -643,6 +644,26 @@ def _is_normative_binding_compatible(
     if discourse_bundle.source_modus_lineage_ref != modus_bundle.source_dictum_ref:
         return False
     if not set(modus_bundle.linked_dictum_candidate_ids).intersection(dictum_ids):
+        return False
+    proposal_source_record_ids = {
+        proposal.source_record_ids[0]
+        for proposal in discourse_bundle.update_proposals
+        if proposal.source_record_ids
+    }
+    if not proposal_source_record_ids:
+        return False
+    if not proposal_source_record_ids.issubset(modus_record_ids):
+        return False
+    continuation_source_record_ids = {
+        continuation.source_record_id for continuation in discourse_bundle.continuation_states
+    }
+    if continuation_source_record_ids and not continuation_source_record_ids.issubset(
+        modus_record_ids
+    ):
+        return False
+    if discourse_bundle.linked_modus_record_ids and not set(
+        discourse_bundle.linked_modus_record_ids
+    ).issubset(modus_record_ids):
         return False
     return True
 

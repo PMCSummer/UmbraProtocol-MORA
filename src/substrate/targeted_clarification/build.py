@@ -745,6 +745,12 @@ def _select_status(
             ("l06_blocked_update_topology", "l06_block_or_guard_must_be_read"),
             False,
         )
+    topology_forced = _select_topology_forced_status(
+        l06_guarded_for_target=l06_guarded_for_target,
+        l06_withheld_for_target=l06_withheld_for_target,
+    )
+    if topology_forced is not None:
+        return topology_forced
     if uncertainty_class is UncertaintyClass.CONTEXT_ONLY_UNCERTAINTY and gain.gain_score < 0.4:
         return (InterventionStatus.CLARIFICATION_NOT_WORTH_COST, ("context_only_uncertainty_low_gain",), True)
     if gain.worth_cost and (
@@ -758,18 +764,6 @@ def _select_status(
             }
         )
     ):
-        if l06_guarded_for_target:
-            return (
-                InterventionStatus.GUARDED_CONTINUE_WITH_LIMITS,
-                ("l06_guarded_continue_topology", "guarded_continue_not_acceptance"),
-                True,
-            )
-        if l06_withheld_for_target:
-            return (
-                InterventionStatus.DEFER_UNTIL_NEEDED,
-                ("l06_abstain_update_withheld_topology", "defer_until_needed_must_be_read"),
-                True,
-            )
         return (
             InterventionStatus.ASK_NOW,
             ("high_value_targeted_clarification", "ask_now_not_equal_resolution"),
@@ -782,6 +776,26 @@ def _select_status(
     if acq.acquisition_status in {AcquisitionStatus.WEAK_PROVISIONAL, AcquisitionStatus.STABLE_PROVISIONAL}:
         return (InterventionStatus.GUARDED_CONTINUE_WITH_LIMITS, ("nonblocking_uncertainty_guarded_continue",), True)
     return (InterventionStatus.ABSTAIN_WITHOUT_QUESTION, ("abstain_without_forced_question",), True)
+
+
+def _select_topology_forced_status(
+    *,
+    l06_guarded_for_target: bool,
+    l06_withheld_for_target: bool,
+) -> tuple[InterventionStatus, tuple[str, ...], bool] | None:
+    if l06_withheld_for_target:
+        return (
+            InterventionStatus.DEFER_UNTIL_NEEDED,
+            ("l06_abstain_update_withheld_topology", "defer_until_needed_must_be_read"),
+            True,
+        )
+    if l06_guarded_for_target:
+        return (
+            InterventionStatus.GUARDED_CONTINUE_WITH_LIMITS,
+            ("l06_guarded_continue_topology", "guarded_continue_not_acceptance"),
+            True,
+        )
+    return None
 
 
 def _lockouts(

@@ -156,3 +156,26 @@ def test_l06_block_vs_guard_topology_materially_changes_intervention(g07_factory
     assert InterventionStatus.BLOCKED_DUE_TO_INSUFFICIENT_QUESTIONABILITY in {
         record.intervention_status for record in blocked.bundle.intervention_records
     }
+
+
+def test_l06_withheld_topology_forces_defer_instead_of_ask(g07_factory) -> None:
+    ctx = g07_factory("you are dangerous", "g07-l06-rewire-withheld-topology")
+    withheld_l06 = replace(
+        ctx.discourse_update.bundle,
+        repair_triggers=(),
+        continuation_states=tuple(
+            replace(
+                state,
+                continuation_status=ContinuationStatus.ABSTAIN_UPDATE_WITHHELD,
+                guarded_continue_allowed=False,
+                guarded_continue_forbidden=True,
+            )
+            for state in ctx.discourse_update.bundle.continuation_states
+        ),
+        blocked_update_ids=(),
+        guarded_update_ids=(),
+    )
+    result = build_targeted_clarification(ctx.acquisition, ctx.framing, withheld_l06)
+    statuses = {record.intervention_status for record in result.bundle.intervention_records}
+    assert InterventionStatus.DEFER_UNTIL_NEEDED in statuses
+    assert InterventionStatus.ASK_NOW not in statuses

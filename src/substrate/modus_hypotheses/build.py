@@ -207,6 +207,27 @@ def _build_record(*, record_index: int, candidate: DictumCandidate) -> ModusHypo
     )
 
 
+def _has_quote_or_echo_signal(candidate: DictumCandidate) -> bool:
+    return candidate.quotation_sensitive or any(
+        "quotation" in reason.lower() for reason in candidate.ambiguity_reasons
+    )
+
+
+def _has_unresolved_reference_or_deixis_slot(candidate: DictumCandidate) -> bool:
+    return any(
+        slot.unresolved
+        and (
+            "reference" in (slot.unresolved_reason or "")
+            or "deixis" in (slot.unresolved_reason or "")
+        )
+        for slot in candidate.argument_slots
+    )
+
+
+def _has_source_scope_ambiguity(candidate: DictumCandidate) -> bool:
+    return any("source" in reason.lower() for reason in candidate.ambiguity_reasons)
+
+
 def _illocution_hypotheses(
     candidate: DictumCandidate,
     record_index: int,
@@ -217,9 +238,7 @@ def _illocution_hypotheses(
         "obligation" in marker.marker_kind.lower() or "deontic" in marker.marker_kind.lower()
         for marker in candidate.scope_markers
     )
-    quote_or_echo = candidate.quotation_sensitive or any(
-        "quotation" in reason.lower() for reason in candidate.ambiguity_reasons
-    )
+    quote_or_echo = _has_quote_or_echo_signal(candidate)
     unresolved = any(slot.unresolved for slot in candidate.argument_slots) or any(
         marker.ambiguous for marker in candidate.scope_markers
     )
@@ -357,12 +376,12 @@ def _modality_profile(candidate: DictumCandidate, record_index: int) -> Modality
     if not modality_markers:
         modality_markers.append("modality_not_resolved_from_l04")
 
-    has_quote = candidate.quotation_sensitive or any("quotation" in reason.lower() for reason in candidate.ambiguity_reasons)
-    if has_quote and any("source" in reason.lower() for reason in candidate.ambiguity_reasons):
+    has_quote = _has_quote_or_echo_signal(candidate)
+    if has_quote and _has_source_scope_ambiguity(candidate):
         evidentiality = EvidentialityState.MIXED
     elif has_quote:
         evidentiality = EvidentialityState.QUOTED
-    elif any(slot.unresolved and ("reference" in (slot.unresolved_reason or "") or "deixis" in (slot.unresolved_reason or "")) for slot in candidate.argument_slots):
+    elif _has_unresolved_reference_or_deixis_slot(candidate):
         evidentiality = EvidentialityState.UNRESOLVED
     else:
         evidentiality = EvidentialityState.DIRECT
@@ -395,14 +414,8 @@ def _addressivity_hypotheses(
     candidate: DictumCandidate,
     record_index: int,
 ) -> tuple[AddressivityHypothesis, ...]:
-    unresolved_target = any(
-        slot.unresolved
-        and ("reference" in (slot.unresolved_reason or "") or "deixis" in (slot.unresolved_reason or ""))
-        for slot in candidate.argument_slots
-    )
-    quote_or_echo = candidate.quotation_sensitive or any(
-        "quotation" in reason.lower() for reason in candidate.ambiguity_reasons
-    )
+    unresolved_target = _has_unresolved_reference_or_deixis_slot(candidate)
+    quote_or_echo = _has_quote_or_echo_signal(candidate)
     weighted: list[tuple[AddressivityKind, float, tuple[str, ...], bool, bool, str]] = [
         (
             AddressivityKind.CURRENT_INTERLOCUTOR,
@@ -470,12 +483,8 @@ def _addressivity_hypotheses(
 
 
 def _quoted_speech_state(candidate: DictumCandidate) -> QuotedSpeechState:
-    quote_or_echo = candidate.quotation_sensitive or any(
-        "quotation" in reason.lower() for reason in candidate.ambiguity_reasons
-    )
-    unresolved_source = quote_or_echo or any(
-        "source" in reason.lower() for reason in candidate.ambiguity_reasons
-    )
+    quote_or_echo = _has_quote_or_echo_signal(candidate)
+    unresolved_source = quote_or_echo or _has_source_scope_ambiguity(candidate)
     return QuotedSpeechState(
         quote_or_echo_present=quote_or_echo,
         reported_force_candidate_present=quote_or_echo,
