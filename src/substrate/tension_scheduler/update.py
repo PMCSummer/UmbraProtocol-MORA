@@ -62,6 +62,18 @@ ATTEMPTED_TENSION_SCHEDULER_PATHS: tuple[str, ...] = (
     "tension_scheduler.downstream_gate",
 )
 
+_SCHEDULING_MODE_ORDER: dict[TensionSchedulingMode, int] = {
+    TensionSchedulingMode.REVISIT_NOW: 0,
+    TensionSchedulingMode.REOPEN_DUE_TO_TRIGGER: 1,
+    TensionSchedulingMode.NO_SAFE_DEFER_CLAIM: 2,
+    TensionSchedulingMode.DEFER_UNTIL_CONDITION: 3,
+    TensionSchedulingMode.MONITOR_PASSIVELY: 4,
+    TensionSchedulingMode.HOLD_IN_BACKGROUND: 5,
+    TensionSchedulingMode.SUPPRESS_TEMPORARILY: 6,
+    TensionSchedulingMode.RELEASE_AS_STALE: 7,
+    TensionSchedulingMode.UNSCHEDULABLE_TENSION: 8,
+}
+
 
 @dataclass(frozen=True, slots=True)
 class _TensionCandidate:
@@ -163,7 +175,7 @@ def build_tension_scheduler(
             )
         )
 
-    entries = sorted(entries, key=lambda item: item.tension_id)
+    entries = sorted(entries, key=_entry_sort_key)
     active_ids = tuple(
         entry.tension_id
         for entry in entries
@@ -1031,4 +1043,13 @@ def _ledger_event(
         reason=reason,
         reason_code=reason_code,
         provenance="c02.tension_scheduler_ledger",
+    )
+
+
+def _entry_sort_key(entry: TensionScheduleEntry) -> tuple[float, int, str, str]:
+    return (
+        -entry.revisit_priority,
+        _SCHEDULING_MODE_ORDER.get(entry.scheduling_mode, 99),
+        entry.tension_kind.value,
+        entry.causal_anchor,
     )
