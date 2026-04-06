@@ -18,6 +18,7 @@ from roadmap_tracker.model import (  # noqa: E402
     GraphEdge,
     Phase,
     RoadmapModel,
+    SEAM_RELATION_EXPECTATIONS,
     phase_objective_text,
 )
 
@@ -62,6 +63,8 @@ def test_relation_schema_defaults_and_unknown_fallback() -> None:
 
     legacy = GraphEdge.from_dict({"source": "a", "target": "b", "relation": "blocks_claim"})
     assert legacy.relation == "invalidates"
+    assert GraphEdge.from_dict({"source": "a", "target": "b", "relation": "supports"}).relation == "modulates"
+    assert GraphEdge.from_dict({"source": "a", "target": "b", "relation": "grounds"}).relation == "requires"
 
 
 def test_tracker_roundtrip_preserves_mixed_relation_types() -> None:
@@ -222,6 +225,9 @@ def test_json_file_migrated_to_new_relation_vocabulary_shape() -> None:
     assert "requests_revalidation" in edge_relations
     assert "overrides_survival" in edge_relations
     assert "invalidates" in edge_relations
+    assert "supports" not in edge_relations
+    assert "grounds" not in edge_relations
+    assert "refines" not in edge_relations
 
 
 def test_canonical_roadmap_load_save_roundtrip_keeps_non_requires_relations() -> None:
@@ -232,3 +238,73 @@ def test_canonical_roadmap_load_save_roundtrip_keeps_non_requires_relations() ->
     assert "gates" in edge_relations
     assert "arbitrates" in edge_relations
     assert "requests_revalidation" in edge_relations
+    assert set(edge_relations).issubset(set(EDGE_RELATION_LABELS))
+
+
+def test_seam_relation_consistency_for_representative_pairs() -> None:
+    roadmap_path = TRACKER_ROOT / "UmbraProtocol_MORA_language_refactor.json"
+    model = RoadmapModel.from_json(json.loads(roadmap_path.read_text(encoding="utf-8")))
+    violations = model.seam_relation_consistency_violations()
+    assert violations == []
+
+
+def test_seam_relation_consistency_detects_relation_drift() -> None:
+    roadmap_path = TRACKER_ROOT / "UmbraProtocol_MORA_language_refactor.json"
+    model = RoadmapModel.from_json(json.loads(roadmap_path.read_text(encoding="utf-8")))
+    target_pair = ("C04", "C05")
+    expected = SEAM_RELATION_EXPECTATIONS[target_pair]
+    assert expected == "arbitrates"
+    for edge in model.graph_edges:
+        if edge.source == "phase::C04" and edge.target == "phase::C05":
+            edge.relation = "requires"
+            break
+    else:
+        raise AssertionError("Missing C04->C05 edge in canonical roadmap.")
+    violations = model.seam_relation_consistency_violations()
+    assert any("C04->C05 expected=arbitrates actual=requires" in item for item in violations)
+
+
+def test_requires_vs_gates_and_invalidates_vs_revalidation_are_distinct() -> None:
+    roadmap_path = TRACKER_ROOT / "UmbraProtocol_MORA_language_refactor.json"
+    model = RoadmapModel.from_json(json.loads(roadmap_path.read_text(encoding="utf-8")))
+    relation_by_pair = {(edge.source, edge.target): edge.relation for edge in model.graph_edges}
+    assert relation_by_pair[("phase::C01", "phase::C02")] == "requires"
+    assert relation_by_pair[("phase::C02", "phase::C04")] == "gates"
+    assert relation_by_pair[("phase::S05", "phase::S04")] == "invalidates"
+    assert relation_by_pair[("phase::C05", "phase::S04")] == "requests_revalidation"
+
+
+def test_observes_only_links_remain_non_enforcement_relations() -> None:
+    roadmap_path = TRACKER_ROOT / "UmbraProtocol_MORA_language_refactor.json"
+    model = RoadmapModel.from_json(json.loads(roadmap_path.read_text(encoding="utf-8")))
+    relation_by_pair = {(edge.source, edge.target): edge.relation for edge in model.graph_edges}
+    for pair in [
+        ("phase::A01", "phase::D01"),
+        ("phase::A02", "phase::D01"),
+        ("phase::A03", "phase::D01"),
+        ("phase::N01", "phase::D01"),
+        ("phase::N02", "phase::D01"),
+        ("phase::N03", "phase::D01"),
+    ]:
+        assert relation_by_pair[pair] == "observes_only"
+
+
+def test_seam_docs_include_relation_semantic_contract_blocks() -> None:
+    seam_dir = ROOT / "docs" / "seams"
+    required = {
+        "C01.seam.md": ["C01 -> C02/C03/C04/C05: `requires`"],
+        "C02.seam.md": ["C02 -> C03: `gates`", "C02 -> C04: `gates`", "C02 -> C05: `gates`"],
+        "C03.seam.md": ["C03 -> C04: `modulates`", "C03 -> C05: `modulates`"],
+        "C04.seam.md": ["C04 -> C05: `arbitrates`"],
+        "C05.seam.md": ["`requests_revalidation`"],
+        "R04.seam.md": ["R04 -> C04/S01/S02/S03/S04/S05: `overrides_survival`"],
+        "D01.seam.md": ["A01/A02/A03/C05/N01/N02/N03 -> D01: `observes_only`", "D01 -> M01: `modulates`"],
+        "S04.seam.md": ["S04 -> O01: `body_world_couples`"],
+        "S05.seam.md": ["S05 -> D01/M01/M02/M03: `feedback_learns`"],
+        "O01.seam.md": ["O01 -> O02: `modulates`", "O01 -> O03: `modulates`"],
+    }
+    for seam_name, fragments in required.items():
+        text = (seam_dir / seam_name).read_text(encoding="utf-8")
+        assert "## RELATION SEMANTIC CONTRACT" in text
+        for fragment in fragments:
+            assert fragment in text

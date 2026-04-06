@@ -104,6 +104,18 @@ GRAPH_LAYER_LABELS = {
     "validation": "Validation grid",
 }
 EDGE_RELATION_DEFAULT = "requires"
+EDGE_RELATION_CANONICAL = (
+    "requires",
+    "modulates",
+    "gates",
+    "invalidates",
+    "arbitrates",
+    "observes_only",
+    "requests_revalidation",
+    "feedback_learns",
+    "body_world_couples",
+    "overrides_survival",
+)
 EDGE_RELATION_LABELS = {
     "requires": "requires",
     "modulates": "modulates",
@@ -115,25 +127,23 @@ EDGE_RELATION_LABELS = {
     "feedback_learns": "feedback_learns",
     "body_world_couples": "body_world_couples",
     "overrides_survival": "overrides_survival",
-    # Legacy relations are kept for backward-compatible load/edit paths.
-    "causes": "causes",
-    "enables": "enables",
-    "tests": "tests",
-    "contradicts": "contradicts",
-    "grounds": "grounds",
-    "generated_by": "generated_by",
-    "implemented_by": "implemented_by",
-    "measured_by": "measured_by",
-    "supports": "supports",
-    "challenged_by": "challenged_by",
-    "refines": "refines",
-    "abstracts_to": "abstracts_to",
-    "belongs_to_scope": "belongs_to_scope",
-    "blocks_claim": "blocks_claim",
-    "forbids_shortcut": "forbids_shortcut",
 }
 EDGE_RELATION_LEGACY_ALIASES = {
+    "causes": "requires",
+    "enables": "requires",
+    "tests": "requests_revalidation",
+    "contradicts": "invalidates",
+    "grounds": "requires",
+    "generated_by": "observes_only",
+    "implemented_by": "requires",
+    "measured_by": "observes_only",
+    "supports": "modulates",
+    "challenged_by": "requests_revalidation",
+    "refines": "modulates",
+    "abstracts_to": "modulates",
+    "belongs_to_scope": "requires",
     "blocks_claim": "invalidates",
+    "forbids_shortcut": "gates",
 }
 EDGE_RELATION_STYLE_HINTS = {
     "requires": "solid_neutral",
@@ -146,6 +156,61 @@ EDGE_RELATION_STYLE_HINTS = {
     "feedback_learns": "solid_feedback",
     "body_world_couples": "solid_coupling",
     "overrides_survival": "solid_override",
+}
+SEAM_RELATION_EXPECTATIONS: Dict[tuple[str, str], str] = {
+    ("C02", "C03"): "gates",
+    ("C02", "C04"): "gates",
+    ("C02", "C05"): "gates",
+    ("C03", "C04"): "modulates",
+    ("C03", "C05"): "modulates",
+    ("C04", "C05"): "arbitrates",
+    ("C05", "A01"): "requests_revalidation",
+    ("C05", "A02"): "requests_revalidation",
+    ("C05", "A03"): "requests_revalidation",
+    ("C05", "D01"): "requests_revalidation",
+    ("C05", "M01"): "requests_revalidation",
+    ("C05", "M02"): "requests_revalidation",
+    ("C05", "M03"): "requests_revalidation",
+    ("C05", "N01"): "requests_revalidation",
+    ("C05", "N02"): "requests_revalidation",
+    ("C05", "N03"): "requests_revalidation",
+    ("C05", "O02"): "requests_revalidation",
+    ("C05", "S01"): "requests_revalidation",
+    ("C05", "S02"): "requests_revalidation",
+    ("C05", "S03"): "requests_revalidation",
+    ("C05", "S04"): "requests_revalidation",
+    ("C05", "S05"): "requests_revalidation",
+    ("C05", "T02"): "requests_revalidation",
+    ("C05", "T03"): "requests_revalidation",
+    ("R04", "A01"): "gates",
+    ("R04", "A02"): "gates",
+    ("R04", "C01"): "modulates",
+    ("R04", "C02"): "modulates",
+    ("R04", "C03"): "modulates",
+    ("R04", "C04"): "overrides_survival",
+    ("R04", "C05"): "modulates",
+    ("R04", "M01"): "gates",
+    ("R04", "O02"): "gates",
+    ("R04", "S01"): "overrides_survival",
+    ("R04", "S02"): "overrides_survival",
+    ("R04", "S03"): "overrides_survival",
+    ("R04", "S04"): "overrides_survival",
+    ("R04", "S05"): "overrides_survival",
+    ("A01", "D01"): "observes_only",
+    ("A02", "D01"): "observes_only",
+    ("A03", "D01"): "observes_only",
+    ("N01", "D01"): "observes_only",
+    ("N02", "D01"): "observes_only",
+    ("N03", "D01"): "observes_only",
+    ("S05", "D01"): "feedback_learns",
+    ("D01", "M01"): "modulates",
+    ("S05", "M01"): "feedback_learns",
+    ("S05", "M02"): "feedback_learns",
+    ("S05", "M03"): "feedback_learns",
+    ("S04", "O01"): "body_world_couples",
+    ("S05", "O01"): "body_world_couples",
+    ("O01", "O02"): "modulates",
+    ("O01", "O03"): "modulates",
 }
 DISCIPLINE_OPTIONS = [
     "psycholinguistics",
@@ -1335,7 +1400,13 @@ class RoadmapModel:
         model.claim_role_vocab = raw.get("claim_role_vocab", {}) or {}
         model.claim_state_vocab = raw.get("claim_state_vocab", {}) or {}
         model.maturity_vocab = raw.get("maturity_vocab", {}) or {}
-        model.edge_relation_vocab = raw.get("edge_relation_vocab", {}) or {}
+        raw_relation_vocab = raw.get("edge_relation_vocab", {}) or {}
+        normalized_relation_vocab: Dict[str, str] = {}
+        if isinstance(raw_relation_vocab, dict):
+            for key, label in raw_relation_vocab.items():
+                canonical = normalize_edge_relation(key)
+                normalized_relation_vocab[canonical] = str(label or canonical).strip() or canonical
+        model.edge_relation_vocab = normalized_relation_vocab
         model.strategic_answers = raw.get("strategic_answers", {}) or {}
         model.non_negotiables = listify(raw.get("non_negotiables", []))
         model.falsification_conditions = listify(raw.get("falsification_conditions", []))
@@ -1561,10 +1632,12 @@ class RoadmapModel:
         migrated = 0
         for edge in self.graph_edges:
             original = edge.relation
+            inferred = self._infer_relation_from_phase_pair(edge.source, edge.target)
             if edge.relation == "blocks_claim":
                 edge.relation = "invalidates"
+            elif inferred is not None and edge.relation != inferred:
+                edge.relation = inferred
             elif edge.relation == EDGE_RELATION_DEFAULT:
-                inferred = self._infer_relation_from_phase_pair(edge.source, edge.target)
                 if inferred is not None:
                     edge.relation = inferred
             else:
@@ -1579,28 +1652,29 @@ class RoadmapModel:
         if not source_code or not target_code:
             return None
 
-        if source_code == "C04" and target_code in {
-            "C05", "A01", "A03", "N01", "O02", "S01", "S02", "S03", "S04", "S05"
-        }:
-            return "arbitrates"
-        if source_code == "C05" and target_code in {
-            "A01", "A02", "A03", "D01", "M01", "M02", "M03", "N01", "N02", "N03",
-            "O02", "S01", "S02", "S03", "S04", "S05", "T01", "T02", "T03"
-        }:
-            return "requests_revalidation"
-        if source_code == "R04" and target_code in {"C04", "S01", "S02", "S03", "S04", "S05"}:
-            return "overrides_survival"
-        if source_code == "R04" and target_code in {"C01", "C02", "C03", "C05"}:
-            return "modulates"
-        if source_code == "C02" and target_code in {"C03", "C04", "C05"}:
-            return "gates"
-        if source_code == "D01" and target_code in {"M01", "M02", "M03"}:
-            return "observes_only"
-        if source_code == "S05" and target_code in {"D01", "M01", "M02", "M03"}:
-            return "feedback_learns"
-        if source_code in {"S04", "S05"} and target_code == "O01":
-            return "body_world_couples"
-        return None
+        return SEAM_RELATION_EXPECTATIONS.get((source_code, target_code))
+
+    def seam_relation_consistency_violations(self) -> List[str]:
+        relation_by_pair: Dict[tuple[str, str], str] = {}
+        for edge in self.graph_edges:
+            source_code = parse_phase_node_code(edge.source)
+            target_code = parse_phase_node_code(edge.target)
+            if not source_code or not target_code:
+                continue
+            pair = (source_code, target_code)
+            if pair not in SEAM_RELATION_EXPECTATIONS:
+                continue
+            relation_by_pair[pair] = normalize_edge_relation(edge.relation)
+
+        violations: List[str] = []
+        for pair, expected in sorted(SEAM_RELATION_EXPECTATIONS.items()):
+            actual = relation_by_pair.get(pair)
+            if actual is None:
+                violations.append(f"{pair[0]}->{pair[1]} missing_edge expected={expected}")
+                continue
+            if actual != expected:
+                violations.append(f"{pair[0]}->{pair[1]} expected={expected} actual={actual}")
+        return violations
 
     def get_node(self, node_id: str) -> Optional[GraphNode]:
         for node in self.graph_nodes:
