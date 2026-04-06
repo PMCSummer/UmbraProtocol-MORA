@@ -272,6 +272,7 @@ def test_requires_vs_gates_and_invalidates_vs_revalidation_are_distinct() -> Non
     assert relation_by_pair[("phase::C02", "phase::C04")] == "gates"
     assert relation_by_pair[("phase::S05", "phase::S04")] == "invalidates"
     assert relation_by_pair[("phase::C05", "phase::S04")] == "requests_revalidation"
+    assert relation_by_pair[("phase::C05", "phase::D01")] == "requests_revalidation"
 
 
 def test_observes_only_links_remain_non_enforcement_relations() -> None:
@@ -285,23 +286,109 @@ def test_observes_only_links_remain_non_enforcement_relations() -> None:
         ("phase::N01", "phase::D01"),
         ("phase::N02", "phase::D01"),
         ("phase::N03", "phase::D01"),
+        ("phase::RT01", "phase::D01"),
     ]:
         assert relation_by_pair[pair] == "observes_only"
+
+
+def test_rt01_present_and_marked_closed_runtime_phase() -> None:
+    roadmap_path = TRACKER_ROOT / "UmbraProtocol_MORA_language_refactor.json"
+    raw = json.loads(roadmap_path.read_text(encoding="utf-8"))
+    phases = {phase.get("code"): phase for phase in raw.get("phases", [])}
+    assert "RT01" in phases
+    rt01 = phases["RT01"]
+    assert rt01.get("status") == "closed"
+    assert rt01.get("validation_state") == "implemented_baseline"
+    assert rt01.get("maturity") in {"L7_stable_in_contour", "L8_externally_benchmarked"}
+    assert rt01.get("claim_state") in {"telemetry_supported", "implemented"}
+
+
+def test_rt01_relations_present_and_authority_safe() -> None:
+    roadmap_path = TRACKER_ROOT / "UmbraProtocol_MORA_language_refactor.json"
+    model = RoadmapModel.from_json(json.loads(roadmap_path.read_text(encoding="utf-8")))
+    relation_by_pair = {(edge.source, edge.target): edge.relation for edge in model.graph_edges}
+    assert relation_by_pair[("phase::C01", "phase::RT01")] == "requires"
+    assert relation_by_pair[("phase::C04", "phase::RT01")] == "arbitrates"
+    assert relation_by_pair[("phase::C05", "phase::RT01")] == "gates"
+    assert relation_by_pair[("phase::RT01", "phase::D01")] == "observes_only"
+    assert relation_by_pair[("phase::C04", "phase::RT01")] != relation_by_pair[("phase::C05", "phase::RT01")]
+
+
+def test_missing_pair_c01_t01_is_now_present() -> None:
+    roadmap_path = TRACKER_ROOT / "UmbraProtocol_MORA_language_refactor.json"
+    model = RoadmapModel.from_json(json.loads(roadmap_path.read_text(encoding="utf-8")))
+    relation_by_pair = {(edge.source, edge.target): edge.relation for edge in model.graph_edges}
+    assert relation_by_pair[("phase::C01", "phase::T01")] == "requires"
+
+
+def test_targeted_self_world_learning_retagging_is_present() -> None:
+    roadmap_path = TRACKER_ROOT / "UmbraProtocol_MORA_language_refactor.json"
+    model = RoadmapModel.from_json(json.loads(roadmap_path.read_text(encoding="utf-8")))
+    relation_by_pair = {(edge.source, edge.target): edge.relation for edge in model.graph_edges}
+    assert relation_by_pair[("phase::N03", "phase::O02")] == "modulates"
+    assert relation_by_pair[("phase::T03", "phase::O02")] == "modulates"
+    assert relation_by_pair[("phase::S05", "phase::O02")] == "modulates"
+    assert relation_by_pair[("phase::O02", "phase::O03")] == "modulates"
+    assert relation_by_pair[("phase::S05", "phase::O03")] == "modulates"
+    assert relation_by_pair[("phase::S05", "phase::A01")] == "modulates"
+    assert relation_by_pair[("phase::S05", "phase::A02")] == "modulates"
+    assert relation_by_pair[("phase::S05", "phase::A03")] == "modulates"
+
+
+def test_audited_frontier_seam_contract_matches_graph_pairs() -> None:
+    roadmap_path = TRACKER_ROOT / "UmbraProtocol_MORA_language_refactor.json"
+    model = RoadmapModel.from_json(json.loads(roadmap_path.read_text(encoding="utf-8")))
+    frontier = [
+        "C01.seam.md",
+        "C02.seam.md",
+        "C03.seam.md",
+        "C04.seam.md",
+        "C05.seam.md",
+        "R04.seam.md",
+        "D01.seam.md",
+        "S01.seam.md",
+        "S02.seam.md",
+        "S03.seam.md",
+        "S04.seam.md",
+        "S05.seam.md",
+        "A01.seam.md",
+        "A02.seam.md",
+        "A03.seam.md",
+        "M01.seam.md",
+        "M02.seam.md",
+        "M03.seam.md",
+        "O01.seam.md",
+        "O02.seam.md",
+        "RT01.seam.md",
+    ]
+    violations = model.seam_relation_contract_violations(seam_files=frontier)
+    assert violations == []
 
 
 def test_seam_docs_include_relation_semantic_contract_blocks() -> None:
     seam_dir = ROOT / "docs" / "seams"
     required = {
-        "C01.seam.md": ["C01 -> C02/C03/C04/C05: `requires`"],
+        "C01.seam.md": ["C01 -> C02/C03/C04/C05/RT01: `requires`", "C01 -> S01/S02/S03/S04/S05/T01: `requires`"],
         "C02.seam.md": ["C02 -> C03: `gates`", "C02 -> C04: `gates`", "C02 -> C05: `gates`"],
         "C03.seam.md": ["C03 -> C04: `modulates`", "C03 -> C05: `modulates`"],
-        "C04.seam.md": ["C04 -> C05: `arbitrates`"],
-        "C05.seam.md": ["`requests_revalidation`"],
+        "C04.seam.md": ["C04 -> C05: `arbitrates`", "C04 -> RT01: `arbitrates`"],
+        "C05.seam.md": ["`requests_revalidation`", "C05 -> RT01: `gates`"],
         "R04.seam.md": ["R04 -> C04/S01/S02/S03/S04/S05: `overrides_survival`"],
-        "D01.seam.md": ["A01/A02/A03/C05/N01/N02/N03 -> D01: `observes_only`", "D01 -> M01: `modulates`"],
+        "D01.seam.md": ["A01/A02/A03/N01/N02/N03/RT01 -> D01: `observes_only`", "C05 -> D01: `requests_revalidation`", "D01 -> M01: `modulates`"],
+        "S01.seam.md": ["C04 -> S01: `arbitrates`", "R04 -> S01: `overrides_survival`"],
+        "S02.seam.md": ["C04 -> S02: `arbitrates`", "R04 -> S02: `overrides_survival`"],
+        "S03.seam.md": ["C04 -> S03: `arbitrates`", "R04 -> S03: `overrides_survival`"],
         "S04.seam.md": ["S04 -> O01: `body_world_couples`"],
         "S05.seam.md": ["S05 -> D01/M01/M02/M03: `feedback_learns`"],
         "O01.seam.md": ["O01 -> O02: `modulates`", "O01 -> O03: `modulates`"],
+        "O02.seam.md": ["C04 -> O02: `arbitrates`", "R04 -> O02: `gates`", "O01/N03/S05/T03 -> O02: `modulates`"],
+        "A01.seam.md": ["C04 -> A01: `arbitrates`", "R04 -> A01: `gates`", "S05 -> A01: `modulates`"],
+        "A02.seam.md": ["A01 -> A02: `requires`", "R04 -> A02: `gates`", "S05 -> A02: `modulates`"],
+        "A03.seam.md": ["A01/A02 -> A03: `requires`", "C04 -> A03: `arbitrates`", "S05 -> A03: `modulates`"],
+        "M01.seam.md": ["D01 -> M01: `modulates`", "R04 -> M01: `gates`", "S05 -> M01: `feedback_learns`"],
+        "M02.seam.md": ["M01 -> M02: `requires`", "C05 -> M02: `requests_revalidation`", "S05 -> M02: `feedback_learns`"],
+        "M03.seam.md": ["M01/M02 -> M03: `requires`", "C05 -> M03: `requests_revalidation`", "S05 -> M03: `feedback_learns`"],
+        "RT01.seam.md": ["C04 -> RT01: `arbitrates`", "C05 -> RT01: `gates`", "RT01 -> D01: `observes_only`"],
     }
     for seam_name, fragments in required.items():
         text = (seam_dir / seam_name).read_text(encoding="utf-8")
