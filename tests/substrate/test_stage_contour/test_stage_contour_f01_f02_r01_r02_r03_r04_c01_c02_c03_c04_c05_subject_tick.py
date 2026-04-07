@@ -82,6 +82,12 @@ def test_stage_contour_subject_tick_obeys_c04_and_c05_contract_changes() -> None
     )
     assert baseline.state.c04_selected_mode
     assert baseline.state.c04_execution_mode_claim
+    assert baseline.state.c04_authority_role == "arbitration"
+    assert baseline.state.c05_authority_role == "invalidation"
+    assert baseline.state.d01_authority_role == "observability_only"
+    assert baseline.state.role_frontier_typed is True
+    assert baseline.state.role_frontier_only is True
+    assert baseline.state.role_map_ready is False
     assert restricted.state.c05_validity_action in {
         "run_selective_revalidation",
         "run_bounded_revalidation",

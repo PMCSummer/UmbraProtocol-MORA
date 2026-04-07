@@ -17,6 +17,16 @@ class SubjectTickContractView:
     tick_index: int
     c04_execution_mode_claim: str
     c05_execution_action_claim: str
+    f01_authority_role: str
+    r04_authority_role: str
+    c04_authority_role: str
+    c05_authority_role: str
+    d01_authority_role: str
+    rt01_authority_role: str
+    role_source_ref: str
+    role_frontier_only: bool
+    role_map_ready: bool
+    role_frontier_typed: bool
     active_execution_mode: str
     c04_selected_mode: str
     c05_validity_action: str
@@ -50,6 +60,16 @@ def derive_subject_tick_contract_view(
         tick_index=state.tick_index,
         c04_execution_mode_claim=state.c04_execution_mode_claim,
         c05_execution_action_claim=state.c05_execution_action_claim,
+        f01_authority_role=state.f01_authority_role,
+        r04_authority_role=state.r04_authority_role,
+        c04_authority_role=state.c04_authority_role,
+        c05_authority_role=state.c05_authority_role,
+        d01_authority_role=state.d01_authority_role,
+        rt01_authority_role=state.rt01_authority_role,
+        role_source_ref=state.role_source_ref,
+        role_frontier_only=state.role_frontier_only,
+        role_map_ready=state.role_map_ready,
+        role_frontier_typed=state.role_frontier_typed,
         active_execution_mode=state.active_execution_mode,
         c04_selected_mode=state.c04_selected_mode,
         c05_validity_action=state.c05_validity_action,

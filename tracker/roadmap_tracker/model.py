@@ -23,6 +23,8 @@ DEFAULT_CLAIM_ROLE = "core_foundation_or_support"
 DEFAULT_PRIORITY_BUCKET = "historical_foundation"
 DEFAULT_CLAIM_STATE = "unknown"
 DEFAULT_MATURITY = "L1_theoretical_only"
+DEFAULT_AUTHORITY_ROLE = "computational"
+DEFAULT_COMPUTATIONAL_ROLE = "unknown"
 DEFAULT_NODE_TYPE = "phase"
 DEFAULT_GRAPH_LAYER = "causal"
 DEFAULT_EVIDENCE_STATUS = "planned"
@@ -86,6 +88,26 @@ MATURITY_LABELS = {
     "L7_stable_in_contour": "L7 / contour stable",
     "L8_externally_benchmarked": "L8 / externally benchmarked",
 }
+AUTHORITY_ROLE_LABELS = {
+    "gating": "gating",
+    "invalidation": "invalidation",
+    "arbitration": "arbitration",
+    "modulatory_only": "modulatory_only",
+    "observability_only": "observability_only",
+    "computational": "computational",
+    "unknown": "unknown",
+}
+COMPUTATIONAL_ROLE_LABELS = {
+    "state_update": "state_update",
+    "scheduler": "scheduler",
+    "evaluator": "evaluator",
+    "observability": "observability",
+    "execution_spine": "execution_spine",
+    "bridge_contract": "bridge_contract",
+    "registry": "registry",
+    "unknown": "unknown",
+}
+ROLE_FRONTIER_PHASE_CODES = ("F01", "R04", "C04", "C05", "D01", "RT01")
 NODE_TYPE_LABELS = {
     "phase": "Phase module",
     "mechanism": "Mechanism",
@@ -362,6 +384,20 @@ def normalize_edge_relation(value: str | None) -> str:
     if canonical in EDGE_RELATION_LABELS:
         return canonical
     return EDGE_RELATION_DEFAULT
+
+
+def normalize_authority_role(value: str | None) -> str:
+    token = str(value or "").strip()
+    if not token:
+        return DEFAULT_AUTHORITY_ROLE
+    return token if token in AUTHORITY_ROLE_LABELS else DEFAULT_AUTHORITY_ROLE
+
+
+def normalize_computational_role(value: str | None) -> str:
+    token = str(value or "").strip()
+    if not token:
+        return DEFAULT_COMPUTATIONAL_ROLE
+    return token if token in COMPUTATIONAL_ROLE_LABELS else DEFAULT_COMPUTATIONAL_ROLE
 
 
 def listify(value: Any) -> List[str]:
@@ -740,6 +776,8 @@ class Phase:
     risk_tags: List[str] = field(default_factory=list)
     claim_state: str = DEFAULT_CLAIM_STATE
     maturity: str = DEFAULT_MATURITY
+    authority_role: str = DEFAULT_AUTHORITY_ROLE
+    computational_role: str = DEFAULT_COMPUTATIONAL_ROLE
     knowledge_card: KnowledgeCard = field(default_factory=KnowledgeCard)
     related_node_ids: List[str] = field(default_factory=list)
 
@@ -755,6 +793,8 @@ class Phase:
         self.risk_tags = [str(item).strip() for item in self.risk_tags if str(item).strip()]
         self.related_node_ids = [str(item).strip() for item in self.related_node_ids if str(item).strip()]
         self.notes = self.notes.strip()
+        self.authority_role = normalize_authority_role(self.authority_role)
+        self.computational_role = normalize_computational_role(self.computational_role)
 
     @property
     def display_track(self) -> str:
@@ -785,6 +825,14 @@ class Phase:
         return display_from_map(self.maturity, MATURITY_LABELS)
 
     @property
+    def display_authority_role(self) -> str:
+        return display_from_map(self.authority_role, AUTHORITY_ROLE_LABELS)
+
+    @property
+    def display_computational_role(self) -> str:
+        return display_from_map(self.computational_role, COMPUTATIONAL_ROLE_LABELS)
+
+    @property
     def protocol_label(self) -> str:
         return f"{self.code} // {self.title}"
 
@@ -797,6 +845,8 @@ class Phase:
             f"CLAIM    {self.display_claim_state}",
             f"ROLE     {self.display_claim_role}",
             f"LEVEL    {self.display_maturity}",
+            f"AUTH     {self.display_authority_role}",
+            f"COMPUTE  {self.display_computational_role}",
         ]
 
     def dependency_codes(self) -> List[str]:
@@ -873,6 +923,8 @@ class Phase:
             self.priority_bucket,
             self.claim_state,
             self.maturity,
+            self.authority_role,
+            self.computational_role,
             self.rendered_description(),
             self.notes,
             " ".join(self.claim_blocked_by),
@@ -902,6 +954,8 @@ class Phase:
             "risk_tags": self.risk_tags,
             "claim_state": self.claim_state,
             "maturity": self.maturity,
+            "authority_role": self.authority_role,
+            "computational_role": self.computational_role,
             "knowledge_card": self.knowledge_card.to_dict(),
             "related_node_ids": self.related_node_ids,
         }
@@ -941,6 +995,8 @@ class Phase:
             ],
             "claim_state": self.claim_state,
             "maturity": self.maturity,
+            "authority_role": self.authority_role,
+            "computational_role": self.computational_role,
             "knowledge_card": {
                 "functional_role": "TODO: Какую незаменимую каузальную роль играет эта фаза?",
                 "why_exists": "TODO: Какую дыру в архитектуре она закрывает и почему это отдельный слой?",
@@ -1003,6 +1059,8 @@ class Phase:
             risk_tags=listify(item.get("risk_tags", [])),
             claim_state=str(item.get("claim_state", DEFAULT_CLAIM_STATE)).strip() or DEFAULT_CLAIM_STATE,
             maturity=str(item.get("maturity", DEFAULT_MATURITY)).strip() or DEFAULT_MATURITY,
+            authority_role=normalize_authority_role(item.get("authority_role", DEFAULT_AUTHORITY_ROLE)),
+            computational_role=normalize_computational_role(item.get("computational_role", DEFAULT_COMPUTATIONAL_ROLE)),
             knowledge_card=KnowledgeCard.from_dict(item.get("knowledge_card") or legacy_knowledge),
             related_node_ids=listify(item.get("related_node_ids", [])),
         )
@@ -1042,6 +1100,8 @@ class Phase:
             validation_state="implemented_baseline" if status == "closed" else "planned",
             claim_role="core_foundation_or_support",
             priority_bucket="historical_foundation" if status == "closed" else "phase_2_long_run_validation_backbone",
+            authority_role=DEFAULT_AUTHORITY_ROLE,
+            computational_role=DEFAULT_COMPUTATIONAL_ROLE,
             knowledge_card=KnowledgeCard(functional_role=description),
         )
 
@@ -1425,6 +1485,8 @@ class RoadmapModel:
         self.claim_role_vocab: Dict[str, str] = {}
         self.claim_state_vocab: Dict[str, str] = {}
         self.maturity_vocab: Dict[str, str] = {}
+        self.authority_role_vocab: Dict[str, str] = {}
+        self.computational_role_vocab: Dict[str, str] = {}
         self.edge_relation_vocab: Dict[str, str] = {}
         self.strategic_answers: Dict[str, Any] = {}
         self.non_negotiables: List[str] = []
@@ -1449,6 +1511,8 @@ class RoadmapModel:
         model.claim_role_vocab = raw.get("claim_role_vocab", {}) or {}
         model.claim_state_vocab = raw.get("claim_state_vocab", {}) or {}
         model.maturity_vocab = raw.get("maturity_vocab", {}) or {}
+        model.authority_role_vocab = raw.get("authority_role_vocab", {}) or {}
+        model.computational_role_vocab = raw.get("computational_role_vocab", {}) or {}
         raw_relation_vocab = raw.get("edge_relation_vocab", {}) or {}
         normalized_relation_vocab: Dict[str, str] = {}
         if isinstance(raw_relation_vocab, dict):
@@ -1486,6 +1550,8 @@ class RoadmapModel:
             "claim_role_vocab": self.claim_role_vocab or {key: value for key, value in CLAIM_ROLE_LABELS.items()},
             "claim_state_vocab": self.claim_state_vocab or {key: value for key, value in CLAIM_STATE_LABELS.items()},
             "maturity_vocab": self.maturity_vocab or {key: value for key, value in MATURITY_LABELS.items()},
+            "authority_role_vocab": self.authority_role_vocab or {key: value for key, value in AUTHORITY_ROLE_LABELS.items()},
+            "computational_role_vocab": self.computational_role_vocab or {key: value for key, value in COMPUTATIONAL_ROLE_LABELS.items()},
             "edge_relation_vocab": self.edge_relation_vocab or {key: value for key, value in EDGE_RELATION_LABELS.items()},
             "strategic_answers": self.strategic_answers,
             "non_negotiables": self.non_negotiables,
@@ -1555,6 +1621,72 @@ class RoadmapModel:
             if normalize_code(phase.code) == target:
                 return idx
         return None
+
+    def phase_role_map(self) -> Dict[str, Dict[str, str]]:
+        return {
+            normalize_code(phase.code): {
+                "authority_role": normalize_authority_role(phase.authority_role),
+                "computational_role": normalize_computational_role(phase.computational_role),
+            }
+            for phase in self.phases
+        }
+
+    def role_readiness_summary(
+        self,
+        *,
+        frontier_codes: Iterable[str] = ROLE_FRONTIER_PHASE_CODES,
+    ) -> Dict[str, Any]:
+        role_map = self.phase_role_map()
+        total_phase_count = len(self.phases)
+        frontier = tuple(normalize_code(code) for code in frontier_codes if normalize_code(code))
+        frontier_present = tuple(code for code in frontier if code in role_map)
+
+        fallback_codes = [
+            code
+            for code, roles in role_map.items()
+            if normalize_authority_role(roles.get("authority_role")) == DEFAULT_AUTHORITY_ROLE
+            and normalize_computational_role(roles.get("computational_role")) == DEFAULT_COMPUTATIONAL_ROLE
+        ]
+        frontier_typed_codes = [
+            code
+            for code in frontier_present
+            if code not in fallback_codes
+        ]
+        frontier_role_typed = len(frontier_present) == len(frontier) and len(frontier_typed_codes) == len(frontier)
+        map_wide_role_ready = total_phase_count > 0 and not fallback_codes
+        role_frontier_only = frontier_role_typed and not map_wide_role_ready
+        return {
+            "frontier_phase_codes": frontier,
+            "frontier_present_phase_codes": frontier_present,
+            "frontier_typed_phase_codes": tuple(frontier_typed_codes),
+            "fallback_phase_codes": tuple(sorted(fallback_codes)),
+            "fallback_phase_count": len(fallback_codes),
+            "total_phase_count": total_phase_count,
+            "frontier_role_typed": frontier_role_typed,
+            "map_wide_role_ready": map_wide_role_ready,
+            "role_frontier_only": role_frontier_only,
+        }
+
+    def subject_tick_role_source_packet(self) -> Dict[str, Any]:
+        readiness = self.role_readiness_summary()
+        role_map = self.phase_role_map()
+        frontier = readiness.get("frontier_phase_codes", ())
+        return {
+            "source_ref": "roadmap.phase_role_frontier_packet.v1",
+            "phase_authority_roles": {
+                code: role_map[code]["authority_role"]
+                for code in frontier
+                if code in role_map
+            },
+            "phase_computational_roles": {
+                code: role_map[code]["computational_role"]
+                for code in frontier
+                if code in role_map
+            },
+            "frontier_role_typed": bool(readiness.get("frontier_role_typed", False)),
+            "map_wide_role_ready": bool(readiness.get("map_wide_role_ready", False)),
+            "role_frontier_only": bool(readiness.get("role_frontier_only", False)),
+        }
 
     def phase_to_json_text(self, code: str) -> str:
         phase = self.get_phase(code)
@@ -2144,6 +2276,7 @@ class RoadmapModel:
             "typed_transition_route_not_encoded_in_tracker_data",
             "allowed_change_budget_not_encoded_in_tracker_data",
         ]
+        role_readiness = self.role_readiness_summary()
 
         packet = {
             "packet_version": "phase_execution_packet_v1",
@@ -2157,6 +2290,8 @@ class RoadmapModel:
                 "claim_role": phase.claim_role,
                 "claim_state": phase.claim_state,
                 "maturity": phase.maturity,
+                "authority_role": phase.authority_role,
+                "computational_role": phase.computational_role,
                 "priority_bucket": phase.priority_bucket,
             },
             "assembly_status": {
@@ -2207,6 +2342,8 @@ class RoadmapModel:
                 "claim_boundaries": {
                     "allowed_claim_state": phase.claim_state,
                     "claim_role": phase.claim_role,
+                    "authority_role": phase.authority_role,
+                    "computational_role": phase.computational_role,
                     "blocked_by": list(phase.claim_blocked_by),
                 },
             },
@@ -2225,6 +2362,7 @@ class RoadmapModel:
                 "available_from_tracker": [],
                 "missing_from_tracker_schema": tracker_schema_gaps,
             },
+            "role_readiness": role_readiness,
             "missing_context_blockers": {
                 "phase_data_gaps": phase_data_gaps,
                 "evidence_gaps": evidence_gaps,
@@ -2240,9 +2378,13 @@ class RoadmapModel:
         packet = self.build_phase_execution_packet(phase_code)
         status = packet.get("assembly_status", {})
         phase = packet.get("phase", {})
+        role_readiness = packet.get("role_readiness", {})
         lines = [f"{phase.get('code', '')} // {phase.get('title', '')}", ""]
         lines.append(f"Design reasoning ready: {'YES' if status.get('ready_for_design_reasoning') else 'NO'}")
         lines.append(f"Repo codegen ready: {'YES' if status.get('ready_for_repo_codegen') else 'NO'}")
+        lines.append(f"Role frontier typed: {'YES' if role_readiness.get('frontier_role_typed') else 'NO'}")
+        lines.append(f"Role map-wide ready: {'YES' if role_readiness.get('map_wide_role_ready') else 'NO'}")
+        lines.append(f"Role frontier-only claim: {'YES' if role_readiness.get('role_frontier_only') else 'NO'}")
         lines.append("")
         for label, items in [
             ("Phase data gaps", status.get("phase_data_gaps", [])),

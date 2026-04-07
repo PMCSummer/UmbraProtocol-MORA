@@ -3,6 +3,7 @@ from __future__ import annotations
 from substrate.subject_tick import (
     SubjectTickContext,
     SubjectTickOutcome,
+    SubjectTickRoleMapSource,
     choose_runtime_execution_outcome,
     derive_subject_tick_contract_view,
 )
@@ -242,6 +243,9 @@ def test_subject_tick_role_boundary_remains_execution_only_not_semantic_reinterp
     result = _result("rt-role-boundary", unresolved=True)
     view = derive_subject_tick_contract_view(result)
     assert view.requires_restrictions_read is True
+    assert view.c04_authority_role == "arbitration"
+    assert view.c05_authority_role == "invalidation"
+    assert view.d01_authority_role == "observability_only"
     assert not hasattr(result.state, "tensions")
     assert not hasattr(result.state, "active_mode")
     assert result.no_planner_orchestrator_dependency is True
@@ -377,4 +381,154 @@ def test_subject_tick_adversarial_late_bound_falsifier_now_requires_checkpoint_d
         checkpoint.checkpoint_id == "rt01.outcome_resolution_checkpoint"
         and checkpoint.status.value == "enforced_detour"
         for checkpoint in restricted.state.execution_checkpoints
+    )
+
+
+def test_subject_tick_authority_roles_are_runtime_load_bearing_for_c05_enforcement() -> None:
+    enforced = _result(
+        "rt-authority-c05-enforced",
+        unresolved=True,
+        context=SubjectTickContext(
+            dependency_trigger_hits=("trigger:mode_shift",),
+            phase_authority_roles={"C05": "invalidation"},
+        ),
+    )
+    downgraded = _result(
+        "rt-authority-c05-downgraded",
+        unresolved=True,
+        context=SubjectTickContext(
+            dependency_trigger_hits=("trigger:mode_shift",),
+            phase_authority_roles={"C05": "computational"},
+        ),
+    )
+    assert enforced.state.final_execution_outcome == SubjectTickOutcome.REVALIDATE
+    assert downgraded.state.final_execution_outcome == SubjectTickOutcome.REPAIR
+    assert any(
+        checkpoint.checkpoint_id == "rt01.c05_legality_checkpoint"
+        and checkpoint.status.value == "blocked"
+        for checkpoint in downgraded.state.execution_checkpoints
+    )
+
+
+def test_subject_tick_explicit_injected_role_map_overrides_default_and_context_maps() -> None:
+    injected = SubjectTickRoleMapSource(
+        source_ref="test.injected_role_map",
+        phase_authority_roles={"C05": "computational"},
+        phase_computational_roles={"C05": "evaluator"},
+        frontier_role_typed=True,
+        map_wide_role_ready=False,
+        role_frontier_only=True,
+    )
+    result = _result(
+        "rt-injected-role-map-priority",
+        unresolved=True,
+        context=SubjectTickContext(
+            dependency_trigger_hits=("trigger:mode_shift",),
+            phase_authority_roles={"C05": "invalidation"},
+            role_map_source=injected,
+        ),
+    )
+    assert result.state.role_source_ref == "test.injected_role_map"
+    assert result.state.c05_authority_role == "computational"
+    assert result.state.final_execution_outcome == SubjectTickOutcome.REPAIR
+
+
+def test_subject_tick_role_fallback_still_works_without_injected_role_map() -> None:
+    result = _result("rt-default-role-map", unresolved=False)
+    assert result.state.role_source_ref == "rt01.default_frontier_role_map"
+    assert result.state.role_frontier_typed is True
+    assert result.state.role_frontier_only is True
+    assert result.state.role_map_ready is False
+
+
+def test_subject_tick_role_readiness_summary_is_exposed_in_contract_view() -> None:
+    injected = SubjectTickRoleMapSource(
+        source_ref="test.frontier_only",
+        phase_authority_roles={"C04": "arbitration", "C05": "invalidation", "D01": "observability_only", "F01": "observability_only", "R04": "gating", "RT01": "gating"},
+        phase_computational_roles={"C04": "scheduler", "C05": "evaluator", "D01": "observability", "F01": "bridge_contract", "R04": "evaluator", "RT01": "execution_spine"},
+        frontier_role_typed=True,
+        map_wide_role_ready=False,
+        role_frontier_only=True,
+    )
+    result = _result(
+        "rt-role-readiness-contract",
+        unresolved=False,
+        context=SubjectTickContext(role_map_source=injected),
+    )
+    view = derive_subject_tick_contract_view(result)
+    assert view.role_source_ref == "test.frontier_only"
+    assert view.role_frontier_only is True
+    assert view.role_map_ready is False
+    assert view.role_frontier_typed is True
+
+
+def test_subject_tick_observability_only_phase_does_not_gain_enforcement_authority() -> None:
+    baseline = _result(
+        "rt-authority-d01-observe",
+        unresolved=False,
+        context=SubjectTickContext(phase_authority_roles={"D01": "observability_only"}),
+    )
+    adversarial = _result(
+        "rt-authority-d01-adversarial",
+        unresolved=False,
+        context=SubjectTickContext(phase_authority_roles={"D01": "gating"}),
+    )
+    assert baseline.state.final_execution_outcome == SubjectTickOutcome.CONTINUE
+    assert adversarial.state.final_execution_outcome == SubjectTickOutcome.REPAIR
+    assert adversarial.state.active_execution_mode == "repair_runtime_path"
+    assert adversarial.state.execution_stance.value == "repair_path"
+    assert any(
+        checkpoint.checkpoint_id == "rt01.d01_observability_guard"
+        and checkpoint.status.value == "enforced_detour"
+        for checkpoint in adversarial.state.execution_checkpoints
+    )
+
+
+def test_subject_tick_f01_role_mismatch_forces_runtime_repair_detour() -> None:
+    baseline = _result("rt-f01-baseline", unresolved=False)
+    adversarial = _result(
+        "rt-f01-adversarial",
+        unresolved=False,
+        context=SubjectTickContext(
+            role_map_source=SubjectTickRoleMapSource(
+                source_ref="test.f01_bad_role",
+                phase_authority_roles={"F01": "gating"},
+                frontier_role_typed=True,
+                map_wide_role_ready=False,
+                role_frontier_only=True,
+            )
+        ),
+    )
+    assert baseline.state.final_execution_outcome == SubjectTickOutcome.CONTINUE
+    assert adversarial.state.final_execution_outcome == SubjectTickOutcome.REPAIR
+    assert adversarial.state.active_execution_mode == "repair_runtime_path"
+    assert any(
+        checkpoint.checkpoint_id == "rt01.authority_role_checkpoint"
+        and checkpoint.status.value == "enforced_detour"
+        for checkpoint in adversarial.state.execution_checkpoints
+    )
+
+
+def test_subject_tick_c04_role_mismatch_blocks_full_mode_binding_legitimacy() -> None:
+    baseline = _result("rt-c04-role-baseline", unresolved=False)
+    adversarial = _result(
+        "rt-c04-role-adversarial",
+        unresolved=False,
+        context=SubjectTickContext(
+            role_map_source=SubjectTickRoleMapSource(
+                source_ref="test.c04_bad_role",
+                phase_authority_roles={"C04": "computational"},
+                frontier_role_typed=True,
+                map_wide_role_ready=False,
+                role_frontier_only=True,
+            )
+        ),
+    )
+    assert baseline.state.final_execution_outcome == SubjectTickOutcome.CONTINUE
+    assert adversarial.state.final_execution_outcome == SubjectTickOutcome.REPAIR
+    assert adversarial.state.active_execution_mode == "repair_runtime_path"
+    assert any(
+        checkpoint.checkpoint_id == "rt01.c04_mode_binding"
+        and checkpoint.status.value == "blocked"
+        for checkpoint in adversarial.state.execution_checkpoints
     )

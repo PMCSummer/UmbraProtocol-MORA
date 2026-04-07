@@ -12,6 +12,8 @@ if str(TRACKER_ROOT) not in sys.path:
     sys.path.insert(0, str(TRACKER_ROOT))
 
 from roadmap_tracker.model import (  # noqa: E402
+    AUTHORITY_ROLE_LABELS,
+    COMPUTATIONAL_ROLE_LABELS,
     EDGE_RELATION_DEFAULT,
     EDGE_RELATION_LABELS,
     EDGE_RELATION_STYLE_HINTS,
@@ -42,6 +44,8 @@ def _minimal_phase(code: str, title: str, after: str | None = None) -> dict:
         "risk_tags": [],
         "claim_state": "unknown",
         "maturity": "L1_theoretical_only",
+        "authority_role": "computational",
+        "computational_role": "unknown",
         "knowledge_card": {},
         "related_node_ids": [],
     }
@@ -65,6 +69,34 @@ def test_relation_schema_defaults_and_unknown_fallback() -> None:
     assert legacy.relation == "invalidates"
     assert GraphEdge.from_dict({"source": "a", "target": "b", "relation": "supports"}).relation == "modulates"
     assert GraphEdge.from_dict({"source": "a", "target": "b", "relation": "grounds"}).relation == "requires"
+
+
+def test_phase_role_schema_defaults_and_unknown_fallback() -> None:
+    phase = Phase.from_dict({"code": "X01", "title": "x"})
+    assert phase.authority_role == "computational"
+    assert phase.computational_role == "unknown"
+
+    unknown = Phase.from_dict(
+        {
+            "code": "X02",
+            "title": "x2",
+            "authority_role": "not_a_role",
+            "computational_role": "also_not_a_role",
+        }
+    )
+    assert unknown.authority_role == "computational"
+    assert unknown.computational_role == "unknown"
+
+    typed = Phase.from_dict(
+        {
+            "code": "X03",
+            "title": "x3",
+            "authority_role": "arbitration",
+            "computational_role": "scheduler",
+        }
+    )
+    assert typed.authority_role == "arbitration"
+    assert typed.computational_role == "scheduler"
 
 
 def test_tracker_roundtrip_preserves_mixed_relation_types() -> None:
@@ -135,6 +167,8 @@ def test_edge_relation_vocab_defaults_to_explicit_registry_on_save() -> None:
     dumped = model.to_dict()
     assert dumped["graph"]["edges"][0]["relation"] == EDGE_RELATION_DEFAULT
     assert dumped["edge_relation_vocab"] == EDGE_RELATION_LABELS
+    assert dumped["authority_role_vocab"] == AUTHORITY_ROLE_LABELS
+    assert dumped["computational_role_vocab"] == COMPUTATIONAL_ROLE_LABELS
 
 
 def test_conservative_migration_upgrades_clear_edges_and_keeps_ambiguous_requires() -> None:
@@ -241,6 +275,28 @@ def test_canonical_roadmap_load_save_roundtrip_keeps_non_requires_relations() ->
     assert set(edge_relations).issubset(set(EDGE_RELATION_LABELS))
 
 
+def test_phase_role_roundtrip_is_preserved_for_mixed_assignments() -> None:
+    raw = {
+        "schema_version": 5,
+        "phases": [
+            _minimal_phase("F01", "foundation"),
+            _minimal_phase("C04", "mode arbitration", after="F01"),
+        ],
+        "graph": {"nodes": [], "edges": []},
+    }
+    raw["phases"][0]["authority_role"] = "observability_only"
+    raw["phases"][0]["computational_role"] = "bridge_contract"
+    raw["phases"][1]["authority_role"] = "arbitration"
+    raw["phases"][1]["computational_role"] = "scheduler"
+    model = RoadmapModel.from_json(raw)
+    dumped = model.to_dict()
+    by_code = {phase["code"]: phase for phase in dumped["phases"]}
+    assert by_code["F01"]["authority_role"] == "observability_only"
+    assert by_code["F01"]["computational_role"] == "bridge_contract"
+    assert by_code["C04"]["authority_role"] == "arbitration"
+    assert by_code["C04"]["computational_role"] == "scheduler"
+
+
 def test_seam_relation_consistency_for_representative_pairs() -> None:
     roadmap_path = TRACKER_ROOT / "UmbraProtocol_MORA_language_refactor.json"
     model = RoadmapModel.from_json(json.loads(roadmap_path.read_text(encoding="utf-8")))
@@ -312,6 +368,59 @@ def test_rt01_relations_present_and_authority_safe() -> None:
     assert relation_by_pair[("phase::C05", "phase::RT01")] == "gates"
     assert relation_by_pair[("phase::RT01", "phase::D01")] == "observes_only"
     assert relation_by_pair[("phase::C04", "phase::RT01")] != relation_by_pair[("phase::C05", "phase::RT01")]
+
+
+def test_target_phase_authority_and_computational_roles_are_machine_readable() -> None:
+    roadmap_path = TRACKER_ROOT / "UmbraProtocol_MORA_language_refactor.json"
+    raw = json.loads(roadmap_path.read_text(encoding="utf-8"))
+    phases = {phase.get("code"): phase for phase in raw.get("phases", [])}
+
+    assert phases["C05"]["authority_role"] == "invalidation"
+    assert phases["C04"]["authority_role"] == "arbitration"
+    assert phases["R04"]["authority_role"] == "gating"
+    assert phases["F01"]["authority_role"] == "observability_only"
+    assert phases["RT01"]["authority_role"] == "gating"
+    assert phases["D01"]["authority_role"] == "observability_only"
+
+    assert phases["C05"]["computational_role"] == "evaluator"
+    assert phases["C04"]["computational_role"] == "scheduler"
+    assert phases["R04"]["computational_role"] == "evaluator"
+    assert phases["F01"]["computational_role"] == "bridge_contract"
+    assert phases["RT01"]["computational_role"] == "execution_spine"
+    assert phases["D01"]["computational_role"] == "observability"
+
+
+def test_role_readiness_summary_is_frontier_only_not_map_wide_for_current_roadmap() -> None:
+    roadmap_path = TRACKER_ROOT / "UmbraProtocol_MORA_language_refactor.json"
+    model = RoadmapModel.from_json(json.loads(roadmap_path.read_text(encoding="utf-8")))
+    summary = model.role_readiness_summary()
+    assert summary["frontier_role_typed"] is True
+    assert summary["map_wide_role_ready"] is False
+    assert summary["role_frontier_only"] is True
+    assert summary["fallback_phase_count"] > 0
+
+
+def test_subject_tick_role_source_packet_exposes_explicit_source_and_flags() -> None:
+    roadmap_path = TRACKER_ROOT / "UmbraProtocol_MORA_language_refactor.json"
+    model = RoadmapModel.from_json(json.loads(roadmap_path.read_text(encoding="utf-8")))
+    packet = model.subject_tick_role_source_packet()
+    assert packet["source_ref"] == "roadmap.phase_role_frontier_packet.v1"
+    assert packet["frontier_role_typed"] is True
+    assert packet["map_wide_role_ready"] is False
+    assert packet["role_frontier_only"] is True
+    assert packet["phase_authority_roles"]["C04"] == "arbitration"
+    assert packet["phase_authority_roles"]["C05"] == "invalidation"
+    assert packet["phase_authority_roles"]["D01"] == "observability_only"
+
+
+def test_phase_execution_packet_includes_machine_readable_role_readiness_summary() -> None:
+    roadmap_path = TRACKER_ROOT / "UmbraProtocol_MORA_language_refactor.json"
+    model = RoadmapModel.from_json(json.loads(roadmap_path.read_text(encoding="utf-8")))
+    packet = model.build_phase_execution_packet("RT01")
+    readiness = packet.get("role_readiness", {})
+    assert readiness.get("frontier_role_typed") is True
+    assert readiness.get("map_wide_role_ready") is False
+    assert readiness.get("role_frontier_only") is True
 
 
 def test_missing_pair_c01_t01_is_now_present() -> None:
@@ -393,5 +502,40 @@ def test_seam_docs_include_relation_semantic_contract_blocks() -> None:
     for seam_name, fragments in required.items():
         text = (seam_dir / seam_name).read_text(encoding="utf-8")
         assert "## RELATION SEMANTIC CONTRACT" in text
+        for fragment in fragments:
+            assert fragment in text
+
+
+def test_key_seams_encode_authority_and_computational_role_contracts() -> None:
+    seam_dir = ROOT / "docs" / "seams"
+    required = {
+        "F01.seam.md": [
+            "authority_role: `observability_only`",
+            "computational_role: `bridge_contract`",
+        ],
+        "R04.seam.md": [
+            "authority_role: `gating`",
+            "computational_role: `evaluator`",
+        ],
+        "C04.seam.md": [
+            "authority_role: `arbitration`",
+            "computational_role: `scheduler`",
+        ],
+        "C05.seam.md": [
+            "authority_role: `invalidation`",
+            "computational_role: `evaluator`",
+        ],
+        "D01.seam.md": [
+            "authority_role: `observability_only`",
+            "computational_role: `observability`",
+        ],
+        "RT01.seam.md": [
+            "authority_role: `gating`",
+            "computational_role: `execution_spine`",
+        ],
+    }
+    for seam_name, fragments in required.items():
+        text = (seam_dir / seam_name).read_text(encoding="utf-8")
+        assert "## PHASE ROLE CONTRACT" in text
         for fragment in fragments:
             assert fragment in text

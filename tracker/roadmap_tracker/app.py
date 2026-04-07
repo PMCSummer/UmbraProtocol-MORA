@@ -1014,8 +1014,21 @@ class MainWindow(QMainWindow):
         splitter = QSplitter()
         layout.addWidget(splitter, 1)
 
-        self.phase_table = QTableWidget(0, 8)
-        self.phase_table.setHorizontalHeaderLabels(["CODE", "PHASE", "TRACK", "STATE", "VERIFY", "ROLE", "CLAIM", "INTEGRITY"])
+        self.phase_table = QTableWidget(0, 10)
+        self.phase_table.setHorizontalHeaderLabels(
+            [
+                "CODE",
+                "PHASE",
+                "TRACK",
+                "STATE",
+                "VERIFY",
+                "ROLE",
+                "AUTHORITY",
+                "COMPUTE",
+                "CLAIM",
+                "INTEGRITY",
+            ]
+        )
         self.phase_table.setSelectionBehavior(QTableWidget.SelectRows)
         self.phase_table.setSelectionMode(QTableWidget.SingleSelection)
         self.phase_table.verticalHeader().setVisible(False)
@@ -1473,7 +1486,8 @@ class MainWindow(QMainWindow):
                 writer.writerow([
                     "kind", "code", "title", "track", "line", "after", "implemented_after", "conceptually_after",
                     "claim_blocked_by", "status", "status_source", "validation_state", "claim_role", "priority_bucket",
-                    "risk_tags", "claim_state", "maturity", "functional_role", "observables", "failure_modes",
+                    "risk_tags", "claim_state", "maturity", "authority_role", "computational_role",
+                    "functional_role", "observables", "failure_modes",
                     "forbidden_shortcuts", "evidence_ids", "notes",
                 ])
                 for p in self.model.phases:
@@ -1481,14 +1495,14 @@ class MainWindow(QMainWindow):
                         "phase", p.code, p.title, p.track, p.line, p.after or "", p.implemented_after or "",
                         " | ".join(p.conceptually_after), " | ".join(p.claim_blocked_by), p.status, p.status_source,
                         p.validation_state, p.claim_role, p.priority_bucket, " | ".join(p.risk_tags), p.claim_state,
-                        p.maturity, p.knowledge_card.functional_role,
+                        p.maturity, p.authority_role, p.computational_role, p.knowledge_card.functional_role,
                         " | ".join(p.knowledge_card.observables), " | ".join(p.knowledge_card.failure_modes),
                         " | ".join(p.knowledge_card.forbidden_shortcuts), " | ".join(p.knowledge_card.evidence_ids), p.notes,
                     ])
                 for g in self.model.governance_gates:
                     writer.writerow([
                         "governance_gate", g.code, g.title, "governance", "governance", "", "", "", "", g.status,
-                        "user", "", "validation_gate", "governance", "", g.claim_state, g.maturity, g.objective,
+                        "user", "", "validation_gate", "governance", "", g.claim_state, g.maturity, "", "", g.objective,
                         "", "", "", g.notes,
                     ])
         except Exception as exc:
@@ -1588,7 +1602,12 @@ class MainWindow(QMainWindow):
             self.phase_table.insertRow(row)
             values = [
                 phase.code, phase.title, phase.display_track, phase.display_status,
-                phase.display_validation_state, phase.display_claim_role, phase.display_claim_state, phase.display_maturity,
+                phase.display_validation_state,
+                phase.display_claim_role,
+                phase.display_authority_role,
+                phase.display_computational_role,
+                phase.display_claim_state,
+                phase.display_maturity,
             ]
             for col, value in enumerate(values):
                 item = QTableWidgetItem(value)
@@ -2451,6 +2470,8 @@ class MainWindow(QMainWindow):
         lines = [phase.protocol_label, ""]
         lines.append(f"STATE: {phase.display_status}")
         lines.append(f"VERIFY: {phase.display_validation_state}")
+        lines.append(f"AUTHORITY: {phase.display_authority_role}")
+        lines.append(f"COMPUTE: {phase.display_computational_role}")
         lines.append(f"CLAIM: {phase.display_claim_state}")
         lines.append(f"INTEGRITY: {phase.display_maturity}")
         lines.append("")

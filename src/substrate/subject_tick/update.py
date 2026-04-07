@@ -52,12 +52,15 @@ from substrate.stream_kernel import (
     derive_stream_kernel_contract_view,
 )
 from substrate.subject_tick.models import (
+    SubjectTickAuthorityRole,
     SubjectTickCheckpointResult,
     SubjectTickCheckpointStatus,
+    SubjectTickComputationalRole,
     SubjectTickContext,
     SubjectTickExecutionStance,
     SubjectTickInput,
     SubjectTickOutcome,
+    SubjectTickRoleMapSource,
     SubjectTickResult,
     SubjectTickState,
     SubjectTickStepResult,
@@ -106,6 +109,28 @@ ATTEMPTED_SUBJECT_TICK_PATHS: tuple[str, ...] = (
     "subject_tick.downstream_gate",
 )
 
+DEFAULT_PHASE_AUTHORITY_ROLES: dict[str, SubjectTickAuthorityRole] = {
+    "F01": SubjectTickAuthorityRole.OBSERVABILITY_ONLY,
+    "R04": SubjectTickAuthorityRole.GATING,
+    "C04": SubjectTickAuthorityRole.ARBITRATION,
+    "C05": SubjectTickAuthorityRole.INVALIDATION,
+    "D01": SubjectTickAuthorityRole.OBSERVABILITY_ONLY,
+    "RT01": SubjectTickAuthorityRole.GATING,
+}
+
+DEFAULT_PHASE_COMPUTATIONAL_ROLES: dict[str, SubjectTickComputationalRole] = {
+    "F01": SubjectTickComputationalRole.BRIDGE_CONTRACT,
+    "R04": SubjectTickComputationalRole.EVALUATOR,
+    "C04": SubjectTickComputationalRole.SCHEDULER,
+    "C05": SubjectTickComputationalRole.EVALUATOR,
+    "D01": SubjectTickComputationalRole.OBSERVABILITY,
+    "RT01": SubjectTickComputationalRole.EXECUTION_SPINE,
+}
+
+ROLE_FRONTIER_CODES: tuple[str, ...] = tuple(DEFAULT_PHASE_AUTHORITY_ROLES.keys())
+ROLE_FALLBACK_AUTHORITY = SubjectTickAuthorityRole.COMPUTATIONAL.value
+ROLE_FALLBACK_COMPUTATIONAL = SubjectTickComputationalRole.UNKNOWN.value
+
 
 def execute_subject_tick(
     tick_input: SubjectTickInput,
@@ -121,6 +146,26 @@ def execute_subject_tick(
     tick_index = 1 if prior_state is None else prior_state.tick_index + 1
     tick_id = f"subject-tick-{tick_input.case_id}-{tick_index}"
     lineage = tuple(dict.fromkeys((*context.source_lineage, f"subject-tick:{tick_input.case_id}")))
+    (
+        authority_roles,
+        computational_roles,
+        role_source_ref,
+        role_frontier_only,
+        role_map_ready,
+        role_frontier_typed,
+    ) = _resolve_phase_role_contract(context)
+    f01_authority_role = authority_roles["F01"].value
+    r04_authority_role = authority_roles["R04"].value
+    c04_authority_role = authority_roles["C04"].value
+    c05_authority_role = authority_roles["C05"].value
+    d01_authority_role = authority_roles["D01"].value
+    rt01_authority_role = authority_roles["RT01"].value
+    f01_computational_role = computational_roles["F01"].value
+    r04_computational_role = computational_roles["R04"].value
+    c04_computational_role = computational_roles["C04"].value
+    c05_computational_role = computational_roles["C05"].value
+    d01_computational_role = computational_roles["D01"].value
+    rt01_computational_role = computational_roles["RT01"].value
 
     regulation = update_regulation_state(
         (
@@ -331,8 +376,25 @@ def execute_subject_tick(
     revalidation_needed = False
     halt_reason: str | None = None
     checkpoints: list[SubjectTickCheckpointResult] = []
+    c05_enforcement_authority = c05_authority_role in {
+        SubjectTickAuthorityRole.GATING.value,
+        SubjectTickAuthorityRole.INVALIDATION.value,
+    }
 
-    if not context.disable_c04_mode_execution_binding:
+    if c04_authority_role != SubjectTickAuthorityRole.ARBITRATION.value:
+        active_execution_mode = "repair_runtime_path"
+        repair_needed = True
+        checkpoints.append(
+            SubjectTickCheckpointResult(
+                checkpoint_id="rt01.c04_mode_binding",
+                source_contract="c04.mode_arbitration",
+                status=SubjectTickCheckpointStatus.BLOCKED,
+                required_action=SubjectTickAuthorityRole.ARBITRATION.value,
+                applied_action=c04_authority_role,
+                reason="rt01 rejected c04 mode claim because roadmap authority_role is not arbitration",
+            )
+        )
+    elif not context.disable_c04_mode_execution_binding:
         active_execution_mode = c04_execution_mode_claim
         checkpoints.append(
             SubjectTickCheckpointResult(
@@ -357,7 +419,20 @@ def execute_subject_tick(
             )
         )
 
-    if not context.disable_c05_validity_enforcement:
+    if not c05_enforcement_authority:
+        repair_needed = True
+        active_execution_mode = "repair_runtime_path"
+        checkpoints.append(
+            SubjectTickCheckpointResult(
+                checkpoint_id="rt01.c05_legality_checkpoint",
+                source_contract="c05.temporal_validity",
+                status=SubjectTickCheckpointStatus.BLOCKED,
+                required_action="gating_or_invalidation",
+                applied_action=c05_authority_role,
+                reason="rt01 refused applying c05 legality as authority because roadmap authority_role is non-enforcement",
+            )
+        )
+    elif not context.disable_c05_validity_enforcement:
         c05_status = SubjectTickCheckpointStatus.ALLOWED
         c05_reason = "c05 legality allows bounded reuse path"
         prior_mode = active_execution_mode
@@ -415,12 +490,95 @@ def execute_subject_tick(
             )
         )
 
+    revalidation_modes = {"revalidate_mode_hold", "revalidate_revisit_basis", "revalidate_scope"}
+    if d01_authority_role != SubjectTickAuthorityRole.OBSERVABILITY_ONLY.value:
+        repair_needed = True
+        if halt_reason is None and active_execution_mode not in revalidation_modes:
+            active_execution_mode = "repair_runtime_path"
+        checkpoints.append(
+            SubjectTickCheckpointResult(
+                checkpoint_id="rt01.d01_observability_guard",
+                source_contract="d01.observability_boundary",
+                status=SubjectTickCheckpointStatus.ENFORCED_DETOUR,
+                required_action=SubjectTickAuthorityRole.OBSERVABILITY_ONLY.value,
+                applied_action=d01_authority_role,
+                reason="rt01 kept D01 out of enforcement authority and downgraded runtime stance to repair",
+            )
+        )
+    else:
+        checkpoints.append(
+            SubjectTickCheckpointResult(
+                checkpoint_id="rt01.d01_observability_guard",
+                source_contract="d01.observability_boundary",
+                status=SubjectTickCheckpointStatus.ALLOWED,
+                required_action=SubjectTickAuthorityRole.OBSERVABILITY_ONLY.value,
+                applied_action=d01_authority_role,
+                reason="d01 remains observability-only and is not used as enforcement authority",
+            )
+        )
+
+    role_checkpoint_status = SubjectTickCheckpointStatus.ALLOWED
+    role_checkpoint_reason = "rt01 consumed phase authority roles under bounded frontier contract"
+    if rt01_authority_role != SubjectTickAuthorityRole.GATING.value:
+        repair_needed = True
+        role_checkpoint_status = SubjectTickCheckpointStatus.ENFORCED_DETOUR
+        role_checkpoint_reason = "rt01 authority_role mismatch: execution spine must remain gating authority surface"
+    if f01_authority_role != SubjectTickAuthorityRole.OBSERVABILITY_ONLY.value:
+        repair_needed = True
+        role_checkpoint_status = SubjectTickCheckpointStatus.ENFORCED_DETOUR
+        role_checkpoint_reason = "f01 authority_role mismatch: f01 must remain observability/transition spine surface"
+    if role_checkpoint_status != SubjectTickCheckpointStatus.ALLOWED:
+        if halt_reason is None and active_execution_mode not in revalidation_modes:
+            active_execution_mode = "repair_runtime_path"
+        role_checkpoint_reason = (
+            f"{role_checkpoint_reason}; runtime detoured to bounded repair stance"
+        )
+    checkpoints.append(
+        SubjectTickCheckpointResult(
+            checkpoint_id="rt01.authority_role_checkpoint",
+            source_contract="roadmap.phase_role_contract",
+            status=role_checkpoint_status,
+            required_action="f01=observability_only; c04=arbitration; c05=gating|invalidation; d01=observability_only; rt01=gating",
+            applied_action=(
+                f"f01={f01_authority_role}; c04={c04_authority_role}; "
+                f"c05={c05_authority_role}; d01={d01_authority_role}; "
+                f"rt01={rt01_authority_role}; runtime_mode={active_execution_mode}"
+            ),
+            reason=role_checkpoint_reason,
+        )
+    )
+    if not role_frontier_typed:
+        repair_needed = True
+        if halt_reason is None and active_execution_mode not in revalidation_modes:
+            active_execution_mode = "repair_runtime_path"
+    checkpoints.append(
+        SubjectTickCheckpointResult(
+            checkpoint_id="rt01.role_coverage_checkpoint",
+            source_contract="roadmap.role_readiness_contract",
+            status=(
+                SubjectTickCheckpointStatus.ALLOWED
+                if role_frontier_typed
+                else SubjectTickCheckpointStatus.ENFORCED_DETOUR
+            ),
+            required_action="frontier_role_typed_required_for_honest_runtime_authority_enforcement",
+            applied_action=(
+                f"source={role_source_ref}; frontier_only={role_frontier_only}; "
+                f"map_ready={role_map_ready}; frontier_typed={role_frontier_typed}"
+            ),
+            reason=(
+                "rt01 consumed explicit role-readiness envelope and kept frontier-only claim bounded"
+                if role_frontier_typed
+                else "frontier role typing incomplete; runtime detoured to repair stance instead of overclaiming authority readiness"
+            ),
+        )
+    )
+
     if not context.disable_gate_application:
         gate_reasons: list[str] = []
-        if c05_validity_action == "halt_reuse_and_rebuild_scope" and halt_reason is None:
+        if c05_enforcement_authority and c05_validity_action == "halt_reuse_and_rebuild_scope" and halt_reason is None:
             halt_reason = "c05_halt_reuse_and_rebuild_scope"
             gate_reasons.append("c05_halt_reuse_action")
-        if c05_validity_action in {
+        if c05_enforcement_authority and c05_validity_action in {
             "run_selective_revalidation",
             "run_bounded_revalidation",
             "suspend_until_revalidation_basis",
@@ -580,6 +738,22 @@ def execute_subject_tick(
         prior_runtime_status=None if prior_state is None else prior_state.final_execution_outcome,
         c04_execution_mode_claim=c04_execution_mode_claim,
         c05_execution_action_claim=c05_execution_action_claim,
+        f01_authority_role=f01_authority_role,
+        r04_authority_role=r04_authority_role,
+        c04_authority_role=c04_authority_role,
+        c05_authority_role=c05_authority_role,
+        d01_authority_role=d01_authority_role,
+        rt01_authority_role=rt01_authority_role,
+        f01_computational_role=f01_computational_role,
+        r04_computational_role=r04_computational_role,
+        c04_computational_role=c04_computational_role,
+        c05_computational_role=c05_computational_role,
+        d01_computational_role=d01_computational_role,
+        rt01_computational_role=rt01_computational_role,
+        role_source_ref=role_source_ref,
+        role_frontier_only=role_frontier_only,
+        role_map_ready=role_map_ready,
+        role_frontier_typed=role_frontier_typed,
         active_execution_mode=active_execution_mode,
         c04_selected_mode=mode_arbitration.state.active_mode.value,
         c05_validity_action=c05_validity_action,
@@ -614,7 +788,7 @@ def execute_subject_tick(
         attempted_paths=ATTEMPTED_SUBJECT_TICK_PATHS,
         downstream_gate=gate,
         causal_basis=(
-            "bounded runtime execution spine enforces C04 mode arbitration and C05 temporal validity legality over fixed R->C order"
+            "bounded runtime execution spine enforces roadmap authority roles for C04/C05 and keeps D01 observability-only over fixed R->C order"
         ),
     )
     abstain = final_outcome in {SubjectTickOutcome.REPAIR, SubjectTickOutcome.REVALIDATE}
@@ -672,6 +846,93 @@ def persist_subject_tick_result_via_f01(
         },
     )
     return execute_transition(request, runtime_state)
+
+
+def _normalize_authority_role(value: str | None) -> SubjectTickAuthorityRole:
+    token = str(value or "").strip()
+    try:
+        return SubjectTickAuthorityRole(token)
+    except ValueError:
+        return SubjectTickAuthorityRole.COMPUTATIONAL
+
+
+def _normalize_computational_role(value: str | None) -> SubjectTickComputationalRole:
+    token = str(value or "").strip()
+    try:
+        return SubjectTickComputationalRole(token)
+    except ValueError:
+        return SubjectTickComputationalRole.UNKNOWN
+
+
+def _resolve_phase_role_contract(
+    context: SubjectTickContext,
+) -> tuple[
+    dict[str, SubjectTickAuthorityRole],
+    dict[str, SubjectTickComputationalRole],
+    str,
+    bool,
+    bool,
+    bool,
+]:
+    authority_roles = dict(DEFAULT_PHASE_AUTHORITY_ROLES)
+    computational_roles = dict(DEFAULT_PHASE_COMPUTATIONAL_ROLES)
+    role_source_ref = "rt01.default_frontier_role_map"
+    role_map_ready = False
+    role_frontier_only = True
+
+    # Backward-compatible local overrides remain supported.
+    if context.phase_authority_roles or context.phase_computational_roles:
+        role_source_ref = "rt01.context_role_overrides"
+    for code, value in (context.phase_authority_roles or {}).items():
+        normalized_code = str(code or "").strip().upper()
+        if normalized_code in authority_roles:
+            authority_roles[normalized_code] = _normalize_authority_role(value)
+    for code, value in (context.phase_computational_roles or {}).items():
+        normalized_code = str(code or "").strip().upper()
+        if normalized_code in computational_roles:
+            computational_roles[normalized_code] = _normalize_computational_role(value)
+
+    # Explicit source-driven injection path has highest priority on frontier.
+    injected = context.role_map_source
+    if isinstance(injected, SubjectTickRoleMapSource):
+        role_source_ref = str(injected.source_ref or "").strip() or "rt01.injected_role_map_source"
+        role_map_ready = bool(injected.map_wide_role_ready)
+        role_frontier_only = bool(injected.role_frontier_only)
+        for code, value in (injected.phase_authority_roles or {}).items():
+            normalized_code = str(code or "").strip().upper()
+            if normalized_code in authority_roles:
+                authority_roles[normalized_code] = _normalize_authority_role(value)
+        for code, value in (injected.phase_computational_roles or {}).items():
+            normalized_code = str(code or "").strip().upper()
+            if normalized_code in computational_roles:
+                computational_roles[normalized_code] = _normalize_computational_role(value)
+
+    role_frontier_typed = _is_frontier_role_typed(authority_roles, computational_roles)
+    if role_map_ready:
+        role_frontier_only = False
+    elif not role_frontier_typed:
+        role_frontier_only = False
+
+    return (
+        authority_roles,
+        computational_roles,
+        role_source_ref,
+        role_frontier_only,
+        role_map_ready,
+        role_frontier_typed,
+    )
+
+
+def _is_frontier_role_typed(
+    authority_roles: dict[str, SubjectTickAuthorityRole],
+    computational_roles: dict[str, SubjectTickComputationalRole],
+) -> bool:
+    for code in ROLE_FRONTIER_CODES:
+        authority = authority_roles[code].value
+        computational = computational_roles[code].value
+        if authority == ROLE_FALLBACK_AUTHORITY and computational == ROLE_FALLBACK_COMPUTATIONAL:
+            return False
+    return True
 
 
 def _phase_step(

@@ -53,7 +53,39 @@ class SubjectTickRestrictionCode(StrEnum):
     CHECKPOINT_DECISIONS_MUST_BE_READ = "checkpoint_decisions_must_be_read"
     C04_MODE_CLAIM_MUST_BE_READ = "c04_mode_claim_must_be_read"
     C05_ACTION_CLAIM_MUST_BE_READ = "c05_action_claim_must_be_read"
+    AUTHORITY_ROLES_MUST_BE_READ = "authority_roles_must_be_read"
     DOWNSTREAM_AUTHORITY_DEGRADED = "downstream_authority_degraded"
+
+
+class SubjectTickAuthorityRole(StrEnum):
+    GATING = "gating"
+    INVALIDATION = "invalidation"
+    ARBITRATION = "arbitration"
+    MODULATORY_ONLY = "modulatory_only"
+    OBSERVABILITY_ONLY = "observability_only"
+    COMPUTATIONAL = "computational"
+    UNKNOWN = "unknown"
+
+
+class SubjectTickComputationalRole(StrEnum):
+    STATE_UPDATE = "state_update"
+    SCHEDULER = "scheduler"
+    EVALUATOR = "evaluator"
+    OBSERVABILITY = "observability"
+    EXECUTION_SPINE = "execution_spine"
+    BRIDGE_CONTRACT = "bridge_contract"
+    REGISTRY = "registry"
+    UNKNOWN = "unknown"
+
+
+@dataclass(frozen=True, slots=True)
+class SubjectTickRoleMapSource:
+    source_ref: str = "rt01.default_frontier_role_map"
+    phase_authority_roles: dict[str, str] = field(default_factory=dict)
+    phase_computational_roles: dict[str, str] = field(default_factory=dict)
+    frontier_role_typed: bool = True
+    map_wide_role_ready: bool = False
+    role_frontier_only: bool = True
 
 
 @dataclass(frozen=True, slots=True)
@@ -89,6 +121,9 @@ class SubjectTickContext:
     disable_gate_application: bool = False
     disable_c04_mode_execution_binding: bool = False
     disable_c05_validity_enforcement: bool = False
+    phase_authority_roles: dict[str, str] = field(default_factory=dict)
+    phase_computational_roles: dict[str, str] = field(default_factory=dict)
+    role_map_source: SubjectTickRoleMapSource | None = None
     source_lineage: tuple[str, ...] = ()
 
 
@@ -120,6 +155,22 @@ class SubjectTickState:
     prior_runtime_status: SubjectTickOutcome | None
     c04_execution_mode_claim: str
     c05_execution_action_claim: str
+    f01_authority_role: str
+    r04_authority_role: str
+    c04_authority_role: str
+    c05_authority_role: str
+    d01_authority_role: str
+    rt01_authority_role: str
+    f01_computational_role: str
+    r04_computational_role: str
+    c04_computational_role: str
+    c05_computational_role: str
+    d01_computational_role: str
+    rt01_computational_role: str
+    role_source_ref: str
+    role_frontier_only: bool
+    role_map_ready: bool
+    role_frontier_typed: bool
     active_execution_mode: str
     c04_selected_mode: str
     c05_validity_action: str
@@ -158,6 +209,16 @@ class SubjectTickTelemetry:
     phase_order: tuple[str, ...]
     c04_execution_mode_claim: str
     c05_execution_action_claim: str
+    f01_authority_role: str
+    r04_authority_role: str
+    c04_authority_role: str
+    c05_authority_role: str
+    d01_authority_role: str
+    rt01_authority_role: str
+    role_source_ref: str
+    role_frontier_only: bool
+    role_map_ready: bool
+    role_frontier_typed: bool
     active_execution_mode: str
     c04_selected_mode: str
     c05_validity_action: str

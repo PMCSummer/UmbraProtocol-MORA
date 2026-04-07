@@ -38,6 +38,7 @@ def evaluate_subject_tick_downstream_gate(
         SubjectTickRestrictionCode.CHECKPOINT_DECISIONS_MUST_BE_READ,
         SubjectTickRestrictionCode.C04_MODE_CLAIM_MUST_BE_READ,
         SubjectTickRestrictionCode.C05_ACTION_CLAIM_MUST_BE_READ,
+        SubjectTickRestrictionCode.AUTHORITY_ROLES_MUST_BE_READ,
     ]
     usability = SubjectTickUsabilityClass.USABLE_BOUNDED
     accepted = True
