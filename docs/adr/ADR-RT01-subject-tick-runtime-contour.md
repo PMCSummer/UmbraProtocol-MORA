@@ -121,3 +121,35 @@ Accepted for narrow BUILD increment that materializes runtime execution obedienc
   - obedience decision (`required_action`)
   - obedience checkpoint (`applied_action`)
   - final runtime stance/outcome.
+
+## Build Update (Sprint 6: Minimal Runtime Topology Normalization)
+- Added bounded production topology surface for current RT01 contour:
+  - minimal runtime bundle,
+  - minimal tick graph,
+  - central dispatch entry.
+- Dispatch classifies route as:
+  - `production_contour`
+  - `helper_path`
+  - `test_only_ablation`
+- Lawful production contour now requires dispatch-level route discipline; helper/test-only paths can exist only with explicit bounded allowance and are marked non-lawful for production use.
+- RT01 remains execution spine; topology layer wires/dispatches but does not reinterpret C04/C05/R04 authority semantics.
+
+### Non-claims preserved
+- No map-wide topology normalization.
+- No global dispatch migration across all phases.
+- No second execution spine beyond RT01.
+
+## Narrow Hardening Update (Sprint 6 Route-Class Contract Discipline)
+- Scope: RT01 contour runtime_topology only; no authority semantics transfer and no repo-wide rollout.
+- Tightened non-production route boundary:
+  - `helper_path` and `test_only_ablation` now require explicit non-production consumer opt-in.
+  - Non-production routes cannot persist through F01 contour bridge.
+- Added explicit binding consequence per route class in dispatch decision/contract:
+  - `lawful_production_contour`
+  - `non_lawful_helper_route`
+  - `test_only_ablation_route`
+- Result: helper/test routes remain available for bounded tooling/ablation, but cannot masquerade as lawful production contour for downstream consumers.
+
+### Claim boundary after this hardening
+- Honest claim remains contour-bounded to RT01 runtime topology surface.
+- This does not imply repo-wide topology normalization or universal helper-path elimination.
