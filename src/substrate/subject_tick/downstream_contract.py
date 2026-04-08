@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from substrate.contracts import RuntimeState
 from substrate.subject_tick.models import (
     SubjectTickOutcome,
     SubjectTickResult,
@@ -40,6 +41,22 @@ class SubjectTickContractView:
     restrictions: tuple[str, ...]
     usability_class: SubjectTickUsabilityClass
     requires_restrictions_read: bool
+    reason: str
+
+
+@dataclass(frozen=True, slots=True)
+class SubjectTickRuntimeDomainContractView:
+    regulation_pressure_level: float | None
+    regulation_override_scope: str | None
+    continuity_mode_claim: str | None
+    continuity_mode_legitimacy: bool
+    validity_action_claim: str | None
+    validity_legality_reuse_allowed: bool
+    validity_revalidation_required: bool
+    validity_no_safe_reuse: bool
+    recommended_outcome: str
+    source_of_truth_surface: str
+    packet_snapshot_precedence_blocked: bool
     reason: str
 
 
@@ -90,6 +107,44 @@ def derive_subject_tick_contract_view(
     )
 
 
+def derive_subject_tick_runtime_domain_contract_view(
+    runtime_state: RuntimeState,
+) -> SubjectTickRuntimeDomainContractView:
+    if not isinstance(runtime_state, RuntimeState):
+        raise TypeError("derive_subject_tick_runtime_domain_contract_view requires RuntimeState")
+
+    regulation = runtime_state.domains.regulation
+    continuity = runtime_state.domains.continuity
+    validity = runtime_state.domains.validity
+    if validity.no_safe_reuse:
+        outcome = "halt"
+        reason = "shared validity no_safe_reuse blocks continuation"
+    elif validity.revalidation_required or not validity.legality_reuse_allowed:
+        outcome = "revalidate"
+        reason = "shared validity requires bounded revalidation before continuation"
+    elif not continuity.mode_legitimacy:
+        outcome = "repair"
+        reason = "shared continuity marks mode legitimacy failure"
+    else:
+        outcome = "continue"
+        reason = "shared runtime domains allow bounded continuation"
+
+    return SubjectTickRuntimeDomainContractView(
+        regulation_pressure_level=regulation.pressure_level,
+        regulation_override_scope=regulation.override_scope,
+        continuity_mode_claim=continuity.c04_mode_claim,
+        continuity_mode_legitimacy=continuity.mode_legitimacy,
+        validity_action_claim=validity.c05_action_claim,
+        validity_legality_reuse_allowed=validity.legality_reuse_allowed,
+        validity_revalidation_required=validity.revalidation_required,
+        validity_no_safe_reuse=validity.no_safe_reuse,
+        recommended_outcome=outcome,
+        source_of_truth_surface="runtime_state.domains",
+        packet_snapshot_precedence_blocked=True,
+        reason=reason,
+    )
+
+
 def choose_runtime_execution_outcome(
     subject_tick_state_or_result: SubjectTickState | SubjectTickResult,
 ) -> str:
@@ -101,3 +156,8 @@ def choose_runtime_execution_outcome(
     if view.final_execution_outcome == SubjectTickOutcome.REPAIR:
         return "repair"
     return "continue"
+
+
+def choose_runtime_execution_outcome_from_runtime_state(runtime_state: RuntimeState) -> str:
+    view = derive_subject_tick_runtime_domain_contract_view(runtime_state)
+    return view.recommended_outcome

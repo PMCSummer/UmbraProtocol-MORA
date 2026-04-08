@@ -100,6 +100,7 @@ class SubjectTickInput:
 @dataclass(frozen=True, slots=True)
 class SubjectTickContext:
     prior_subject_tick_state: SubjectTickState | None = None
+    prior_runtime_state: object | None = None
     prior_regulation_state: object | None = None
     prior_viability_state: object | None = None
     prior_stream_state: object | None = None

@@ -5,7 +5,14 @@ from datetime import datetime, timezone
 from typing import Any
 from uuid import uuid4
 
-from substrate.authority import allowed_changed_paths, check_authority, writer_transition_paths
+from substrate.authority import (
+    allowed_changed_paths,
+    check_authority,
+    check_domain_route_authenticity,
+    check_domain_writer_discipline,
+    runtime_domain_paths_from_update,
+    writer_transition_paths,
+)
 from substrate.contracts import (
     AuthorityDecision,
     FailureCode,
@@ -13,6 +20,9 @@ from substrate.contracts import (
     Lifecycle,
     ProvenanceRecord,
     ProvenanceStatus,
+    RuntimeDomainUpdate,
+    RuntimeRouteAuthContext,
+    RuntimeDomainsState,
     RuntimeState,
     StateDelta,
     TransitionKind,
@@ -46,6 +56,8 @@ class _TransitionContext:
     event_id: str = ""
     cause_chain: tuple[str, ...] = ()
     attempted_paths: tuple[str, ...] = ()
+    domain_update: RuntimeDomainUpdate | None = None
+    route_auth: RuntimeRouteAuthContext | None = None
 
 
 def execute_transition(request: Any, state: Any) -> TransitionResult:
@@ -95,6 +107,27 @@ def validate_request_shape(context: _TransitionContext) -> None:
                 message="event transitions require event_payload",
             )
             return
+        payload = context.request.event_payload or {}
+        domain_update = payload.get("runtime_domain_update")
+        if domain_update is not None and not isinstance(domain_update, RuntimeDomainUpdate):
+            _set_failure(
+                context,
+                code=FailureCode.INVALID_REQUEST_SHAPE,
+                stage="validate_request_shape",
+                message="runtime_domain_update must be RuntimeDomainUpdate",
+            )
+            return
+        route_auth = payload.get("runtime_route_auth")
+        if route_auth is not None and not isinstance(route_auth, RuntimeRouteAuthContext):
+            _set_failure(
+                context,
+                code=FailureCode.INVALID_REQUEST_SHAPE,
+                stage="validate_request_shape",
+                message="runtime_route_auth must be RuntimeRouteAuthContext",
+            )
+            return
+        context.domain_update = domain_update
+        context.route_auth = route_auth
         return
 
     context.transition_id = _new_transition_id()
@@ -139,11 +172,41 @@ def resolve_transition_kind(context: _TransitionContext) -> None:
 
 def check_authority_stage(context: _TransitionContext) -> None:
     writer = _resolve_writer(context)
-    requested = writer_transition_paths(context.kind)
-    context.attempted_paths = tuple(sorted(requested))
-    context.authority = check_authority(writer, requested)
+    requested = set(writer_transition_paths(context.kind))
+    requested.update(runtime_domain_paths_from_update(context.domain_update))
+    requested_paths = frozenset(requested)
+    context.attempted_paths = tuple(sorted(requested_paths))
+    context.authority = check_authority(writer, requested_paths)
     if context.failure is not None:
         return
+    if context.authority.allowed and context.domain_update is not None:
+        domain_authority = check_domain_writer_discipline(
+            domain_update=context.domain_update,
+            transition_kind=context.kind,
+        )
+        context.authority = _merge_authority_decisions(context.authority, domain_authority)
+        if not domain_authority.allowed:
+            _set_failure(
+                context,
+                code=FailureCode.AUTHORITY_DENIED,
+                stage="check_authority",
+                message="domain writer discipline rejected runtime domain update",
+            )
+            return
+        route_authority = check_domain_route_authenticity(
+            domain_update=context.domain_update,
+            route_auth=context.route_auth,
+            transition_kind=context.kind,
+        )
+        context.authority = _merge_authority_decisions(context.authority, route_authority)
+        if not route_authority.allowed:
+            _set_failure(
+                context,
+                code=FailureCode.AUTHORITY_DENIED,
+                stage="check_authority",
+                message="domain route authenticity rejected runtime domain update",
+            )
+            return
     if not context.authority.allowed:
         _set_failure(
             context,
@@ -179,6 +242,7 @@ def apply_pure_transition(context: _TransitionContext) -> None:
     next_runtime = base.runtime
     next_turn = base.turn
     next_failures = replace(base.failures, current=None)
+    next_domains = base.domains
 
     if context.kind == TransitionKind.BOOTSTRAP_INIT:
         schema_version = str(payload.get("schema_version", "f01"))
@@ -198,6 +262,8 @@ def apply_pure_transition(context: _TransitionContext) -> None:
             current_turn_id=turn_id,
             last_event_ref=event_id,
         )
+        if context.domain_update is not None:
+            next_domains = _apply_runtime_domain_update(base.domains, context.domain_update)
 
     next_runtime = replace(
         next_runtime,
@@ -220,6 +286,7 @@ def apply_pure_transition(context: _TransitionContext) -> None:
         turn=next_turn,
         failures=next_failures,
         trace=next_trace,
+        domains=next_domains,
     )
     context.accepted = True
     context.emitted_event = event
@@ -451,6 +518,12 @@ def _flatten_state(state: RuntimeState) -> dict[str, object]:
         "failures.current": state.failures.current,
         "trace.transitions": state.trace.transitions,
         "trace.events": state.trace.events,
+        "domains.regulation": state.domains.regulation,
+        "domains.continuity": state.domains.continuity,
+        "domains.validity": state.domains.validity,
+        "domains.self_boundary": state.domains.self_boundary,
+        "domains.world": state.domains.world,
+        "domains.memory_economics": state.domains.memory_economics,
     }
 
 
@@ -471,3 +544,31 @@ def _new_event_id() -> str:
 
 def _now_iso() -> str:
     return datetime.now(tz=timezone.utc).isoformat()
+
+
+def _apply_runtime_domain_update(
+    domains: RuntimeDomainsState,
+    domain_update: RuntimeDomainUpdate,
+) -> RuntimeDomainsState:
+    updated = domains
+    if domain_update.regulation is not None:
+        updated = replace(updated, regulation=domain_update.regulation)
+    if domain_update.continuity is not None:
+        updated = replace(updated, continuity=domain_update.continuity)
+    if domain_update.validity is not None:
+        updated = replace(updated, validity=domain_update.validity)
+    return updated
+
+
+def _merge_authority_decisions(
+    base: AuthorityDecision,
+    overlay: AuthorityDecision,
+) -> AuthorityDecision:
+    denied = tuple(sorted(set(base.denied_paths).union(overlay.denied_paths)))
+    allowed = base.allowed and overlay.allowed
+    if allowed:
+        reason = "writer authorized"
+    else:
+        reasons = [base.reason, overlay.reason]
+        reason = "; ".join(dict.fromkeys(part for part in reasons if part))
+    return AuthorityDecision(allowed=allowed, denied_paths=denied, reason=reason)

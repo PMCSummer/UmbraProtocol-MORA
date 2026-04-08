@@ -3,6 +3,7 @@ from substrate.state import create_empty_state
 from substrate.subject_tick import (
     SubjectTickContext,
     SubjectTickInput,
+    choose_runtime_execution_outcome_from_runtime_state,
     execute_subject_tick,
     persist_subject_tick_result_via_f01,
 )
@@ -51,6 +52,15 @@ def test_stage_contour_f01_f02_r01_r02_r03_r04_c01_c02_c03_c04_c05_subject_tick_
     snapshot = persisted.state.trace.events[-1].payload["subject_tick_snapshot"]
     assert snapshot["state"]["tick_id"]
     assert snapshot["state"]["final_execution_outcome"] in {
+        "continue",
+        "repair",
+        "revalidate",
+        "halt",
+    }
+    assert persisted.state.domains.regulation.updated_by_phase == "R04"
+    assert persisted.state.domains.continuity.updated_by_phase == "C04"
+    assert persisted.state.domains.validity.updated_by_phase == "C05"
+    assert choose_runtime_execution_outcome_from_runtime_state(persisted.state) in {
         "continue",
         "repair",
         "revalidate",

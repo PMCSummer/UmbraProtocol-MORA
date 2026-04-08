@@ -1,6 +1,9 @@
 from substrate.subject_tick.downstream_contract import (
     SubjectTickContractView,
+    SubjectTickRuntimeDomainContractView,
+    choose_runtime_execution_outcome_from_runtime_state,
     choose_runtime_execution_outcome,
+    derive_subject_tick_runtime_domain_contract_view,
     derive_subject_tick_contract_view,
 )
 from substrate.subject_tick.models import (
@@ -24,6 +27,8 @@ from substrate.subject_tick.models import (
 )
 from substrate.subject_tick.policy import evaluate_subject_tick_downstream_gate
 from substrate.subject_tick.update import (
+    build_subject_tick_runtime_domain_update,
+    build_subject_tick_runtime_route_auth_context,
     execute_subject_tick,
     persist_subject_tick_result_via_f01,
     subject_tick_result_to_payload,
@@ -42,6 +47,7 @@ __all__ = [
     "SubjectTickOutcome",
     "SubjectTickRestrictionCode",
     "SubjectTickResult",
+    "SubjectTickRuntimeDomainContractView",
     "SubjectTickRoleMapSource",
     "SubjectTickState",
     "SubjectTickStepResult",
@@ -49,7 +55,11 @@ __all__ = [
     "SubjectTickTelemetry",
     "SubjectTickUsabilityClass",
     "choose_runtime_execution_outcome",
+    "choose_runtime_execution_outcome_from_runtime_state",
+    "build_subject_tick_runtime_domain_update",
+    "build_subject_tick_runtime_route_auth_context",
     "derive_subject_tick_contract_view",
+    "derive_subject_tick_runtime_domain_contract_view",
     "evaluate_subject_tick_downstream_gate",
     "execute_subject_tick",
     "persist_subject_tick_result_via_f01",

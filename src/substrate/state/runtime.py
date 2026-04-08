@@ -1,6 +1,16 @@
 from __future__ import annotations
 
-from substrate.contracts import Lifecycle, RuntimeState
+from substrate.contracts import (
+    ContinuityDomainState,
+    Lifecycle,
+    MemoryEconomicsDomainState,
+    RegulationDomainState,
+    RuntimeDomainsState,
+    RuntimeState,
+    SelfBoundaryDomainState,
+    ValidityDomainState,
+    WorldDomainState,
+)
 
 
 def create_empty_state() -> RuntimeState:
@@ -18,4 +28,20 @@ def validate_runtime_state_shape(state: RuntimeState) -> tuple[bool, str | None]
         return False, "trace.events must be tuple"
     if not isinstance(state.trace.transitions, tuple):
         return False, "trace.transitions must be tuple"
+    if not isinstance(state.domains, RuntimeDomainsState):
+        return False, "domains must be RuntimeDomainsState"
+    if not isinstance(state.domains.regulation, RegulationDomainState):
+        return False, "domains.regulation must be RegulationDomainState"
+    if not isinstance(state.domains.continuity, ContinuityDomainState):
+        return False, "domains.continuity must be ContinuityDomainState"
+    if not isinstance(state.domains.validity, ValidityDomainState):
+        return False, "domains.validity must be ValidityDomainState"
+    if not isinstance(state.domains.self_boundary, SelfBoundaryDomainState):
+        return False, "domains.self_boundary must be SelfBoundaryDomainState"
+    if not isinstance(state.domains.world, WorldDomainState):
+        return False, "domains.world must be WorldDomainState"
+    if not isinstance(state.domains.memory_economics, MemoryEconomicsDomainState):
+        return False, "domains.memory_economics must be MemoryEconomicsDomainState"
+    if not isinstance(state.domains.validity.selective_scope_targets, tuple):
+        return False, "domains.validity.selective_scope_targets must be tuple"
     return True, None

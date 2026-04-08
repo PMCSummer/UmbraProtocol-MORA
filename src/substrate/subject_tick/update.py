@@ -1,17 +1,27 @@
 from __future__ import annotations
 
 from dataclasses import replace
+from typing import Iterable
 
 from substrate.affordances import (
     create_default_capability_state,
     generate_regulation_affordances,
 )
 from substrate.affordances.policy import evaluate_affordance_landscape_for_downstream
+from substrate.authority import issue_rt01_route_auth_nonce
 from substrate.contracts import (
+    ContinuityDomainState,
+    DomainWriteClaim,
+    DomainWriteRoute,
+    DomainWriterPhase,
+    RegulationDomainState,
     RuntimeState,
+    RuntimeDomainUpdate,
+    RuntimeRouteAuthContext,
     TransitionKind,
     TransitionRequest,
     TransitionResult,
+    ValidityDomainState,
     WriterIdentity,
 )
 from substrate.mode_arbitration import (
@@ -573,6 +583,84 @@ def execute_subject_tick(
         )
     )
 
+    prior_shared_runtime = (
+        context.prior_runtime_state
+        if isinstance(context.prior_runtime_state, RuntimeState)
+        else None
+    )
+    if prior_shared_runtime is not None:
+        shared_reasons: list[str] = []
+        shared_validity = prior_shared_runtime.domains.validity
+        shared_continuity = prior_shared_runtime.domains.continuity
+        shared_regulation = prior_shared_runtime.domains.regulation
+
+        if shared_validity.no_safe_reuse and halt_reason is None:
+            halt_reason = "shared_validity_no_safe_reuse"
+            active_execution_mode = "halt_execution"
+            shared_reasons.append("shared_validity.no_safe_reuse")
+        elif shared_validity.revalidation_required and halt_reason is None:
+            if active_execution_mode != "revalidate_scope":
+                active_execution_mode = "revalidate_scope"
+            revalidation_needed = True
+            shared_reasons.append("shared_validity.revalidation_required")
+
+        if (
+            not shared_continuity.mode_legitimacy
+            and halt_reason is None
+            and active_execution_mode not in revalidation_modes
+        ):
+            repair_needed = True
+            active_execution_mode = "repair_runtime_path"
+            shared_reasons.append("shared_continuity.mode_legitimacy_false")
+
+        if (
+            shared_regulation.override_scope in {"broad", "emergency"}
+            and not shared_regulation.no_strong_override_claim
+            and halt_reason is None
+            and active_execution_mode
+            not in {
+                "run_recovery",
+                "repair_runtime_path",
+                "revalidate_scope",
+                "halt_execution",
+            }
+        ):
+            repair_needed = True
+            active_execution_mode = "repair_runtime_path"
+            shared_reasons.append("shared_regulation.high_override_scope")
+
+        checkpoints.append(
+            SubjectTickCheckpointResult(
+                checkpoint_id="rt01.shared_runtime_domain_checkpoint",
+                source_contract="shared.runtime_domains",
+                status=(
+                    SubjectTickCheckpointStatus.BLOCKED
+                    if halt_reason == "shared_validity_no_safe_reuse"
+                    else SubjectTickCheckpointStatus.ENFORCED_DETOUR
+                    if shared_reasons
+                    else SubjectTickCheckpointStatus.ALLOWED
+                ),
+                required_action="consume_shared_regulation_continuity_validity_domains",
+                applied_action=active_execution_mode,
+                reason=(
+                    "shared runtime domains influenced contour path: " + ",".join(shared_reasons)
+                    if shared_reasons
+                    else "shared runtime domains read with no additional detour"
+                ),
+            )
+        )
+    else:
+        checkpoints.append(
+            SubjectTickCheckpointResult(
+                checkpoint_id="rt01.shared_runtime_domain_checkpoint",
+                source_contract="shared.runtime_domains",
+                status=SubjectTickCheckpointStatus.ALLOWED,
+                required_action="consume_shared_regulation_continuity_validity_domains",
+                applied_action=active_execution_mode,
+                reason="no prior shared runtime state supplied; contour followed phase-local contracts",
+            )
+        )
+
     if not context.disable_gate_application:
         gate_reasons: list[str] = []
         if c05_enforcement_authority and c05_validity_action == "halt_reuse_and_rebuild_scope" and halt_reason is None:
@@ -833,6 +921,11 @@ def persist_subject_tick_result_via_f01(
     requested_at: str,
     cause_chain: tuple[str, ...] = ("subject-tick-runtime-update",),
 ) -> TransitionResult:
+    domain_update = build_subject_tick_runtime_domain_update(result)
+    route_auth = build_subject_tick_runtime_route_auth_context(
+        result=result,
+        domain_update=domain_update,
+    )
     request = TransitionRequest(
         transition_id=transition_id,
         transition_kind=TransitionKind.APPLY_INTERNAL_EVENT,
@@ -843,9 +936,146 @@ def persist_subject_tick_result_via_f01(
         event_payload={
             "turn_id": f"subject-tick-{result.state.tick_index}",
             "subject_tick_snapshot": subject_tick_result_to_payload(result),
+            "runtime_domain_update": domain_update,
+            "runtime_route_auth": route_auth,
         },
     )
     return execute_transition(request, runtime_state)
+
+
+def build_subject_tick_runtime_domain_update(result: SubjectTickResult) -> RuntimeDomainUpdate:
+    if not isinstance(result, SubjectTickResult):
+        raise TypeError("build_subject_tick_runtime_domain_update requires SubjectTickResult")
+
+    viability_state = result.viability_result.state
+    c04_state = result.c04_result.state
+    c05_state = result.c05_result.state
+
+    mode_legitimacy = any(
+        checkpoint.checkpoint_id == "rt01.c04_mode_binding"
+        and checkpoint.status in {SubjectTickCheckpointStatus.ALLOWED, SubjectTickCheckpointStatus.ENFORCED_DETOUR}
+        for checkpoint in result.state.execution_checkpoints
+    ) and result.state.c04_authority_role == SubjectTickAuthorityRole.ARBITRATION.value
+
+    legality_reuse_allowed = not bool(
+        c05_state.invalidated_item_ids
+        or c05_state.expired_item_ids
+        or c05_state.dependency_contaminated_item_ids
+        or c05_state.no_safe_reuse_item_ids
+    )
+    revalidation_required = bool(
+        c05_state.revalidation_item_ids
+        or c05_state.selective_scope_targets
+        or c05_state.insufficient_basis_for_revalidation
+        or c05_state.selective_scope_uncertain
+        or result.state.revalidation_needed
+    )
+    no_safe_reuse = bool(c05_state.no_safe_reuse_item_ids)
+
+    return RuntimeDomainUpdate(
+        regulation=RegulationDomainState(
+            pressure_level=viability_state.pressure_level,
+            escalation_stage=viability_state.escalation_stage.value,
+            override_scope=viability_state.override_scope.value,
+            no_strong_override_claim=viability_state.no_strong_override_claim,
+            gate_accepted=result.viability_result.downstream_gate.accepted,
+            source_state_ref=viability_state.input_regulation_snapshot_ref,
+            updated_by_phase=DomainWriterPhase.R04.value,
+            last_update_provenance=viability_state.provenance,
+        ),
+        continuity=ContinuityDomainState(
+            c04_mode_claim=result.state.c04_execution_mode_claim,
+            c04_selected_mode=result.state.c04_selected_mode,
+            mode_legitimacy=mode_legitimacy,
+            endogenous_tick_allowed=c04_state.endogenous_tick_allowed,
+            arbitration_confidence=c04_state.arbitration_confidence,
+            source_state_ref=result.state.source_c04_state_ref,
+            updated_by_phase=DomainWriterPhase.C04.value,
+            last_update_provenance=c04_state.last_update_provenance,
+        ),
+        validity=ValidityDomainState(
+            c05_action_claim=result.state.c05_execution_action_claim,
+            c05_validity_action=result.state.c05_validity_action,
+            legality_reuse_allowed=legality_reuse_allowed,
+            revalidation_required=revalidation_required,
+            no_safe_reuse=no_safe_reuse,
+            selective_scope_targets=c05_state.selective_scope_targets,
+            source_state_ref=result.state.source_c05_state_ref,
+            updated_by_phase=DomainWriterPhase.C05.value,
+            last_update_provenance=c05_state.last_update_provenance,
+        ),
+        write_claims=(
+            DomainWriteClaim(
+                phase=DomainWriterPhase.R04,
+                domain_path="domains.regulation",
+                transition_kind=TransitionKind.APPLY_INTERNAL_EVENT,
+                route=DomainWriteRoute.RT01_SUBJECT_TICK_CONTOUR,
+                checkpoint_id="rt01.r04_regulation_surface",
+                reason="r04 viability pressure must propagate to shared regulation runtime domain",
+            ),
+            DomainWriteClaim(
+                phase=DomainWriterPhase.C04,
+                domain_path="domains.continuity",
+                transition_kind=TransitionKind.APPLY_INTERNAL_EVENT,
+                route=DomainWriteRoute.RT01_SUBJECT_TICK_CONTOUR,
+                checkpoint_id="rt01.c04_mode_binding",
+                reason="c04 lawful mode arbitration must propagate to shared continuity runtime domain",
+            ),
+            DomainWriteClaim(
+                phase=DomainWriterPhase.C05,
+                domain_path="domains.validity",
+                transition_kind=TransitionKind.APPLY_INTERNAL_EVENT,
+                route=DomainWriteRoute.RT01_SUBJECT_TICK_CONTOUR,
+                checkpoint_id="rt01.c05_legality_checkpoint",
+                reason="c05 temporal legality/revalidation claims must propagate to shared validity runtime domain",
+            ),
+        ),
+        reason="subject_tick runtime contour shared domain propagation",
+    )
+
+
+def build_subject_tick_runtime_route_auth_context(
+    *,
+    result: SubjectTickResult,
+    domain_update: RuntimeDomainUpdate | None = None,
+) -> RuntimeRouteAuthContext:
+    if not isinstance(result, SubjectTickResult):
+        raise TypeError("build_subject_tick_runtime_route_auth_context requires SubjectTickResult")
+    domain_update = domain_update or build_subject_tick_runtime_domain_update(result)
+    if not isinstance(domain_update, RuntimeDomainUpdate):
+        raise TypeError("domain_update must be RuntimeDomainUpdate")
+
+    claims = tuple(
+        claim
+        for claim in domain_update.write_claims
+        if claim.route == DomainWriteRoute.RT01_SUBJECT_TICK_CONTOUR
+    )
+    authorized_paths = tuple(sorted({claim.domain_path for claim in claims}))
+    claimed_checkpoint_ids = tuple(sorted({claim.checkpoint_id for claim in claims}))
+    available_checkpoint_ids = tuple(
+        checkpoint.checkpoint_id for checkpoint in result.state.execution_checkpoints
+    )
+    checkpoint_ids = _union_unique(claimed_checkpoint_ids, available_checkpoint_ids)
+
+    nonce = issue_rt01_route_auth_nonce(
+        route=DomainWriteRoute.RT01_SUBJECT_TICK_CONTOUR,
+        origin_phase=DomainWriterPhase.RT01,
+        transition_kind=TransitionKind.APPLY_INTERNAL_EVENT,
+        tick_id=result.state.tick_id,
+        authorized_domain_paths=authorized_paths,
+        checkpoint_ids=checkpoint_ids,
+        origin_contract="subject_tick.runtime_contour_from_r_to_c05",
+    )
+    return RuntimeRouteAuthContext(
+        route=DomainWriteRoute.RT01_SUBJECT_TICK_CONTOUR,
+        origin_phase=DomainWriterPhase.RT01,
+        transition_kind=TransitionKind.APPLY_INTERNAL_EVENT,
+        tick_id=result.state.tick_id,
+        authorized_domain_paths=authorized_paths,
+        checkpoint_ids=checkpoint_ids,
+        origin_contract="subject_tick.runtime_contour_from_r_to_c05",
+        auth_nonce=nonce,
+    )
 
 
 def _normalize_authority_role(value: str | None) -> SubjectTickAuthorityRole:
@@ -953,3 +1183,13 @@ def _phase_step(
         restrictions=restrictions,
         reason=reason,
     )
+
+
+def _union_unique(*chunks: Iterable[str]) -> tuple[str, ...]:
+    acc: list[str] = []
+    for chunk in chunks:
+        for item in chunk:
+            token = str(item or "").strip()
+            if token and token not in acc:
+                acc.append(token)
+    return tuple(acc)

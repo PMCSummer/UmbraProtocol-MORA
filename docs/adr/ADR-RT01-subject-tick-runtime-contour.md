@@ -71,3 +71,25 @@ Accepted for narrow BUILD increment that materializes runtime execution obedienc
 - C05 remains authority for temporal legality/revalidation restrictions.
 - RT01 remains authority only for runtime contour execution and contract enforcement.
 - No planner/orchestrator rewrite, no new mode semantics, no C05 reasoning moved into RT01.
+
+## Narrow Hardening Update (Route Authenticity + Source-of-Truth)
+- Scope: one contour-bounded hardening pass for shared runtime domains, without architecture-wide propagation/security redesign.
+
+### Route authenticity hardening
+- `runtime_domain_update` now requires typed `runtime_route_auth` context for `rt01_subject_tick_contour` claims.
+- Engine enforces:
+  - origin phase must be `RT01`,
+  - transition kind must match,
+  - claimed domain paths/checkpoints must match route-auth context,
+  - one-time nonce must be issued by lawful RT01 persistence path.
+- Result: spoofed external/manual transitions that only reuse route token/claims are rejected.
+
+### Source-of-truth precedence hardening
+- Runtime domain contract view explicitly declares:
+  - `source_of_truth_surface = runtime_state.domains`,
+  - `packet_snapshot_precedence_blocked = true`.
+- In conflicting packet/snapshot vs domains cases, runtime outcome follows shared domains.
+
+### Bound preserved
+- Hardening is RT01 contour-local only.
+- No map-wide authenticated propagation claim is introduced.
