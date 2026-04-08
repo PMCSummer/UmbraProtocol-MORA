@@ -19,6 +19,9 @@ class RuntimeDispatchContractView:
     restrictions: tuple[str, ...]
     final_execution_outcome: str | None
     downstream_obedience_status: str | None
+    world_link_status: str | None
+    world_grounded_transition_allowed: bool | None
+    world_effect_feedback_correlated: bool | None
     reason: str
 
 
@@ -46,6 +49,13 @@ def derive_runtime_dispatch_contract_view(
         ),
         downstream_obedience_status=(
             None if state is None else state.downstream_obedience_status
+        ),
+        world_link_status=(None if state is None else state.world_link_status),
+        world_grounded_transition_allowed=(
+            None if state is None else state.world_grounded_transition_allowed
+        ),
+        world_effect_feedback_correlated=(
+            None if state is None else state.world_effect_feedback_correlated
         ),
         reason=result.decision.reason,
     )

@@ -45,16 +45,30 @@ def build_minimal_runtime_tick_graph() -> RuntimeTickGraph:
                 checkpoint_ids=("rt01.c05_legality_checkpoint",),
             ),
             RuntimeContourNode(
+                node_id="node.world_adapter",
+                phase_id="WORLD_SEAM",
+                authority_role="external_seam",
+                computational_role="adapter",
+                surfaces=(
+                    "world_adapter.observation",
+                    "world_adapter.action",
+                    "world_adapter.effect_feedback",
+                ),
+                checkpoint_ids=("rt01.world_seam_checkpoint",),
+            ),
+            RuntimeContourNode(
                 node_id="node.rt01",
                 phase_id="RT01",
                 authority_role="gating",
                 computational_role="execution_spine",
                 surfaces=(
                     "rt01.downstream_obedience_checkpoint",
+                    "rt01.world_seam_checkpoint",
                     "rt01.outcome_resolution_checkpoint",
                 ),
                 checkpoint_ids=(
                     "rt01.downstream_obedience_checkpoint",
+                    "rt01.world_seam_checkpoint",
                     "rt01.outcome_resolution_checkpoint",
                 ),
             ),
@@ -72,15 +86,21 @@ def build_minimal_runtime_tick_graph() -> RuntimeTickGraph:
             RuntimeContourEdge(source_phase="R04", target_phase="RT01", relation="modulates"),
             RuntimeContourEdge(source_phase="C04", target_phase="RT01", relation="arbitrates"),
             RuntimeContourEdge(source_phase="C05", target_phase="RT01", relation="gates"),
+            RuntimeContourEdge(source_phase="WORLD_SEAM", target_phase="RT01", relation="requires"),
             RuntimeContourEdge(source_phase="RT01", target_phase="F01", relation="persists_via_f01"),
         ),
         mandatory_checkpoint_ids=(
             "rt01.c04_mode_binding",
             "rt01.c05_legality_checkpoint",
             "rt01.downstream_obedience_checkpoint",
+            "rt01.world_seam_checkpoint",
             "rt01.outcome_resolution_checkpoint",
         ),
-        source_of_truth_surfaces=("runtime_state.domains", "rt01.downstream_obedience_checkpoint"),
+        source_of_truth_surfaces=(
+            "runtime_state.domains",
+            "rt01.downstream_obedience_checkpoint",
+            "world_adapter.state",
+        ),
         reason="minimal production runtime graph for bounded RT01 contour wiring",
     )
 
@@ -103,6 +123,7 @@ def build_minimal_runtime_topology_bundle() -> RuntimeTopologyBundle:
             "production_route_required",
             "test_only_ablation_guard",
             "dispatch_contract_required_for_lawful_production_use",
+            "world_seam_presence_contract",
         ),
         f01_transition_route="subject_tick.persist_subject_tick_result_via_f01",
         tick_graph=tick_graph,

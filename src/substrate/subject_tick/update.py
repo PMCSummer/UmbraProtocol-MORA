@@ -109,6 +109,7 @@ from substrate.viability_control import (
     compute_viability_control_state,
     evaluate_viability_downstream_gate,
 )
+from substrate.world_adapter import run_world_adapter_cycle
 
 
 ATTEMPTED_SUBJECT_TICK_PATHS: tuple[str, ...] = (
@@ -120,6 +121,7 @@ ATTEMPTED_SUBJECT_TICK_PATHS: tuple[str, ...] = (
     "subject_tick.run_c05_temporal_validity",
     "subject_tick.enforce_c04_c05_contract_obedience",
     "subject_tick.enforce_downstream_obedience_contract",
+    "subject_tick.world_seam_enforcement",
     "subject_tick.resolve_bounded_runtime_outcome",
     "subject_tick.downstream_gate",
 )
@@ -825,6 +827,64 @@ def execute_subject_tick(
         )
     )
 
+    world_adapter_result = run_world_adapter_cycle(
+        tick_id=tick_id,
+        execution_mode=active_execution_mode,
+        adapter_input=context.world_adapter_input,
+        request_action_candidate=(
+            context.emit_world_action_candidate
+            or context.require_world_effect_feedback_for_success_claim
+        ),
+        source_lineage=lineage,
+    )
+    world_checkpoint_status = SubjectTickCheckpointStatus.ALLOWED
+    world_checkpoint_reason = world_adapter_result.gate.reason
+    if not context.disable_world_seam_enforcement:
+        if (
+            context.require_world_grounded_transition
+            and not world_adapter_result.gate.world_grounded_transition_allowed
+            and halt_reason is None
+        ):
+            repair_needed = True
+            world_checkpoint_status = SubjectTickCheckpointStatus.ENFORCED_DETOUR
+            world_checkpoint_reason = (
+                "world grounded transition required but world seam is unavailable/degraded/unobserved"
+            )
+            if active_execution_mode not in {"halt_execution", "revalidate_scope"}:
+                active_execution_mode = "repair_runtime_path"
+
+        if (
+            context.require_world_effect_feedback_for_success_claim
+            and not world_adapter_result.gate.externally_effected_change_claim_allowed
+            and halt_reason is None
+            and not repair_needed
+        ):
+            revalidation_needed = True
+            world_checkpoint_status = SubjectTickCheckpointStatus.ENFORCED_DETOUR
+            world_checkpoint_reason = (
+                "world effect feedback required for externally effected change claim"
+            )
+            if active_execution_mode != "halt_execution":
+                active_execution_mode = "revalidate_scope"
+    else:
+        world_checkpoint_status = SubjectTickCheckpointStatus.ENFORCED_DETOUR
+        world_checkpoint_reason = "world seam enforcement disabled in ablation context"
+
+    checkpoints.append(
+        SubjectTickCheckpointResult(
+            checkpoint_id="rt01.world_seam_checkpoint",
+            source_contract="world_adapter.external_seam",
+            status=world_checkpoint_status,
+            required_action=(
+                "require_world_grounded_transition"
+                if context.require_world_grounded_transition
+                else "world_seam_optional"
+            ),
+            applied_action=active_execution_mode,
+            reason=world_checkpoint_reason,
+        )
+    )
+
     if halt_reason is not None:
         final_outcome = SubjectTickOutcome.HALT
         execution_stance = SubjectTickExecutionStance.HALT_PATH
@@ -955,6 +1015,23 @@ def execute_subject_tick(
             obedience_decision.requires_restrictions_read
         ),
         downstream_obedience_reason=obedience_decision.reason,
+        world_adapter_presence=world_adapter_result.state.adapter_presence,
+        world_adapter_available=world_adapter_result.state.adapter_available,
+        world_adapter_degraded=world_adapter_result.state.adapter_degraded,
+        world_link_status=world_adapter_result.state.world_link_status.value,
+        world_effect_status=world_adapter_result.state.effect_status.value,
+        world_grounded_transition_allowed=world_adapter_result.gate.world_grounded_transition_allowed,
+        world_externally_effected_change_claim_allowed=(
+            world_adapter_result.gate.externally_effected_change_claim_allowed
+        ),
+        world_action_success_claim_allowed=world_adapter_result.gate.world_action_success_claim_allowed,
+        world_effect_feedback_correlated=world_adapter_result.gate.effect_feedback_correlated,
+        world_grounding_confidence=world_adapter_result.state.world_grounding_confidence,
+        world_require_grounded_transition=context.require_world_grounded_transition,
+        world_require_effect_feedback_for_success_claim=(
+            context.require_world_effect_feedback_for_success_claim
+        ),
+        world_adapter_reason=world_adapter_result.gate.reason,
         execution_stance=execution_stance,
         execution_checkpoints=tuple(checkpoints),
         downstream_step_results=step_results,
@@ -1012,6 +1089,7 @@ def execute_subject_tick(
         c03_result=diversification,
         c04_result=mode_arbitration,
         c05_result=temporal_validity,
+        world_adapter_result=world_adapter_result,
         abstain=abstain,
         abstain_reason=abstain_reason,
         no_planner_orchestrator_dependency=True,

@@ -43,6 +43,23 @@ def build_subject_tick_telemetry(
             state.downstream_obedience_requires_restrictions_read
         ),
         downstream_obedience_reason=state.downstream_obedience_reason,
+        world_adapter_presence=state.world_adapter_presence,
+        world_adapter_available=state.world_adapter_available,
+        world_adapter_degraded=state.world_adapter_degraded,
+        world_link_status=state.world_link_status,
+        world_effect_status=state.world_effect_status,
+        world_grounded_transition_allowed=state.world_grounded_transition_allowed,
+        world_externally_effected_change_claim_allowed=(
+            state.world_externally_effected_change_claim_allowed
+        ),
+        world_action_success_claim_allowed=state.world_action_success_claim_allowed,
+        world_effect_feedback_correlated=state.world_effect_feedback_correlated,
+        world_grounding_confidence=state.world_grounding_confidence,
+        world_require_grounded_transition=state.world_require_grounded_transition,
+        world_require_effect_feedback_for_success_claim=(
+            state.world_require_effect_feedback_for_success_claim
+        ),
+        world_adapter_reason=state.world_adapter_reason,
         execution_stance=state.execution_stance,
         execution_checkpoints=state.execution_checkpoints,
         final_execution_outcome=state.final_execution_outcome,
@@ -99,6 +116,23 @@ def subject_tick_result_snapshot(result: SubjectTickResult) -> dict[str, object]
                 state.downstream_obedience_requires_restrictions_read
             ),
             "downstream_obedience_reason": state.downstream_obedience_reason,
+            "world_adapter_presence": state.world_adapter_presence,
+            "world_adapter_available": state.world_adapter_available,
+            "world_adapter_degraded": state.world_adapter_degraded,
+            "world_link_status": state.world_link_status,
+            "world_effect_status": state.world_effect_status,
+            "world_grounded_transition_allowed": state.world_grounded_transition_allowed,
+            "world_externally_effected_change_claim_allowed": (
+                state.world_externally_effected_change_claim_allowed
+            ),
+            "world_action_success_claim_allowed": state.world_action_success_claim_allowed,
+            "world_effect_feedback_correlated": state.world_effect_feedback_correlated,
+            "world_grounding_confidence": state.world_grounding_confidence,
+            "world_require_grounded_transition": state.world_require_grounded_transition,
+            "world_require_effect_feedback_for_success_claim": (
+                state.world_require_effect_feedback_for_success_claim
+            ),
+            "world_adapter_reason": state.world_adapter_reason,
             "execution_stance": state.execution_stance.value,
             "execution_checkpoints": tuple(
                 {
@@ -137,6 +171,26 @@ def subject_tick_result_snapshot(result: SubjectTickResult) -> dict[str, object]
             "source_lineage": state.source_lineage,
             "last_update_provenance": state.last_update_provenance,
         },
+        "world_adapter_result": {
+            "world_link_status": result.world_adapter_result.state.world_link_status.value,
+            "effect_status": result.world_adapter_result.state.effect_status.value,
+            "adapter_presence": result.world_adapter_result.state.adapter_presence,
+            "adapter_available": result.world_adapter_result.state.adapter_available,
+            "adapter_degraded": result.world_adapter_result.state.adapter_degraded,
+            "world_grounding_confidence": result.world_adapter_result.state.world_grounding_confidence,
+            "world_grounded_transition_allowed": (
+                result.world_adapter_result.gate.world_grounded_transition_allowed
+            ),
+            "externally_effected_change_claim_allowed": (
+                result.world_adapter_result.gate.externally_effected_change_claim_allowed
+            ),
+            "world_action_success_claim_allowed": (
+                result.world_adapter_result.gate.world_action_success_claim_allowed
+            ),
+            "effect_feedback_correlated": result.world_adapter_result.gate.effect_feedback_correlated,
+            "restrictions": result.world_adapter_result.gate.restrictions,
+            "reason": result.world_adapter_result.gate.reason,
+        },
         "downstream_gate": {
             "accepted": result.downstream_gate.accepted,
             "usability_class": result.downstream_gate.usability_class.value,
@@ -173,6 +227,27 @@ def subject_tick_result_snapshot(result: SubjectTickResult) -> dict[str, object]
                 result.telemetry.downstream_obedience_requires_restrictions_read
             ),
             "downstream_obedience_reason": result.telemetry.downstream_obedience_reason,
+            "world_adapter_presence": result.telemetry.world_adapter_presence,
+            "world_adapter_available": result.telemetry.world_adapter_available,
+            "world_adapter_degraded": result.telemetry.world_adapter_degraded,
+            "world_link_status": result.telemetry.world_link_status,
+            "world_effect_status": result.telemetry.world_effect_status,
+            "world_grounded_transition_allowed": (
+                result.telemetry.world_grounded_transition_allowed
+            ),
+            "world_externally_effected_change_claim_allowed": (
+                result.telemetry.world_externally_effected_change_claim_allowed
+            ),
+            "world_action_success_claim_allowed": (
+                result.telemetry.world_action_success_claim_allowed
+            ),
+            "world_effect_feedback_correlated": result.telemetry.world_effect_feedback_correlated,
+            "world_grounding_confidence": result.telemetry.world_grounding_confidence,
+            "world_require_grounded_transition": result.telemetry.world_require_grounded_transition,
+            "world_require_effect_feedback_for_success_claim": (
+                result.telemetry.world_require_effect_feedback_for_success_claim
+            ),
+            "world_adapter_reason": result.telemetry.world_adapter_reason,
             "execution_stance": result.telemetry.execution_stance.value,
             "execution_checkpoints": tuple(
                 {

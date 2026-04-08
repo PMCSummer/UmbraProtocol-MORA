@@ -46,6 +46,9 @@ def runtime_dispatch_snapshot(result: RuntimeDispatchResult) -> dict[str, object
                 "final_execution_outcome": state.final_execution_outcome.value,
                 "downstream_obedience_status": state.downstream_obedience_status,
                 "downstream_obedience_fallback": state.downstream_obedience_fallback,
+                "world_link_status": state.world_link_status,
+                "world_grounded_transition_allowed": state.world_grounded_transition_allowed,
+                "world_effect_feedback_correlated": state.world_effect_feedback_correlated,
             }
         ),
         "persist_transition_accepted": (

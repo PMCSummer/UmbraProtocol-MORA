@@ -41,6 +41,7 @@ def evaluate_subject_tick_downstream_gate(
         SubjectTickRestrictionCode.AUTHORITY_ROLES_MUST_BE_READ,
         SubjectTickRestrictionCode.DOWNSTREAM_OBEDIENCE_CONTRACT_MUST_BE_READ,
         SubjectTickRestrictionCode.DOWNSTREAM_OBEDIENCE_RESTRICTIONS_MUST_BE_ENFORCED,
+        SubjectTickRestrictionCode.WORLD_SEAM_CONTRACT_MUST_BE_READ,
     ]
     usability = SubjectTickUsabilityClass.USABLE_BOUNDED
     accepted = True
@@ -69,6 +70,27 @@ def evaluate_subject_tick_downstream_gate(
             accepted = False
             usability = SubjectTickUsabilityClass.BLOCKED
             reason = "downstream obedience contract rejected continue path despite local helper surfaces"
+    if state.world_require_grounded_transition and not state.world_grounded_transition_allowed:
+        restrictions.append(
+            SubjectTickRestrictionCode.WORLD_GROUNDED_TRANSITION_REQUIRES_WORLD_PRESENCE
+        )
+        restrictions.append(SubjectTickRestrictionCode.DOWNSTREAM_AUTHORITY_DEGRADED)
+        if state.final_execution_outcome == SubjectTickOutcome.CONTINUE:
+            accepted = False
+            usability = SubjectTickUsabilityClass.BLOCKED
+            reason = "world grounded transition requested but world seam grounding is unavailable"
+    if (
+        state.world_require_effect_feedback_for_success_claim
+        and not state.world_externally_effected_change_claim_allowed
+    ):
+        restrictions.append(
+            SubjectTickRestrictionCode.WORLD_EFFECT_FEEDBACK_REQUIRED_FOR_SUCCESS_CLAIM
+        )
+        restrictions.append(SubjectTickRestrictionCode.DOWNSTREAM_AUTHORITY_DEGRADED)
+        if state.final_execution_outcome == SubjectTickOutcome.CONTINUE:
+            accepted = False
+            usability = SubjectTickUsabilityClass.BLOCKED
+            reason = "world effect feedback required for externally effected claim but effect observation is absent"
 
     return SubjectTickGateDecision(
         accepted=accepted,

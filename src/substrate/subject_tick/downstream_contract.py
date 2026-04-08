@@ -36,6 +36,19 @@ class SubjectTickContractView:
     downstream_obedience_source_of_truth_surface: str
     downstream_obedience_requires_restrictions_read: bool
     downstream_obedience_reason: str
+    world_adapter_presence: bool
+    world_adapter_available: bool
+    world_adapter_degraded: bool
+    world_link_status: str
+    world_effect_status: str
+    world_grounded_transition_allowed: bool
+    world_externally_effected_change_claim_allowed: bool
+    world_action_success_claim_allowed: bool
+    world_effect_feedback_correlated: bool
+    world_grounding_confidence: float
+    world_require_grounded_transition: bool
+    world_require_effect_feedback_for_success_claim: bool
+    world_adapter_reason: str
     execution_stance: str
     execution_checkpoints: tuple[str, ...]
     final_execution_outcome: SubjectTickOutcome
@@ -102,6 +115,23 @@ def derive_subject_tick_contract_view(
             state.downstream_obedience_requires_restrictions_read
         ),
         downstream_obedience_reason=state.downstream_obedience_reason,
+        world_adapter_presence=state.world_adapter_presence,
+        world_adapter_available=state.world_adapter_available,
+        world_adapter_degraded=state.world_adapter_degraded,
+        world_link_status=state.world_link_status,
+        world_effect_status=state.world_effect_status,
+        world_grounded_transition_allowed=state.world_grounded_transition_allowed,
+        world_externally_effected_change_claim_allowed=(
+            state.world_externally_effected_change_claim_allowed
+        ),
+        world_action_success_claim_allowed=state.world_action_success_claim_allowed,
+        world_effect_feedback_correlated=state.world_effect_feedback_correlated,
+        world_grounding_confidence=state.world_grounding_confidence,
+        world_require_grounded_transition=state.world_require_grounded_transition,
+        world_require_effect_feedback_for_success_claim=(
+            state.world_require_effect_feedback_for_success_claim
+        ),
+        world_adapter_reason=state.world_adapter_reason,
         execution_stance=state.execution_stance.value,
         execution_checkpoints=tuple(
             f"{checkpoint.checkpoint_id}:{checkpoint.status.value}"

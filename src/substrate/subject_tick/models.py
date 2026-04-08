@@ -3,6 +3,10 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from enum import Enum, StrEnum
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from substrate.world_adapter import WorldAdapterInput, WorldAdapterResult
 
 
 class SubjectTickOutcome(str, Enum):
@@ -57,6 +61,13 @@ class SubjectTickRestrictionCode(StrEnum):
     DOWNSTREAM_OBEDIENCE_CONTRACT_MUST_BE_READ = "downstream_obedience_contract_must_be_read"
     DOWNSTREAM_OBEDIENCE_RESTRICTIONS_MUST_BE_ENFORCED = (
         "downstream_obedience_restrictions_must_be_enforced"
+    )
+    WORLD_SEAM_CONTRACT_MUST_BE_READ = "world_seam_contract_must_be_read"
+    WORLD_GROUNDED_TRANSITION_REQUIRES_WORLD_PRESENCE = (
+        "world_grounded_transition_requires_world_presence"
+    )
+    WORLD_EFFECT_FEEDBACK_REQUIRED_FOR_SUCCESS_CLAIM = (
+        "world_effect_feedback_required_for_success_claim"
     )
     DOWNSTREAM_AUTHORITY_DEGRADED = "downstream_authority_degraded"
 
@@ -130,6 +141,11 @@ class SubjectTickContext:
     phase_authority_roles: dict[str, str] = field(default_factory=dict)
     phase_computational_roles: dict[str, str] = field(default_factory=dict)
     role_map_source: SubjectTickRoleMapSource | None = None
+    world_adapter_input: WorldAdapterInput | None = None
+    require_world_grounded_transition: bool = False
+    require_world_effect_feedback_for_success_claim: bool = False
+    emit_world_action_candidate: bool = False
+    disable_world_seam_enforcement: bool = False
     source_lineage: tuple[str, ...] = ()
 
 
@@ -185,6 +201,19 @@ class SubjectTickState:
     downstream_obedience_source_of_truth_surface: str
     downstream_obedience_requires_restrictions_read: bool
     downstream_obedience_reason: str
+    world_adapter_presence: bool
+    world_adapter_available: bool
+    world_adapter_degraded: bool
+    world_link_status: str
+    world_effect_status: str
+    world_grounded_transition_allowed: bool
+    world_externally_effected_change_claim_allowed: bool
+    world_action_success_claim_allowed: bool
+    world_effect_feedback_correlated: bool
+    world_grounding_confidence: float
+    world_require_grounded_transition: bool
+    world_require_effect_feedback_for_success_claim: bool
+    world_adapter_reason: str
     execution_stance: SubjectTickExecutionStance
     execution_checkpoints: tuple[SubjectTickCheckpointResult, ...]
     downstream_step_results: tuple[SubjectTickStepResult, ...]
@@ -238,6 +267,19 @@ class SubjectTickTelemetry:
     downstream_obedience_source_of_truth_surface: str
     downstream_obedience_requires_restrictions_read: bool
     downstream_obedience_reason: str
+    world_adapter_presence: bool
+    world_adapter_available: bool
+    world_adapter_degraded: bool
+    world_link_status: str
+    world_effect_status: str
+    world_grounded_transition_allowed: bool
+    world_externally_effected_change_claim_allowed: bool
+    world_action_success_claim_allowed: bool
+    world_effect_feedback_correlated: bool
+    world_grounding_confidence: float
+    world_require_grounded_transition: bool
+    world_require_effect_feedback_for_success_claim: bool
+    world_adapter_reason: str
     execution_stance: SubjectTickExecutionStance
     execution_checkpoints: tuple[SubjectTickCheckpointResult, ...]
     final_execution_outcome: SubjectTickOutcome
@@ -265,6 +307,7 @@ class SubjectTickResult:
     c03_result: object
     c04_result: object
     c05_result: object
+    world_adapter_result: WorldAdapterResult
     abstain: bool
     abstain_reason: str | None
     no_planner_orchestrator_dependency: bool

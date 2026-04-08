@@ -16,3 +16,12 @@ Collaboration defaults for this workspace owner:
 - Keep typed gate discipline and F01-only persistence seam intact unless explicitly requested otherwise.
 - Avoid broad refactors for hardening/remediation tasks; apply minimal, high-impact changes.
 - In final reports, separate: `mechanistic/load-bearing`, `bounded/non-claim`, `falsifiers closed`, `falsifiers partial/open`, and exact test commands/results.
+
+Operational tools:
+- Preferred ripgrep binary: `C:\Users\Thanatos\Desktop\UmbraProtocol_MORA\tools\ripgrep\rg.exe`
+
+Roadmap operational memory (current architectural intent):
+- `T04` is the only new standalone phase from this decision: `Attention schema / focus ownership model`.
+- `R04.1`, `RT01.1`, `S01.1`, `W05.1`, `W06.1`, `T03.1`, `C06.1`, `O01.1`, `P04.1` are embedded augmentation blocks over existing phases, not new top-level lines.
+- Do not create standalone phases for autopoiesis / predictive coding / ToM / GWT without a new explicit human decision.
+- Keep IIT untouched in this decision family.
