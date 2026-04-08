@@ -1688,6 +1688,68 @@ class RoadmapModel:
             "role_frontier_only": bool(readiness.get("role_frontier_only", False)),
         }
 
+    def normalize_embedded_blocks(self, raw_blocks: Any) -> List[Dict[str, Any]]:
+        if not isinstance(raw_blocks, list):
+            return []
+        normalized: List[Dict[str, Any]] = []
+        seen_codes: set[str] = set()
+        anonymous_idx = 0
+        for item in raw_blocks:
+            if not isinstance(item, dict):
+                continue
+            code = str(item.get("code", "")).strip()
+            title = str(item.get("title", "")).strip()
+            intent = str(item.get("intent", "")).strip()
+            load_bearing_fields = listify(item.get("load_bearing_fields", []))
+            marker = code or f"__anon_{anonymous_idx}"
+            if marker in seen_codes:
+                continue
+            seen_codes.add(marker)
+            anonymous_idx += 1
+            normalized.append(
+                {
+                    "code": code,
+                    "title": title,
+                    "intent": intent,
+                    "load_bearing_fields": load_bearing_fields,
+                }
+            )
+        return normalized
+
+    def phase_embedded_blocks(self, phase_or_code: Phase | str | None) -> List[Dict[str, Any]]:
+        phase: Optional[Phase]
+        if isinstance(phase_or_code, Phase):
+            phase = phase_or_code
+        elif isinstance(phase_or_code, str):
+            phase = self.get_phase(phase_or_code)
+        else:
+            phase = None
+        if not phase:
+            return []
+        spec = phase.spec or {}
+        return self.normalize_embedded_blocks(spec.get("embedded_blocks", []))
+
+    def phase_embedded_blocks_summary_text(self, phase_or_code: Phase | str | None) -> str:
+        blocks = self.phase_embedded_blocks(phase_or_code)
+        lines: List[str] = ["Embedded augmentations:"]
+        if not blocks:
+            lines.append("- none")
+            return "\n".join(lines)
+        for block in blocks:
+            code = str(block.get("code", "")).strip()
+            title = str(block.get("title", "")).strip()
+            intent = str(block.get("intent", "")).strip()
+            fields = listify(block.get("load_bearing_fields", []))
+            header = code or "(unnamed)"
+            if title:
+                header = f"{header} — {title}"
+            lines.append(f"- {header}")
+            if intent:
+                lines.append(f"  intent: {intent}")
+            if fields:
+                lines.append(f"  fields: {', '.join(fields)}")
+        return "\n".join(lines)
+
     def phase_to_json_text(self, code: str) -> str:
         phase = self.get_phase(code)
         if not phase:
@@ -2306,6 +2368,7 @@ class RoadmapModel:
                 "rationale": rationale,
                 "includes": includes,
                 "excludes": excludes,
+                "embedded_blocks": self.phase_embedded_blocks(phase),
                 "notes": phase.notes,
                 "functional_role": phase.knowledge_card.functional_role,
                 "why_exists": phase.knowledge_card.why_exists,
@@ -2397,6 +2460,26 @@ class RoadmapModel:
             else:
                 lines.append("- none")
             lines.append("")
+
+        embedded_blocks = packet.get("phase_core", {}).get("embedded_blocks", [])
+        lines.append("Embedded augmentations:")
+        if embedded_blocks:
+            for block in self.normalize_embedded_blocks(embedded_blocks):
+                code = str(block.get("code", "")).strip()
+                title = str(block.get("title", "")).strip()
+                intent = str(block.get("intent", "")).strip()
+                fields = listify(block.get("load_bearing_fields", []))
+                header = code or "(unnamed)"
+                if title:
+                    header = f"{header} — {title}"
+                lines.append(f"- {header}")
+                if intent:
+                    lines.append(f"  intent: {intent}")
+                if fields:
+                    lines.append(f"  fields: {', '.join(fields)}")
+        else:
+            lines.append("- none")
+        lines.append("")
 
         neighbors = packet.get("neighbor_seams", [])
         lines.append(f"Critical neighbors: {len(neighbors)}")

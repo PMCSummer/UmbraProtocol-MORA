@@ -423,6 +423,105 @@ def test_phase_execution_packet_includes_machine_readable_role_readiness_summary
     assert readiness.get("role_frontier_only") is True
 
 
+def test_embedded_blocks_normalization_is_stable_and_deduped() -> None:
+    raw = {
+        "schema_version": 5,
+        "phases": [
+            {
+                **_minimal_phase("X01", "Embedded block probe"),
+                "spec": {
+                    "objective": "x",
+                    "includes": [],
+                    "rationale": "",
+                    "excludes": [],
+                    "embedded_blocks": [
+                        {
+                            "code": "X01.1",
+                            "title": "Probe",
+                            "intent": "intent text",
+                            "load_bearing_fields": ["a", "b"],
+                        },
+                        {
+                            "code": "X01.1",
+                            "title": "Probe duplicate",
+                            "intent": "duplicate should be dropped",
+                            "load_bearing_fields": ["z"],
+                        },
+                        {
+                            "title": "Anonymous",
+                            "intent": "anonymous item",
+                            "load_bearing_fields": "single-field",
+                        },
+                        "bad-shape",
+                    ],
+                },
+            }
+        ],
+        "graph": {"nodes": [], "edges": []},
+    }
+    model = RoadmapModel.from_json(raw)
+    blocks = model.phase_embedded_blocks("X01")
+    assert len(blocks) == 2
+    assert blocks[0]["code"] == "X01.1"
+    assert blocks[0]["load_bearing_fields"] == ["a", "b"]
+    assert blocks[1]["code"] == ""
+    assert blocks[1]["title"] == "Anonymous"
+    assert blocks[1]["load_bearing_fields"] == ["single-field"]
+    assert model.phase_embedded_blocks("MISSING") == []
+
+
+def test_embedded_blocks_visible_in_context_assembler_surfaces() -> None:
+    roadmap_path = TRACKER_ROOT / "UmbraProtocol_MORA_language_refactor.json"
+    model = RoadmapModel.from_json(json.loads(roadmap_path.read_text(encoding="utf-8")))
+
+    packet = model.build_phase_execution_packet("RT01")
+    phase_core = packet.get("phase_core", {})
+    embedded = phase_core.get("embedded_blocks", [])
+    assert any(item.get("code") == "RT01.1" for item in embedded)
+
+    summary = model.phase_execution_packet_summary_text("RT01")
+    assert "Embedded augmentations:" in summary
+    assert "RT01.1" in summary
+    assert "Constitutive self-boundary / degradation criteria" in summary
+
+    empty_summary = model.phase_execution_packet_summary_text("F01")
+    assert "Embedded augmentations:" in empty_summary
+    assert "Embedded augmentations:\n- none" in empty_summary
+
+
+def test_open_workspace_surface_includes_embedded_block_section() -> None:
+    app_source = (TRACKER_ROOT / "roadmap_tracker" / "app.py").read_text(encoding="utf-8")
+    assert "Embedded augmentations" in app_source
+    assert "workspace_embedded_preview" in app_source
+    assert "phase_embedded_blocks_summary_text(code)" in app_source
+
+
+def test_t04_is_standalone_and_dot_blocks_stay_embedded_only() -> None:
+    roadmap_path = TRACKER_ROOT / "UmbraProtocol_MORA_language_refactor.json"
+    raw = json.loads(roadmap_path.read_text(encoding="utf-8"))
+    phases = raw.get("phases", [])
+    codes = [phase.get("code", "") for phase in phases]
+    assert codes.count("T04") == 1
+    assert not any("." in str(code) for code in codes)
+
+    expected_embedded = {
+        "R04": "R04.1",
+        "RT01": "RT01.1",
+        "S01": "S01.1",
+        "W05": "W05.1",
+        "W06": "W06.1",
+        "T03": "T03.1",
+        "C06": "C06.1",
+        "O01": "O01.1",
+        "P04": "P04.1",
+    }
+    by_code = {phase.get("code"): phase for phase in phases}
+    for phase_code, block_code in expected_embedded.items():
+        phase = by_code[phase_code]
+        blocks = phase.get("spec", {}).get("embedded_blocks", [])
+        assert any(isinstance(item, dict) and item.get("code") == block_code for item in blocks)
+
+
 def test_missing_pair_c01_t01_is_now_present() -> None:
     roadmap_path = TRACKER_ROOT / "UmbraProtocol_MORA_language_refactor.json"
     model = RoadmapModel.from_json(json.loads(roadmap_path.read_text(encoding="utf-8")))

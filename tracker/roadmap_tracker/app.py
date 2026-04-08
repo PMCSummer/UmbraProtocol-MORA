@@ -782,6 +782,7 @@ class PhaseWorkspaceDialog(QDialog):
         self.phase_combo = QComboBox()
         for phase in self.model.phases:
             self.phase_combo.addItem(f"{phase.code} — {phase.title}", phase.code)
+        self.phase_combo.currentIndexChanged.connect(self._refresh_workspace_embedded_preview)
         top.addWidget(self.phase_combo, 1)
 
         self.load_json_btn = QPushButton("Load JSON")
@@ -813,6 +814,13 @@ class PhaseWorkspaceDialog(QDialog):
         info.setWordWrap(True)
         layout.addWidget(info)
 
+        layout.addWidget(QLabel("Embedded augmentations"))
+        self.workspace_embedded_preview = QPlainTextEdit()
+        self.workspace_embedded_preview.setReadOnly(True)
+        self.workspace_embedded_preview.setMinimumHeight(150)
+        self.workspace_embedded_preview.setPlaceholderText("No embedded augmentations for current phase.")
+        layout.addWidget(self.workspace_embedded_preview)
+
         self.editor = QPlainTextEdit()
         self.editor.setLineWrapMode(QPlainTextEdit.NoWrap)
         mono = QFont("Consolas", 10)
@@ -839,6 +847,11 @@ class PhaseWorkspaceDialog(QDialog):
         code = self.current_phase_code()
         if code:
             self.editor.setPlainText(self.model.phase_to_json_text(code))
+            self.workspace_embedded_preview.setPlainText(self.model.phase_embedded_blocks_summary_text(code))
+
+    def _refresh_workspace_embedded_preview(self, *_args) -> None:
+        code = self.current_phase_code()
+        self.workspace_embedded_preview.setPlainText(self.model.phase_embedded_blocks_summary_text(code))
 
     def load_todo_template(self) -> None:
         code = self.current_phase_code()
