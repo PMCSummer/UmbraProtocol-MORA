@@ -93,3 +93,31 @@ Accepted for narrow BUILD increment that materializes runtime execution obedienc
 ### Bound preserved
 - Hardening is RT01 contour-local only.
 - No map-wide authenticated propagation claim is introduced.
+
+## Build Update (Sprint 5: Downstream Obedience Contract)
+- Added first production slice of typed downstream obedience protocol for RT01 contour consumption.
+- New runtime decision surface distinguishes:
+  - `allow_continue`
+  - `allow_continue_with_restriction`
+  - `must_repair`
+  - `must_revalidate`
+  - `must_halt`
+  - `insufficient_authority_basis`
+  - `invalidated_upstream_surface`
+  - `blocked_by_survival_override`
+- RT01 now applies this protocol as a binding checkpoint (`rt01.downstream_obedience_checkpoint`) before resolving runtime outcome.
+- Shared `runtime_state.domains` remains source-of-truth where materialized; conflicting packet-local snapshot surfaces do not override obedience enforcement.
+
+### Non-claims preserved
+- No map-wide downstream obedience rollout.
+- No planner/global orchestration migration.
+- No authority transfer from R04/C04/C05 to RT01.
+
+## Narrow Hardening Update (Sprint 5 Checkpoint Coherence)
+- Scope: RT01/downstream-obedience contour only; no authority or planner semantics expansion.
+- `rt01.downstream_obedience_checkpoint.applied_action` now records post-enforcement runtime action.
+- When obedience fallback changes runtime action, checkpoint reason now exposes explicit action transition.
+- Enforcement chain remains auditable as:
+  - obedience decision (`required_action`)
+  - obedience checkpoint (`applied_action`)
+  - final runtime stance/outcome.

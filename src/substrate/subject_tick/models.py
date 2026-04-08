@@ -54,6 +54,10 @@ class SubjectTickRestrictionCode(StrEnum):
     C04_MODE_CLAIM_MUST_BE_READ = "c04_mode_claim_must_be_read"
     C05_ACTION_CLAIM_MUST_BE_READ = "c05_action_claim_must_be_read"
     AUTHORITY_ROLES_MUST_BE_READ = "authority_roles_must_be_read"
+    DOWNSTREAM_OBEDIENCE_CONTRACT_MUST_BE_READ = "downstream_obedience_contract_must_be_read"
+    DOWNSTREAM_OBEDIENCE_RESTRICTIONS_MUST_BE_ENFORCED = (
+        "downstream_obedience_restrictions_must_be_enforced"
+    )
     DOWNSTREAM_AUTHORITY_DEGRADED = "downstream_authority_degraded"
 
 
@@ -122,6 +126,7 @@ class SubjectTickContext:
     disable_gate_application: bool = False
     disable_c04_mode_execution_binding: bool = False
     disable_c05_validity_enforcement: bool = False
+    disable_downstream_obedience_enforcement: bool = False
     phase_authority_roles: dict[str, str] = field(default_factory=dict)
     phase_computational_roles: dict[str, str] = field(default_factory=dict)
     role_map_source: SubjectTickRoleMapSource | None = None
@@ -175,6 +180,11 @@ class SubjectTickState:
     active_execution_mode: str
     c04_selected_mode: str
     c05_validity_action: str
+    downstream_obedience_status: str
+    downstream_obedience_fallback: str
+    downstream_obedience_source_of_truth_surface: str
+    downstream_obedience_requires_restrictions_read: bool
+    downstream_obedience_reason: str
     execution_stance: SubjectTickExecutionStance
     execution_checkpoints: tuple[SubjectTickCheckpointResult, ...]
     downstream_step_results: tuple[SubjectTickStepResult, ...]
@@ -223,6 +233,11 @@ class SubjectTickTelemetry:
     active_execution_mode: str
     c04_selected_mode: str
     c05_validity_action: str
+    downstream_obedience_status: str
+    downstream_obedience_fallback: str
+    downstream_obedience_source_of_truth_surface: str
+    downstream_obedience_requires_restrictions_read: bool
+    downstream_obedience_reason: str
     execution_stance: SubjectTickExecutionStance
     execution_checkpoints: tuple[SubjectTickCheckpointResult, ...]
     final_execution_outcome: SubjectTickOutcome

@@ -36,6 +36,13 @@ def build_subject_tick_telemetry(
         active_execution_mode=state.active_execution_mode,
         c04_selected_mode=state.c04_selected_mode,
         c05_validity_action=state.c05_validity_action,
+        downstream_obedience_status=state.downstream_obedience_status,
+        downstream_obedience_fallback=state.downstream_obedience_fallback,
+        downstream_obedience_source_of_truth_surface=state.downstream_obedience_source_of_truth_surface,
+        downstream_obedience_requires_restrictions_read=(
+            state.downstream_obedience_requires_restrictions_read
+        ),
+        downstream_obedience_reason=state.downstream_obedience_reason,
         execution_stance=state.execution_stance,
         execution_checkpoints=state.execution_checkpoints,
         final_execution_outcome=state.final_execution_outcome,
@@ -83,6 +90,15 @@ def subject_tick_result_snapshot(result: SubjectTickResult) -> dict[str, object]
             "active_execution_mode": state.active_execution_mode,
             "c04_selected_mode": state.c04_selected_mode,
             "c05_validity_action": state.c05_validity_action,
+            "downstream_obedience_status": state.downstream_obedience_status,
+            "downstream_obedience_fallback": state.downstream_obedience_fallback,
+            "downstream_obedience_source_of_truth_surface": (
+                state.downstream_obedience_source_of_truth_surface
+            ),
+            "downstream_obedience_requires_restrictions_read": (
+                state.downstream_obedience_requires_restrictions_read
+            ),
+            "downstream_obedience_reason": state.downstream_obedience_reason,
             "execution_stance": state.execution_stance.value,
             "execution_checkpoints": tuple(
                 {
@@ -148,6 +164,15 @@ def subject_tick_result_snapshot(result: SubjectTickResult) -> dict[str, object]
             "active_execution_mode": result.telemetry.active_execution_mode,
             "c04_selected_mode": result.telemetry.c04_selected_mode,
             "c05_validity_action": result.telemetry.c05_validity_action,
+            "downstream_obedience_status": result.telemetry.downstream_obedience_status,
+            "downstream_obedience_fallback": result.telemetry.downstream_obedience_fallback,
+            "downstream_obedience_source_of_truth_surface": (
+                result.telemetry.downstream_obedience_source_of_truth_surface
+            ),
+            "downstream_obedience_requires_restrictions_read": (
+                result.telemetry.downstream_obedience_requires_restrictions_read
+            ),
+            "downstream_obedience_reason": result.telemetry.downstream_obedience_reason,
             "execution_stance": result.telemetry.execution_stance.value,
             "execution_checkpoints": tuple(
                 {

@@ -31,6 +31,11 @@ class SubjectTickContractView:
     active_execution_mode: str
     c04_selected_mode: str
     c05_validity_action: str
+    downstream_obedience_status: str
+    downstream_obedience_fallback: str
+    downstream_obedience_source_of_truth_surface: str
+    downstream_obedience_requires_restrictions_read: bool
+    downstream_obedience_reason: str
     execution_stance: str
     execution_checkpoints: tuple[str, ...]
     final_execution_outcome: SubjectTickOutcome
@@ -90,6 +95,13 @@ def derive_subject_tick_contract_view(
         active_execution_mode=state.active_execution_mode,
         c04_selected_mode=state.c04_selected_mode,
         c05_validity_action=state.c05_validity_action,
+        downstream_obedience_status=state.downstream_obedience_status,
+        downstream_obedience_fallback=state.downstream_obedience_fallback,
+        downstream_obedience_source_of_truth_surface=state.downstream_obedience_source_of_truth_surface,
+        downstream_obedience_requires_restrictions_read=(
+            state.downstream_obedience_requires_restrictions_read
+        ),
+        downstream_obedience_reason=state.downstream_obedience_reason,
         execution_stance=state.execution_stance.value,
         execution_checkpoints=tuple(
             f"{checkpoint.checkpoint_id}:{checkpoint.status.value}"

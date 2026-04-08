@@ -9,6 +9,10 @@ from substrate.affordances import (
 )
 from substrate.affordances.policy import evaluate_affordance_landscape_for_downstream
 from substrate.authority import issue_rt01_route_auth_nonce
+from substrate.downstream_obedience import (
+    ObedienceFallback,
+    build_downstream_obedience_decision,
+)
 from substrate.contracts import (
     ContinuityDomainState,
     DomainWriteClaim,
@@ -115,6 +119,7 @@ ATTEMPTED_SUBJECT_TICK_PATHS: tuple[str, ...] = (
     "subject_tick.run_c04_mode_arbitration",
     "subject_tick.run_c05_temporal_validity",
     "subject_tick.enforce_c04_c05_contract_obedience",
+    "subject_tick.enforce_downstream_obedience_contract",
     "subject_tick.resolve_bounded_runtime_outcome",
     "subject_tick.downstream_gate",
 )
@@ -583,6 +588,32 @@ def execute_subject_tick(
         )
     )
 
+    c05_state = temporal_validity.state
+    obedience_source_of_truth_surface = "phase_local.upstream_surfaces"
+    obedience_c04_mode_legitimacy = mode_view.gate_accepted
+    obedience_c05_legality_reuse_allowed = not bool(
+        c05_state.invalidated_item_ids
+        or c05_state.expired_item_ids
+        or c05_state.dependency_contaminated_item_ids
+        or c05_state.no_safe_reuse_item_ids
+    )
+    obedience_c05_revalidation_required = bool(
+        c05_state.revalidation_item_ids
+        or c05_state.selective_scope_targets
+        or c05_state.insufficient_basis_for_revalidation
+        or c05_state.selective_scope_uncertain
+        or c05_validity_action
+        in {"run_selective_revalidation", "run_bounded_revalidation", "suspend_until_revalidation_basis"}
+    )
+    obedience_c05_no_safe_reuse = bool(c05_state.no_safe_reuse_item_ids)
+    obedience_c05_surface_invalidated = bool(
+        c05_state.invalidated_item_ids
+        or c05_state.expired_item_ids
+        or c05_state.dependency_contaminated_item_ids
+    )
+    obedience_r04_override_scope = viability.state.override_scope.value
+    obedience_r04_no_strong_override_claim = viability.state.no_strong_override_claim
+
     prior_shared_runtime = (
         context.prior_runtime_state
         if isinstance(context.prior_runtime_state, RuntimeState)
@@ -593,6 +624,13 @@ def execute_subject_tick(
         shared_validity = prior_shared_runtime.domains.validity
         shared_continuity = prior_shared_runtime.domains.continuity
         shared_regulation = prior_shared_runtime.domains.regulation
+        obedience_source_of_truth_surface = "runtime_state.domains"
+        obedience_c04_mode_legitimacy = shared_continuity.mode_legitimacy
+        obedience_c05_legality_reuse_allowed = shared_validity.legality_reuse_allowed
+        obedience_c05_revalidation_required = shared_validity.revalidation_required
+        obedience_c05_no_safe_reuse = shared_validity.no_safe_reuse
+        obedience_r04_override_scope = shared_regulation.override_scope
+        obedience_r04_no_strong_override_claim = shared_regulation.no_strong_override_claim
 
         if shared_validity.no_safe_reuse and halt_reason is None:
             halt_reason = "shared_validity_no_safe_reuse"
@@ -722,6 +760,71 @@ def execute_subject_tick(
             )
         )
 
+    obedience_decision = build_downstream_obedience_decision(
+        source_of_truth_surface=obedience_source_of_truth_surface,
+        c04_mode_legitimacy=obedience_c04_mode_legitimacy,
+        c04_mode_claim=c04_execution_mode_claim,
+        c04_authority_role=c04_authority_role,
+        c04_computational_role=c04_computational_role,
+        c05_legality_reuse_allowed=obedience_c05_legality_reuse_allowed,
+        c05_revalidation_required=obedience_c05_revalidation_required,
+        c05_no_safe_reuse=obedience_c05_no_safe_reuse,
+        c05_action_claim=c05_execution_action_claim,
+        c05_authority_role=c05_authority_role,
+        c05_computational_role=c05_computational_role,
+        r04_override_scope=obedience_r04_override_scope,
+        r04_no_strong_override_claim=obedience_r04_no_strong_override_claim,
+        r04_authority_role=r04_authority_role,
+        r04_computational_role=r04_computational_role,
+        c05_surface_invalidated=obedience_c05_surface_invalidated,
+    )
+    obedience_pre_enforcement_action = active_execution_mode
+    obedience_checkpoint_status = (
+        SubjectTickCheckpointStatus.BLOCKED
+        if obedience_decision.fallback == ObedienceFallback.HALT
+        else SubjectTickCheckpointStatus.ENFORCED_DETOUR
+        if obedience_decision.fallback in {ObedienceFallback.REPAIR, ObedienceFallback.REVALIDATE}
+        else SubjectTickCheckpointStatus.ALLOWED
+    )
+    if not context.disable_downstream_obedience_enforcement:
+        if obedience_decision.fallback == ObedienceFallback.HALT:
+            halt_reason = halt_reason or "downstream_obedience_halt"
+            active_execution_mode = "halt_execution"
+        elif obedience_decision.fallback == ObedienceFallback.REVALIDATE and halt_reason is None:
+            revalidation_needed = True
+            if active_execution_mode not in {"halt_execution"}:
+                active_execution_mode = "revalidate_scope"
+        elif obedience_decision.fallback == ObedienceFallback.REPAIR and halt_reason is None:
+            repair_needed = True
+            if active_execution_mode not in {"halt_execution", "revalidate_scope"}:
+                active_execution_mode = "repair_runtime_path"
+    else:
+        checkpoints.append(
+            SubjectTickCheckpointResult(
+                checkpoint_id="rt01.downstream_obedience_ablation",
+                source_contract="rt01.downstream_obedience",
+                status=SubjectTickCheckpointStatus.ENFORCED_DETOUR,
+                required_action=obedience_decision.status.value,
+                applied_action=active_execution_mode,
+                reason="downstream obedience enforcement disabled in ablation context",
+            )
+        )
+    obedience_reason = obedience_decision.reason
+    if obedience_pre_enforcement_action != active_execution_mode:
+        obedience_reason = (
+            f"{obedience_reason}; action_transition={obedience_pre_enforcement_action}->{active_execution_mode}"
+        )
+    checkpoints.append(
+        SubjectTickCheckpointResult(
+            checkpoint_id="rt01.downstream_obedience_checkpoint",
+            source_contract="rt01.downstream_obedience",
+            status=obedience_checkpoint_status,
+            required_action=obedience_decision.status.value,
+            applied_action=active_execution_mode,
+            reason=obedience_reason,
+        )
+    )
+
     if halt_reason is not None:
         final_outcome = SubjectTickOutcome.HALT
         execution_stance = SubjectTickExecutionStance.HALT_PATH
@@ -845,6 +948,13 @@ def execute_subject_tick(
         active_execution_mode=active_execution_mode,
         c04_selected_mode=mode_arbitration.state.active_mode.value,
         c05_validity_action=c05_validity_action,
+        downstream_obedience_status=obedience_decision.status.value,
+        downstream_obedience_fallback=obedience_decision.fallback.value,
+        downstream_obedience_source_of_truth_surface=obedience_decision.source_of_truth_surface,
+        downstream_obedience_requires_restrictions_read=(
+            obedience_decision.requires_restrictions_read
+        ),
+        downstream_obedience_reason=obedience_decision.reason,
         execution_stance=execution_stance,
         execution_checkpoints=tuple(checkpoints),
         downstream_step_results=step_results,

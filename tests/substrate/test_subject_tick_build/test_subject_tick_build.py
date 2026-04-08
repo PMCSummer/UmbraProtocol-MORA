@@ -81,6 +81,7 @@ def test_subject_tick_invariant_c05_restriction_cannot_be_silently_ignored() -> 
             dependency_trigger_hits=("trigger:mode_shift",),
             disable_c05_validity_enforcement=True,
             disable_gate_application=True,
+            disable_downstream_obedience_enforcement=True,
         ),
     )
     assert obeyed.state.final_execution_outcome == SubjectTickOutcome.REVALIDATE
@@ -152,6 +153,7 @@ def test_subject_tick_ablation_gate_bypass_changes_contour_behavior() -> None:
             dependency_trigger_hits=("trigger:mode_shift",),
             disable_gate_application=True,
             disable_c05_validity_enforcement=True,
+            disable_downstream_obedience_enforcement=True,
         ),
     )
     assert enforced.state.final_execution_outcome == SubjectTickOutcome.REVALIDATE
@@ -191,6 +193,7 @@ def test_subject_tick_ablation_ignoring_c05_signal_allows_illegal_profile() -> N
         context=SubjectTickContext(
             dependency_trigger_hits=("trigger:mode_shift",),
             disable_c05_validity_enforcement=True,
+            disable_downstream_obedience_enforcement=True,
         ),
     )
     assert enforced.state.active_execution_mode != ignored.state.active_execution_mode
@@ -278,6 +281,7 @@ def test_subject_tick_critical_gate_checkpoint_is_path_affecting_not_label_only(
             dependency_trigger_hits=("trigger:mode_shift",),
             disable_c05_validity_enforcement=True,
             disable_gate_application=True,
+            disable_downstream_obedience_enforcement=True,
         ),
     )
     assert enforced.state.final_execution_outcome == SubjectTickOutcome.REVALIDATE
@@ -351,6 +355,7 @@ def test_subject_tick_role_boundary_c05_legality_enforced_without_semantic_reint
             dependency_trigger_hits=("trigger:mode_shift",),
             disable_c05_validity_enforcement=True,
             disable_gate_application=True,
+            disable_downstream_obedience_enforcement=True,
         ),
     )
     assert enforced.state.c05_execution_action_claim in {

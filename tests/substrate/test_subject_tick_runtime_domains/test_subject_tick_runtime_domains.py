@@ -172,27 +172,30 @@ def test_c05_shared_validity_path_is_load_bearing_for_following_runtime_tick() -
         ),
         _bootstrapped_state(),
     )
-    without_validity_update = replace(
+    permissive_validity_update = replace(
         update,
-        validity=None,
-        write_claims=tuple(
-            claim for claim in update.write_claims if claim.domain_path != "domains.validity"
+        validity=replace(
+            update.validity,
+            legality_reuse_allowed=True,
+            revalidation_required=False,
+            no_safe_reuse=False,
+            selective_scope_targets=(),
         ),
     )
-    without_validity = execute_transition(
+    permissive_validity = execute_transition(
         TransitionRequest(
-            transition_id="tr-rt-domain-c05-without",
+            transition_id="tr-rt-domain-c05-permissive",
             transition_kind=TransitionKind.APPLY_INTERNAL_EVENT,
             writer=WriterIdentity.TRANSITION_ENGINE,
             cause_chain=("test", "c05-domain"),
             requested_at="2026-04-08T01:03:30+00:00",
-            event_id="ev-rt-domain-c05-without",
+            event_id="ev-rt-domain-c05-permissive",
             event_payload={
-                "turn_id": "turn-rt-domain-c05-without",
-                "runtime_domain_update": without_validity_update,
+                "turn_id": "turn-rt-domain-c05-permissive",
+                "runtime_domain_update": permissive_validity_update,
                 "runtime_route_auth": build_subject_tick_runtime_route_auth_context(
                     result=restricted,
-                    domain_update=without_validity_update,
+                    domain_update=permissive_validity_update,
                 ),
             },
         ),
@@ -203,13 +206,13 @@ def test_c05_shared_validity_path_is_load_bearing_for_following_runtime_tick() -
         unresolved=False,
         context=SubjectTickContext(prior_runtime_state=with_validity.state),
     )
-    without_shared = _tick(
-        "rt-domain-c05-follow-up-without",
+    permissive_shared = _tick(
+        "rt-domain-c05-follow-up-permissive",
         unresolved=False,
-        context=SubjectTickContext(prior_runtime_state=without_validity.state),
+        context=SubjectTickContext(prior_runtime_state=permissive_validity.state),
     )
     assert with_shared.state.final_execution_outcome == SubjectTickOutcome.REVALIDATE
-    assert without_shared.state.final_execution_outcome != SubjectTickOutcome.REVALIDATE
+    assert permissive_shared.state.final_execution_outcome != SubjectTickOutcome.REVALIDATE
 
 
 def test_r04_shared_regulation_path_can_enforce_runtime_detour_under_high_override_scope() -> None:

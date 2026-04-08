@@ -39,6 +39,8 @@ def evaluate_subject_tick_downstream_gate(
         SubjectTickRestrictionCode.C04_MODE_CLAIM_MUST_BE_READ,
         SubjectTickRestrictionCode.C05_ACTION_CLAIM_MUST_BE_READ,
         SubjectTickRestrictionCode.AUTHORITY_ROLES_MUST_BE_READ,
+        SubjectTickRestrictionCode.DOWNSTREAM_OBEDIENCE_CONTRACT_MUST_BE_READ,
+        SubjectTickRestrictionCode.DOWNSTREAM_OBEDIENCE_RESTRICTIONS_MUST_BE_ENFORCED,
     ]
     usability = SubjectTickUsabilityClass.USABLE_BOUNDED
     accepted = True
@@ -57,6 +59,16 @@ def evaluate_subject_tick_downstream_gate(
         usability = SubjectTickUsabilityClass.BLOCKED
         restrictions.append(SubjectTickRestrictionCode.DOWNSTREAM_AUTHORITY_DEGRADED)
         reason = "runtime contour halted by upstream legality/contract restrictions"
+    if state.downstream_obedience_status in {
+        "insufficient_authority_basis",
+        "invalidated_upstream_surface",
+        "blocked_by_survival_override",
+    }:
+        restrictions.append(SubjectTickRestrictionCode.DOWNSTREAM_AUTHORITY_DEGRADED)
+        if state.final_execution_outcome == SubjectTickOutcome.CONTINUE:
+            accepted = False
+            usability = SubjectTickUsabilityClass.BLOCKED
+            reason = "downstream obedience contract rejected continue path despite local helper surfaces"
 
     return SubjectTickGateDecision(
         accepted=accepted,
