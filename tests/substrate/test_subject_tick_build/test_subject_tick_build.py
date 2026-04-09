@@ -13,6 +13,7 @@ from substrate.subject_tick import (
     require_subject_tick_bounded_n_scope,
     require_subject_tick_strong_narrative_commitment,
 )
+from substrate.world_adapter import WorldAdapterInput, build_world_observation_packet
 from tests.substrate.subject_tick_testkit import build_subject_tick
 
 
@@ -573,3 +574,128 @@ def test_subject_tick_n_scope_validator_blocks_tampered_or_unsafe_strong_claim()
     tampered = replace(view, n_scope_n_minimal_only=False)
     with pytest.raises(PermissionError):
         require_subject_tick_bounded_n_scope(tampered)
+
+
+def test_subject_tick_t01_unresolved_laundering_under_consumer_pressure_forces_detour() -> None:
+    base_context = SubjectTickContext(
+        require_t01_preverbal_scene_consumer=True,
+        emit_world_action_candidate=True,
+        world_adapter_input=WorldAdapterInput(
+            adapter_presence=True,
+            adapter_available=True,
+            observation_packet=build_world_observation_packet(
+                observation_id="obs-t01-unresolved-laundering",
+                source_ref="world.sensor.subject_tick_test",
+                observed_at="2026-04-15T11:00:00+00:00",
+                payload_ref="payload:t01-unresolved-laundering",
+            ),
+        ),
+    )
+    preserved = _result(
+        "rt-t01-unresolved-preserved",
+        unresolved=False,
+        context=base_context,
+    )
+    laundered = _result(
+        "rt-t01-unresolved-laundered",
+        unresolved=False,
+        context=replace(base_context, disable_t01_unresolved_slot_maintenance=True),
+    )
+    preserved_checkpoint = next(
+        checkpoint
+        for checkpoint in preserved.state.execution_checkpoints
+        if checkpoint.checkpoint_id == "rt01.t01_semantic_field_checkpoint"
+    )
+    laundered_checkpoint = next(
+        checkpoint
+        for checkpoint in laundered.state.execution_checkpoints
+        if checkpoint.checkpoint_id == "rt01.t01_semantic_field_checkpoint"
+    )
+
+    assert "premature_scene_closure" not in preserved.state.t01_forbidden_shortcuts
+    assert "premature_scene_closure" in laundered.state.t01_forbidden_shortcuts
+    assert laundered.state.final_execution_outcome == SubjectTickOutcome.REVALIDATE
+    assert laundered_checkpoint.status.value == "enforced_detour"
+    assert "laundering risk" not in preserved_checkpoint.reason
+    assert "laundering risk" in laundered_checkpoint.reason
+
+
+def test_subject_tick_t01_second_scene_comparison_consumer_requirement_is_path_affecting() -> None:
+    shared_context = SubjectTickContext(
+        emit_world_action_candidate=True,
+        world_adapter_input=WorldAdapterInput(
+            adapter_presence=True,
+            adapter_available=True,
+            observation_packet=build_world_observation_packet(
+                observation_id="obs-t01-scene-comparison",
+                source_ref="world.sensor.subject_tick_test",
+                observed_at="2026-04-15T11:02:00+00:00",
+                payload_ref="payload:t01-scene-comparison",
+            ),
+        ),
+    )
+    without_comparison_requirement = _result(
+        "rt-t01-scene-comparison-baseline",
+        unresolved=False,
+        context=shared_context,
+    )
+    with_comparison_requirement = _result(
+        "rt-t01-scene-comparison-required",
+        unresolved=False,
+        context=replace(shared_context, require_t01_scene_comparison_consumer=True),
+    )
+
+    assert without_comparison_requirement.state.t01_scene_comparison_ready is False
+    assert with_comparison_requirement.state.t01_scene_comparison_ready is False
+    assert (
+        without_comparison_requirement.state.final_execution_outcome
+        == SubjectTickOutcome.CONTINUE
+    )
+    assert with_comparison_requirement.state.final_execution_outcome == SubjectTickOutcome.REVALIDATE
+    assert any(
+        checkpoint.checkpoint_id == "rt01.t01_semantic_field_checkpoint"
+        and checkpoint.status.value == "enforced_detour"
+        for checkpoint in with_comparison_requirement.state.execution_checkpoints
+    )
+
+
+def test_subject_tick_t02_constrained_scene_consumer_requirement_is_path_affecting() -> None:
+    baseline = _result(
+        "rt-t02-baseline",
+        unresolved=False,
+    )
+    required = _result(
+        "rt-t02-required",
+        unresolved=False,
+        context=SubjectTickContext(require_t02_constrained_scene_consumer=True),
+    )
+    assert baseline.state.final_execution_outcome == SubjectTickOutcome.CONTINUE
+    assert required.state.final_execution_outcome in {
+        SubjectTickOutcome.REPAIR,
+        SubjectTickOutcome.REVALIDATE,
+    }
+    assert any(
+        checkpoint.checkpoint_id == "rt01.t02_relation_binding_checkpoint"
+        and checkpoint.status.value == "enforced_detour"
+        for checkpoint in required.state.execution_checkpoints
+    )
+
+
+def test_subject_tick_contract_view_exposes_t02_raw_vs_constrained_distinction() -> None:
+    result = _result(
+        "rt-t02-contract-view",
+        unresolved=False,
+        context=SubjectTickContext(require_t02_constrained_scene_consumer=True),
+    )
+    view = derive_subject_tick_contract_view(result)
+    assert view.t02_constrained_scene_id is not None
+    assert view.t02_scene_status is not None
+    assert view.t02_confirmed_bindings_count is not None
+    assert view.t02_scope == "rt01_contour_only"
+    assert view.t02_scope_rt01_contour_only is True
+    assert view.t02_scope_t02_first_slice_only is True
+    assert view.t02_scope_t03_implemented is False
+    assert view.t02_scope_t04_implemented is False
+    assert view.t02_scope_o01_implemented is False
+    assert view.t02_scope_full_silent_thought_line_implemented is False
+    assert view.t02_scope_repo_wide_adoption is False

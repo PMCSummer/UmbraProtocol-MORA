@@ -18,7 +18,7 @@ def build_minimal_runtime_tick_graph() -> RuntimeTickGraph:
     return RuntimeTickGraph(
         graph_id="rt01.minimal_runtime_tick_graph.v1",
         contour_id="rt01_subject_tick_contour",
-        runtime_order=("R", "C01", "C02", "C03", "C04", "C05", "T01", "RT01"),
+        runtime_order=("R", "C01", "C02", "C03", "C04", "C05", "T01", "T02", "RT01"),
         nodes=(
             RuntimeContourNode(
                 node_id="node.r04",
@@ -116,6 +116,19 @@ def build_minimal_runtime_tick_graph() -> RuntimeTickGraph:
                 checkpoint_ids=("rt01.t01_semantic_field_checkpoint",),
             ),
             RuntimeContourNode(
+                node_id="node.t02_relation_binding",
+                phase_id="T02",
+                authority_role="relation_binding_constraint_contract",
+                computational_role="preverbal_constraint_propagator",
+                surfaces=(
+                    "t02_relation_binding.constrained_scene",
+                    "t02_relation_binding.constraint_objects",
+                    "t02_relation_binding.propagation_records",
+                    "t02_relation_binding.preverbal_consumer_contract",
+                ),
+                checkpoint_ids=("rt01.t02_relation_binding_checkpoint",),
+            ),
+            RuntimeContourNode(
                 node_id="node.rt01",
                 phase_id="RT01",
                 authority_role="gating",
@@ -129,6 +142,7 @@ def build_minimal_runtime_tick_graph() -> RuntimeTickGraph:
                     "rt01.m_minimal_contour_checkpoint",
                     "rt01.n_minimal_contour_checkpoint",
                     "rt01.t01_semantic_field_checkpoint",
+                    "rt01.t02_relation_binding_checkpoint",
                     "rt01.outcome_resolution_checkpoint",
                 ),
                 checkpoint_ids=(
@@ -140,6 +154,7 @@ def build_minimal_runtime_tick_graph() -> RuntimeTickGraph:
                     "rt01.m_minimal_contour_checkpoint",
                     "rt01.n_minimal_contour_checkpoint",
                     "rt01.t01_semantic_field_checkpoint",
+                    "rt01.t02_relation_binding_checkpoint",
                     "rt01.outcome_resolution_checkpoint",
                 ),
             ),
@@ -176,7 +191,8 @@ def build_minimal_runtime_tick_graph() -> RuntimeTickGraph:
             RuntimeContourEdge(source_phase="M_MINIMAL", target_phase="T01", relation="requires"),
             RuntimeContourEdge(source_phase="A_MINIMAL", target_phase="T01", relation="requires"),
             RuntimeContourEdge(source_phase="WORLD_SEAM", target_phase="T01", relation="requires"),
-            RuntimeContourEdge(source_phase="T01", target_phase="RT01", relation="requires"),
+            RuntimeContourEdge(source_phase="T01", target_phase="T02", relation="requires"),
+            RuntimeContourEdge(source_phase="T02", target_phase="RT01", relation="requires"),
             RuntimeContourEdge(source_phase="RT01", target_phase="F01", relation="persists_via_f01"),
         ),
         mandatory_checkpoint_ids=(
@@ -190,6 +206,7 @@ def build_minimal_runtime_tick_graph() -> RuntimeTickGraph:
             "rt01.m_minimal_contour_checkpoint",
             "rt01.n_minimal_contour_checkpoint",
             "rt01.t01_semantic_field_checkpoint",
+            "rt01.t02_relation_binding_checkpoint",
             "rt01.outcome_resolution_checkpoint",
         ),
         source_of_truth_surfaces=(
@@ -202,6 +219,7 @@ def build_minimal_runtime_tick_graph() -> RuntimeTickGraph:
             "m_minimal.lifecycle_state",
             "n_minimal.commitment_state",
             "t01_semantic_field.active_scene",
+            "t02_relation_binding.constrained_scene",
         ),
         reason="minimal production runtime graph for bounded RT01 contour wiring",
     )
@@ -232,6 +250,7 @@ def build_minimal_runtime_topology_bundle() -> RuntimeTopologyBundle:
             "m_minimal_memory_lifecycle_contract",
             "n_minimal_narrative_commitment_contract",
             "t01_semantic_field_contract",
+            "t02_relation_binding_constraint_propagation_contract",
         ),
         f01_transition_route="subject_tick.persist_subject_tick_result_via_f01",
         tick_graph=tick_graph,
@@ -392,5 +411,7 @@ def _context_has_ablation_flags(context: SubjectTickContext | None) -> bool:
         or context.disable_s_minimal_enforcement
         or context.disable_m_minimal_enforcement
         or context.disable_n_minimal_enforcement
+        or context.disable_t01_unresolved_slot_maintenance
         or context.disable_t01_field_enforcement
+        or context.disable_t02_enforcement
     )

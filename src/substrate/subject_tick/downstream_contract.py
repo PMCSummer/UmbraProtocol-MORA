@@ -246,6 +246,7 @@ class SubjectTickContractView:
     t01_unresolved_slots_count: int
     t01_contested_relations_count: int
     t01_preverbal_consumer_ready: bool
+    t01_scene_comparison_ready: bool
     t01_no_clean_scene_commit: bool
     t01_forbidden_shortcuts: tuple[str, ...]
     t01_restrictions: tuple[str, ...]
@@ -261,6 +262,27 @@ class SubjectTickContractView:
     t01_scope_reason: str
     t01_reason: str
     t01_require_preverbal_scene_consumer: bool
+    t01_require_scene_comparison_consumer: bool
+    t02_constrained_scene_id: str | None
+    t02_scene_status: str | None
+    t02_preverbal_constraint_consumer_ready: bool | None
+    t02_no_clean_binding_commit: bool | None
+    t02_confirmed_bindings_count: int | None
+    t02_provisional_bindings_count: int | None
+    t02_blocked_bindings_count: int | None
+    t02_conflicted_bindings_count: int | None
+    t02_propagated_consequences_count: int | None
+    t02_blocked_or_conflicted_consequences_count: int | None
+    t02_forbidden_shortcuts: tuple[str, ...] | None
+    t02_scope: str | None
+    t02_scope_rt01_contour_only: bool | None
+    t02_scope_t02_first_slice_only: bool | None
+    t02_scope_t03_implemented: bool | None
+    t02_scope_t04_implemented: bool | None
+    t02_scope_o01_implemented: bool | None
+    t02_scope_full_silent_thought_line_implemented: bool | None
+    t02_scope_repo_wide_adoption: bool | None
+    t02_require_constrained_scene_consumer: bool | None
     execution_stance: str
     execution_checkpoints: tuple[str, ...]
     final_execution_outcome: SubjectTickOutcome
@@ -295,8 +317,10 @@ def derive_subject_tick_contract_view(
 ) -> SubjectTickContractView:
     if isinstance(subject_tick_state_or_result, SubjectTickResult):
         state = subject_tick_state_or_result.state
+        t02_result = subject_tick_state_or_result.t02_result
     elif isinstance(subject_tick_state_or_result, SubjectTickState):
         state = subject_tick_state_or_result
+        t02_result = None
     else:
         raise TypeError(
             "derive_subject_tick_contract_view requires SubjectTickState/SubjectTickResult"
@@ -565,6 +589,7 @@ def derive_subject_tick_contract_view(
         t01_unresolved_slots_count=state.t01_unresolved_slots_count,
         t01_contested_relations_count=state.t01_contested_relations_count,
         t01_preverbal_consumer_ready=state.t01_preverbal_consumer_ready,
+        t01_scene_comparison_ready=state.t01_scene_comparison_ready,
         t01_no_clean_scene_commit=state.t01_no_clean_scene_commit,
         t01_forbidden_shortcuts=state.t01_forbidden_shortcuts,
         t01_restrictions=state.t01_restrictions,
@@ -584,6 +609,103 @@ def derive_subject_tick_contract_view(
         t01_require_preverbal_scene_consumer=(
             state.t01_require_preverbal_scene_consumer
         ),
+        t01_require_scene_comparison_consumer=(
+            state.t01_require_scene_comparison_consumer
+        ),
+        t02_constrained_scene_id=(
+            None if t02_result is None else t02_result.state.constrained_scene_id
+        ),
+        t02_scene_status=(
+            None if t02_result is None else t02_result.state.scene_status.value
+        ),
+        t02_preverbal_constraint_consumer_ready=(
+            None if t02_result is None else t02_result.gate.pre_verbal_constraint_consumer_ready
+        ),
+        t02_no_clean_binding_commit=(
+            None if t02_result is None else t02_result.gate.no_clean_binding_commit
+        ),
+        t02_confirmed_bindings_count=(
+            None
+            if t02_result is None
+            else sum(
+                1
+                for item in t02_result.state.relation_bindings
+                if item.status.value == "confirmed"
+            )
+        ),
+        t02_provisional_bindings_count=(
+            None
+            if t02_result is None
+            else sum(
+                1
+                for item in t02_result.state.relation_bindings
+                if item.status.value == "provisional"
+            )
+        ),
+        t02_blocked_bindings_count=(
+            None
+            if t02_result is None
+            else sum(
+                1
+                for item in t02_result.state.relation_bindings
+                if item.status.value == "blocked"
+            )
+        ),
+        t02_conflicted_bindings_count=(
+            None
+            if t02_result is None
+            else sum(
+                1
+                for item in t02_result.state.relation_bindings
+                if item.status.value in {"conflicted", "incompatible"}
+            )
+        ),
+        t02_propagated_consequences_count=(
+            None
+            if t02_result is None
+            else sum(
+                1
+                for item in t02_result.state.propagation_records
+                if item.effect_type.value != "no_effect" and item.status.value == "active"
+            )
+        ),
+        t02_blocked_or_conflicted_consequences_count=(
+            None
+            if t02_result is None
+            else sum(
+                1
+                for item in t02_result.state.propagation_records
+                if item.status.value in {"blocked", "stopped"}
+            )
+        ),
+        t02_forbidden_shortcuts=(
+            None if t02_result is None else t02_result.gate.forbidden_shortcuts
+        ),
+        t02_scope=(None if t02_result is None else t02_result.scope_marker.scope),
+        t02_scope_rt01_contour_only=(
+            None if t02_result is None else t02_result.scope_marker.rt01_contour_only
+        ),
+        t02_scope_t02_first_slice_only=(
+            None if t02_result is None else t02_result.scope_marker.t02_first_slice_only
+        ),
+        t02_scope_t03_implemented=(
+            None if t02_result is None else t02_result.scope_marker.t03_implemented
+        ),
+        t02_scope_t04_implemented=(
+            None if t02_result is None else t02_result.scope_marker.t04_implemented
+        ),
+        t02_scope_o01_implemented=(
+            None if t02_result is None else t02_result.scope_marker.o01_implemented
+        ),
+        t02_scope_full_silent_thought_line_implemented=(
+            None
+            if t02_result is None
+            else t02_result.scope_marker.full_silent_thought_line_implemented
+        ),
+        t02_scope_repo_wide_adoption=(
+            None if t02_result is None else t02_result.scope_marker.repo_wide_adoption
+        ),
+        t02_require_constrained_scene_consumer=state.t02_require_constrained_scene_consumer,
         execution_stance=state.execution_stance.value,
         execution_checkpoints=tuple(
             f"{checkpoint.checkpoint_id}:{checkpoint.status.value}"

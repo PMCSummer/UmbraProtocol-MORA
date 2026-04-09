@@ -97,7 +97,7 @@ def test_runtime_topology_bundle_and_graph_are_materialized() -> None:
         "domains.continuity",
         "domains.validity",
     )
-    assert graph.runtime_order == ("R", "C01", "C02", "C03", "C04", "C05", "T01", "RT01")
+    assert graph.runtime_order == ("R", "C01", "C02", "C03", "C04", "C05", "T01", "T02", "RT01")
     assert "rt01.downstream_obedience_checkpoint" in graph.mandatory_checkpoint_ids
     assert "rt01.world_seam_checkpoint" in graph.mandatory_checkpoint_ids
     assert "rt01.world_entry_checkpoint" in graph.mandatory_checkpoint_ids
@@ -106,6 +106,7 @@ def test_runtime_topology_bundle_and_graph_are_materialized() -> None:
     assert "rt01.m_minimal_contour_checkpoint" in graph.mandatory_checkpoint_ids
     assert "rt01.n_minimal_contour_checkpoint" in graph.mandatory_checkpoint_ids
     assert "rt01.t01_semantic_field_checkpoint" in graph.mandatory_checkpoint_ids
+    assert "rt01.t02_relation_binding_checkpoint" in graph.mandatory_checkpoint_ids
     assert "world_adapter.state" in graph.source_of_truth_surfaces
     assert "world_entry_contract.episode" in graph.source_of_truth_surfaces
     assert "s_minimal_contour.boundary_state" in graph.source_of_truth_surfaces
@@ -113,6 +114,7 @@ def test_runtime_topology_bundle_and_graph_are_materialized() -> None:
     assert "m_minimal.lifecycle_state" in graph.source_of_truth_surfaces
     assert "n_minimal.commitment_state" in graph.source_of_truth_surfaces
     assert "t01_semantic_field.active_scene" in graph.source_of_truth_surfaces
+    assert "t02_relation_binding.constrained_scene" in graph.source_of_truth_surfaces
 
 
 def test_dispatch_happy_path_runs_lawful_production_contour() -> None:
@@ -485,6 +487,32 @@ def test_dispatch_contract_view_and_snapshot_are_inspectable() -> None:
     assert view.n_scope_full_narrative_line_implemented is False
     assert view.n_scope_repo_wide_adoption is False
     assert isinstance(view.n_n01_blockers, tuple)
+    assert view.t01_scene_id is not None
+    assert view.t01_scene_status is not None
+    assert view.t01_stability_state is not None
+    assert view.t01_preverbal_consumer_ready in {True, False}
+    assert view.t01_scene_comparison_ready in {True, False}
+    assert view.t01_no_clean_scene_commit in {True, False}
+    assert view.t01_require_scene_comparison_consumer in {True, False}
+    assert view.t02_constrained_scene_id is not None
+    assert view.t02_scene_status is not None
+    assert view.t02_preverbal_constraint_consumer_ready in {True, False}
+    assert view.t02_no_clean_binding_commit in {True, False}
+    assert view.t02_confirmed_bindings_count is not None
+    assert view.t02_provisional_bindings_count is not None
+    assert view.t02_blocked_bindings_count is not None
+    assert view.t02_conflicted_bindings_count is not None
+    assert view.t02_propagated_consequences_count is not None
+    assert view.t02_blocked_or_conflicted_consequences_count is not None
+    assert view.t02_scope == "rt01_contour_only"
+    assert view.t02_scope_rt01_contour_only is True
+    assert view.t02_scope_t02_first_slice_only is True
+    assert view.t02_scope_t03_implemented is False
+    assert view.t02_scope_t04_implemented is False
+    assert view.t02_scope_o01_implemented is False
+    assert view.t02_scope_full_silent_thought_line_implemented is False
+    assert view.t02_scope_repo_wide_adoption is False
+    assert view.t02_require_constrained_scene_consumer in {True, False}
     assert require_dispatch_bounded_n_scope(view) is view
     assert isinstance(view.m_m01_blockers, tuple)
     assert view.m_m01_structurally_present_but_not_ready in {True, False}
@@ -559,6 +587,30 @@ def test_dispatch_contract_view_and_snapshot_are_inspectable() -> None:
     assert snapshot["subject_tick_state"]["n_scope_n04_implemented"] is False
     assert snapshot["subject_tick_state"]["n_scope_full_narrative_line_implemented"] is False
     assert snapshot["subject_tick_state"]["n_scope_repo_wide_adoption"] is False
+    assert "t01_scene_id" in snapshot["subject_tick_state"]
+    assert "t01_scene_status" in snapshot["subject_tick_state"]
+    assert "t01_stability_state" in snapshot["subject_tick_state"]
+    assert "t01_preverbal_consumer_ready" in snapshot["subject_tick_state"]
+    assert "t01_scene_comparison_ready" in snapshot["subject_tick_state"]
+    assert "t01_no_clean_scene_commit" in snapshot["subject_tick_state"]
+    assert "t01_require_scene_comparison_consumer" in snapshot["subject_tick_state"]
+    assert snapshot["subject_tick_state"]["t02_constrained_scene_id"] is not None
+    assert snapshot["subject_tick_state"]["t02_scene_status"] is not None
+    assert snapshot["subject_tick_state"]["t02_preverbal_constraint_consumer_ready"] in {True, False}
+    assert snapshot["subject_tick_state"]["t02_no_clean_binding_commit"] in {True, False}
+    assert snapshot["subject_tick_state"]["t02_confirmed_bindings_count"] is not None
+    assert snapshot["subject_tick_state"]["t02_scope"] == "rt01_contour_only"
+    assert snapshot["subject_tick_state"]["t02_scope_rt01_contour_only"] is True
+    assert snapshot["subject_tick_state"]["t02_scope_t02_first_slice_only"] is True
+    assert snapshot["subject_tick_state"]["t02_scope_t03_implemented"] is False
+    assert snapshot["subject_tick_state"]["t02_scope_t04_implemented"] is False
+    assert snapshot["subject_tick_state"]["t02_scope_o01_implemented"] is False
+    assert (
+        snapshot["subject_tick_state"]["t02_scope_full_silent_thought_line_implemented"]
+        is False
+    )
+    assert snapshot["subject_tick_state"]["t02_scope_repo_wide_adoption"] is False
+    assert snapshot["subject_tick_state"]["t02_require_constrained_scene_consumer"] in {True, False}
     assert isinstance(snapshot["subject_tick_state"]["n_n01_blockers"], tuple)
     assert isinstance(snapshot["subject_tick_state"]["m_m01_blockers"], tuple)
     assert snapshot["subject_tick_state"]["m_m01_structurally_present_but_not_ready"] in {True, False}
@@ -621,3 +673,64 @@ def test_matched_input_route_class_change_changes_binding_contract_surface() -> 
     assert production_view.route_binding_consequence != helper_view.route_binding_consequence
     assert production_view.production_consumer_ready is True
     assert helper_view.production_consumer_ready is False
+
+
+def test_dispatch_t01_scene_comparison_consumer_requirement_is_load_bearing() -> None:
+    baseline = dispatch_runtime_tick(
+        RuntimeDispatchRequest(
+            tick_input=_tick_input("runtime-topology-t01-comparison"),
+            context=SubjectTickContext(
+                emit_world_action_candidate=True,
+            ),
+            route_class=RuntimeRouteClass.PRODUCTION_CONTOUR,
+        )
+    )
+    required = dispatch_runtime_tick(
+        RuntimeDispatchRequest(
+            tick_input=_tick_input("runtime-topology-t01-comparison"),
+            context=SubjectTickContext(
+                emit_world_action_candidate=True,
+                require_t01_scene_comparison_consumer=True,
+            ),
+            route_class=RuntimeRouteClass.PRODUCTION_CONTOUR,
+        )
+    )
+    assert baseline.subject_tick_result is not None
+    assert required.subject_tick_result is not None
+    assert baseline.subject_tick_result.state.t01_scene_comparison_ready is False
+    assert required.subject_tick_result.state.t01_scene_comparison_ready is False
+    assert baseline.subject_tick_result.state.final_execution_outcome == SubjectTickOutcome.CONTINUE
+    assert required.subject_tick_result.state.final_execution_outcome == SubjectTickOutcome.REVALIDATE
+    assert any(
+        checkpoint.checkpoint_id == "rt01.t01_semantic_field_checkpoint"
+        and checkpoint.status.value == "enforced_detour"
+        for checkpoint in required.subject_tick_result.state.execution_checkpoints
+    )
+
+
+def test_dispatch_t02_constrained_scene_consumer_requirement_is_load_bearing() -> None:
+    baseline = dispatch_runtime_tick(
+        RuntimeDispatchRequest(
+            tick_input=_tick_input("runtime-topology-t02-consumer"),
+            route_class=RuntimeRouteClass.PRODUCTION_CONTOUR,
+        )
+    )
+    required = dispatch_runtime_tick(
+        RuntimeDispatchRequest(
+            tick_input=_tick_input("runtime-topology-t02-consumer"),
+            context=SubjectTickContext(require_t02_constrained_scene_consumer=True),
+            route_class=RuntimeRouteClass.PRODUCTION_CONTOUR,
+        )
+    )
+    assert baseline.subject_tick_result is not None
+    assert required.subject_tick_result is not None
+    assert baseline.subject_tick_result.state.final_execution_outcome == SubjectTickOutcome.CONTINUE
+    assert required.subject_tick_result.state.final_execution_outcome in {
+        SubjectTickOutcome.REPAIR,
+        SubjectTickOutcome.REVALIDATE,
+    }
+    assert any(
+        checkpoint.checkpoint_id == "rt01.t02_relation_binding_checkpoint"
+        and checkpoint.status.value == "enforced_detour"
+        for checkpoint in required.subject_tick_result.state.execution_checkpoints
+    )

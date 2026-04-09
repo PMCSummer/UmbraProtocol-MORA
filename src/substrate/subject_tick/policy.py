@@ -55,6 +55,8 @@ def evaluate_subject_tick_downstream_gate(
         SubjectTickRestrictionCode.N_FORBIDDEN_SHORTCUTS_MUST_BE_READ,
         SubjectTickRestrictionCode.T01_SEMANTIC_FIELD_CONTRACT_MUST_BE_READ,
         SubjectTickRestrictionCode.T01_FORBIDDEN_SHORTCUTS_MUST_BE_READ,
+        SubjectTickRestrictionCode.T02_RELATION_BINDING_CONTRACT_MUST_BE_READ,
+        SubjectTickRestrictionCode.T02_FORBIDDEN_SHORTCUTS_MUST_BE_READ,
     ]
     usability = SubjectTickUsabilityClass.USABLE_BOUNDED
     accepted = True
@@ -235,6 +237,20 @@ def evaluate_subject_tick_downstream_gate(
             reason = (
                 "t01 preverbal scene consumer requested but semantic field is not cleanly consumable"
             )
+    if (
+        state.t01_require_preverbal_scene_consumer
+        and "premature_scene_closure" in state.t01_forbidden_shortcuts
+    ):
+        restrictions.append(
+            SubjectTickRestrictionCode.T01_PREVERBAL_SCENE_REQUIRED_FOR_CONSUMER
+        )
+        restrictions.append(SubjectTickRestrictionCode.DOWNSTREAM_AUTHORITY_DEGRADED)
+        if state.final_execution_outcome == SubjectTickOutcome.CONTINUE:
+            accepted = False
+            usability = SubjectTickUsabilityClass.BLOCKED
+            reason = (
+                "t01 unresolved laundering risk detected under pre-verbal consumer pressure"
+            )
     if state.t01_require_preverbal_scene_consumer and state.t01_no_clean_scene_commit:
         restrictions.append(
             SubjectTickRestrictionCode.T01_PREVERBAL_SCENE_REQUIRED_FOR_CONSUMER
@@ -244,6 +260,35 @@ def evaluate_subject_tick_downstream_gate(
             accepted = False
             usability = SubjectTickUsabilityClass.BLOCKED
             reason = "t01 scene remains no-clean under claim pressure; clarification/revalidation required"
+    if (
+        state.t01_require_scene_comparison_consumer
+        and not state.t01_scene_comparison_ready
+    ):
+        restrictions.append(
+            SubjectTickRestrictionCode.T01_SCENE_COMPARISON_REQUIRED_FOR_CONSUMER
+        )
+        restrictions.append(SubjectTickRestrictionCode.DOWNSTREAM_AUTHORITY_DEGRADED)
+        if state.final_execution_outcome == SubjectTickOutcome.CONTINUE:
+            accepted = False
+            usability = SubjectTickUsabilityClass.BLOCKED
+            reason = "t01 comparison consumer requested but scene is not comparison-ready"
+    t02_checkpoint = next(
+        (
+            checkpoint
+            for checkpoint in state.execution_checkpoints
+            if checkpoint.checkpoint_id == "rt01.t02_relation_binding_checkpoint"
+        ),
+        None,
+    )
+    if t02_checkpoint is not None and t02_checkpoint.status.value != "allowed":
+        restrictions.append(SubjectTickRestrictionCode.T02_CONSTRAINED_SCENE_REQUIRED_FOR_CONSUMER)
+        restrictions.append(SubjectTickRestrictionCode.DOWNSTREAM_AUTHORITY_DEGRADED)
+        if state.final_execution_outcome == SubjectTickOutcome.CONTINUE:
+            accepted = False
+            usability = SubjectTickUsabilityClass.BLOCKED
+            reason = (
+                "t02 constrained-scene consumer checkpoint requires detour before downstream continuation"
+            )
 
     return SubjectTickGateDecision(
         accepted=accepted,

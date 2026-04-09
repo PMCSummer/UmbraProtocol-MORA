@@ -7,6 +7,7 @@ def runtime_dispatch_snapshot(result: RuntimeDispatchResult) -> dict[str, object
     if not isinstance(result, RuntimeDispatchResult):
         raise TypeError("runtime_dispatch_snapshot requires RuntimeDispatchResult")
     state = None if result.subject_tick_result is None else result.subject_tick_result.state
+    t02_result = None if result.subject_tick_result is None else result.subject_tick_result.t02_result
     return {
         "decision": {
             "accepted": result.decision.accepted,
@@ -176,9 +177,13 @@ def runtime_dispatch_snapshot(result: RuntimeDispatchResult) -> dict[str, object
                 "t01_scene_status": state.t01_scene_status,
                 "t01_stability_state": state.t01_stability_state,
                 "t01_preverbal_consumer_ready": state.t01_preverbal_consumer_ready,
+                "t01_scene_comparison_ready": state.t01_scene_comparison_ready,
                 "t01_no_clean_scene_commit": state.t01_no_clean_scene_commit,
                 "t01_unresolved_slots_count": state.t01_unresolved_slots_count,
                 "t01_forbidden_shortcuts": state.t01_forbidden_shortcuts,
+                "t01_require_scene_comparison_consumer": (
+                    state.t01_require_scene_comparison_consumer
+                ),
                 "t01_scope": state.t01_scope,
                 "t01_scope_rt01_contour_only": state.t01_scope_rt01_contour_only,
                 "t01_scope_t01_first_slice_only": state.t01_scope_t01_first_slice_only,
@@ -190,6 +195,106 @@ def runtime_dispatch_snapshot(result: RuntimeDispatchResult) -> dict[str, object
                     state.t01_scope_full_silent_thought_line_implemented
                 ),
                 "t01_scope_repo_wide_adoption": state.t01_scope_repo_wide_adoption,
+                "t02_constrained_scene_id": (
+                    None if t02_result is None else t02_result.state.constrained_scene_id
+                ),
+                "t02_scene_status": (
+                    None if t02_result is None else t02_result.state.scene_status.value
+                ),
+                "t02_preverbal_constraint_consumer_ready": (
+                    None
+                    if t02_result is None
+                    else t02_result.gate.pre_verbal_constraint_consumer_ready
+                ),
+                "t02_no_clean_binding_commit": (
+                    None if t02_result is None else t02_result.gate.no_clean_binding_commit
+                ),
+                "t02_confirmed_bindings_count": (
+                    None
+                    if t02_result is None
+                    else sum(
+                        1
+                        for item in t02_result.state.relation_bindings
+                        if item.status.value == "confirmed"
+                    )
+                ),
+                "t02_provisional_bindings_count": (
+                    None
+                    if t02_result is None
+                    else sum(
+                        1
+                        for item in t02_result.state.relation_bindings
+                        if item.status.value == "provisional"
+                    )
+                ),
+                "t02_blocked_bindings_count": (
+                    None
+                    if t02_result is None
+                    else sum(
+                        1
+                        for item in t02_result.state.relation_bindings
+                        if item.status.value == "blocked"
+                    )
+                ),
+                "t02_conflicted_bindings_count": (
+                    None
+                    if t02_result is None
+                    else sum(
+                        1
+                        for item in t02_result.state.relation_bindings
+                        if item.status.value in {"conflicted", "incompatible"}
+                    )
+                ),
+                "t02_propagated_consequences_count": (
+                    None
+                    if t02_result is None
+                    else sum(
+                        1
+                        for item in t02_result.state.propagation_records
+                        if item.effect_type.value != "no_effect" and item.status.value == "active"
+                    )
+                ),
+                "t02_blocked_or_conflicted_consequences_count": (
+                    None
+                    if t02_result is None
+                    else sum(
+                        1
+                        for item in t02_result.state.propagation_records
+                        if item.status.value in {"blocked", "stopped"}
+                    )
+                ),
+                "t02_forbidden_shortcuts": (
+                    None if t02_result is None else t02_result.gate.forbidden_shortcuts
+                ),
+                "t02_scope": (
+                    None if t02_result is None else t02_result.scope_marker.scope
+                ),
+                "t02_scope_rt01_contour_only": (
+                    None if t02_result is None else t02_result.scope_marker.rt01_contour_only
+                ),
+                "t02_scope_t02_first_slice_only": (
+                    None if t02_result is None else t02_result.scope_marker.t02_first_slice_only
+                ),
+                "t02_scope_t03_implemented": (
+                    None if t02_result is None else t02_result.scope_marker.t03_implemented
+                ),
+                "t02_scope_t04_implemented": (
+                    None if t02_result is None else t02_result.scope_marker.t04_implemented
+                ),
+                "t02_scope_o01_implemented": (
+                    None if t02_result is None else t02_result.scope_marker.o01_implemented
+                ),
+                "t02_scope_full_silent_thought_line_implemented": (
+                    None
+                    if t02_result is None
+                    else t02_result.scope_marker.full_silent_thought_line_implemented
+                ),
+                "t02_scope_repo_wide_adoption": (
+                    None if t02_result is None else t02_result.scope_marker.repo_wide_adoption
+                ),
+                "t02_require_constrained_scene_consumer": (
+                    state.t02_require_constrained_scene_consumer
+                ),
             }
         ),
         "persist_transition_accepted": (

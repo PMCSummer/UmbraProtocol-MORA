@@ -6,7 +6,14 @@ from typing import Iterable
 from substrate.a_line_normalization import build_a_line_normalization
 from substrate.m_minimal import build_m_minimal
 from substrate.n_minimal import build_n_minimal
-from substrate.t01_semantic_field import build_t01_active_semantic_field
+from substrate.t01_semantic_field import (
+    build_t01_active_semantic_field,
+    derive_t01_preverbal_consumer_view,
+)
+from substrate.t02_relation_binding import (
+    build_t02_constrained_scene,
+    derive_t02_preverbal_constraint_consumer_view,
+)
 from substrate.affordances import (
     create_default_capability_state,
     generate_regulation_affordances,
@@ -133,6 +140,7 @@ ATTEMPTED_SUBJECT_TICK_PATHS: tuple[str, ...] = (
     "subject_tick.evaluate_m_minimal_contour",
     "subject_tick.evaluate_n_minimal_contour",
     "subject_tick.evaluate_t01_semantic_field",
+    "subject_tick.evaluate_t02_relation_binding",
     "subject_tick.world_seam_enforcement",
     "subject_tick.resolve_bounded_runtime_outcome",
     "subject_tick.downstream_gate",
@@ -1180,11 +1188,28 @@ def execute_subject_tick(
         c04_execution_mode_claim=c04_execution_mode_claim,
         c05_validity_action=c05_validity_action,
         prior_state=None,
+        maintain_unresolved_slots=not context.disable_t01_unresolved_slot_maintenance,
         source_lineage=lineage,
+    )
+    t01_preverbal_view = derive_t01_preverbal_consumer_view(t01_result)
+    t01_scene_comparison_ready = bool(
+        t01_preverbal_view.comparison_ready and not t01_preverbal_view.clarification_required
     )
     t01_checkpoint_status = SubjectTickCheckpointStatus.ALLOWED
     t01_checkpoint_reason = t01_result.gate.reason
     if not context.disable_t01_field_enforcement:
+        if (
+            context.require_t01_preverbal_scene_consumer
+            and "premature_scene_closure" in t01_result.gate.forbidden_shortcuts
+            and halt_reason is None
+        ):
+            t01_checkpoint_status = SubjectTickCheckpointStatus.ENFORCED_DETOUR
+            revalidation_needed = True
+            t01_checkpoint_reason = (
+                "t01 unresolved laundering risk detected under pre-verbal consumer pressure; revalidate detour enforced"
+            )
+            if active_execution_mode != "halt_execution":
+                active_execution_mode = "revalidate_scope"
         if (
             context.require_t01_preverbal_scene_consumer
             and not t01_result.gate.pre_verbal_consumer_ready
@@ -1205,6 +1230,18 @@ def execute_subject_tick(
                 )
                 if active_execution_mode not in {"halt_execution", "revalidate_scope"}:
                     active_execution_mode = "repair_runtime_path"
+        if (
+            context.require_t01_scene_comparison_consumer
+            and not t01_scene_comparison_ready
+            and halt_reason is None
+        ):
+            t01_checkpoint_status = SubjectTickCheckpointStatus.ENFORCED_DETOUR
+            revalidation_needed = True
+            t01_checkpoint_reason = (
+                "t01 comparison consumer requested but scene is not comparison-ready; revalidate detour enforced"
+            )
+            if active_execution_mode != "halt_execution":
+                active_execution_mode = "revalidate_scope"
     else:
         t01_checkpoint_status = SubjectTickCheckpointStatus.ENFORCED_DETOUR
         t01_checkpoint_reason = "t01 semantic field enforcement disabled in ablation context"
@@ -1214,12 +1251,83 @@ def execute_subject_tick(
             source_contract="t01_semantic_field.active_non_verbal_scene",
             status=t01_checkpoint_status,
             required_action=(
-                "require_t01_preverbal_scene_consumer"
+                "require_t01_preverbal_and_comparison_consumer"
+                if (
+                    context.require_t01_preverbal_scene_consumer
+                    and context.require_t01_scene_comparison_consumer
+                )
+                else "require_t01_preverbal_scene_consumer"
                 if context.require_t01_preverbal_scene_consumer
+                else "require_t01_scene_comparison_consumer"
+                if context.require_t01_scene_comparison_consumer
                 else "t01_optional"
             ),
             applied_action=active_execution_mode,
             reason=t01_checkpoint_reason,
+        )
+    )
+    t02_result = build_t02_constrained_scene(
+        tick_id=tick_id,
+        t01_result=t01_result,
+        world_entry_result=world_entry_result,
+        s_minimal_result=s_minimal_result,
+        a_line_result=a_line_result,
+        m_minimal_result=m_minimal_result,
+        n_minimal_result=n_minimal_result,
+        c05_validity_action=c05_validity_action,
+        source_lineage=lineage,
+    )
+    t02_preverbal_view = derive_t02_preverbal_constraint_consumer_view(t02_result)
+    t02_checkpoint_status = SubjectTickCheckpointStatus.ALLOWED
+    t02_checkpoint_reason = t02_result.gate.reason
+    if not context.disable_t02_enforcement:
+        if (
+            context.require_t02_constrained_scene_consumer
+            and "silent_conflict_overwrite" in t02_result.gate.forbidden_shortcuts
+            and halt_reason is None
+        ):
+            t02_checkpoint_status = SubjectTickCheckpointStatus.ENFORCED_DETOUR
+            revalidation_needed = True
+            t02_checkpoint_reason = (
+                "t02 conflict preservation shortcut detected under constrained-scene consumer pressure; revalidate detour enforced"
+            )
+            if active_execution_mode != "halt_execution":
+                active_execution_mode = "revalidate_scope"
+        if (
+            context.require_t02_constrained_scene_consumer
+            and not t02_preverbal_view.can_consume_constrained_scene
+            and halt_reason is None
+        ):
+            t02_checkpoint_status = SubjectTickCheckpointStatus.ENFORCED_DETOUR
+            if t02_result.gate.no_clean_binding_commit:
+                revalidation_needed = True
+                t02_checkpoint_reason = (
+                    "t02 constrained-scene consumer requested but bindings remain no-clean/conflicted; revalidate detour enforced"
+                )
+                if active_execution_mode != "halt_execution":
+                    active_execution_mode = "revalidate_scope"
+            else:
+                repair_needed = True
+                t02_checkpoint_reason = (
+                    "t02 constrained-scene consumer requested but relation binding surface is not consumable"
+                )
+                if active_execution_mode not in {"halt_execution", "revalidate_scope"}:
+                    active_execution_mode = "repair_runtime_path"
+    else:
+        t02_checkpoint_status = SubjectTickCheckpointStatus.ENFORCED_DETOUR
+        t02_checkpoint_reason = "t02 relation binding enforcement disabled in ablation context"
+    checkpoints.append(
+        SubjectTickCheckpointResult(
+            checkpoint_id="rt01.t02_relation_binding_checkpoint",
+            source_contract="t02_relation_binding.constraint_propagation",
+            status=t02_checkpoint_status,
+            required_action=(
+                "require_t02_constrained_scene_consumer"
+                if context.require_t02_constrained_scene_consumer
+                else "t02_optional"
+            ),
+            applied_action=active_execution_mode,
+            reason=t02_checkpoint_reason,
         )
     )
 
@@ -1611,6 +1719,7 @@ def execute_subject_tick(
             1 for edge in t01_result.state.relation_edges if edge.contested
         ),
         t01_preverbal_consumer_ready=t01_result.gate.pre_verbal_consumer_ready,
+        t01_scene_comparison_ready=t01_scene_comparison_ready,
         t01_no_clean_scene_commit=t01_result.gate.no_clean_scene_commit,
         t01_forbidden_shortcuts=t01_result.gate.forbidden_shortcuts,
         t01_restrictions=t01_result.gate.restrictions,
@@ -1629,6 +1738,12 @@ def execute_subject_tick(
         t01_reason=t01_result.reason,
         t01_require_preverbal_scene_consumer=(
             context.require_t01_preverbal_scene_consumer
+        ),
+        t01_require_scene_comparison_consumer=(
+            context.require_t01_scene_comparison_consumer
+        ),
+        t02_require_constrained_scene_consumer=(
+            context.require_t02_constrained_scene_consumer
         ),
         execution_stance=execution_stance,
         execution_checkpoints=tuple(checkpoints),
@@ -1661,7 +1776,7 @@ def execute_subject_tick(
         attempted_paths=ATTEMPTED_SUBJECT_TICK_PATHS,
         downstream_gate=gate,
         causal_basis=(
-            "bounded runtime execution spine enforces roadmap authority roles for C04/C05, consumes world-entry, s-minimal, a-line, m-minimal, n-minimal and t01 semantic-field gates, and keeps D01 observability-only over fixed R->C order"
+            "bounded runtime execution spine enforces roadmap authority roles for C04/C05, consumes world-entry, s-minimal, a-line, m-minimal, n-minimal, t01 semantic-field and t02 relation-binding gates, and keeps D01 observability-only over fixed R->C order"
         ),
     )
     abstain = final_outcome in {SubjectTickOutcome.REPAIR, SubjectTickOutcome.REVALIDATE}
@@ -1694,6 +1809,7 @@ def execute_subject_tick(
         m_minimal_result=m_minimal_result,
         n_minimal_result=n_minimal_result,
         t01_result=t01_result,
+        t02_result=t02_result,
         abstain=abstain,
         abstain_reason=abstain_reason,
         no_planner_orchestrator_dependency=True,

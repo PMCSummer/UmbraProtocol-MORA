@@ -277,6 +277,7 @@ def build_subject_tick_telemetry(
         t01_unresolved_slots_count=state.t01_unresolved_slots_count,
         t01_contested_relations_count=state.t01_contested_relations_count,
         t01_preverbal_consumer_ready=state.t01_preverbal_consumer_ready,
+        t01_scene_comparison_ready=state.t01_scene_comparison_ready,
         t01_no_clean_scene_commit=state.t01_no_clean_scene_commit,
         t01_forbidden_shortcuts=state.t01_forbidden_shortcuts,
         t01_restrictions=state.t01_restrictions,
@@ -295,6 +296,9 @@ def build_subject_tick_telemetry(
         t01_reason=state.t01_reason,
         t01_require_preverbal_scene_consumer=(
             state.t01_require_preverbal_scene_consumer
+        ),
+        t01_require_scene_comparison_consumer=(
+            state.t01_require_scene_comparison_consumer
         ),
         execution_stance=state.execution_stance,
         execution_checkpoints=state.execution_checkpoints,
@@ -600,6 +604,7 @@ def subject_tick_result_snapshot(result: SubjectTickResult) -> dict[str, object]
             "t01_unresolved_slots_count": state.t01_unresolved_slots_count,
             "t01_contested_relations_count": state.t01_contested_relations_count,
             "t01_preverbal_consumer_ready": state.t01_preverbal_consumer_ready,
+            "t01_scene_comparison_ready": state.t01_scene_comparison_ready,
             "t01_no_clean_scene_commit": state.t01_no_clean_scene_commit,
             "t01_forbidden_shortcuts": state.t01_forbidden_shortcuts,
             "t01_restrictions": state.t01_restrictions,
@@ -618,6 +623,9 @@ def subject_tick_result_snapshot(result: SubjectTickResult) -> dict[str, object]
             "t01_reason": state.t01_reason,
             "t01_require_preverbal_scene_consumer": (
                 state.t01_require_preverbal_scene_consumer
+            ),
+            "t01_require_scene_comparison_consumer": (
+                state.t01_require_scene_comparison_consumer
             ),
             "execution_stance": state.execution_stance.value,
             "execution_checkpoints": tuple(
@@ -1000,6 +1008,64 @@ def subject_tick_result_snapshot(result: SubjectTickResult) -> dict[str, object]
             },
             "reason": result.t01_result.reason,
         },
+        "t02_relation_binding_result": {
+            "constrained_scene_id": result.t02_result.state.constrained_scene_id,
+            "source_t01_scene_id": result.t02_result.state.source_t01_scene_id,
+            "source_t01_scene_status": result.t02_result.state.source_t01_scene_status,
+            "scene_status": result.t02_result.state.scene_status.value,
+            "raw_scene_nodes_count": len(result.t02_result.state.raw_scene_nodes),
+            "raw_relation_candidates_count": len(result.t02_result.state.raw_relation_candidates),
+            "confirmed_bindings_count": sum(
+                1
+                for item in result.t02_result.state.relation_bindings
+                if item.status.value == "confirmed"
+            ),
+            "provisional_bindings_count": sum(
+                1
+                for item in result.t02_result.state.relation_bindings
+                if item.status.value == "provisional"
+            ),
+            "blocked_bindings_count": sum(
+                1
+                for item in result.t02_result.state.relation_bindings
+                if item.status.value == "blocked"
+            ),
+            "conflicted_bindings_count": sum(
+                1
+                for item in result.t02_result.state.relation_bindings
+                if item.status.value in {"conflicted", "incompatible"}
+            ),
+            "constraint_objects_count": len(result.t02_result.state.constraint_objects),
+            "propagation_records_count": len(result.t02_result.state.propagation_records),
+            "stopped_propagation_count": sum(
+                1
+                for item in result.t02_result.state.propagation_records
+                if item.status.value == "stopped"
+            ),
+            "conflict_records_count": len(result.t02_result.state.conflict_records),
+            "narrowed_role_candidates": result.t02_result.state.narrowed_role_candidates,
+            "operations_applied": result.t02_result.state.operations_applied,
+            "pre_verbal_constraint_consumer_ready": (
+                result.t02_result.gate.pre_verbal_constraint_consumer_ready
+            ),
+            "no_clean_binding_commit": result.t02_result.gate.no_clean_binding_commit,
+            "forbidden_shortcuts": result.t02_result.gate.forbidden_shortcuts,
+            "restrictions": result.t02_result.gate.restrictions,
+            "scope_marker": {
+                "scope": result.t02_result.scope_marker.scope,
+                "rt01_contour_only": result.t02_result.scope_marker.rt01_contour_only,
+                "t02_first_slice_only": result.t02_result.scope_marker.t02_first_slice_only,
+                "t03_implemented": result.t02_result.scope_marker.t03_implemented,
+                "t04_implemented": result.t02_result.scope_marker.t04_implemented,
+                "o01_implemented": result.t02_result.scope_marker.o01_implemented,
+                "full_silent_thought_line_implemented": (
+                    result.t02_result.scope_marker.full_silent_thought_line_implemented
+                ),
+                "repo_wide_adoption": result.t02_result.scope_marker.repo_wide_adoption,
+                "reason": result.t02_result.scope_marker.reason,
+            },
+            "reason": result.t02_result.reason,
+        },
         "downstream_gate": {
             "accepted": result.downstream_gate.accepted,
             "usability_class": result.downstream_gate.usability_class.value,
@@ -1336,6 +1402,7 @@ def subject_tick_result_snapshot(result: SubjectTickResult) -> dict[str, object]
             "t01_unresolved_slots_count": result.telemetry.t01_unresolved_slots_count,
             "t01_contested_relations_count": result.telemetry.t01_contested_relations_count,
             "t01_preverbal_consumer_ready": result.telemetry.t01_preverbal_consumer_ready,
+            "t01_scene_comparison_ready": result.telemetry.t01_scene_comparison_ready,
             "t01_no_clean_scene_commit": result.telemetry.t01_no_clean_scene_commit,
             "t01_forbidden_shortcuts": result.telemetry.t01_forbidden_shortcuts,
             "t01_restrictions": result.telemetry.t01_restrictions,
@@ -1354,6 +1421,9 @@ def subject_tick_result_snapshot(result: SubjectTickResult) -> dict[str, object]
             "t01_reason": result.telemetry.t01_reason,
             "t01_require_preverbal_scene_consumer": (
                 result.telemetry.t01_require_preverbal_scene_consumer
+            ),
+            "t01_require_scene_comparison_consumer": (
+                result.telemetry.t01_require_scene_comparison_consumer
             ),
             "execution_stance": result.telemetry.execution_stance.value,
             "execution_checkpoints": tuple(

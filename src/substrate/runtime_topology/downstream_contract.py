@@ -121,9 +121,11 @@ class RuntimeDispatchContractView:
     t01_scene_status: str | None
     t01_stability_state: str | None
     t01_preverbal_consumer_ready: bool | None
+    t01_scene_comparison_ready: bool | None
     t01_no_clean_scene_commit: bool | None
     t01_unresolved_slots_count: int | None
     t01_forbidden_shortcuts: tuple[str, ...] | None
+    t01_require_scene_comparison_consumer: bool | None
     t01_scope: str | None
     t01_scope_rt01_contour_only: bool | None
     t01_scope_t01_first_slice_only: bool | None
@@ -133,6 +135,26 @@ class RuntimeDispatchContractView:
     t01_scope_o01_implemented: bool | None
     t01_scope_full_silent_thought_line_implemented: bool | None
     t01_scope_repo_wide_adoption: bool | None
+    t02_constrained_scene_id: str | None
+    t02_scene_status: str | None
+    t02_preverbal_constraint_consumer_ready: bool | None
+    t02_no_clean_binding_commit: bool | None
+    t02_confirmed_bindings_count: int | None
+    t02_provisional_bindings_count: int | None
+    t02_blocked_bindings_count: int | None
+    t02_conflicted_bindings_count: int | None
+    t02_propagated_consequences_count: int | None
+    t02_blocked_or_conflicted_consequences_count: int | None
+    t02_forbidden_shortcuts: tuple[str, ...] | None
+    t02_scope: str | None
+    t02_scope_rt01_contour_only: bool | None
+    t02_scope_t02_first_slice_only: bool | None
+    t02_scope_t03_implemented: bool | None
+    t02_scope_t04_implemented: bool | None
+    t02_scope_o01_implemented: bool | None
+    t02_scope_full_silent_thought_line_implemented: bool | None
+    t02_scope_repo_wide_adoption: bool | None
+    t02_require_constrained_scene_consumer: bool | None
     reason: str
 
 
@@ -142,6 +164,7 @@ def derive_runtime_dispatch_contract_view(
     if not isinstance(result, RuntimeDispatchResult):
         raise TypeError("derive_runtime_dispatch_contract_view requires RuntimeDispatchResult")
     state = None if result.subject_tick_result is None else result.subject_tick_result.state
+    t02_result = None if result.subject_tick_result is None else result.subject_tick_result.t02_result
     return RuntimeDispatchContractView(
         accepted=result.decision.accepted,
         lawful_production_route=result.decision.lawful_production_route,
@@ -363,6 +386,9 @@ def derive_runtime_dispatch_contract_view(
         t01_preverbal_consumer_ready=(
             None if state is None else state.t01_preverbal_consumer_ready
         ),
+        t01_scene_comparison_ready=(
+            None if state is None else state.t01_scene_comparison_ready
+        ),
         t01_no_clean_scene_commit=(
             None if state is None else state.t01_no_clean_scene_commit
         ),
@@ -370,6 +396,9 @@ def derive_runtime_dispatch_contract_view(
             None if state is None else state.t01_unresolved_slots_count
         ),
         t01_forbidden_shortcuts=(None if state is None else state.t01_forbidden_shortcuts),
+        t01_require_scene_comparison_consumer=(
+            None if state is None else state.t01_require_scene_comparison_consumer
+        ),
         t01_scope=(None if state is None else state.t01_scope),
         t01_scope_rt01_contour_only=(
             None if state is None else state.t01_scope_rt01_contour_only
@@ -396,6 +425,104 @@ def derive_runtime_dispatch_contract_view(
         ),
         t01_scope_repo_wide_adoption=(
             None if state is None else state.t01_scope_repo_wide_adoption
+        ),
+        t02_constrained_scene_id=(
+            None if t02_result is None else t02_result.state.constrained_scene_id
+        ),
+        t02_scene_status=(
+            None if t02_result is None else t02_result.state.scene_status.value
+        ),
+        t02_preverbal_constraint_consumer_ready=(
+            None
+            if t02_result is None
+            else t02_result.gate.pre_verbal_constraint_consumer_ready
+        ),
+        t02_no_clean_binding_commit=(
+            None if t02_result is None else t02_result.gate.no_clean_binding_commit
+        ),
+        t02_confirmed_bindings_count=(
+            None
+            if t02_result is None
+            else sum(
+                1
+                for item in t02_result.state.relation_bindings
+                if item.status.value == "confirmed"
+            )
+        ),
+        t02_provisional_bindings_count=(
+            None
+            if t02_result is None
+            else sum(
+                1
+                for item in t02_result.state.relation_bindings
+                if item.status.value == "provisional"
+            )
+        ),
+        t02_blocked_bindings_count=(
+            None
+            if t02_result is None
+            else sum(
+                1
+                for item in t02_result.state.relation_bindings
+                if item.status.value == "blocked"
+            )
+        ),
+        t02_conflicted_bindings_count=(
+            None
+            if t02_result is None
+            else sum(
+                1
+                for item in t02_result.state.relation_bindings
+                if item.status.value in {"conflicted", "incompatible"}
+            )
+        ),
+        t02_propagated_consequences_count=(
+            None
+            if t02_result is None
+            else sum(
+                1
+                for item in t02_result.state.propagation_records
+                if item.effect_type.value != "no_effect" and item.status.value == "active"
+            )
+        ),
+        t02_blocked_or_conflicted_consequences_count=(
+            None
+            if t02_result is None
+            else sum(
+                1
+                for item in t02_result.state.propagation_records
+                if item.status.value in {"blocked", "stopped"}
+            )
+        ),
+        t02_forbidden_shortcuts=(
+            None if t02_result is None else t02_result.gate.forbidden_shortcuts
+        ),
+        t02_scope=(None if t02_result is None else t02_result.scope_marker.scope),
+        t02_scope_rt01_contour_only=(
+            None if t02_result is None else t02_result.scope_marker.rt01_contour_only
+        ),
+        t02_scope_t02_first_slice_only=(
+            None if t02_result is None else t02_result.scope_marker.t02_first_slice_only
+        ),
+        t02_scope_t03_implemented=(
+            None if t02_result is None else t02_result.scope_marker.t03_implemented
+        ),
+        t02_scope_t04_implemented=(
+            None if t02_result is None else t02_result.scope_marker.t04_implemented
+        ),
+        t02_scope_o01_implemented=(
+            None if t02_result is None else t02_result.scope_marker.o01_implemented
+        ),
+        t02_scope_full_silent_thought_line_implemented=(
+            None
+            if t02_result is None
+            else t02_result.scope_marker.full_silent_thought_line_implemented
+        ),
+        t02_scope_repo_wide_adoption=(
+            None if t02_result is None else t02_result.scope_marker.repo_wide_adoption
+        ),
+        t02_require_constrained_scene_consumer=(
+            None if state is None else state.t02_require_constrained_scene_consumer
         ),
         reason=result.decision.reason,
     )

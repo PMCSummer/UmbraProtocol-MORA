@@ -57,3 +57,13 @@ This pass is also **not**:
 - T02/T03/T04 implemented.
 - O01 implemented.
 - Repo-wide T01 adoption.
+
+## Hardening Addendum (Bounded)
+- Tightened unresolved-laundering discipline for weak-edge evidence:
+  - `premature_scene_closure` now remains detectable under weaker unresolved basis signals when unresolved-slot maintenance is ablated.
+  - RT01 pre-verbal consumer pressure enforces revalidation detour when laundering marker is present.
+- Added second bounded downstream consequence in RT01 contour:
+  - `require_t01_scene_comparison_consumer` requires scene-comparison readiness from T01 pre-verbal contract.
+  - Not comparison-ready scenes now enforce bounded detour, without introducing T02/T03/T04 logic.
+
+This addendum remains RT01-bounded and does not change the anti-creep boundary above.

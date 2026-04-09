@@ -398,6 +398,61 @@ def test_t01_memory_pollution_and_premature_closure_adversarial_cases() -> None:
     assert "premature_scene_closure" in premature.gate.forbidden_shortcuts
 
 
+def test_t01_weak_unresolved_evidence_still_emits_premature_closure_when_slots_are_laundered() -> None:
+    world_entry, s_result, a_result, m_result, n_result = _upstream_bundle(
+        "weak-unresolved-edge",
+        include_observation=True,
+        request_action=True,
+        effect_action_id="__MATCHED__",
+        c05_action="reuse_without_revalidation",
+    )
+    weakened_world_entry = replace(
+        world_entry,
+        episode=replace(
+            world_entry.episode,
+            confidence=0.62,
+            incomplete=False,
+            effect_basis_present=True,
+            effect_feedback_correlated=True,
+        ),
+    )
+    weakened_s = replace(
+        s_result,
+        state=replace(s_result.state, attribution_confidence=0.61, underconstrained=False),
+    )
+    weakened_a = replace(
+        a_result,
+        state=replace(a_result.state, confidence=0.63, underconstrained=False),
+    )
+    weakened_m = replace(
+        m_result,
+        state=replace(m_result.state, confidence=0.64),
+    )
+    weakened_n = replace(
+        n_result,
+        state=replace(
+            n_result.state,
+            confidence=0.6,
+            underconstrained=False,
+            ambiguity_residue=False,
+        ),
+    )
+    laundered = build_t01_active_semantic_field(
+        tick_id="tick-weak-unresolved-laundered",
+        world_entry_result=weakened_world_entry,
+        s_minimal_result=weakened_s,
+        a_line_result=weakened_a,
+        m_minimal_result=weakened_m,
+        n_minimal_result=weakened_n,
+        c04_execution_mode_claim="continue_stream",
+        c05_validity_action="reuse_without_revalidation",
+        maintain_unresolved_slots=False,
+        source_lineage=("test.t01",),
+    )
+    assert "premature_scene_closure" in laundered.gate.forbidden_shortcuts
+    assert "t01_unresolved_laundering_risk_detected" in laundered.gate.restrictions
+
+
 def test_t01_field_dynamics_hooks_are_typed_and_load_bearing() -> None:
     base = _t01_result(
         "dynamics",

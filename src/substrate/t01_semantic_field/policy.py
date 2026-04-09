@@ -833,7 +833,25 @@ def _build_gate(
         forbidden.append(ForbiddenT01Shortcut.BAG_OF_TAGS_REBRANDING.value)
     if assembly_mode is T01AssemblyMode.TOKEN_GRAPH_ABLATION:
         forbidden.append(ForbiddenT01Shortcut.TOKEN_GRAPH_REBRANDING.value)
-    if unresolved_basis_expected and not maintain_unresolved_slots:
+    provisional_structure_present = bool(
+        any(item.provisional for item in state.active_entities)
+        or any(item.provisional or item.contested for item in state.relation_edges)
+        or any(item.provisional or item.unresolved for item in state.role_bindings)
+        or any(item.provisional for item in state.temporal_links)
+        or any(item.provisional for item in state.expectation_links)
+    )
+    weak_unresolved_risk = bool(
+        unresolved_basis_expected
+        or provisional_structure_present
+        or state.scene_status
+        in {
+            T01SceneStatus.PROVISIONAL_SCENE_ONLY,
+            T01SceneStatus.UNRESOLVED_RELATION_CLUSTER,
+            T01SceneStatus.COMPETING_SCENE_HYPOTHESES,
+            T01SceneStatus.NO_CLEAN_SCENE_COMMIT,
+        }
+    )
+    if weak_unresolved_risk and not maintain_unresolved_slots:
         forbidden.append(ForbiddenT01Shortcut.PREMATURE_SCENE_CLOSURE.value)
     if (
         m_minimal_result.state.conflict_risk in {RiskLevel.MEDIUM, RiskLevel.HIGH}
@@ -854,6 +872,8 @@ def _build_gate(
         restrictions.append("no_clean_scene_commit_requires_revalidate_or_clarification")
     if not pre_verbal_consumer_ready:
         restrictions.append("t01_preverbal_consumer_not_ready")
+    if ForbiddenT01Shortcut.PREMATURE_SCENE_CLOSURE.value in forbidden:
+        restrictions.append("t01_unresolved_laundering_risk_detected")
     return T01FieldGateDecision(
         pre_verbal_consumer_ready=pre_verbal_consumer_ready,
         no_clean_scene_commit=no_clean,
@@ -874,9 +894,16 @@ def _has_unresolved_basis_expectation(
 ) -> bool:
     return bool(
         s_minimal_result.state.underconstrained
+        or s_minimal_result.state.attribution_confidence < 0.7
+        or world_entry_result.episode.incomplete
+        or world_entry_result.episode.confidence < 0.7
         or (
             world_entry_result.episode.action_trace_present
             and not world_entry_result.episode.effect_basis_present
+        )
+        or (
+            world_entry_result.episode.action_trace_present
+            and not world_entry_result.episode.effect_feedback_correlated
         )
         or c05_validity_action
         in {
@@ -886,10 +913,19 @@ def _has_unresolved_basis_expectation(
             "halt_reuse_and_rebuild_scope",
         }
         or m_minimal_result.state.review_required
+        or m_minimal_result.state.reactivation_eligible
         or m_minimal_result.gate.no_safe_memory_claim
         or a_line_result.gate.policy_conditioned_capability_present
         or a_line_result.state.underconstrained
+        or a_line_result.state.confidence < 0.7
         or n_minimal_result.state.ambiguity_residue
+        or n_minimal_result.state.underconstrained
+        or n_minimal_result.state.confidence < 0.7
+        or n_minimal_result.state.contradiction_risk in {
+            NarrativeRiskLevel.MEDIUM,
+            NarrativeRiskLevel.HIGH,
+        }
+        or m_minimal_result.state.confidence < 0.7
     )
 
 
