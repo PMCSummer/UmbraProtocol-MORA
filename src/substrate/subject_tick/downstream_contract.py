@@ -88,9 +88,21 @@ class SubjectTickContractView:
     s_forbidden_shortcuts: tuple[str, ...]
     s_restrictions: tuple[str, ...]
     s_s01_admission_ready: bool
+    s_self_attribution_basis_sufficient: bool
+    s_controllability_basis_sufficient: bool
+    s_ownership_basis_sufficient: bool
+    s_attribution_underconstrained: bool
+    s_mixed_boundary_instability: bool
+    s_no_safe_self_basis: bool
+    s_no_safe_world_basis: bool
+    s_readiness_blockers: tuple[str, ...]
     s_future_s01_s05_remain_open: bool
     s_full_self_model_implemented: bool
     s_scope: str
+    s_scope_rt01_contour_only: bool
+    s_scope_s_minimal_only: bool
+    s_scope_s01_implemented: bool
+    s_scope_s_line_implemented: bool
     s_scope_minimal_contour_only: bool
     s_scope_s01_s05_implemented: bool
     s_scope_full_self_model_implemented: bool
@@ -100,6 +112,7 @@ class SubjectTickContractView:
     s_require_self_side_claim: bool
     s_require_world_side_claim: bool
     s_require_self_controlled_transition_claim: bool
+    s_strict_mixed_attribution_guard: bool
     execution_stance: str
     execution_checkpoints: tuple[str, ...]
     final_execution_outcome: SubjectTickOutcome
@@ -226,9 +239,21 @@ def derive_subject_tick_contract_view(
         s_forbidden_shortcuts=state.s_forbidden_shortcuts,
         s_restrictions=state.s_restrictions,
         s_s01_admission_ready=state.s_s01_admission_ready,
+        s_self_attribution_basis_sufficient=state.s_self_attribution_basis_sufficient,
+        s_controllability_basis_sufficient=state.s_controllability_basis_sufficient,
+        s_ownership_basis_sufficient=state.s_ownership_basis_sufficient,
+        s_attribution_underconstrained=state.s_attribution_underconstrained,
+        s_mixed_boundary_instability=state.s_mixed_boundary_instability,
+        s_no_safe_self_basis=state.s_no_safe_self_basis,
+        s_no_safe_world_basis=state.s_no_safe_world_basis,
+        s_readiness_blockers=state.s_readiness_blockers,
         s_future_s01_s05_remain_open=state.s_future_s01_s05_remain_open,
         s_full_self_model_implemented=state.s_full_self_model_implemented,
         s_scope=state.s_scope,
+        s_scope_rt01_contour_only=state.s_scope_rt01_contour_only,
+        s_scope_s_minimal_only=state.s_scope_s_minimal_only,
+        s_scope_s01_implemented=state.s_scope_s01_implemented,
+        s_scope_s_line_implemented=state.s_scope_s_line_implemented,
         s_scope_minimal_contour_only=state.s_scope_minimal_contour_only,
         s_scope_s01_s05_implemented=state.s_scope_s01_s05_implemented,
         s_scope_full_self_model_implemented=state.s_scope_full_self_model_implemented,
@@ -240,6 +265,7 @@ def derive_subject_tick_contract_view(
         s_require_self_controlled_transition_claim=(
             state.s_require_self_controlled_transition_claim
         ),
+        s_strict_mixed_attribution_guard=state.s_strict_mixed_attribution_guard,
         execution_stance=state.execution_stance.value,
         execution_checkpoints=tuple(
             f"{checkpoint.checkpoint_id}:{checkpoint.status.value}"

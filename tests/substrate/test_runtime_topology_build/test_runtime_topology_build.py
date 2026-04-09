@@ -435,10 +435,15 @@ def test_dispatch_contract_view_and_snapshot_are_inspectable() -> None:
     assert view.world_entry_scope_repo_wide_adoption is False
     assert view.s_boundary_state_id is not None
     assert view.s_scope == "rt01_contour_only"
+    assert view.s_scope_rt01_contour_only is True
+    assert view.s_scope_s_minimal_only is True
+    assert view.s_scope_s01_implemented is False
+    assert view.s_scope_s_line_implemented is False
     assert view.s_scope_minimal_contour_only is True
     assert view.s_scope_s01_s05_implemented is False
     assert view.s_scope_full_self_model_implemented is False
     assert view.s_scope_repo_wide_adoption is False
+    assert isinstance(view.s_readiness_blockers, tuple)
     assert snapshot["decision"]["route_class"] == "production_contour"
     assert snapshot["decision"]["production_consumer_ready"] is True
     assert snapshot["decision"]["route_binding_consequence"] == "lawful_production_contour"
@@ -451,10 +456,15 @@ def test_dispatch_contract_view_and_snapshot_are_inspectable() -> None:
     assert snapshot["subject_tick_state"]["world_entry_scope_w_line_implemented"] is False
     assert snapshot["subject_tick_state"]["world_entry_scope_repo_wide_adoption"] is False
     assert snapshot["subject_tick_state"]["s_scope"] == "rt01_contour_only"
+    assert snapshot["subject_tick_state"]["s_scope_rt01_contour_only"] is True
+    assert snapshot["subject_tick_state"]["s_scope_s_minimal_only"] is True
+    assert snapshot["subject_tick_state"]["s_scope_s01_implemented"] is False
+    assert snapshot["subject_tick_state"]["s_scope_s_line_implemented"] is False
     assert snapshot["subject_tick_state"]["s_scope_minimal_contour_only"] is True
     assert snapshot["subject_tick_state"]["s_scope_s01_s05_implemented"] is False
     assert snapshot["subject_tick_state"]["s_scope_full_self_model_implemented"] is False
     assert snapshot["subject_tick_state"]["s_scope_repo_wide_adoption"] is False
+    assert isinstance(snapshot["subject_tick_state"]["s_readiness_blockers"], tuple)
     assert snapshot["bundle"]["runtime_entry"] == "runtime_topology.dispatch_runtime_tick"
 
 

@@ -43,6 +43,13 @@ def s_minimal_contour_snapshot(result: SMinimalContourResult) -> dict[str, objec
             "ownership_controllability_discipline_exists": (
                 result.admission.ownership_controllability_discipline_exists
             ),
+            "self_attribution_basis_sufficient": result.admission.self_attribution_basis_sufficient,
+            "controllability_basis_sufficient": result.admission.controllability_basis_sufficient,
+            "ownership_basis_sufficient": result.admission.ownership_basis_sufficient,
+            "attribution_underconstrained": result.admission.attribution_underconstrained,
+            "mixed_boundary_instability": result.admission.mixed_boundary_instability,
+            "no_safe_self_basis": result.admission.no_safe_self_basis,
+            "no_safe_world_basis": result.admission.no_safe_world_basis,
             "forbidden_shortcuts_machine_readable": (
                 result.admission.forbidden_shortcuts_machine_readable
             ),
@@ -52,11 +59,16 @@ def s_minimal_contour_snapshot(result: SMinimalContourResult) -> dict[str, objec
             "future_s01_s05_remain_open": result.admission.future_s01_s05_remain_open,
             "full_self_model_implemented": result.admission.full_self_model_implemented,
             "admission_ready_for_s01": result.admission.admission_ready_for_s01,
+            "readiness_blockers": result.admission.readiness_blockers,
             "restrictions": result.admission.restrictions,
             "reason": result.admission.reason,
         },
         "scope_marker": {
             "scope": result.scope_marker.scope,
+            "rt01_contour_only": result.scope_marker.rt01_contour_only,
+            "s_minimal_only": result.scope_marker.s_minimal_only,
+            "s01_implemented": result.scope_marker.s01_implemented,
+            "s_line_implemented": result.scope_marker.s_line_implemented,
             "minimal_contour_only": result.scope_marker.minimal_contour_only,
             "s01_s05_implemented": result.scope_marker.s01_s05_implemented,
             "full_self_model_implemented": result.scope_marker.full_self_model_implemented,

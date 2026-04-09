@@ -37,7 +37,12 @@ class RuntimeDispatchContractView:
     s_no_safe_world_claim: bool | None
     s_forbidden_shortcuts: tuple[str, ...] | None
     s_s01_admission_ready: bool | None
+    s_readiness_blockers: tuple[str, ...] | None
     s_scope: str | None
+    s_scope_rt01_contour_only: bool | None
+    s_scope_s_minimal_only: bool | None
+    s_scope_s01_implemented: bool | None
+    s_scope_s_line_implemented: bool | None
     s_scope_minimal_contour_only: bool | None
     s_scope_s01_s05_implemented: bool | None
     s_scope_full_self_model_implemented: bool | None
@@ -104,7 +109,16 @@ def derive_runtime_dispatch_contract_view(
         s_no_safe_world_claim=(None if state is None else state.s_no_safe_world_claim),
         s_forbidden_shortcuts=(None if state is None else state.s_forbidden_shortcuts),
         s_s01_admission_ready=(None if state is None else state.s_s01_admission_ready),
+        s_readiness_blockers=(None if state is None else state.s_readiness_blockers),
         s_scope=(None if state is None else state.s_scope),
+        s_scope_rt01_contour_only=(
+            None if state is None else state.s_scope_rt01_contour_only
+        ),
+        s_scope_s_minimal_only=(None if state is None else state.s_scope_s_minimal_only),
+        s_scope_s01_implemented=(None if state is None else state.s_scope_s01_implemented),
+        s_scope_s_line_implemented=(
+            None if state is None else state.s_scope_s_line_implemented
+        ),
         s_scope_minimal_contour_only=(
             None if state is None else state.s_scope_minimal_contour_only
         ),

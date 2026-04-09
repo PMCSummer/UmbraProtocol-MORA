@@ -103,9 +103,21 @@ def build_subject_tick_telemetry(
         s_forbidden_shortcuts=state.s_forbidden_shortcuts,
         s_restrictions=state.s_restrictions,
         s_s01_admission_ready=state.s_s01_admission_ready,
+        s_self_attribution_basis_sufficient=state.s_self_attribution_basis_sufficient,
+        s_controllability_basis_sufficient=state.s_controllability_basis_sufficient,
+        s_ownership_basis_sufficient=state.s_ownership_basis_sufficient,
+        s_attribution_underconstrained=state.s_attribution_underconstrained,
+        s_mixed_boundary_instability=state.s_mixed_boundary_instability,
+        s_no_safe_self_basis=state.s_no_safe_self_basis,
+        s_no_safe_world_basis=state.s_no_safe_world_basis,
+        s_readiness_blockers=state.s_readiness_blockers,
         s_future_s01_s05_remain_open=state.s_future_s01_s05_remain_open,
         s_full_self_model_implemented=state.s_full_self_model_implemented,
         s_scope=state.s_scope,
+        s_scope_rt01_contour_only=state.s_scope_rt01_contour_only,
+        s_scope_s_minimal_only=state.s_scope_s_minimal_only,
+        s_scope_s01_implemented=state.s_scope_s01_implemented,
+        s_scope_s_line_implemented=state.s_scope_s_line_implemented,
         s_scope_minimal_contour_only=state.s_scope_minimal_contour_only,
         s_scope_s01_s05_implemented=state.s_scope_s01_s05_implemented,
         s_scope_full_self_model_implemented=state.s_scope_full_self_model_implemented,
@@ -115,6 +127,7 @@ def build_subject_tick_telemetry(
         s_require_self_side_claim=state.s_require_self_side_claim,
         s_require_world_side_claim=state.s_require_world_side_claim,
         s_require_self_controlled_transition_claim=state.s_require_self_controlled_transition_claim,
+        s_strict_mixed_attribution_guard=state.s_strict_mixed_attribution_guard,
         execution_stance=state.execution_stance,
         execution_checkpoints=state.execution_checkpoints,
         final_execution_outcome=state.final_execution_outcome,
@@ -231,9 +244,21 @@ def subject_tick_result_snapshot(result: SubjectTickResult) -> dict[str, object]
             "s_forbidden_shortcuts": state.s_forbidden_shortcuts,
             "s_restrictions": state.s_restrictions,
             "s_s01_admission_ready": state.s_s01_admission_ready,
+            "s_self_attribution_basis_sufficient": state.s_self_attribution_basis_sufficient,
+            "s_controllability_basis_sufficient": state.s_controllability_basis_sufficient,
+            "s_ownership_basis_sufficient": state.s_ownership_basis_sufficient,
+            "s_attribution_underconstrained": state.s_attribution_underconstrained,
+            "s_mixed_boundary_instability": state.s_mixed_boundary_instability,
+            "s_no_safe_self_basis": state.s_no_safe_self_basis,
+            "s_no_safe_world_basis": state.s_no_safe_world_basis,
+            "s_readiness_blockers": state.s_readiness_blockers,
             "s_future_s01_s05_remain_open": state.s_future_s01_s05_remain_open,
             "s_full_self_model_implemented": state.s_full_self_model_implemented,
             "s_scope": state.s_scope,
+            "s_scope_rt01_contour_only": state.s_scope_rt01_contour_only,
+            "s_scope_s_minimal_only": state.s_scope_s_minimal_only,
+            "s_scope_s01_implemented": state.s_scope_s01_implemented,
+            "s_scope_s_line_implemented": state.s_scope_s_line_implemented,
             "s_scope_minimal_contour_only": state.s_scope_minimal_contour_only,
             "s_scope_s01_s05_implemented": state.s_scope_s01_s05_implemented,
             "s_scope_full_self_model_implemented": state.s_scope_full_self_model_implemented,
@@ -245,6 +270,7 @@ def subject_tick_result_snapshot(result: SubjectTickResult) -> dict[str, object]
             "s_require_self_controlled_transition_claim": (
                 state.s_require_self_controlled_transition_claim
             ),
+            "s_strict_mixed_attribution_guard": state.s_strict_mixed_attribution_guard,
             "execution_stance": state.execution_stance.value,
             "execution_checkpoints": tuple(
                 {
@@ -350,8 +376,30 @@ def subject_tick_result_snapshot(result: SubjectTickResult) -> dict[str, object]
             "forbidden_shortcuts": result.self_contour_result.gate.forbidden_shortcuts,
             "restrictions": result.self_contour_result.gate.restrictions,
             "s01_admission_ready": result.self_contour_result.admission.admission_ready_for_s01,
+            "self_attribution_basis_sufficient": (
+                result.self_contour_result.admission.self_attribution_basis_sufficient
+            ),
+            "controllability_basis_sufficient": (
+                result.self_contour_result.admission.controllability_basis_sufficient
+            ),
+            "ownership_basis_sufficient": (
+                result.self_contour_result.admission.ownership_basis_sufficient
+            ),
+            "attribution_underconstrained": (
+                result.self_contour_result.admission.attribution_underconstrained
+            ),
+            "mixed_boundary_instability": (
+                result.self_contour_result.admission.mixed_boundary_instability
+            ),
+            "no_safe_self_basis": result.self_contour_result.admission.no_safe_self_basis,
+            "no_safe_world_basis": result.self_contour_result.admission.no_safe_world_basis,
+            "readiness_blockers": result.self_contour_result.admission.readiness_blockers,
             "scope_marker": {
                 "scope": result.self_contour_result.scope_marker.scope,
+                "rt01_contour_only": result.self_contour_result.scope_marker.rt01_contour_only,
+                "s_minimal_only": result.self_contour_result.scope_marker.s_minimal_only,
+                "s01_implemented": result.self_contour_result.scope_marker.s01_implemented,
+                "s_line_implemented": result.self_contour_result.scope_marker.s_line_implemented,
                 "minimal_contour_only": result.self_contour_result.scope_marker.minimal_contour_only,
                 "s01_s05_implemented": result.self_contour_result.scope_marker.s01_s05_implemented,
                 "full_self_model_implemented": (
@@ -480,9 +528,25 @@ def subject_tick_result_snapshot(result: SubjectTickResult) -> dict[str, object]
             "s_forbidden_shortcuts": result.telemetry.s_forbidden_shortcuts,
             "s_restrictions": result.telemetry.s_restrictions,
             "s_s01_admission_ready": result.telemetry.s_s01_admission_ready,
+            "s_self_attribution_basis_sufficient": (
+                result.telemetry.s_self_attribution_basis_sufficient
+            ),
+            "s_controllability_basis_sufficient": (
+                result.telemetry.s_controllability_basis_sufficient
+            ),
+            "s_ownership_basis_sufficient": result.telemetry.s_ownership_basis_sufficient,
+            "s_attribution_underconstrained": result.telemetry.s_attribution_underconstrained,
+            "s_mixed_boundary_instability": result.telemetry.s_mixed_boundary_instability,
+            "s_no_safe_self_basis": result.telemetry.s_no_safe_self_basis,
+            "s_no_safe_world_basis": result.telemetry.s_no_safe_world_basis,
+            "s_readiness_blockers": result.telemetry.s_readiness_blockers,
             "s_future_s01_s05_remain_open": result.telemetry.s_future_s01_s05_remain_open,
             "s_full_self_model_implemented": result.telemetry.s_full_self_model_implemented,
             "s_scope": result.telemetry.s_scope,
+            "s_scope_rt01_contour_only": result.telemetry.s_scope_rt01_contour_only,
+            "s_scope_s_minimal_only": result.telemetry.s_scope_s_minimal_only,
+            "s_scope_s01_implemented": result.telemetry.s_scope_s01_implemented,
+            "s_scope_s_line_implemented": result.telemetry.s_scope_s_line_implemented,
             "s_scope_minimal_contour_only": result.telemetry.s_scope_minimal_contour_only,
             "s_scope_s01_s05_implemented": result.telemetry.s_scope_s01_s05_implemented,
             "s_scope_full_self_model_implemented": (
@@ -496,6 +560,7 @@ def subject_tick_result_snapshot(result: SubjectTickResult) -> dict[str, object]
             "s_require_self_controlled_transition_claim": (
                 result.telemetry.s_require_self_controlled_transition_claim
             ),
+            "s_strict_mixed_attribution_guard": result.telemetry.s_strict_mixed_attribution_guard,
             "execution_stance": result.telemetry.execution_stance.value,
             "execution_checkpoints": tuple(
                 {

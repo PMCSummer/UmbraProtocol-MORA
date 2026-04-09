@@ -160,6 +160,7 @@ class SubjectTickContext:
     require_self_side_claim: bool = False
     require_world_side_claim: bool = False
     require_self_controlled_transition_claim: bool = False
+    strict_mixed_attribution_guard: bool = True
     disable_s_minimal_enforcement: bool = False
     source_lineage: tuple[str, ...] = ()
 
@@ -268,9 +269,21 @@ class SubjectTickState:
     s_forbidden_shortcuts: tuple[str, ...]
     s_restrictions: tuple[str, ...]
     s_s01_admission_ready: bool
+    s_self_attribution_basis_sufficient: bool
+    s_controllability_basis_sufficient: bool
+    s_ownership_basis_sufficient: bool
+    s_attribution_underconstrained: bool
+    s_mixed_boundary_instability: bool
+    s_no_safe_self_basis: bool
+    s_no_safe_world_basis: bool
+    s_readiness_blockers: tuple[str, ...]
     s_future_s01_s05_remain_open: bool
     s_full_self_model_implemented: bool
     s_scope: str
+    s_scope_rt01_contour_only: bool
+    s_scope_s_minimal_only: bool
+    s_scope_s01_implemented: bool
+    s_scope_s_line_implemented: bool
     s_scope_minimal_contour_only: bool
     s_scope_s01_s05_implemented: bool
     s_scope_full_self_model_implemented: bool
@@ -280,6 +293,7 @@ class SubjectTickState:
     s_require_self_side_claim: bool
     s_require_world_side_claim: bool
     s_require_self_controlled_transition_claim: bool
+    s_strict_mixed_attribution_guard: bool
     execution_stance: SubjectTickExecutionStance
     execution_checkpoints: tuple[SubjectTickCheckpointResult, ...]
     downstream_step_results: tuple[SubjectTickStepResult, ...]
@@ -385,9 +399,21 @@ class SubjectTickTelemetry:
     s_forbidden_shortcuts: tuple[str, ...]
     s_restrictions: tuple[str, ...]
     s_s01_admission_ready: bool
+    s_self_attribution_basis_sufficient: bool
+    s_controllability_basis_sufficient: bool
+    s_ownership_basis_sufficient: bool
+    s_attribution_underconstrained: bool
+    s_mixed_boundary_instability: bool
+    s_no_safe_self_basis: bool
+    s_no_safe_world_basis: bool
+    s_readiness_blockers: tuple[str, ...]
     s_future_s01_s05_remain_open: bool
     s_full_self_model_implemented: bool
     s_scope: str
+    s_scope_rt01_contour_only: bool
+    s_scope_s_minimal_only: bool
+    s_scope_s01_implemented: bool
+    s_scope_s_line_implemented: bool
     s_scope_minimal_contour_only: bool
     s_scope_s01_s05_implemented: bool
     s_scope_full_self_model_implemented: bool
@@ -397,6 +423,7 @@ class SubjectTickTelemetry:
     s_require_self_side_claim: bool
     s_require_world_side_claim: bool
     s_require_self_controlled_transition_claim: bool
+    s_strict_mixed_attribution_guard: bool
     execution_stance: SubjectTickExecutionStance
     execution_checkpoints: tuple[SubjectTickCheckpointResult, ...]
     final_execution_outcome: SubjectTickOutcome

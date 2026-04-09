@@ -27,9 +27,21 @@ class SMinimalContourContractView:
     no_safe_world_claim: bool
     forbidden_shortcuts: tuple[str, ...]
     s01_admission_ready: bool
+    self_attribution_basis_sufficient: bool
+    controllability_basis_sufficient: bool
+    ownership_basis_sufficient: bool
+    attribution_underconstrained: bool
+    mixed_boundary_instability: bool
+    no_safe_self_basis: bool
+    no_safe_world_basis: bool
+    readiness_blockers: tuple[str, ...]
     future_s01_s05_remain_open: bool
     full_self_model_implemented: bool
     scope: str
+    scope_rt01_contour_only: bool
+    scope_s_minimal_only: bool
+    scope_s01_implemented: bool
+    scope_s_line_implemented: bool
     scope_minimal_contour_only: bool
     scope_s01_s05_implemented: bool
     scope_full_self_model_implemented: bool
@@ -65,9 +77,21 @@ def derive_s_minimal_contour_contract_view(
         no_safe_world_claim=result.gate.no_safe_world_claim,
         forbidden_shortcuts=result.gate.forbidden_shortcuts,
         s01_admission_ready=result.admission.admission_ready_for_s01,
+        self_attribution_basis_sufficient=result.admission.self_attribution_basis_sufficient,
+        controllability_basis_sufficient=result.admission.controllability_basis_sufficient,
+        ownership_basis_sufficient=result.admission.ownership_basis_sufficient,
+        attribution_underconstrained=result.admission.attribution_underconstrained,
+        mixed_boundary_instability=result.admission.mixed_boundary_instability,
+        no_safe_self_basis=result.admission.no_safe_self_basis,
+        no_safe_world_basis=result.admission.no_safe_world_basis,
+        readiness_blockers=result.admission.readiness_blockers,
         future_s01_s05_remain_open=result.admission.future_s01_s05_remain_open,
         full_self_model_implemented=result.admission.full_self_model_implemented,
         scope=result.scope_marker.scope,
+        scope_rt01_contour_only=result.scope_marker.rt01_contour_only,
+        scope_s_minimal_only=result.scope_marker.s_minimal_only,
+        scope_s01_implemented=result.scope_marker.s01_implemented,
+        scope_s_line_implemented=result.scope_marker.s_line_implemented,
         scope_minimal_contour_only=result.scope_marker.minimal_contour_only,
         scope_s01_s05_implemented=result.scope_marker.s01_s05_implemented,
         scope_full_self_model_implemented=result.scope_marker.full_self_model_implemented,

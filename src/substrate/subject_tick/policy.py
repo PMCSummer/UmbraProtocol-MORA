@@ -128,9 +128,15 @@ def evaluate_subject_tick_downstream_gate(
             usability = SubjectTickUsabilityClass.BLOCKED
             reason = "self-controlled transition requested but s-minimal contour lacks lawful controllability basis"
     if (
-        state.s_require_self_side_claim
-        and state.s_require_world_side_claim
+        state.s_strict_mixed_attribution_guard
         and "mixed_attribution_without_uncertainty_marking" in state.s_forbidden_shortcuts
+        and (
+            state.s_require_self_side_claim
+            or state.s_require_world_side_claim
+            or state.s_require_self_controlled_transition_claim
+            or state.world_require_grounded_transition
+            or state.world_require_effect_feedback_for_success_claim
+        )
     ):
         restrictions.append(SubjectTickRestrictionCode.S_OWNERSHIP_CONTROL_DISCIPLINE_REQUIRED)
         restrictions.append(SubjectTickRestrictionCode.DOWNSTREAM_AUTHORITY_DEGRADED)

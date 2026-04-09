@@ -67,6 +67,22 @@ Sprint 8B is **not**:
 - global self-theory,
 - repo-wide self/world rollout.
 
+## Narrow Hardening Addendum (Sprint 8B)
+This hardening pass tightened bounded contour discipline without expanding S-line scope:
+
+- `s01_admission_ready` is now quality-gated, not just structural.
+  - Admission requires sufficient self-attribution/controllability/ownership basis.
+  - Underconstrained, mixed-instable, and no-safe-basis cases now materialize explicit readiness blockers.
+- Mixed self/world ambiguity enforcement is stricter under S-claim pressure.
+  - Mixed instability now forces bounded revalidation when required self/world/control claim classes are requested.
+  - This is bounded to RT01 S-minimal consumption and does not change phase authority semantics.
+- Consumer-facing scope truth is machine-readable in public contract surfaces.
+  - `rt01_contour_only=true`
+  - `s_minimal_only=true`
+  - `s01_implemented=false`
+  - `s_line_implemented=false`
+  - `repo_wide_adoption=false`
+
 ## What Is Now Claimable
 - A typed, inspectable S-minimal self/world boundary and attribution contour exists in bounded RT01 runtime contour.
 - Forbidden self/world shortcuts are machine-readable.

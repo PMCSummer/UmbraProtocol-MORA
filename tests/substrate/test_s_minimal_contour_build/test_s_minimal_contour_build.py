@@ -98,12 +98,22 @@ def test_s_minimal_contour_materializes_typed_contract_and_scope() -> None:
     assert result.state.boundary_state_id.startswith("s-boundary:")
     assert result.state.attribution_class == AttributionClass.SELF_CONTROLLED_TRANSITION_CLAIM
     assert result.gate.self_controlled_transition_claim_allowed is True
+    assert result.admission.admission_ready_for_s01 is True
+    assert result.admission.readiness_blockers == ()
     assert view.scope == "rt01_contour_only"
+    assert view.scope_rt01_contour_only is True
+    assert view.scope_s_minimal_only is True
+    assert view.scope_s01_implemented is False
+    assert view.scope_s_line_implemented is False
     assert view.scope_minimal_contour_only is True
     assert view.scope_s01_s05_implemented is False
     assert view.scope_full_self_model_implemented is False
     assert view.scope_repo_wide_adoption is False
     assert snapshot["scope_marker"]["scope"] == "rt01_contour_only"
+    assert snapshot["scope_marker"]["rt01_contour_only"] is True
+    assert snapshot["scope_marker"]["s_minimal_only"] is True
+    assert snapshot["scope_marker"]["s01_implemented"] is False
+    assert snapshot["scope_marker"]["s_line_implemented"] is False
     assert snapshot["scope_marker"]["minimal_contour_only"] is True
     assert snapshot["scope_marker"]["s01_s05_implemented"] is False
 
@@ -133,6 +143,9 @@ def test_s_minimal_forbidden_shortcuts_machine_readable_without_self_basis() -> 
     assert result.gate.no_safe_self_claim is True
     assert "self_claim_without_self_basis" in result.gate.forbidden_shortcuts
     assert "ownership_claim_without_action_or_boundary_basis" in result.gate.forbidden_shortcuts
+    assert result.admission.admission_ready_for_s01 is False
+    assert "self_attribution_basis_insufficient" in result.admission.readiness_blockers
+    assert "no_safe_self_basis" in result.admission.readiness_blockers
 
 
 def test_s_minimal_mixed_attribution_forbidden_when_both_sides_requested() -> None:
@@ -150,6 +163,32 @@ def test_s_minimal_mixed_attribution_forbidden_when_both_sides_requested() -> No
     )
     assert result.state.internal_vs_external_source_status.value == "mixed"
     assert "mixed_attribution_without_uncertainty_marking" in result.gate.forbidden_shortcuts
+
+
+def test_s_minimal_admission_not_ready_when_contour_exists_but_basis_underconstrained() -> None:
+    adapter_result = run_world_adapter_cycle(
+        tick_id="tick-s8b-underconstrained-admission",
+        execution_mode="continue_stream",
+        adapter_input=WorldAdapterInput(
+            adapter_presence=True,
+            adapter_available=True,
+        ),
+        request_action_candidate=False,
+    )
+    world_entry = build_world_entry_contract(
+        tick_id="tick-s8b-underconstrained-admission",
+        world_adapter_result=adapter_result,
+    )
+    result = build_s_minimal_contour(
+        tick_id="tick-s8b-underconstrained-admission",
+        world_entry_result=world_entry,
+        world_adapter_result=adapter_result,
+    )
+    assert result.admission.s_minimal_contour_materialized is True
+    assert result.admission.admission_ready_for_s01 is False
+    assert result.admission.attribution_underconstrained is True
+    assert "attribution_underconstrained" in result.admission.readiness_blockers
+    assert "no_safe_world_basis" in result.admission.readiness_blockers
 
 
 def test_rt01_s_minimal_self_side_requirement_is_path_affecting() -> None:
@@ -244,6 +283,54 @@ def test_rt01_s_minimal_world_side_requirement_can_force_no_safe_world_claim_det
     assert result.state.final_execution_outcome == SubjectTickOutcome.REPAIR
 
 
+def test_rt01_strict_mixed_ambiguity_guard_triggers_revalidate_under_claim_pressure() -> None:
+    result = execute_subject_tick(
+        _tick_input("s8b-mixed-guard-pressure"),
+        context=SubjectTickContext(
+            require_self_side_claim=True,
+            emit_world_action_candidate=True,
+            world_adapter_input=WorldAdapterInput(
+                adapter_presence=True,
+                adapter_available=True,
+                observation_packet=_observation("s8b-mixed-guard-pressure"),
+            ),
+        ),
+    )
+    assert result.state.s_source_status == "mixed"
+    assert "mixed_attribution_without_uncertainty_marking" in result.state.s_forbidden_shortcuts
+    assert result.state.final_execution_outcome == SubjectTickOutcome.REVALIDATE
+
+
+def test_rt01_mixed_guard_can_be_ablated_explicitly_without_phase_creep() -> None:
+    strict = execute_subject_tick(
+        _tick_input("s8b-mixed-guard-strict"),
+        context=SubjectTickContext(
+            require_self_side_claim=True,
+            emit_world_action_candidate=True,
+            world_adapter_input=WorldAdapterInput(
+                adapter_presence=True,
+                adapter_available=True,
+                observation_packet=_observation("s8b-mixed-guard-strict"),
+            ),
+        ),
+    )
+    relaxed = execute_subject_tick(
+        _tick_input("s8b-mixed-guard-relaxed"),
+        context=SubjectTickContext(
+            require_self_side_claim=True,
+            emit_world_action_candidate=True,
+            strict_mixed_attribution_guard=False,
+            world_adapter_input=WorldAdapterInput(
+                adapter_presence=True,
+                adapter_available=True,
+                observation_packet=_observation("s8b-mixed-guard-relaxed"),
+            ),
+        ),
+    )
+    assert strict.state.final_execution_outcome == SubjectTickOutcome.REVALIDATE
+    assert relaxed.state.final_execution_outcome == SubjectTickOutcome.CONTINUE
+
+
 def test_rt01_s_minimal_ablation_contrast_proves_enforcement_causal_effect() -> None:
     enforced = execute_subject_tick(
         _tick_input("s8b-ablation-enforced"),
@@ -295,11 +382,20 @@ def test_subject_tick_snapshot_exposes_s_minimal_scope_and_contract_fields() -> 
     state = payload["state"]
     assert state["s_boundary_state_id"].startswith("s-boundary:")
     assert state["s_scope"] == "rt01_contour_only"
+    assert state["s_scope_rt01_contour_only"] is True
+    assert state["s_scope_s_minimal_only"] is True
+    assert state["s_scope_s01_implemented"] is False
+    assert state["s_scope_s_line_implemented"] is False
     assert state["s_scope_minimal_contour_only"] is True
     assert state["s_scope_s01_s05_implemented"] is False
     assert state["s_scope_full_self_model_implemented"] is False
     assert state["s_scope_repo_wide_adoption"] is False
+    assert isinstance(state["s_readiness_blockers"], tuple)
     assert payload["self_contour_result"]["scope_marker"]["scope"] == "rt01_contour_only"
+    assert payload["self_contour_result"]["scope_marker"]["rt01_contour_only"] is True
+    assert payload["self_contour_result"]["scope_marker"]["s_minimal_only"] is True
+    assert payload["self_contour_result"]["scope_marker"]["s01_implemented"] is False
+    assert payload["self_contour_result"]["scope_marker"]["s_line_implemented"] is False
     assert payload["self_contour_result"]["scope_marker"]["s01_s05_implemented"] is False
 
 

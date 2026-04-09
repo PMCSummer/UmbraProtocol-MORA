@@ -967,16 +967,20 @@ def execute_subject_tick(
             if active_execution_mode not in {"halt_execution", "revalidate_scope"}:
                 active_execution_mode = "repair_runtime_path"
         if (
-            context.require_self_side_claim
-            and context.require_world_side_claim
+            context.strict_mixed_attribution_guard
             and "mixed_attribution_without_uncertainty_marking"
             in s_minimal_result.gate.forbidden_shortcuts
+            and (
+                context.require_self_side_claim
+                or context.require_world_side_claim
+                or context.require_self_controlled_transition_claim
+            )
             and halt_reason is None
         ):
             revalidation_needed = True
             s_checkpoint_status = SubjectTickCheckpointStatus.ENFORCED_DETOUR
             s_checkpoint_reason = (
-                "simultaneous self/world claim request remains mixed; explicit uncertainty marking required"
+                "mixed self/world attribution remains unstable under claim pressure; explicit uncertainty marking required"
             )
             if active_execution_mode != "halt_execution":
                 active_execution_mode = "revalidate_scope"
@@ -1192,9 +1196,21 @@ def execute_subject_tick(
         s_forbidden_shortcuts=s_minimal_result.gate.forbidden_shortcuts,
         s_restrictions=s_minimal_result.gate.restrictions,
         s_s01_admission_ready=s_minimal_result.admission.admission_ready_for_s01,
+        s_self_attribution_basis_sufficient=s_minimal_result.admission.self_attribution_basis_sufficient,
+        s_controllability_basis_sufficient=s_minimal_result.admission.controllability_basis_sufficient,
+        s_ownership_basis_sufficient=s_minimal_result.admission.ownership_basis_sufficient,
+        s_attribution_underconstrained=s_minimal_result.admission.attribution_underconstrained,
+        s_mixed_boundary_instability=s_minimal_result.admission.mixed_boundary_instability,
+        s_no_safe_self_basis=s_minimal_result.admission.no_safe_self_basis,
+        s_no_safe_world_basis=s_minimal_result.admission.no_safe_world_basis,
+        s_readiness_blockers=s_minimal_result.admission.readiness_blockers,
         s_future_s01_s05_remain_open=s_minimal_result.admission.future_s01_s05_remain_open,
         s_full_self_model_implemented=s_minimal_result.admission.full_self_model_implemented,
         s_scope=s_minimal_result.scope_marker.scope,
+        s_scope_rt01_contour_only=s_minimal_result.scope_marker.rt01_contour_only,
+        s_scope_s_minimal_only=s_minimal_result.scope_marker.s_minimal_only,
+        s_scope_s01_implemented=s_minimal_result.scope_marker.s01_implemented,
+        s_scope_s_line_implemented=s_minimal_result.scope_marker.s_line_implemented,
         s_scope_minimal_contour_only=s_minimal_result.scope_marker.minimal_contour_only,
         s_scope_s01_s05_implemented=s_minimal_result.scope_marker.s01_s05_implemented,
         s_scope_full_self_model_implemented=s_minimal_result.scope_marker.full_self_model_implemented,
@@ -1204,6 +1220,7 @@ def execute_subject_tick(
         s_require_self_side_claim=context.require_self_side_claim,
         s_require_world_side_claim=context.require_world_side_claim,
         s_require_self_controlled_transition_claim=context.require_self_controlled_transition_claim,
+        s_strict_mixed_attribution_guard=context.strict_mixed_attribution_guard,
         execution_stance=execution_stance,
         execution_checkpoints=tuple(checkpoints),
         downstream_step_results=step_results,

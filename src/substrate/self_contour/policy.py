@@ -82,16 +82,20 @@ def build_s_minimal_contour(
     if require_world_side_claim and not world_basis:
         forbidden.append(ForbiddenSelfWorldShortcut.SELF_STATE_REFRAMED_AS_WORLD_FACT.value)
         restrictions.append("world_side_claim_requires_world_basis")
-    if (
-        require_self_side_claim
-        and require_world_side_claim
-        and source_status is AttributionSourceStatus.MIXED
-        and confidence < 0.7
-    ):
+    mixed_boundary_instability = (
+        source_status is AttributionSourceStatus.MIXED and confidence < 0.7
+    )
+    if mixed_boundary_instability:
         forbidden.append(
             ForbiddenSelfWorldShortcut.MIXED_ATTRIBUTION_WITHOUT_UNCERTAINTY_MARKING.value
         )
         restrictions.append("mixed_attribution_requires_explicit_uncertainty_marking")
+    if (
+        require_self_side_claim
+        and require_world_side_claim
+        and mixed_boundary_instability
+    ):
+        restrictions.append("dual_claim_request_hits_mixed_boundary_instability")
 
     attribution_class = _derive_attribution_class(
         self_control_allowed=self_control_allowed,
@@ -245,36 +249,87 @@ def _build_s_line_admission(
     ownership_controllability_discipline_exists = (
         state.controllability_estimate >= 0.0 and state.ownership_estimate >= 0.0
     )
+    self_attribution_basis_sufficient = bool(
+        state.self_attribution_basis_present and state.attribution_confidence >= 0.5
+    )
+    controllability_basis_sufficient = bool(
+        state.self_attribution_basis_present and state.controllability_estimate >= 0.62
+    )
+    ownership_basis_sufficient = bool(
+        state.self_attribution_basis_present and state.ownership_estimate >= 0.58
+    )
+    attribution_underconstrained = bool(state.underconstrained)
+    mixed_boundary_instability = bool(
+        state.internal_vs_external_source_status is AttributionSourceStatus.MIXED
+        and state.attribution_confidence < 0.7
+    )
+    no_safe_self_basis = bool(not state.self_attribution_basis_present or gate.no_safe_self_claim)
+    no_safe_world_basis = bool(not state.world_attribution_basis_present)
     forbidden_shortcuts_machine_readable = True
     rt01_path_affecting_consumption_ready = True
     future_s01_s05_remain_open = True
     full_self_model_implemented = False
+    readiness_blockers: list[str] = []
+    if not self_attribution_basis_sufficient:
+        readiness_blockers.append("self_attribution_basis_insufficient")
+    if not controllability_basis_sufficient:
+        readiness_blockers.append("controllability_basis_insufficient")
+    if not ownership_basis_sufficient:
+        readiness_blockers.append("ownership_basis_insufficient")
+    if attribution_underconstrained:
+        readiness_blockers.append("attribution_underconstrained")
+    if mixed_boundary_instability:
+        readiness_blockers.append("mixed_boundary_instability")
+    if no_safe_self_basis:
+        readiness_blockers.append("no_safe_self_basis")
+    if no_safe_world_basis:
+        readiness_blockers.append("no_safe_world_basis")
     admission_ready_for_s01 = (
         s_minimal_contour_materialized
         and typed_boundary_surface_exists
         and ownership_controllability_discipline_exists
+        and self_attribution_basis_sufficient
+        and controllability_basis_sufficient
+        and ownership_basis_sufficient
+        and not attribution_underconstrained
+        and not mixed_boundary_instability
+        and not no_safe_self_basis
+        and not no_safe_world_basis
         and forbidden_shortcuts_machine_readable
         and rt01_path_affecting_consumption_ready
     )
-    restrictions = (
-        "sprint8b_s_minimal_contour_only",
-        "future_s01_s05_not_implemented_in_this_pass",
-        "full_self_model_not_claimable",
+    restrictions = tuple(
+        dict.fromkeys(
+            (
+                "sprint8b_s_minimal_contour_only",
+                "future_s01_s05_not_implemented_in_this_pass",
+                "full_self_model_not_claimable",
+                *readiness_blockers,
+            )
+        )
     )
     reason = (
-        "s-minimal contour provides bounded enabling substrate for later S01-S05"
+        "s-minimal contour provides bounded enabling substrate with sufficient lawful basis for later S01-S05"
         if admission_ready_for_s01
-        else "s-minimal contour admission remains incomplete"
+        else "s-minimal contour admission remains incomplete because lawful basis quality is insufficient"
     )
     return SLineAdmissionCriteria(
         s_minimal_contour_materialized=s_minimal_contour_materialized,
         typed_boundary_surface_exists=typed_boundary_surface_exists,
         ownership_controllability_discipline_exists=ownership_controllability_discipline_exists,
+        self_attribution_basis_sufficient=self_attribution_basis_sufficient,
+        controllability_basis_sufficient=controllability_basis_sufficient,
+        ownership_basis_sufficient=ownership_basis_sufficient,
+        attribution_underconstrained=attribution_underconstrained,
+        mixed_boundary_instability=mixed_boundary_instability,
+        no_safe_self_basis=no_safe_self_basis,
+        no_safe_world_basis=no_safe_world_basis,
         forbidden_shortcuts_machine_readable=forbidden_shortcuts_machine_readable,
         rt01_path_affecting_consumption_ready=rt01_path_affecting_consumption_ready,
         future_s01_s05_remain_open=future_s01_s05_remain_open,
         full_self_model_implemented=full_self_model_implemented,
         admission_ready_for_s01=admission_ready_for_s01,
+        readiness_blockers=tuple(readiness_blockers),
         restrictions=restrictions,
         reason=reason,
     )
@@ -283,6 +338,10 @@ def _build_s_line_admission(
 def _build_scope_marker() -> SMinimalScopeMarker:
     return SMinimalScopeMarker(
         scope="rt01_contour_only",
+        rt01_contour_only=True,
+        s_minimal_only=True,
+        s01_implemented=False,
+        s_line_implemented=False,
         minimal_contour_only=True,
         s01_s05_implemented=False,
         full_self_model_implemented=False,

@@ -83,11 +83,19 @@ class SLineAdmissionCriteria:
     s_minimal_contour_materialized: bool
     typed_boundary_surface_exists: bool
     ownership_controllability_discipline_exists: bool
+    self_attribution_basis_sufficient: bool
+    controllability_basis_sufficient: bool
+    ownership_basis_sufficient: bool
+    attribution_underconstrained: bool
+    mixed_boundary_instability: bool
+    no_safe_self_basis: bool
+    no_safe_world_basis: bool
     forbidden_shortcuts_machine_readable: bool
     rt01_path_affecting_consumption_ready: bool
     future_s01_s05_remain_open: bool
     full_self_model_implemented: bool
     admission_ready_for_s01: bool
+    readiness_blockers: tuple[str, ...]
     restrictions: tuple[str, ...]
     reason: str
 
@@ -95,6 +103,10 @@ class SLineAdmissionCriteria:
 @dataclass(frozen=True, slots=True)
 class SMinimalScopeMarker:
     scope: str
+    rt01_contour_only: bool
+    s_minimal_only: bool
+    s01_implemented: bool
+    s_line_implemented: bool
     minimal_contour_only: bool
     s01_s05_implemented: bool
     full_self_model_implemented: bool
