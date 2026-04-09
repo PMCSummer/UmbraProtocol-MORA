@@ -172,6 +172,24 @@ def runtime_dispatch_snapshot(result: RuntimeDispatchResult) -> dict[str, object
                     state.n_scope_full_narrative_line_implemented
                 ),
                 "n_scope_repo_wide_adoption": state.n_scope_repo_wide_adoption,
+                "t01_scene_id": state.t01_scene_id,
+                "t01_scene_status": state.t01_scene_status,
+                "t01_stability_state": state.t01_stability_state,
+                "t01_preverbal_consumer_ready": state.t01_preverbal_consumer_ready,
+                "t01_no_clean_scene_commit": state.t01_no_clean_scene_commit,
+                "t01_unresolved_slots_count": state.t01_unresolved_slots_count,
+                "t01_forbidden_shortcuts": state.t01_forbidden_shortcuts,
+                "t01_scope": state.t01_scope,
+                "t01_scope_rt01_contour_only": state.t01_scope_rt01_contour_only,
+                "t01_scope_t01_first_slice_only": state.t01_scope_t01_first_slice_only,
+                "t01_scope_t02_implemented": state.t01_scope_t02_implemented,
+                "t01_scope_t03_implemented": state.t01_scope_t03_implemented,
+                "t01_scope_t04_implemented": state.t01_scope_t04_implemented,
+                "t01_scope_o01_implemented": state.t01_scope_o01_implemented,
+                "t01_scope_full_silent_thought_line_implemented": (
+                    state.t01_scope_full_silent_thought_line_implemented
+                ),
+                "t01_scope_repo_wide_adoption": state.t01_scope_repo_wide_adoption,
             }
         ),
         "persist_transition_accepted": (

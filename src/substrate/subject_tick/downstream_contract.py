@@ -237,6 +237,30 @@ class SubjectTickContractView:
     n_scope_reason: str
     n_reason: str
     n_require_narrative_safe_claim: bool
+    t01_scene_id: str
+    t01_scene_status: str
+    t01_stability_state: str
+    t01_active_entities_count: int
+    t01_relation_edges_count: int
+    t01_role_bindings_count: int
+    t01_unresolved_slots_count: int
+    t01_contested_relations_count: int
+    t01_preverbal_consumer_ready: bool
+    t01_no_clean_scene_commit: bool
+    t01_forbidden_shortcuts: tuple[str, ...]
+    t01_restrictions: tuple[str, ...]
+    t01_scope: str
+    t01_scope_rt01_contour_only: bool
+    t01_scope_t01_first_slice_only: bool
+    t01_scope_t02_implemented: bool
+    t01_scope_t03_implemented: bool
+    t01_scope_t04_implemented: bool
+    t01_scope_o01_implemented: bool
+    t01_scope_full_silent_thought_line_implemented: bool
+    t01_scope_repo_wide_adoption: bool
+    t01_scope_reason: str
+    t01_reason: str
+    t01_require_preverbal_scene_consumer: bool
     execution_stance: str
     execution_checkpoints: tuple[str, ...]
     final_execution_outcome: SubjectTickOutcome
@@ -532,6 +556,34 @@ def derive_subject_tick_contract_view(
         n_scope_reason=state.n_scope_reason,
         n_reason=state.n_reason,
         n_require_narrative_safe_claim=state.n_require_narrative_safe_claim,
+        t01_scene_id=state.t01_scene_id,
+        t01_scene_status=state.t01_scene_status,
+        t01_stability_state=state.t01_stability_state,
+        t01_active_entities_count=state.t01_active_entities_count,
+        t01_relation_edges_count=state.t01_relation_edges_count,
+        t01_role_bindings_count=state.t01_role_bindings_count,
+        t01_unresolved_slots_count=state.t01_unresolved_slots_count,
+        t01_contested_relations_count=state.t01_contested_relations_count,
+        t01_preverbal_consumer_ready=state.t01_preverbal_consumer_ready,
+        t01_no_clean_scene_commit=state.t01_no_clean_scene_commit,
+        t01_forbidden_shortcuts=state.t01_forbidden_shortcuts,
+        t01_restrictions=state.t01_restrictions,
+        t01_scope=state.t01_scope,
+        t01_scope_rt01_contour_only=state.t01_scope_rt01_contour_only,
+        t01_scope_t01_first_slice_only=state.t01_scope_t01_first_slice_only,
+        t01_scope_t02_implemented=state.t01_scope_t02_implemented,
+        t01_scope_t03_implemented=state.t01_scope_t03_implemented,
+        t01_scope_t04_implemented=state.t01_scope_t04_implemented,
+        t01_scope_o01_implemented=state.t01_scope_o01_implemented,
+        t01_scope_full_silent_thought_line_implemented=(
+            state.t01_scope_full_silent_thought_line_implemented
+        ),
+        t01_scope_repo_wide_adoption=state.t01_scope_repo_wide_adoption,
+        t01_scope_reason=state.t01_scope_reason,
+        t01_reason=state.t01_reason,
+        t01_require_preverbal_scene_consumer=(
+            state.t01_require_preverbal_scene_consumer
+        ),
         execution_stance=state.execution_stance.value,
         execution_checkpoints=tuple(
             f"{checkpoint.checkpoint_id}:{checkpoint.status.value}"
@@ -547,8 +599,8 @@ def derive_subject_tick_contract_view(
         requires_restrictions_read=True,
         reason=(
             "runtime contour contract requires C04/C05 claims, world-entry basis, s-minimal "
-            "self/world boundary, a-line normalization, m-minimal lifecycle and n-minimal "
-            "narrative commitment checkpoint surfaces to be read"
+            "self/world boundary, a-line normalization, m-minimal lifecycle, n-minimal "
+            "narrative commitment and t01 semantic field checkpoint surfaces to be read"
         ),
     )
 

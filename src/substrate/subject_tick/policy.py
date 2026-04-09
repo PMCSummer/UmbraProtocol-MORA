@@ -53,6 +53,8 @@ def evaluate_subject_tick_downstream_gate(
         SubjectTickRestrictionCode.M_FORBIDDEN_SHORTCUTS_MUST_BE_READ,
         SubjectTickRestrictionCode.N_MINIMAL_CONTOUR_CONTRACT_MUST_BE_READ,
         SubjectTickRestrictionCode.N_FORBIDDEN_SHORTCUTS_MUST_BE_READ,
+        SubjectTickRestrictionCode.T01_SEMANTIC_FIELD_CONTRACT_MUST_BE_READ,
+        SubjectTickRestrictionCode.T01_FORBIDDEN_SHORTCUTS_MUST_BE_READ,
     ]
     usability = SubjectTickUsabilityClass.USABLE_BOUNDED
     accepted = True
@@ -219,6 +221,29 @@ def evaluate_subject_tick_downstream_gate(
             reason = (
                 "safe narrative commitment requested while n-minimal surface remains ambiguous/contradictory"
             )
+    if (
+        state.t01_require_preverbal_scene_consumer
+        and not state.t01_preverbal_consumer_ready
+    ):
+        restrictions.append(
+            SubjectTickRestrictionCode.T01_PREVERBAL_SCENE_REQUIRED_FOR_CONSUMER
+        )
+        restrictions.append(SubjectTickRestrictionCode.DOWNSTREAM_AUTHORITY_DEGRADED)
+        if state.final_execution_outcome == SubjectTickOutcome.CONTINUE:
+            accepted = False
+            usability = SubjectTickUsabilityClass.BLOCKED
+            reason = (
+                "t01 preverbal scene consumer requested but semantic field is not cleanly consumable"
+            )
+    if state.t01_require_preverbal_scene_consumer and state.t01_no_clean_scene_commit:
+        restrictions.append(
+            SubjectTickRestrictionCode.T01_PREVERBAL_SCENE_REQUIRED_FOR_CONSUMER
+        )
+        restrictions.append(SubjectTickRestrictionCode.DOWNSTREAM_AUTHORITY_DEGRADED)
+        if state.final_execution_outcome == SubjectTickOutcome.CONTINUE:
+            accepted = False
+            usability = SubjectTickUsabilityClass.BLOCKED
+            reason = "t01 scene remains no-clean under claim pressure; clarification/revalidation required"
 
     return SubjectTickGateDecision(
         accepted=accepted,

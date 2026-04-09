@@ -10,6 +10,7 @@ if TYPE_CHECKING:
     from substrate.m_minimal import MMinimalResult
     from substrate.n_minimal import NMinimalResult
     from substrate.self_contour import SMinimalContourResult
+    from substrate.t01_semantic_field import T01ActiveFieldResult
     from substrate.world_adapter import WorldAdapterInput, WorldAdapterResult
     from substrate.world_entry_contract import WorldEntryContractResult
 
@@ -95,6 +96,9 @@ class SubjectTickRestrictionCode(StrEnum):
     N_MINIMAL_CONTOUR_CONTRACT_MUST_BE_READ = "n_minimal_contour_contract_must_be_read"
     N_FORBIDDEN_SHORTCUTS_MUST_BE_READ = "n_forbidden_shortcuts_must_be_read"
     N_SAFE_NARRATIVE_CLAIM_REQUIRES_BASIS = "n_safe_narrative_claim_requires_basis"
+    T01_SEMANTIC_FIELD_CONTRACT_MUST_BE_READ = "t01_semantic_field_contract_must_be_read"
+    T01_FORBIDDEN_SHORTCUTS_MUST_BE_READ = "t01_forbidden_shortcuts_must_be_read"
+    T01_PREVERBAL_SCENE_REQUIRED_FOR_CONSUMER = "t01_preverbal_scene_required_for_consumer"
     DOWNSTREAM_AUTHORITY_DEGRADED = "downstream_authority_degraded"
 
 
@@ -183,6 +187,8 @@ class SubjectTickContext:
     disable_m_minimal_enforcement: bool = False
     require_narrative_safe_claim: bool = False
     disable_n_minimal_enforcement: bool = False
+    require_t01_preverbal_scene_consumer: bool = False
+    disable_t01_field_enforcement: bool = False
     source_lineage: tuple[str, ...] = ()
 
 
@@ -439,6 +445,30 @@ class SubjectTickState:
     n_scope_reason: str
     n_reason: str
     n_require_narrative_safe_claim: bool
+    t01_scene_id: str
+    t01_scene_status: str
+    t01_stability_state: str
+    t01_active_entities_count: int
+    t01_relation_edges_count: int
+    t01_role_bindings_count: int
+    t01_unresolved_slots_count: int
+    t01_contested_relations_count: int
+    t01_preverbal_consumer_ready: bool
+    t01_no_clean_scene_commit: bool
+    t01_forbidden_shortcuts: tuple[str, ...]
+    t01_restrictions: tuple[str, ...]
+    t01_scope: str
+    t01_scope_rt01_contour_only: bool
+    t01_scope_t01_first_slice_only: bool
+    t01_scope_t02_implemented: bool
+    t01_scope_t03_implemented: bool
+    t01_scope_t04_implemented: bool
+    t01_scope_o01_implemented: bool
+    t01_scope_full_silent_thought_line_implemented: bool
+    t01_scope_repo_wide_adoption: bool
+    t01_scope_reason: str
+    t01_reason: str
+    t01_require_preverbal_scene_consumer: bool
     execution_stance: SubjectTickExecutionStance
     execution_checkpoints: tuple[SubjectTickCheckpointResult, ...]
     downstream_step_results: tuple[SubjectTickStepResult, ...]
@@ -693,6 +723,30 @@ class SubjectTickTelemetry:
     n_scope_reason: str
     n_reason: str
     n_require_narrative_safe_claim: bool
+    t01_scene_id: str
+    t01_scene_status: str
+    t01_stability_state: str
+    t01_active_entities_count: int
+    t01_relation_edges_count: int
+    t01_role_bindings_count: int
+    t01_unresolved_slots_count: int
+    t01_contested_relations_count: int
+    t01_preverbal_consumer_ready: bool
+    t01_no_clean_scene_commit: bool
+    t01_forbidden_shortcuts: tuple[str, ...]
+    t01_restrictions: tuple[str, ...]
+    t01_scope: str
+    t01_scope_rt01_contour_only: bool
+    t01_scope_t01_first_slice_only: bool
+    t01_scope_t02_implemented: bool
+    t01_scope_t03_implemented: bool
+    t01_scope_t04_implemented: bool
+    t01_scope_o01_implemented: bool
+    t01_scope_full_silent_thought_line_implemented: bool
+    t01_scope_repo_wide_adoption: bool
+    t01_scope_reason: str
+    t01_reason: str
+    t01_require_preverbal_scene_consumer: bool
     execution_stance: SubjectTickExecutionStance
     execution_checkpoints: tuple[SubjectTickCheckpointResult, ...]
     final_execution_outcome: SubjectTickOutcome
@@ -726,6 +780,7 @@ class SubjectTickResult:
     a_line_result: ALineNormalizationResult
     m_minimal_result: MMinimalResult
     n_minimal_result: NMinimalResult
+    t01_result: T01ActiveFieldResult
     abstain: bool
     abstain_reason: str | None
     no_planner_orchestrator_dependency: bool

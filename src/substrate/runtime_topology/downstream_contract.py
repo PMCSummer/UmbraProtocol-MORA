@@ -117,6 +117,22 @@ class RuntimeDispatchContractView:
     n_scope_n04_implemented: bool | None
     n_scope_full_narrative_line_implemented: bool | None
     n_scope_repo_wide_adoption: bool | None
+    t01_scene_id: str | None
+    t01_scene_status: str | None
+    t01_stability_state: str | None
+    t01_preverbal_consumer_ready: bool | None
+    t01_no_clean_scene_commit: bool | None
+    t01_unresolved_slots_count: int | None
+    t01_forbidden_shortcuts: tuple[str, ...] | None
+    t01_scope: str | None
+    t01_scope_rt01_contour_only: bool | None
+    t01_scope_t01_first_slice_only: bool | None
+    t01_scope_t02_implemented: bool | None
+    t01_scope_t03_implemented: bool | None
+    t01_scope_t04_implemented: bool | None
+    t01_scope_o01_implemented: bool | None
+    t01_scope_full_silent_thought_line_implemented: bool | None
+    t01_scope_repo_wide_adoption: bool | None
     reason: str
 
 
@@ -340,6 +356,46 @@ def derive_runtime_dispatch_contract_view(
         ),
         n_scope_repo_wide_adoption=(
             None if state is None else state.n_scope_repo_wide_adoption
+        ),
+        t01_scene_id=(None if state is None else state.t01_scene_id),
+        t01_scene_status=(None if state is None else state.t01_scene_status),
+        t01_stability_state=(None if state is None else state.t01_stability_state),
+        t01_preverbal_consumer_ready=(
+            None if state is None else state.t01_preverbal_consumer_ready
+        ),
+        t01_no_clean_scene_commit=(
+            None if state is None else state.t01_no_clean_scene_commit
+        ),
+        t01_unresolved_slots_count=(
+            None if state is None else state.t01_unresolved_slots_count
+        ),
+        t01_forbidden_shortcuts=(None if state is None else state.t01_forbidden_shortcuts),
+        t01_scope=(None if state is None else state.t01_scope),
+        t01_scope_rt01_contour_only=(
+            None if state is None else state.t01_scope_rt01_contour_only
+        ),
+        t01_scope_t01_first_slice_only=(
+            None if state is None else state.t01_scope_t01_first_slice_only
+        ),
+        t01_scope_t02_implemented=(
+            None if state is None else state.t01_scope_t02_implemented
+        ),
+        t01_scope_t03_implemented=(
+            None if state is None else state.t01_scope_t03_implemented
+        ),
+        t01_scope_t04_implemented=(
+            None if state is None else state.t01_scope_t04_implemented
+        ),
+        t01_scope_o01_implemented=(
+            None if state is None else state.t01_scope_o01_implemented
+        ),
+        t01_scope_full_silent_thought_line_implemented=(
+            None
+            if state is None
+            else state.t01_scope_full_silent_thought_line_implemented
+        ),
+        t01_scope_repo_wide_adoption=(
+            None if state is None else state.t01_scope_repo_wide_adoption
         ),
         reason=result.decision.reason,
     )

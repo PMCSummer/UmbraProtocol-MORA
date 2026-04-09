@@ -6,6 +6,7 @@ from typing import Iterable
 from substrate.a_line_normalization import build_a_line_normalization
 from substrate.m_minimal import build_m_minimal
 from substrate.n_minimal import build_n_minimal
+from substrate.t01_semantic_field import build_t01_active_semantic_field
 from substrate.affordances import (
     create_default_capability_state,
     generate_regulation_affordances,
@@ -131,6 +132,7 @@ ATTEMPTED_SUBJECT_TICK_PATHS: tuple[str, ...] = (
     "subject_tick.evaluate_a_line_normalization",
     "subject_tick.evaluate_m_minimal_contour",
     "subject_tick.evaluate_n_minimal_contour",
+    "subject_tick.evaluate_t01_semantic_field",
     "subject_tick.world_seam_enforcement",
     "subject_tick.resolve_bounded_runtime_outcome",
     "subject_tick.downstream_gate",
@@ -1168,6 +1170,58 @@ def execute_subject_tick(
             reason=n_checkpoint_reason,
         )
     )
+    t01_result = build_t01_active_semantic_field(
+        tick_id=tick_id,
+        world_entry_result=world_entry_result,
+        s_minimal_result=s_minimal_result,
+        a_line_result=a_line_result,
+        m_minimal_result=m_minimal_result,
+        n_minimal_result=n_minimal_result,
+        c04_execution_mode_claim=c04_execution_mode_claim,
+        c05_validity_action=c05_validity_action,
+        prior_state=None,
+        source_lineage=lineage,
+    )
+    t01_checkpoint_status = SubjectTickCheckpointStatus.ALLOWED
+    t01_checkpoint_reason = t01_result.gate.reason
+    if not context.disable_t01_field_enforcement:
+        if (
+            context.require_t01_preverbal_scene_consumer
+            and not t01_result.gate.pre_verbal_consumer_ready
+            and halt_reason is None
+        ):
+            t01_checkpoint_status = SubjectTickCheckpointStatus.ENFORCED_DETOUR
+            if t01_result.gate.no_clean_scene_commit:
+                revalidation_needed = True
+                t01_checkpoint_reason = (
+                    "t01 pre-verbal consumer requested but scene is no-clean/contested; clarification/revalidate required"
+                )
+                if active_execution_mode != "halt_execution":
+                    active_execution_mode = "revalidate_scope"
+            else:
+                repair_needed = True
+                t01_checkpoint_reason = (
+                    "t01 pre-verbal consumer requested but scene remains fragmentary/authority-insufficient"
+                )
+                if active_execution_mode not in {"halt_execution", "revalidate_scope"}:
+                    active_execution_mode = "repair_runtime_path"
+    else:
+        t01_checkpoint_status = SubjectTickCheckpointStatus.ENFORCED_DETOUR
+        t01_checkpoint_reason = "t01 semantic field enforcement disabled in ablation context"
+    checkpoints.append(
+        SubjectTickCheckpointResult(
+            checkpoint_id="rt01.t01_semantic_field_checkpoint",
+            source_contract="t01_semantic_field.active_non_verbal_scene",
+            status=t01_checkpoint_status,
+            required_action=(
+                "require_t01_preverbal_scene_consumer"
+                if context.require_t01_preverbal_scene_consumer
+                else "t01_optional"
+            ),
+            applied_action=active_execution_mode,
+            reason=t01_checkpoint_reason,
+        )
+    )
 
     if halt_reason is not None:
         final_outcome = SubjectTickOutcome.HALT
@@ -1546,6 +1600,36 @@ def execute_subject_tick(
         n_scope_reason=n_minimal_result.scope_marker.reason,
         n_reason=n_minimal_result.reason,
         n_require_narrative_safe_claim=context.require_narrative_safe_claim,
+        t01_scene_id=t01_result.state.scene_id,
+        t01_scene_status=t01_result.state.scene_status.value,
+        t01_stability_state=t01_result.state.stability_state.value,
+        t01_active_entities_count=len(t01_result.state.active_entities),
+        t01_relation_edges_count=len(t01_result.state.relation_edges),
+        t01_role_bindings_count=len(t01_result.state.role_bindings),
+        t01_unresolved_slots_count=len(t01_result.state.unresolved_slots),
+        t01_contested_relations_count=sum(
+            1 for edge in t01_result.state.relation_edges if edge.contested
+        ),
+        t01_preverbal_consumer_ready=t01_result.gate.pre_verbal_consumer_ready,
+        t01_no_clean_scene_commit=t01_result.gate.no_clean_scene_commit,
+        t01_forbidden_shortcuts=t01_result.gate.forbidden_shortcuts,
+        t01_restrictions=t01_result.gate.restrictions,
+        t01_scope=t01_result.scope_marker.scope,
+        t01_scope_rt01_contour_only=t01_result.scope_marker.rt01_contour_only,
+        t01_scope_t01_first_slice_only=t01_result.scope_marker.t01_first_slice_only,
+        t01_scope_t02_implemented=t01_result.scope_marker.t02_implemented,
+        t01_scope_t03_implemented=t01_result.scope_marker.t03_implemented,
+        t01_scope_t04_implemented=t01_result.scope_marker.t04_implemented,
+        t01_scope_o01_implemented=t01_result.scope_marker.o01_implemented,
+        t01_scope_full_silent_thought_line_implemented=(
+            t01_result.scope_marker.full_silent_thought_line_implemented
+        ),
+        t01_scope_repo_wide_adoption=t01_result.scope_marker.repo_wide_adoption,
+        t01_scope_reason=t01_result.scope_marker.reason,
+        t01_reason=t01_result.reason,
+        t01_require_preverbal_scene_consumer=(
+            context.require_t01_preverbal_scene_consumer
+        ),
         execution_stance=execution_stance,
         execution_checkpoints=tuple(checkpoints),
         downstream_step_results=step_results,
@@ -1577,7 +1661,7 @@ def execute_subject_tick(
         attempted_paths=ATTEMPTED_SUBJECT_TICK_PATHS,
         downstream_gate=gate,
         causal_basis=(
-            "bounded runtime execution spine enforces roadmap authority roles for C04/C05, consumes world-entry, s-minimal, a-line, m-minimal and n-minimal gates, and keeps D01 observability-only over fixed R->C order"
+            "bounded runtime execution spine enforces roadmap authority roles for C04/C05, consumes world-entry, s-minimal, a-line, m-minimal, n-minimal and t01 semantic-field gates, and keeps D01 observability-only over fixed R->C order"
         ),
     )
     abstain = final_outcome in {SubjectTickOutcome.REPAIR, SubjectTickOutcome.REVALIDATE}
@@ -1609,6 +1693,7 @@ def execute_subject_tick(
         a_line_result=a_line_result,
         m_minimal_result=m_minimal_result,
         n_minimal_result=n_minimal_result,
+        t01_result=t01_result,
         abstain=abstain,
         abstain_reason=abstain_reason,
         no_planner_orchestrator_dependency=True,

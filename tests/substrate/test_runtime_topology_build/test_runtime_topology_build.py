@@ -97,7 +97,7 @@ def test_runtime_topology_bundle_and_graph_are_materialized() -> None:
         "domains.continuity",
         "domains.validity",
     )
-    assert graph.runtime_order == ("R", "C01", "C02", "C03", "C04", "C05", "RT01")
+    assert graph.runtime_order == ("R", "C01", "C02", "C03", "C04", "C05", "T01", "RT01")
     assert "rt01.downstream_obedience_checkpoint" in graph.mandatory_checkpoint_ids
     assert "rt01.world_seam_checkpoint" in graph.mandatory_checkpoint_ids
     assert "rt01.world_entry_checkpoint" in graph.mandatory_checkpoint_ids
@@ -105,12 +105,14 @@ def test_runtime_topology_bundle_and_graph_are_materialized() -> None:
     assert "rt01.a_line_normalization_checkpoint" in graph.mandatory_checkpoint_ids
     assert "rt01.m_minimal_contour_checkpoint" in graph.mandatory_checkpoint_ids
     assert "rt01.n_minimal_contour_checkpoint" in graph.mandatory_checkpoint_ids
+    assert "rt01.t01_semantic_field_checkpoint" in graph.mandatory_checkpoint_ids
     assert "world_adapter.state" in graph.source_of_truth_surfaces
     assert "world_entry_contract.episode" in graph.source_of_truth_surfaces
     assert "s_minimal_contour.boundary_state" in graph.source_of_truth_surfaces
     assert "a_line_normalization.capability_state" in graph.source_of_truth_surfaces
     assert "m_minimal.lifecycle_state" in graph.source_of_truth_surfaces
     assert "n_minimal.commitment_state" in graph.source_of_truth_surfaces
+    assert "t01_semantic_field.active_scene" in graph.source_of_truth_surfaces
 
 
 def test_dispatch_happy_path_runs_lawful_production_contour() -> None:
