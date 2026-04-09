@@ -25,3 +25,10 @@ Roadmap operational memory (current architectural intent):
 - `R04.1`, `RT01.1`, `S01.1`, `W05.1`, `W06.1`, `T03.1`, `C06.1`, `O01.1`, `P04.1` are embedded augmentation blocks over existing phases, not new top-level lines.
 - Do not create standalone phases for autopoiesis / predictive coding / ToM / GWT without a new explicit human decision.
 - Keep IIT untouched in this decision family.
+
+## Agent workflow acceleration
+- Read `docs/agent/*` summaries first.
+- Reopen raw owner files only when summary assumptions are invalidated by current diff/scope.
+- Default review mode: touched-files-only.
+- Proof-before-broadening: require seam + owner files + checkpoints + direct tests evidence before expanding scope.
+- Stop expansion once seam contract, owner surfaces, load-bearing checkpoints, and direct tests are known.
