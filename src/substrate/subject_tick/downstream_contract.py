@@ -200,6 +200,43 @@ class SubjectTickContractView:
     m_scope_reason: str
     m_reason: str
     m_require_memory_safe_claim: bool
+    n_narrative_commitment_id: str
+    n_commitment_status: str
+    n_commitment_scope: str
+    n_narrative_basis_present: bool
+    n_self_basis_present: bool
+    n_world_basis_present: bool
+    n_memory_basis_present: bool
+    n_capability_basis_present: bool
+    n_ambiguity_residue: bool
+    n_contradiction_risk: str
+    n_confidence: float
+    n_degraded: bool
+    n_underconstrained: bool
+    n_safe_narrative_commitment_allowed: bool
+    n_bounded_commitment_allowed: bool
+    n_no_safe_narrative_claim: bool
+    n_forbidden_shortcuts: tuple[str, ...]
+    n_restrictions: tuple[str, ...]
+    n_n01_admission_ready: bool
+    n_n01_blockers: tuple[str, ...]
+    n_n01_implemented: bool
+    n_n02_implemented: bool
+    n_n03_implemented: bool
+    n_n04_implemented: bool
+    n_scope: str
+    n_scope_rt01_contour_only: bool
+    n_scope_n_minimal_only: bool
+    n_scope_readiness_gate_only: bool
+    n_scope_n01_implemented: bool
+    n_scope_n02_implemented: bool
+    n_scope_n03_implemented: bool
+    n_scope_n04_implemented: bool
+    n_scope_full_narrative_line_implemented: bool
+    n_scope_repo_wide_adoption: bool
+    n_scope_reason: str
+    n_reason: str
+    n_require_narrative_safe_claim: bool
     execution_stance: str
     execution_checkpoints: tuple[str, ...]
     final_execution_outcome: SubjectTickOutcome
@@ -456,6 +493,45 @@ def derive_subject_tick_contract_view(
         m_scope_reason=state.m_scope_reason,
         m_reason=state.m_reason,
         m_require_memory_safe_claim=state.m_require_memory_safe_claim,
+        n_narrative_commitment_id=state.n_narrative_commitment_id,
+        n_commitment_status=state.n_commitment_status,
+        n_commitment_scope=state.n_commitment_scope,
+        n_narrative_basis_present=state.n_narrative_basis_present,
+        n_self_basis_present=state.n_self_basis_present,
+        n_world_basis_present=state.n_world_basis_present,
+        n_memory_basis_present=state.n_memory_basis_present,
+        n_capability_basis_present=state.n_capability_basis_present,
+        n_ambiguity_residue=state.n_ambiguity_residue,
+        n_contradiction_risk=state.n_contradiction_risk,
+        n_confidence=state.n_confidence,
+        n_degraded=state.n_degraded,
+        n_underconstrained=state.n_underconstrained,
+        n_safe_narrative_commitment_allowed=state.n_safe_narrative_commitment_allowed,
+        n_bounded_commitment_allowed=state.n_bounded_commitment_allowed,
+        n_no_safe_narrative_claim=state.n_no_safe_narrative_claim,
+        n_forbidden_shortcuts=state.n_forbidden_shortcuts,
+        n_restrictions=state.n_restrictions,
+        n_n01_admission_ready=state.n_n01_admission_ready,
+        n_n01_blockers=state.n_n01_blockers,
+        n_n01_implemented=state.n_n01_implemented,
+        n_n02_implemented=state.n_n02_implemented,
+        n_n03_implemented=state.n_n03_implemented,
+        n_n04_implemented=state.n_n04_implemented,
+        n_scope=state.n_scope,
+        n_scope_rt01_contour_only=state.n_scope_rt01_contour_only,
+        n_scope_n_minimal_only=state.n_scope_n_minimal_only,
+        n_scope_readiness_gate_only=state.n_scope_readiness_gate_only,
+        n_scope_n01_implemented=state.n_scope_n01_implemented,
+        n_scope_n02_implemented=state.n_scope_n02_implemented,
+        n_scope_n03_implemented=state.n_scope_n03_implemented,
+        n_scope_n04_implemented=state.n_scope_n04_implemented,
+        n_scope_full_narrative_line_implemented=(
+            state.n_scope_full_narrative_line_implemented
+        ),
+        n_scope_repo_wide_adoption=state.n_scope_repo_wide_adoption,
+        n_scope_reason=state.n_scope_reason,
+        n_reason=state.n_reason,
+        n_require_narrative_safe_claim=state.n_require_narrative_safe_claim,
         execution_stance=state.execution_stance.value,
         execution_checkpoints=tuple(
             f"{checkpoint.checkpoint_id}:{checkpoint.status.value}"
@@ -471,7 +547,8 @@ def derive_subject_tick_contract_view(
         requires_restrictions_read=True,
         reason=(
             "runtime contour contract requires C04/C05 claims, world-entry basis, s-minimal "
-            "self/world boundary and a-line normalization checkpoint surfaces to be read"
+            "self/world boundary, a-line normalization, m-minimal lifecycle and n-minimal "
+            "narrative commitment checkpoint surfaces to be read"
         ),
     )
 
@@ -530,3 +607,40 @@ def choose_runtime_execution_outcome(
 def choose_runtime_execution_outcome_from_runtime_state(runtime_state: RuntimeState) -> str:
     view = derive_subject_tick_runtime_domain_contract_view(runtime_state)
     return view.recommended_outcome
+
+
+def require_subject_tick_bounded_n_scope(
+    subject_tick_state_or_result: SubjectTickState | SubjectTickResult | SubjectTickContractView,
+) -> SubjectTickContractView:
+    view = (
+        subject_tick_state_or_result
+        if isinstance(subject_tick_state_or_result, SubjectTickContractView)
+        else derive_subject_tick_contract_view(subject_tick_state_or_result)
+    )
+    if (
+        view.n_scope != "rt01_contour_only"
+        or not view.n_scope_rt01_contour_only
+        or not view.n_scope_n_minimal_only
+        or not view.n_scope_readiness_gate_only
+        or view.n_scope_n01_implemented
+        or view.n_scope_n02_implemented
+        or view.n_scope_n03_implemented
+        or view.n_scope_n04_implemented
+        or view.n_scope_full_narrative_line_implemented
+        or view.n_scope_repo_wide_adoption
+    ):
+        raise PermissionError(
+            "subject_tick n-surface does not satisfy bounded rt01 contour-only non-claim scope contract"
+        )
+    return view
+
+
+def require_subject_tick_strong_narrative_commitment(
+    subject_tick_state_or_result: SubjectTickState | SubjectTickResult | SubjectTickContractView,
+) -> SubjectTickContractView:
+    view = require_subject_tick_bounded_n_scope(subject_tick_state_or_result)
+    if not view.n_safe_narrative_commitment_allowed or view.n_no_safe_narrative_claim:
+        raise PermissionError(
+            "subject_tick strong narrative commitment requires safe bounded n-minimal basis"
+        )
+    return view

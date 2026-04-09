@@ -5,6 +5,8 @@ from substrate.subject_tick.downstream_contract import (
     choose_runtime_execution_outcome,
     derive_subject_tick_runtime_domain_contract_view,
     derive_subject_tick_contract_view,
+    require_subject_tick_bounded_n_scope,
+    require_subject_tick_strong_narrative_commitment,
 )
 from substrate.subject_tick.models import (
     SubjectTickAuthorityRole,
@@ -62,6 +64,8 @@ __all__ = [
     "derive_subject_tick_runtime_domain_contract_view",
     "evaluate_subject_tick_downstream_gate",
     "execute_subject_tick",
+    "require_subject_tick_bounded_n_scope",
+    "require_subject_tick_strong_narrative_commitment",
     "persist_subject_tick_result_via_f01",
     "subject_tick_result_to_payload",
 ]

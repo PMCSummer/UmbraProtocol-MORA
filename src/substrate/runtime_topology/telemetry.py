@@ -148,6 +148,30 @@ def runtime_dispatch_snapshot(result: RuntimeDispatchResult) -> dict[str, object
                     state.m_scope_full_memory_stack_implemented
                 ),
                 "m_scope_repo_wide_adoption": state.m_scope_repo_wide_adoption,
+                "n_narrative_commitment_id": state.n_narrative_commitment_id,
+                "n_commitment_status": state.n_commitment_status,
+                "n_safe_narrative_commitment_allowed": (
+                    state.n_safe_narrative_commitment_allowed
+                ),
+                "n_bounded_commitment_allowed": state.n_bounded_commitment_allowed,
+                "n_ambiguity_residue": state.n_ambiguity_residue,
+                "n_contradiction_risk": state.n_contradiction_risk,
+                "n_no_safe_narrative_claim": state.n_no_safe_narrative_claim,
+                "n_forbidden_shortcuts": state.n_forbidden_shortcuts,
+                "n_n01_admission_ready": state.n_n01_admission_ready,
+                "n_n01_blockers": state.n_n01_blockers,
+                "n_scope": state.n_scope,
+                "n_scope_rt01_contour_only": state.n_scope_rt01_contour_only,
+                "n_scope_n_minimal_only": state.n_scope_n_minimal_only,
+                "n_scope_readiness_gate_only": state.n_scope_readiness_gate_only,
+                "n_scope_n01_implemented": state.n_scope_n01_implemented,
+                "n_scope_n02_implemented": state.n_scope_n02_implemented,
+                "n_scope_n03_implemented": state.n_scope_n03_implemented,
+                "n_scope_n04_implemented": state.n_scope_n04_implemented,
+                "n_scope_full_narrative_line_implemented": (
+                    state.n_scope_full_narrative_line_implemented
+                ),
+                "n_scope_repo_wide_adoption": state.n_scope_repo_wide_adoption,
             }
         ),
         "persist_transition_accepted": (

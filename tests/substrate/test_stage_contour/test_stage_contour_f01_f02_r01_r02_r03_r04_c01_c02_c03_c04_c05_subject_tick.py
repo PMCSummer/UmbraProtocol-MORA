@@ -359,3 +359,61 @@ def test_stage_contour_a_line_capability_claim_is_path_affecting() -> None:
         and checkpoint.status.value in {"allowed", "enforced_detour"}
         for checkpoint in lawful_basis.state.execution_checkpoints
     )
+
+
+def test_stage_contour_n_minimal_narrative_safe_claim_is_path_affecting() -> None:
+    missing_basis = execute_subject_tick(
+        SubjectTickInput(
+            case_id="stage-subject-tick-n-minimal-missing-basis",
+            energy=66.0,
+            cognitive=44.0,
+            safety=74.0,
+            unresolved_preference=False,
+        ),
+        context=SubjectTickContext(
+            require_narrative_safe_claim=True,
+        ),
+    )
+    lawful_basis = execute_subject_tick(
+        SubjectTickInput(
+            case_id="stage-subject-tick-n-minimal-lawful-basis",
+            energy=66.0,
+            cognitive=44.0,
+            safety=74.0,
+            unresolved_preference=False,
+        ),
+        context=SubjectTickContext(
+            require_narrative_safe_claim=True,
+            emit_world_action_candidate=True,
+            world_adapter_input=WorldAdapterInput(
+                adapter_presence=True,
+                adapter_available=True,
+                observation_packet=build_world_observation_packet(
+                    observation_id="obs-stage-n-minimal-lawful",
+                    source_ref="world.sensor.stage",
+                    observed_at="2026-04-09T17:10:00+00:00",
+                    payload_ref="payload:stage-n-minimal-lawful",
+                ),
+                effect_packet=build_world_effect_packet(
+                    effect_id="eff-stage-n-minimal-lawful",
+                    action_id="world-action-subject-tick-stage-subject-tick-n-minimal-lawful-basis-1",
+                    observed_at="2026-04-09T17:10:01+00:00",
+                    source_ref="world.effect.stage",
+                    success=True,
+                ),
+            ),
+        ),
+    )
+    assert missing_basis.state.final_execution_outcome.value in {"repair", "revalidate"}
+    assert missing_basis.state.n_safe_narrative_commitment_allowed is False
+    assert any(
+        checkpoint.checkpoint_id == "rt01.n_minimal_contour_checkpoint"
+        and checkpoint.status.value == "enforced_detour"
+        for checkpoint in missing_basis.state.execution_checkpoints
+    )
+    assert lawful_basis.state.n_narrative_commitment_id.startswith("n-commitment:")
+    assert any(
+        checkpoint.checkpoint_id == "rt01.n_minimal_contour_checkpoint"
+        and checkpoint.status.value in {"allowed", "enforced_detour"}
+        for checkpoint in lawful_basis.state.execution_checkpoints
+    )

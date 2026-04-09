@@ -5,6 +5,7 @@ from typing import Iterable
 
 from substrate.a_line_normalization import build_a_line_normalization
 from substrate.m_minimal import build_m_minimal
+from substrate.n_minimal import build_n_minimal
 from substrate.affordances import (
     create_default_capability_state,
     generate_regulation_affordances,
@@ -129,6 +130,7 @@ ATTEMPTED_SUBJECT_TICK_PATHS: tuple[str, ...] = (
     "subject_tick.evaluate_s_minimal_contour",
     "subject_tick.evaluate_a_line_normalization",
     "subject_tick.evaluate_m_minimal_contour",
+    "subject_tick.evaluate_n_minimal_contour",
     "subject_tick.world_seam_enforcement",
     "subject_tick.resolve_bounded_runtime_outcome",
     "subject_tick.downstream_gate",
@@ -1113,6 +1115,59 @@ def execute_subject_tick(
             reason=m_checkpoint_reason,
         )
     )
+    n_minimal_result = build_n_minimal(
+        tick_id=tick_id,
+        world_entry_result=world_entry_result,
+        s_minimal_result=s_minimal_result,
+        a_line_result=a_line_result,
+        m_minimal_result=m_minimal_result,
+        claim_pressure=context.require_narrative_safe_claim,
+        source_lineage=lineage,
+    )
+    n_checkpoint_status = SubjectTickCheckpointStatus.ALLOWED
+    n_checkpoint_reason = n_minimal_result.gate.reason
+    if not context.disable_n_minimal_enforcement:
+        if (
+            context.require_narrative_safe_claim
+            and not n_minimal_result.gate.safe_narrative_commitment_allowed
+            and halt_reason is None
+        ):
+            n_checkpoint_status = SubjectTickCheckpointStatus.ENFORCED_DETOUR
+            if (
+                n_minimal_result.state.ambiguity_residue
+                or n_minimal_result.state.contradiction_risk.value in {"medium", "high"}
+                or n_minimal_result.state.underconstrained
+            ):
+                revalidation_needed = True
+                n_checkpoint_reason = (
+                    "safe narrative commitment requested but basis remains ambiguous/contradictory or underconstrained"
+                )
+                if active_execution_mode != "halt_execution":
+                    active_execution_mode = "revalidate_scope"
+            else:
+                repair_needed = True
+                n_checkpoint_reason = (
+                    "safe narrative commitment requested but no safe narrative basis is available"
+                )
+                if active_execution_mode not in {"halt_execution", "revalidate_scope"}:
+                    active_execution_mode = "repair_runtime_path"
+    else:
+        n_checkpoint_status = SubjectTickCheckpointStatus.ENFORCED_DETOUR
+        n_checkpoint_reason = "n-minimal contour enforcement disabled in ablation context"
+    checkpoints.append(
+        SubjectTickCheckpointResult(
+            checkpoint_id="rt01.n_minimal_contour_checkpoint",
+            source_contract="n_minimal.narrative_commitment",
+            status=n_checkpoint_status,
+            required_action=(
+                "require_narrative_safe_claim"
+                if context.require_narrative_safe_claim
+                else "n_minimal_optional"
+            ),
+            applied_action=active_execution_mode,
+            reason=n_checkpoint_reason,
+        )
+    )
 
     if halt_reason is not None:
         final_outcome = SubjectTickOutcome.HALT
@@ -1450,6 +1505,47 @@ def execute_subject_tick(
         m_scope_reason=m_minimal_result.scope_marker.reason,
         m_reason=m_minimal_result.reason,
         m_require_memory_safe_claim=context.require_memory_safe_claim,
+        n_narrative_commitment_id=n_minimal_result.state.narrative_commitment_id,
+        n_commitment_status=n_minimal_result.state.commitment_status.value,
+        n_commitment_scope=n_minimal_result.state.commitment_scope,
+        n_narrative_basis_present=n_minimal_result.state.narrative_basis_present,
+        n_self_basis_present=n_minimal_result.state.self_basis_present,
+        n_world_basis_present=n_minimal_result.state.world_basis_present,
+        n_memory_basis_present=n_minimal_result.state.memory_basis_present,
+        n_capability_basis_present=n_minimal_result.state.capability_basis_present,
+        n_ambiguity_residue=n_minimal_result.state.ambiguity_residue,
+        n_contradiction_risk=n_minimal_result.state.contradiction_risk.value,
+        n_confidence=n_minimal_result.state.confidence,
+        n_degraded=n_minimal_result.state.degraded,
+        n_underconstrained=n_minimal_result.state.underconstrained,
+        n_safe_narrative_commitment_allowed=(
+            n_minimal_result.gate.safe_narrative_commitment_allowed
+        ),
+        n_bounded_commitment_allowed=n_minimal_result.gate.bounded_commitment_allowed,
+        n_no_safe_narrative_claim=n_minimal_result.gate.no_safe_narrative_claim,
+        n_forbidden_shortcuts=n_minimal_result.gate.forbidden_shortcuts,
+        n_restrictions=n_minimal_result.gate.restrictions,
+        n_n01_admission_ready=n_minimal_result.admission.admission_ready_for_n01,
+        n_n01_blockers=n_minimal_result.admission.blockers,
+        n_n01_implemented=n_minimal_result.admission.n01_implemented,
+        n_n02_implemented=n_minimal_result.admission.n02_implemented,
+        n_n03_implemented=n_minimal_result.admission.n03_implemented,
+        n_n04_implemented=n_minimal_result.admission.n04_implemented,
+        n_scope=n_minimal_result.scope_marker.scope,
+        n_scope_rt01_contour_only=n_minimal_result.scope_marker.rt01_contour_only,
+        n_scope_n_minimal_only=n_minimal_result.scope_marker.n_minimal_only,
+        n_scope_readiness_gate_only=n_minimal_result.scope_marker.readiness_gate_only,
+        n_scope_n01_implemented=n_minimal_result.scope_marker.n01_implemented,
+        n_scope_n02_implemented=n_minimal_result.scope_marker.n02_implemented,
+        n_scope_n03_implemented=n_minimal_result.scope_marker.n03_implemented,
+        n_scope_n04_implemented=n_minimal_result.scope_marker.n04_implemented,
+        n_scope_full_narrative_line_implemented=(
+            n_minimal_result.scope_marker.full_narrative_line_implemented
+        ),
+        n_scope_repo_wide_adoption=n_minimal_result.scope_marker.repo_wide_adoption,
+        n_scope_reason=n_minimal_result.scope_marker.reason,
+        n_reason=n_minimal_result.reason,
+        n_require_narrative_safe_claim=context.require_narrative_safe_claim,
         execution_stance=execution_stance,
         execution_checkpoints=tuple(checkpoints),
         downstream_step_results=step_results,
@@ -1481,7 +1577,7 @@ def execute_subject_tick(
         attempted_paths=ATTEMPTED_SUBJECT_TICK_PATHS,
         downstream_gate=gate,
         causal_basis=(
-            "bounded runtime execution spine enforces roadmap authority roles for C04/C05, consumes world-entry, s-minimal contour and a-line normalization gates, and keeps D01 observability-only over fixed R->C order"
+            "bounded runtime execution spine enforces roadmap authority roles for C04/C05, consumes world-entry, s-minimal, a-line, m-minimal and n-minimal gates, and keeps D01 observability-only over fixed R->C order"
         ),
     )
     abstain = final_outcome in {SubjectTickOutcome.REPAIR, SubjectTickOutcome.REVALIDATE}
@@ -1512,6 +1608,7 @@ def execute_subject_tick(
         self_contour_result=s_minimal_result,
         a_line_result=a_line_result,
         m_minimal_result=m_minimal_result,
+        n_minimal_result=n_minimal_result,
         abstain=abstain,
         abstain_reason=abstain_reason,
         no_planner_orchestrator_dependency=True,

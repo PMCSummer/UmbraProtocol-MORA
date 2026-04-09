@@ -93,6 +93,18 @@ def build_minimal_runtime_tick_graph() -> RuntimeTickGraph:
                 checkpoint_ids=("rt01.m_minimal_contour_checkpoint",),
             ),
             RuntimeContourNode(
+                node_id="node.n_minimal",
+                phase_id="N_MINIMAL",
+                authority_role="narrative_commitment_contract",
+                computational_role="contour_contract",
+                surfaces=(
+                    "n_minimal.commitment_state",
+                    "n_minimal.forbidden_shortcuts",
+                    "n_minimal.admission",
+                ),
+                checkpoint_ids=("rt01.n_minimal_contour_checkpoint",),
+            ),
+            RuntimeContourNode(
                 node_id="node.rt01",
                 phase_id="RT01",
                 authority_role="gating",
@@ -104,6 +116,7 @@ def build_minimal_runtime_tick_graph() -> RuntimeTickGraph:
                     "rt01.s_minimal_contour_checkpoint",
                     "rt01.a_line_normalization_checkpoint",
                     "rt01.m_minimal_contour_checkpoint",
+                    "rt01.n_minimal_contour_checkpoint",
                     "rt01.outcome_resolution_checkpoint",
                 ),
                 checkpoint_ids=(
@@ -113,6 +126,7 @@ def build_minimal_runtime_tick_graph() -> RuntimeTickGraph:
                     "rt01.s_minimal_contour_checkpoint",
                     "rt01.a_line_normalization_checkpoint",
                     "rt01.m_minimal_contour_checkpoint",
+                    "rt01.n_minimal_contour_checkpoint",
                     "rt01.outcome_resolution_checkpoint",
                 ),
             ),
@@ -140,6 +154,11 @@ def build_minimal_runtime_tick_graph() -> RuntimeTickGraph:
             RuntimeContourEdge(source_phase="S_MINIMAL", target_phase="M_MINIMAL", relation="requires"),
             RuntimeContourEdge(source_phase="WORLD_SEAM", target_phase="M_MINIMAL", relation="requires"),
             RuntimeContourEdge(source_phase="M_MINIMAL", target_phase="RT01", relation="requires"),
+            RuntimeContourEdge(source_phase="S_MINIMAL", target_phase="N_MINIMAL", relation="requires"),
+            RuntimeContourEdge(source_phase="A_MINIMAL", target_phase="N_MINIMAL", relation="requires"),
+            RuntimeContourEdge(source_phase="M_MINIMAL", target_phase="N_MINIMAL", relation="requires"),
+            RuntimeContourEdge(source_phase="WORLD_SEAM", target_phase="N_MINIMAL", relation="requires"),
+            RuntimeContourEdge(source_phase="N_MINIMAL", target_phase="RT01", relation="requires"),
             RuntimeContourEdge(source_phase="RT01", target_phase="F01", relation="persists_via_f01"),
         ),
         mandatory_checkpoint_ids=(
@@ -151,6 +170,7 @@ def build_minimal_runtime_tick_graph() -> RuntimeTickGraph:
             "rt01.s_minimal_contour_checkpoint",
             "rt01.a_line_normalization_checkpoint",
             "rt01.m_minimal_contour_checkpoint",
+            "rt01.n_minimal_contour_checkpoint",
             "rt01.outcome_resolution_checkpoint",
         ),
         source_of_truth_surfaces=(
@@ -161,6 +181,7 @@ def build_minimal_runtime_tick_graph() -> RuntimeTickGraph:
             "s_minimal_contour.boundary_state",
             "a_line_normalization.capability_state",
             "m_minimal.lifecycle_state",
+            "n_minimal.commitment_state",
         ),
         reason="minimal production runtime graph for bounded RT01 contour wiring",
     )
@@ -189,6 +210,7 @@ def build_minimal_runtime_topology_bundle() -> RuntimeTopologyBundle:
             "s_minimal_boundary_attribution_contract",
             "a_line_normalization_capability_contract",
             "m_minimal_memory_lifecycle_contract",
+            "n_minimal_narrative_commitment_contract",
         ),
         f01_transition_route="subject_tick.persist_subject_tick_result_via_f01",
         tick_graph=tick_graph,
@@ -348,4 +370,5 @@ def _context_has_ablation_flags(context: SubjectTickContext | None) -> bool:
         or context.disable_downstream_obedience_enforcement
         or context.disable_s_minimal_enforcement
         or context.disable_m_minimal_enforcement
+        or context.disable_n_minimal_enforcement
     )

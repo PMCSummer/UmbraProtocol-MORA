@@ -1,11 +1,17 @@
 from __future__ import annotations
 
+from dataclasses import replace
+
+import pytest
+
 from substrate.subject_tick import (
     SubjectTickContext,
     SubjectTickOutcome,
     SubjectTickRoleMapSource,
     choose_runtime_execution_outcome,
     derive_subject_tick_contract_view,
+    require_subject_tick_bounded_n_scope,
+    require_subject_tick_strong_narrative_commitment,
 )
 from tests.substrate.subject_tick_testkit import build_subject_tick
 
@@ -537,3 +543,33 @@ def test_subject_tick_c04_role_mismatch_blocks_full_mode_binding_legitimacy() ->
         and checkpoint.status.value == "blocked"
         for checkpoint in adversarial.state.execution_checkpoints
     )
+
+
+def test_subject_tick_n_minimal_safe_narrative_claim_requirement_is_path_affecting() -> None:
+    baseline = _result("rt-n-minimal-baseline", unresolved=False)
+    enforced = _result(
+        "rt-n-minimal-enforced",
+        unresolved=False,
+        context=SubjectTickContext(require_narrative_safe_claim=True),
+    )
+    assert baseline.state.final_execution_outcome == SubjectTickOutcome.CONTINUE
+    assert enforced.state.final_execution_outcome in {
+        SubjectTickOutcome.REPAIR,
+        SubjectTickOutcome.REVALIDATE,
+    }
+    assert any(
+        checkpoint.checkpoint_id == "rt01.n_minimal_contour_checkpoint"
+        and checkpoint.status.value == "enforced_detour"
+        for checkpoint in enforced.state.execution_checkpoints
+    )
+
+
+def test_subject_tick_n_scope_validator_blocks_tampered_or_unsafe_strong_claim() -> None:
+    result = _result("rt-n-scope-validator", unresolved=False)
+    view = derive_subject_tick_contract_view(result)
+    assert require_subject_tick_bounded_n_scope(view) is view
+    with pytest.raises(PermissionError):
+        require_subject_tick_strong_narrative_commitment(view)
+    tampered = replace(view, n_scope_n_minimal_only=False)
+    with pytest.raises(PermissionError):
+        require_subject_tick_bounded_n_scope(tampered)

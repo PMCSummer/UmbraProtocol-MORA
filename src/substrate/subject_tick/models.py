@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from substrate.a_line_normalization import ALineNormalizationResult
     from substrate.m_minimal import MMinimalResult
+    from substrate.n_minimal import NMinimalResult
     from substrate.self_contour import SMinimalContourResult
     from substrate.world_adapter import WorldAdapterInput, WorldAdapterResult
     from substrate.world_entry_contract import WorldEntryContractResult
@@ -91,6 +92,9 @@ class SubjectTickRestrictionCode(StrEnum):
     M_SAFE_MEMORY_CLAIM_REQUIRES_LIFECYCLE_BASIS = (
         "m_safe_memory_claim_requires_lifecycle_basis"
     )
+    N_MINIMAL_CONTOUR_CONTRACT_MUST_BE_READ = "n_minimal_contour_contract_must_be_read"
+    N_FORBIDDEN_SHORTCUTS_MUST_BE_READ = "n_forbidden_shortcuts_must_be_read"
+    N_SAFE_NARRATIVE_CLAIM_REQUIRES_BASIS = "n_safe_narrative_claim_requires_basis"
     DOWNSTREAM_AUTHORITY_DEGRADED = "downstream_authority_degraded"
 
 
@@ -177,6 +181,8 @@ class SubjectTickContext:
     disable_a_line_enforcement: bool = False
     require_memory_safe_claim: bool = False
     disable_m_minimal_enforcement: bool = False
+    require_narrative_safe_claim: bool = False
+    disable_n_minimal_enforcement: bool = False
     source_lineage: tuple[str, ...] = ()
 
 
@@ -396,6 +402,43 @@ class SubjectTickState:
     m_scope_reason: str
     m_reason: str
     m_require_memory_safe_claim: bool
+    n_narrative_commitment_id: str
+    n_commitment_status: str
+    n_commitment_scope: str
+    n_narrative_basis_present: bool
+    n_self_basis_present: bool
+    n_world_basis_present: bool
+    n_memory_basis_present: bool
+    n_capability_basis_present: bool
+    n_ambiguity_residue: bool
+    n_contradiction_risk: str
+    n_confidence: float
+    n_degraded: bool
+    n_underconstrained: bool
+    n_safe_narrative_commitment_allowed: bool
+    n_bounded_commitment_allowed: bool
+    n_no_safe_narrative_claim: bool
+    n_forbidden_shortcuts: tuple[str, ...]
+    n_restrictions: tuple[str, ...]
+    n_n01_admission_ready: bool
+    n_n01_blockers: tuple[str, ...]
+    n_n01_implemented: bool
+    n_n02_implemented: bool
+    n_n03_implemented: bool
+    n_n04_implemented: bool
+    n_scope: str
+    n_scope_rt01_contour_only: bool
+    n_scope_n_minimal_only: bool
+    n_scope_readiness_gate_only: bool
+    n_scope_n01_implemented: bool
+    n_scope_n02_implemented: bool
+    n_scope_n03_implemented: bool
+    n_scope_n04_implemented: bool
+    n_scope_full_narrative_line_implemented: bool
+    n_scope_repo_wide_adoption: bool
+    n_scope_reason: str
+    n_reason: str
+    n_require_narrative_safe_claim: bool
     execution_stance: SubjectTickExecutionStance
     execution_checkpoints: tuple[SubjectTickCheckpointResult, ...]
     downstream_step_results: tuple[SubjectTickStepResult, ...]
@@ -613,6 +656,43 @@ class SubjectTickTelemetry:
     m_scope_reason: str
     m_reason: str
     m_require_memory_safe_claim: bool
+    n_narrative_commitment_id: str
+    n_commitment_status: str
+    n_commitment_scope: str
+    n_narrative_basis_present: bool
+    n_self_basis_present: bool
+    n_world_basis_present: bool
+    n_memory_basis_present: bool
+    n_capability_basis_present: bool
+    n_ambiguity_residue: bool
+    n_contradiction_risk: str
+    n_confidence: float
+    n_degraded: bool
+    n_underconstrained: bool
+    n_safe_narrative_commitment_allowed: bool
+    n_bounded_commitment_allowed: bool
+    n_no_safe_narrative_claim: bool
+    n_forbidden_shortcuts: tuple[str, ...]
+    n_restrictions: tuple[str, ...]
+    n_n01_admission_ready: bool
+    n_n01_blockers: tuple[str, ...]
+    n_n01_implemented: bool
+    n_n02_implemented: bool
+    n_n03_implemented: bool
+    n_n04_implemented: bool
+    n_scope: str
+    n_scope_rt01_contour_only: bool
+    n_scope_n_minimal_only: bool
+    n_scope_readiness_gate_only: bool
+    n_scope_n01_implemented: bool
+    n_scope_n02_implemented: bool
+    n_scope_n03_implemented: bool
+    n_scope_n04_implemented: bool
+    n_scope_full_narrative_line_implemented: bool
+    n_scope_repo_wide_adoption: bool
+    n_scope_reason: str
+    n_reason: str
+    n_require_narrative_safe_claim: bool
     execution_stance: SubjectTickExecutionStance
     execution_checkpoints: tuple[SubjectTickCheckpointResult, ...]
     final_execution_outcome: SubjectTickOutcome
@@ -645,6 +725,7 @@ class SubjectTickResult:
     self_contour_result: SMinimalContourResult
     a_line_result: ALineNormalizationResult
     m_minimal_result: MMinimalResult
+    n_minimal_result: NMinimalResult
     abstain: bool
     abstain_reason: str | None
     no_planner_orchestrator_dependency: bool

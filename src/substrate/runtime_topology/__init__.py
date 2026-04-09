@@ -5,6 +5,8 @@ from substrate.runtime_topology.dispatch import (
 from substrate.runtime_topology.downstream_contract import (
     RuntimeDispatchContractView,
     derive_runtime_dispatch_contract_view,
+    require_dispatch_bounded_n_scope,
+    require_dispatch_strong_narrative_commitment,
     require_lawful_production_dispatch,
 )
 from substrate.runtime_topology.models import (
@@ -44,6 +46,8 @@ __all__ = [
     "dispatch_rt01_production_tick",
     "dispatch_runtime_tick",
     "evaluate_runtime_dispatch_decision",
+    "require_dispatch_bounded_n_scope",
+    "require_dispatch_strong_narrative_commitment",
     "require_lawful_production_dispatch",
     "runtime_dispatch_snapshot",
 ]

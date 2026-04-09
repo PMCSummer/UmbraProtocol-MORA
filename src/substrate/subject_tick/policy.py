@@ -51,6 +51,8 @@ def evaluate_subject_tick_downstream_gate(
         SubjectTickRestrictionCode.A_FORBIDDEN_SHORTCUTS_MUST_BE_READ,
         SubjectTickRestrictionCode.M_MINIMAL_CONTOUR_CONTRACT_MUST_BE_READ,
         SubjectTickRestrictionCode.M_FORBIDDEN_SHORTCUTS_MUST_BE_READ,
+        SubjectTickRestrictionCode.N_MINIMAL_CONTOUR_CONTRACT_MUST_BE_READ,
+        SubjectTickRestrictionCode.N_FORBIDDEN_SHORTCUTS_MUST_BE_READ,
     ]
     usability = SubjectTickUsabilityClass.USABLE_BOUNDED
     accepted = True
@@ -195,6 +197,28 @@ def evaluate_subject_tick_downstream_gate(
             accepted = False
             usability = SubjectTickUsabilityClass.BLOCKED
             reason = "safe memory claim requested while memory surface is stale/conflicted/review-bound"
+    if state.n_require_narrative_safe_claim and not state.n_safe_narrative_commitment_allowed:
+        restrictions.append(SubjectTickRestrictionCode.N_SAFE_NARRATIVE_CLAIM_REQUIRES_BASIS)
+        restrictions.append(SubjectTickRestrictionCode.DOWNSTREAM_AUTHORITY_DEGRADED)
+        if state.final_execution_outcome == SubjectTickOutcome.CONTINUE:
+            accepted = False
+            usability = SubjectTickUsabilityClass.BLOCKED
+            reason = (
+                "safe narrative commitment requested but n-minimal contour does not provide lawful basis"
+            )
+    if state.n_require_narrative_safe_claim and (
+        state.n_underconstrained
+        or state.n_ambiguity_residue
+        or state.n_contradiction_risk in {"medium", "high"}
+    ):
+        restrictions.append(SubjectTickRestrictionCode.N_SAFE_NARRATIVE_CLAIM_REQUIRES_BASIS)
+        restrictions.append(SubjectTickRestrictionCode.DOWNSTREAM_AUTHORITY_DEGRADED)
+        if state.final_execution_outcome == SubjectTickOutcome.CONTINUE:
+            accepted = False
+            usability = SubjectTickUsabilityClass.BLOCKED
+            reason = (
+                "safe narrative commitment requested while n-minimal surface remains ambiguous/contradictory"
+            )
 
     return SubjectTickGateDecision(
         accepted=accepted,

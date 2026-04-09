@@ -97,6 +97,26 @@ class RuntimeDispatchContractView:
     m_scope_m03_implemented: bool | None
     m_scope_full_memory_stack_implemented: bool | None
     m_scope_repo_wide_adoption: bool | None
+    n_narrative_commitment_id: str | None
+    n_commitment_status: str | None
+    n_safe_narrative_commitment_allowed: bool | None
+    n_bounded_commitment_allowed: bool | None
+    n_ambiguity_residue: bool | None
+    n_contradiction_risk: str | None
+    n_no_safe_narrative_claim: bool | None
+    n_forbidden_shortcuts: tuple[str, ...] | None
+    n_n01_admission_ready: bool | None
+    n_n01_blockers: tuple[str, ...] | None
+    n_scope: str | None
+    n_scope_rt01_contour_only: bool | None
+    n_scope_n_minimal_only: bool | None
+    n_scope_readiness_gate_only: bool | None
+    n_scope_n01_implemented: bool | None
+    n_scope_n02_implemented: bool | None
+    n_scope_n03_implemented: bool | None
+    n_scope_n04_implemented: bool | None
+    n_scope_full_narrative_line_implemented: bool | None
+    n_scope_repo_wide_adoption: bool | None
     reason: str
 
 
@@ -285,6 +305,42 @@ def derive_runtime_dispatch_contract_view(
         m_scope_repo_wide_adoption=(
             None if state is None else state.m_scope_repo_wide_adoption
         ),
+        n_narrative_commitment_id=(
+            None if state is None else state.n_narrative_commitment_id
+        ),
+        n_commitment_status=(None if state is None else state.n_commitment_status),
+        n_safe_narrative_commitment_allowed=(
+            None if state is None else state.n_safe_narrative_commitment_allowed
+        ),
+        n_bounded_commitment_allowed=(
+            None if state is None else state.n_bounded_commitment_allowed
+        ),
+        n_ambiguity_residue=(None if state is None else state.n_ambiguity_residue),
+        n_contradiction_risk=(None if state is None else state.n_contradiction_risk),
+        n_no_safe_narrative_claim=(
+            None if state is None else state.n_no_safe_narrative_claim
+        ),
+        n_forbidden_shortcuts=(None if state is None else state.n_forbidden_shortcuts),
+        n_n01_admission_ready=(None if state is None else state.n_n01_admission_ready),
+        n_n01_blockers=(None if state is None else state.n_n01_blockers),
+        n_scope=(None if state is None else state.n_scope),
+        n_scope_rt01_contour_only=(
+            None if state is None else state.n_scope_rt01_contour_only
+        ),
+        n_scope_n_minimal_only=(None if state is None else state.n_scope_n_minimal_only),
+        n_scope_readiness_gate_only=(
+            None if state is None else state.n_scope_readiness_gate_only
+        ),
+        n_scope_n01_implemented=(None if state is None else state.n_scope_n01_implemented),
+        n_scope_n02_implemented=(None if state is None else state.n_scope_n02_implemented),
+        n_scope_n03_implemented=(None if state is None else state.n_scope_n03_implemented),
+        n_scope_n04_implemented=(None if state is None else state.n_scope_n04_implemented),
+        n_scope_full_narrative_line_implemented=(
+            None if state is None else state.n_scope_full_narrative_line_implemented
+        ),
+        n_scope_repo_wide_adoption=(
+            None if state is None else state.n_scope_repo_wide_adoption
+        ),
         reason=result.decision.reason,
     )
 
@@ -295,3 +351,48 @@ def require_lawful_production_dispatch(result: RuntimeDispatchResult) -> None:
         raise PermissionError("runtime dispatch rejected; contour path is not lawful")
     if not view.lawful_production_route:
         raise PermissionError("runtime dispatch path is not lawful production contour")
+
+
+def require_dispatch_bounded_n_scope(
+    result: RuntimeDispatchResult | RuntimeDispatchContractView,
+) -> RuntimeDispatchContractView:
+    view = (
+        result
+        if isinstance(result, RuntimeDispatchContractView)
+        else derive_runtime_dispatch_contract_view(result)
+    )
+    if not view.accepted:
+        raise PermissionError("runtime dispatch rejected; contour path is not lawful")
+    if view.n_scope is None:
+        raise PermissionError("runtime dispatch does not expose n-minimal scope surface")
+    if (
+        view.n_scope != "rt01_contour_only"
+        or not view.n_scope_rt01_contour_only
+        or not view.n_scope_n_minimal_only
+        or not view.n_scope_readiness_gate_only
+        or view.n_scope_n01_implemented
+        or view.n_scope_n02_implemented
+        or view.n_scope_n03_implemented
+        or view.n_scope_n04_implemented
+        or view.n_scope_full_narrative_line_implemented
+        or view.n_scope_repo_wide_adoption
+    ):
+        raise PermissionError(
+            "runtime dispatch n-surface violates bounded rt01 contour-only non-claim scope contract"
+        )
+    return view
+
+
+def require_dispatch_strong_narrative_commitment(
+    result: RuntimeDispatchResult | RuntimeDispatchContractView,
+) -> RuntimeDispatchContractView:
+    view = require_dispatch_bounded_n_scope(result)
+    if not view.lawful_production_route:
+        raise PermissionError(
+            "strong narrative commitment consumer requires lawful production dispatch route"
+        )
+    if not view.n_safe_narrative_commitment_allowed or view.n_no_safe_narrative_claim:
+        raise PermissionError(
+            "strong narrative commitment requires safe bounded n-minimal basis in dispatched contour"
+        )
+    return view
