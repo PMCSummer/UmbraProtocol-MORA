@@ -144,9 +144,11 @@ def derive_t02_preverbal_constraint_consumer_view(
         view.narrowed_role_candidates
         and any(len(candidates) == 1 for _, candidates in view.narrowed_role_candidates)
     )
+    raw_vs_propagated_collapsed = "raw_vs_propagated_collapse" in view.forbidden_shortcuts
     raw_vs_propagated_distinct = bool(
         view.raw_relation_candidates
         and (view.propagated_consequences or view.blocked_or_conflicted_consequences)
+        and not raw_vs_propagated_collapsed
     )
     can_consume = bool(
         view.pre_verbal_constraint_consumer_ready

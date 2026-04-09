@@ -300,6 +300,11 @@ def build_subject_tick_telemetry(
         t01_require_scene_comparison_consumer=(
             state.t01_require_scene_comparison_consumer
         ),
+        t02_require_constrained_scene_consumer=state.t02_require_constrained_scene_consumer,
+        t02_require_raw_vs_propagated_distinction=(
+            state.t02_require_raw_vs_propagated_distinction
+        ),
+        t02_raw_vs_propagated_distinct=state.t02_raw_vs_propagated_distinct,
         execution_stance=state.execution_stance,
         execution_checkpoints=state.execution_checkpoints,
         final_execution_outcome=state.final_execution_outcome,
@@ -627,6 +632,13 @@ def subject_tick_result_snapshot(result: SubjectTickResult) -> dict[str, object]
             "t01_require_scene_comparison_consumer": (
                 state.t01_require_scene_comparison_consumer
             ),
+            "t02_require_constrained_scene_consumer": (
+                state.t02_require_constrained_scene_consumer
+            ),
+            "t02_require_raw_vs_propagated_distinction": (
+                state.t02_require_raw_vs_propagated_distinction
+            ),
+            "t02_raw_vs_propagated_distinct": state.t02_raw_vs_propagated_distinct,
             "execution_stance": state.execution_stance.value,
             "execution_checkpoints": tuple(
                 {
@@ -1424,6 +1436,15 @@ def subject_tick_result_snapshot(result: SubjectTickResult) -> dict[str, object]
             ),
             "t01_require_scene_comparison_consumer": (
                 result.telemetry.t01_require_scene_comparison_consumer
+            ),
+            "t02_require_constrained_scene_consumer": (
+                result.telemetry.t02_require_constrained_scene_consumer
+            ),
+            "t02_require_raw_vs_propagated_distinction": (
+                result.telemetry.t02_require_raw_vs_propagated_distinction
+            ),
+            "t02_raw_vs_propagated_distinct": (
+                result.telemetry.t02_raw_vs_propagated_distinct
             ),
             "execution_stance": result.telemetry.execution_stance.value,
             "execution_checkpoints": tuple(

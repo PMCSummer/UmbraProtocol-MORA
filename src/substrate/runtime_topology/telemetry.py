@@ -295,6 +295,12 @@ def runtime_dispatch_snapshot(result: RuntimeDispatchResult) -> dict[str, object
                 "t02_require_constrained_scene_consumer": (
                     state.t02_require_constrained_scene_consumer
                 ),
+                "t02_require_raw_vs_propagated_distinction": (
+                    state.t02_require_raw_vs_propagated_distinction
+                ),
+                "t02_raw_vs_propagated_distinct": (
+                    state.t02_raw_vs_propagated_distinct
+                ),
             }
         ),
         "persist_transition_accepted": (

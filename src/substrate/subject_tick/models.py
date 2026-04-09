@@ -104,6 +104,9 @@ class SubjectTickRestrictionCode(StrEnum):
     T02_RELATION_BINDING_CONTRACT_MUST_BE_READ = "t02_relation_binding_contract_must_be_read"
     T02_FORBIDDEN_SHORTCUTS_MUST_BE_READ = "t02_forbidden_shortcuts_must_be_read"
     T02_CONSTRAINED_SCENE_REQUIRED_FOR_CONSUMER = "t02_constrained_scene_required_for_consumer"
+    T02_RAW_VS_PROPAGATED_DISTINCTION_REQUIRED = (
+        "t02_raw_vs_propagated_distinction_required"
+    )
     DOWNSTREAM_AUTHORITY_DEGRADED = "downstream_authority_degraded"
 
 
@@ -197,6 +200,8 @@ class SubjectTickContext:
     disable_t01_unresolved_slot_maintenance: bool = False
     disable_t01_field_enforcement: bool = False
     require_t02_constrained_scene_consumer: bool = False
+    require_t02_raw_vs_propagated_distinction: bool = False
+    t02_assembly_mode: str | None = None
     disable_t02_enforcement: bool = False
     source_lineage: tuple[str, ...] = ()
 
@@ -481,6 +486,8 @@ class SubjectTickState:
     t01_require_preverbal_scene_consumer: bool
     t01_require_scene_comparison_consumer: bool
     t02_require_constrained_scene_consumer: bool
+    t02_require_raw_vs_propagated_distinction: bool
+    t02_raw_vs_propagated_distinct: bool
     execution_stance: SubjectTickExecutionStance
     execution_checkpoints: tuple[SubjectTickCheckpointResult, ...]
     downstream_step_results: tuple[SubjectTickStepResult, ...]
@@ -761,6 +768,9 @@ class SubjectTickTelemetry:
     t01_reason: str
     t01_require_preverbal_scene_consumer: bool
     t01_require_scene_comparison_consumer: bool
+    t02_require_constrained_scene_consumer: bool
+    t02_require_raw_vs_propagated_distinction: bool
+    t02_raw_vs_propagated_distinct: bool
     execution_stance: SubjectTickExecutionStance
     execution_checkpoints: tuple[SubjectTickCheckpointResult, ...]
     final_execution_outcome: SubjectTickOutcome

@@ -17,6 +17,9 @@ This increment materializes:
   - propagated consequences,
   - blocked/conflicted consequences;
 - bounded pre-verbal consumer interface and RT01 checkpoint integration via `rt01.t02_relation_binding_checkpoint`.
+- bounded raw-vs-propagated integrity consequence in RT01 via
+  `rt01.t02_raw_vs_propagated_integrity_checkpoint`, so raw scene vs propagated/blocked consequences
+  remains load-bearing under a dedicated bounded contract requirement.
 
 This increment does **not** implement `T03`, `T04`, or `O01`.
 This increment does **not** implement full silent-thought-line closure.
@@ -55,6 +58,8 @@ This pass is also **not**:
 - Constraint objects and propagation stop conditions are inspectable.
 - Conflict-preserving structure exists and silent-overwrite shortcuts are explicitly markable.
 - At least one bounded pre-verbal downstream consumer path is load-bearing before wording/final selection.
+- A second bounded RT01-local consequence exists for raw-vs-propagated distinction integrity; flattening
+  this distinction can enforce detour without introducing T03/T04/O01 logic.
 
 ## What Is Not Claimable
 - Full silent-thought line implemented.

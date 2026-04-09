@@ -289,6 +289,42 @@ def evaluate_subject_tick_downstream_gate(
             reason = (
                 "t02 constrained-scene consumer checkpoint requires detour before downstream continuation"
             )
+    t02_integrity_checkpoint = next(
+        (
+            checkpoint
+            for checkpoint in state.execution_checkpoints
+            if checkpoint.checkpoint_id == "rt01.t02_raw_vs_propagated_integrity_checkpoint"
+        ),
+        None,
+    )
+    if (
+        state.t02_require_raw_vs_propagated_distinction
+        and not state.t02_raw_vs_propagated_distinct
+    ):
+        restrictions.append(
+            SubjectTickRestrictionCode.T02_RAW_VS_PROPAGATED_DISTINCTION_REQUIRED
+        )
+        restrictions.append(SubjectTickRestrictionCode.DOWNSTREAM_AUTHORITY_DEGRADED)
+        if state.final_execution_outcome == SubjectTickOutcome.CONTINUE:
+            accepted = False
+            usability = SubjectTickUsabilityClass.BLOCKED
+            reason = (
+                "t02 raw-vs-propagated distinction required but constrained scene surface collapsed"
+            )
+    if (
+        t02_integrity_checkpoint is not None
+        and t02_integrity_checkpoint.status.value != "allowed"
+    ):
+        restrictions.append(
+            SubjectTickRestrictionCode.T02_RAW_VS_PROPAGATED_DISTINCTION_REQUIRED
+        )
+        restrictions.append(SubjectTickRestrictionCode.DOWNSTREAM_AUTHORITY_DEGRADED)
+        if state.final_execution_outcome == SubjectTickOutcome.CONTINUE:
+            accepted = False
+            usability = SubjectTickUsabilityClass.BLOCKED
+            reason = (
+                "t02 raw-vs-propagated integrity checkpoint requires detour before downstream continuation"
+            )
 
     return SubjectTickGateDecision(
         accepted=accepted,

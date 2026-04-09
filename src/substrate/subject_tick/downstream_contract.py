@@ -283,6 +283,8 @@ class SubjectTickContractView:
     t02_scope_full_silent_thought_line_implemented: bool | None
     t02_scope_repo_wide_adoption: bool | None
     t02_require_constrained_scene_consumer: bool | None
+    t02_require_raw_vs_propagated_distinction: bool | None
+    t02_raw_vs_propagated_distinct: bool | None
     execution_stance: str
     execution_checkpoints: tuple[str, ...]
     final_execution_outcome: SubjectTickOutcome
@@ -706,6 +708,10 @@ def derive_subject_tick_contract_view(
             None if t02_result is None else t02_result.scope_marker.repo_wide_adoption
         ),
         t02_require_constrained_scene_consumer=state.t02_require_constrained_scene_consumer,
+        t02_require_raw_vs_propagated_distinction=(
+            state.t02_require_raw_vs_propagated_distinction
+        ),
+        t02_raw_vs_propagated_distinct=state.t02_raw_vs_propagated_distinct,
         execution_stance=state.execution_stance.value,
         execution_checkpoints=tuple(
             f"{checkpoint.checkpoint_id}:{checkpoint.status.value}"
@@ -722,7 +728,8 @@ def derive_subject_tick_contract_view(
         reason=(
             "runtime contour contract requires C04/C05 claims, world-entry basis, s-minimal "
             "self/world boundary, a-line normalization, m-minimal lifecycle, n-minimal "
-            "narrative commitment and t01 semantic field checkpoint surfaces to be read"
+            "narrative commitment, t01 semantic field checkpoints, and t02 raw-vs-propagated "
+            "distinction surfaces to be read"
         ),
     )
 

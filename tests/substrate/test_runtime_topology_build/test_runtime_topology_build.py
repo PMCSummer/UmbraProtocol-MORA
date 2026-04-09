@@ -33,6 +33,7 @@ from substrate.subject_tick import (
     execute_subject_tick,
 )
 from substrate.transition import execute_transition
+from substrate.world_adapter import WorldAdapterInput, build_world_observation_packet
 
 
 def _bootstrapped_state():
@@ -107,6 +108,7 @@ def test_runtime_topology_bundle_and_graph_are_materialized() -> None:
     assert "rt01.n_minimal_contour_checkpoint" in graph.mandatory_checkpoint_ids
     assert "rt01.t01_semantic_field_checkpoint" in graph.mandatory_checkpoint_ids
     assert "rt01.t02_relation_binding_checkpoint" in graph.mandatory_checkpoint_ids
+    assert "rt01.t02_raw_vs_propagated_integrity_checkpoint" in graph.mandatory_checkpoint_ids
     assert "world_adapter.state" in graph.source_of_truth_surfaces
     assert "world_entry_contract.episode" in graph.source_of_truth_surfaces
     assert "s_minimal_contour.boundary_state" in graph.source_of_truth_surfaces
@@ -115,6 +117,7 @@ def test_runtime_topology_bundle_and_graph_are_materialized() -> None:
     assert "n_minimal.commitment_state" in graph.source_of_truth_surfaces
     assert "t01_semantic_field.active_scene" in graph.source_of_truth_surfaces
     assert "t02_relation_binding.constrained_scene" in graph.source_of_truth_surfaces
+    assert "t02_relation_binding.raw_vs_propagated_distinction" in graph.source_of_truth_surfaces
 
 
 def test_dispatch_happy_path_runs_lawful_production_contour() -> None:
@@ -513,6 +516,8 @@ def test_dispatch_contract_view_and_snapshot_are_inspectable() -> None:
     assert view.t02_scope_full_silent_thought_line_implemented is False
     assert view.t02_scope_repo_wide_adoption is False
     assert view.t02_require_constrained_scene_consumer in {True, False}
+    assert view.t02_require_raw_vs_propagated_distinction in {True, False}
+    assert view.t02_raw_vs_propagated_distinct in {True, False}
     assert require_dispatch_bounded_n_scope(view) is view
     assert isinstance(view.m_m01_blockers, tuple)
     assert view.m_m01_structurally_present_but_not_ready in {True, False}
@@ -611,6 +616,11 @@ def test_dispatch_contract_view_and_snapshot_are_inspectable() -> None:
     )
     assert snapshot["subject_tick_state"]["t02_scope_repo_wide_adoption"] is False
     assert snapshot["subject_tick_state"]["t02_require_constrained_scene_consumer"] in {True, False}
+    assert (
+        snapshot["subject_tick_state"]["t02_require_raw_vs_propagated_distinction"]
+        in {True, False}
+    )
+    assert snapshot["subject_tick_state"]["t02_raw_vs_propagated_distinct"] in {True, False}
     assert isinstance(snapshot["subject_tick_state"]["n_n01_blockers"], tuple)
     assert isinstance(snapshot["subject_tick_state"]["m_m01_blockers"], tuple)
     assert snapshot["subject_tick_state"]["m_m01_structurally_present_but_not_ready"] in {True, False}
@@ -733,4 +743,52 @@ def test_dispatch_t02_constrained_scene_consumer_requirement_is_load_bearing() -
         checkpoint.checkpoint_id == "rt01.t02_relation_binding_checkpoint"
         and checkpoint.status.value == "enforced_detour"
         for checkpoint in required.subject_tick_result.state.execution_checkpoints
+    )
+
+
+def test_dispatch_t02_raw_vs_propagated_integrity_requirement_is_load_bearing() -> None:
+    enriched_context = SubjectTickContext(
+        require_t02_raw_vs_propagated_distinction=True,
+        emit_world_action_candidate=True,
+        world_adapter_input=WorldAdapterInput(
+            adapter_presence=True,
+            adapter_available=True,
+            observation_packet=build_world_observation_packet(
+                observation_id="obs-runtime-topology-t02-raw-propagated",
+                source_ref="world.sensor.runtime_topology_test",
+                observed_at="2026-04-18T10:05:00+00:00",
+                payload_ref="payload:runtime-topology-t02-raw-propagated",
+            ),
+        ),
+    )
+    required_distinct = dispatch_runtime_tick(
+        RuntimeDispatchRequest(
+            tick_input=_tick_input("runtime-topology-t02-raw-propagated"),
+            context=enriched_context,
+            route_class=RuntimeRouteClass.PRODUCTION_CONTOUR,
+        )
+    )
+    flattened = dispatch_runtime_tick(
+        RuntimeDispatchRequest(
+            tick_input=_tick_input("runtime-topology-t02-raw-propagated"),
+            context=replace(
+                enriched_context,
+                t02_assembly_mode="raw_vs_propagated_flatten_ablation",
+            ),
+            route_class=RuntimeRouteClass.TEST_ONLY_ABLATION,
+            allow_test_only_route=True,
+            allow_non_production_consumer_opt_in=True,
+        )
+    )
+    assert required_distinct.subject_tick_result is not None
+    assert flattened.subject_tick_result is not None
+    assert (
+        required_distinct.subject_tick_result.state.final_execution_outcome
+        == SubjectTickOutcome.CONTINUE
+    )
+    assert flattened.subject_tick_result.state.final_execution_outcome == SubjectTickOutcome.REVALIDATE
+    assert any(
+        checkpoint.checkpoint_id == "rt01.t02_raw_vs_propagated_integrity_checkpoint"
+        and checkpoint.status.value == "enforced_detour"
+        for checkpoint in flattened.subject_tick_result.state.execution_checkpoints
     )

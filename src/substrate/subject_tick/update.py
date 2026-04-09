@@ -11,6 +11,7 @@ from substrate.t01_semantic_field import (
     derive_t01_preverbal_consumer_view,
 )
 from substrate.t02_relation_binding import (
+    T02AssemblyMode,
     build_t02_constrained_scene,
     derive_t02_preverbal_constraint_consumer_view,
 )
@@ -1266,6 +1267,7 @@ def execute_subject_tick(
             reason=t01_checkpoint_reason,
         )
     )
+    t02_assembly_mode = _resolve_t02_assembly_mode(context.t02_assembly_mode)
     t02_result = build_t02_constrained_scene(
         tick_id=tick_id,
         t01_result=t01_result,
@@ -1275,9 +1277,11 @@ def execute_subject_tick(
         m_minimal_result=m_minimal_result,
         n_minimal_result=n_minimal_result,
         c05_validity_action=c05_validity_action,
+        assembly_mode=t02_assembly_mode,
         source_lineage=lineage,
     )
     t02_preverbal_view = derive_t02_preverbal_constraint_consumer_view(t02_result)
+    t02_raw_vs_propagated_distinct = t02_preverbal_view.raw_vs_propagated_distinct
     t02_checkpoint_status = SubjectTickCheckpointStatus.ALLOWED
     t02_checkpoint_reason = t02_result.gate.reason
     if not context.disable_t02_enforcement:
@@ -1328,6 +1332,42 @@ def execute_subject_tick(
             ),
             applied_action=active_execution_mode,
             reason=t02_checkpoint_reason,
+        )
+    )
+    t02_integrity_checkpoint_status = SubjectTickCheckpointStatus.ALLOWED
+    t02_integrity_checkpoint_reason = (
+        "t02 raw-vs-propagated distinction preserved for bounded downstream use"
+    )
+    if not context.disable_t02_enforcement:
+        if (
+            context.require_t02_raw_vs_propagated_distinction
+            and not t02_raw_vs_propagated_distinct
+            and halt_reason is None
+        ):
+            t02_integrity_checkpoint_status = SubjectTickCheckpointStatus.ENFORCED_DETOUR
+            revalidation_needed = True
+            t02_integrity_checkpoint_reason = (
+                "t02 raw-vs-propagated distinction required but collapsed; revalidate detour enforced"
+            )
+            if active_execution_mode != "halt_execution":
+                active_execution_mode = "revalidate_scope"
+    else:
+        t02_integrity_checkpoint_status = SubjectTickCheckpointStatus.ENFORCED_DETOUR
+        t02_integrity_checkpoint_reason = (
+            "t02 raw-vs-propagated integrity enforcement disabled in ablation context"
+        )
+    checkpoints.append(
+        SubjectTickCheckpointResult(
+            checkpoint_id="rt01.t02_raw_vs_propagated_integrity_checkpoint",
+            source_contract="t02_relation_binding.raw_vs_propagated_distinction",
+            status=t02_integrity_checkpoint_status,
+            required_action=(
+                "require_t02_raw_vs_propagated_distinction"
+                if context.require_t02_raw_vs_propagated_distinction
+                else "t02_raw_vs_propagated_optional"
+            ),
+            applied_action=active_execution_mode,
+            reason=t02_integrity_checkpoint_reason,
         )
     )
 
@@ -1745,6 +1785,10 @@ def execute_subject_tick(
         t02_require_constrained_scene_consumer=(
             context.require_t02_constrained_scene_consumer
         ),
+        t02_require_raw_vs_propagated_distinction=(
+            context.require_t02_raw_vs_propagated_distinction
+        ),
+        t02_raw_vs_propagated_distinct=t02_raw_vs_propagated_distinct,
         execution_stance=execution_stance,
         execution_checkpoints=tuple(checkpoints),
         downstream_step_results=step_results,
@@ -2071,6 +2115,18 @@ def _is_frontier_role_typed(
         if authority == ROLE_FALLBACK_AUTHORITY and computational == ROLE_FALLBACK_COMPUTATIONAL:
             return False
     return True
+
+
+def _resolve_t02_assembly_mode(token: str | None) -> T02AssemblyMode:
+    if token is None:
+        return T02AssemblyMode.BOUNDED_CONSTRAINT_PROPAGATION
+    normalized = str(token).strip()
+    if not normalized:
+        return T02AssemblyMode.BOUNDED_CONSTRAINT_PROPAGATION
+    try:
+        return T02AssemblyMode(normalized)
+    except ValueError:
+        return T02AssemblyMode.BOUNDED_CONSTRAINT_PROPAGATION
 
 
 def _phase_step(

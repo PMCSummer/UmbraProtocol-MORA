@@ -355,6 +355,14 @@ def test_t02_ablation_shortcuts_are_machine_readable_and_causally_degrading() ->
         effect_action_id="__MATCHED__",
         assembly_mode=T02AssemblyMode.HIDDEN_LOGIC_ABLATION,
     )
+    flattened, _ = _t02_result(
+        "abl-flattened",
+        wording_ref="wording:t02-abl-flattened",
+        include_observation=True,
+        request_action=True,
+        effect_action_id="__MATCHED__",
+        assembly_mode=T02AssemblyMode.RAW_VS_PROPAGATED_FLATTEN_ABLATION,
+    )
     no_stop, _ = _t02_result(
         "abl-no-stop",
         wording_ref="wording:t02-abl-no-stop",
@@ -379,6 +387,11 @@ def test_t02_ablation_shortcuts_are_machine_readable_and_causally_degrading() ->
     assert "authority_leak_propagation" in graph.gate.forbidden_shortcuts
     assert "spreading_activation_rebranding" in spread.gate.forbidden_shortcuts
     assert "hidden_logic_shortcut" in hidden.gate.forbidden_shortcuts
+    assert "raw_vs_propagated_collapse" in flattened.gate.forbidden_shortcuts
+    assert (
+        derive_t02_preverbal_constraint_consumer_view(flattened).raw_vs_propagated_distinct
+        is False
+    )
     assert "scope_leak_propagation" in no_stop.gate.forbidden_shortcuts
     assert "silent_conflict_overwrite" in no_conflict.gate.forbidden_shortcuts
     assert no_conflict.state.conflict_records == ()
@@ -519,6 +532,22 @@ def test_t02_downstream_contract_distinguishes_raw_scene_from_propagated_consequ
     consumer_view = derive_t02_preverbal_constraint_consumer_view(view)
     assert view.raw_relation_candidates
     assert view.confirmed_bindings
+    assert consumer_view.raw_vs_propagated_distinct is True
+
+
+def test_t02_blocked_or_conflicted_consequences_keep_raw_vs_propagated_distinction() -> None:
+    conflict, _ = _t02_result(
+        "downstream-conflict-distinction",
+        wording_ref="wording:t02-downstream-conflict-distinction",
+        include_observation=True,
+        request_action=True,
+        effect_action_id="__MATCHED__",
+        conflict_seed=True,
+        preserve_conflicts=True,
+    )
+    view = derive_t02_constrained_scene_contract_view(conflict)
+    consumer_view = derive_t02_preverbal_constraint_consumer_view(view)
+    assert view.blocked_or_conflicted_consequences
     assert consumer_view.raw_vs_propagated_distinct is True
 
 

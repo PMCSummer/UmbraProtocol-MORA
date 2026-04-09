@@ -124,9 +124,13 @@ def build_minimal_runtime_tick_graph() -> RuntimeTickGraph:
                     "t02_relation_binding.constrained_scene",
                     "t02_relation_binding.constraint_objects",
                     "t02_relation_binding.propagation_records",
+                    "t02_relation_binding.raw_vs_propagated_distinction",
                     "t02_relation_binding.preverbal_consumer_contract",
                 ),
-                checkpoint_ids=("rt01.t02_relation_binding_checkpoint",),
+                checkpoint_ids=(
+                    "rt01.t02_relation_binding_checkpoint",
+                    "rt01.t02_raw_vs_propagated_integrity_checkpoint",
+                ),
             ),
             RuntimeContourNode(
                 node_id="node.rt01",
@@ -143,6 +147,7 @@ def build_minimal_runtime_tick_graph() -> RuntimeTickGraph:
                     "rt01.n_minimal_contour_checkpoint",
                     "rt01.t01_semantic_field_checkpoint",
                     "rt01.t02_relation_binding_checkpoint",
+                    "rt01.t02_raw_vs_propagated_integrity_checkpoint",
                     "rt01.outcome_resolution_checkpoint",
                 ),
                 checkpoint_ids=(
@@ -155,6 +160,7 @@ def build_minimal_runtime_tick_graph() -> RuntimeTickGraph:
                     "rt01.n_minimal_contour_checkpoint",
                     "rt01.t01_semantic_field_checkpoint",
                     "rt01.t02_relation_binding_checkpoint",
+                    "rt01.t02_raw_vs_propagated_integrity_checkpoint",
                     "rt01.outcome_resolution_checkpoint",
                 ),
             ),
@@ -207,6 +213,7 @@ def build_minimal_runtime_tick_graph() -> RuntimeTickGraph:
             "rt01.n_minimal_contour_checkpoint",
             "rt01.t01_semantic_field_checkpoint",
             "rt01.t02_relation_binding_checkpoint",
+            "rt01.t02_raw_vs_propagated_integrity_checkpoint",
             "rt01.outcome_resolution_checkpoint",
         ),
         source_of_truth_surfaces=(
@@ -220,6 +227,7 @@ def build_minimal_runtime_tick_graph() -> RuntimeTickGraph:
             "n_minimal.commitment_state",
             "t01_semantic_field.active_scene",
             "t02_relation_binding.constrained_scene",
+            "t02_relation_binding.raw_vs_propagated_distinction",
         ),
         reason="minimal production runtime graph for bounded RT01 contour wiring",
     )
@@ -251,6 +259,7 @@ def build_minimal_runtime_topology_bundle() -> RuntimeTopologyBundle:
             "n_minimal_narrative_commitment_contract",
             "t01_semantic_field_contract",
             "t02_relation_binding_constraint_propagation_contract",
+            "t02_raw_vs_propagated_integrity_contract",
         ),
         f01_transition_route="subject_tick.persist_subject_tick_result_via_f01",
         tick_graph=tick_graph,
@@ -413,5 +422,10 @@ def _context_has_ablation_flags(context: SubjectTickContext | None) -> bool:
         or context.disable_n_minimal_enforcement
         or context.disable_t01_unresolved_slot_maintenance
         or context.disable_t01_field_enforcement
+        or (
+            context.t02_assembly_mode is not None
+            and str(context.t02_assembly_mode).strip()
+            and str(context.t02_assembly_mode).strip() != "bounded_constraint_propagation"
+        )
         or context.disable_t02_enforcement
     )

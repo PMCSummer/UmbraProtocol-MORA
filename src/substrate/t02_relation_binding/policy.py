@@ -534,6 +534,10 @@ def _build_propagation_records(
         if assembly_mode is T02AssemblyMode.SPREADING_ACTIVATION_ABLATION:
             scope = "diffuse_scene"
             effect_type = T02PropagationEffectType.NO_EFFECT
+        if assembly_mode is T02AssemblyMode.RAW_VS_PROPAGATED_FLATTEN_ABLATION:
+            effect_type = T02PropagationEffectType.NO_EFFECT
+            status = T02PropagationStatus.ACTIVE
+            stop_reason = None
         if binding.status in {
             T02BindingStatus.BLOCKED,
             T02BindingStatus.INCOMPATIBLE,
@@ -570,23 +574,25 @@ def _build_propagation_records(
             )
         )
     for index, constraint in enumerate(constraints, start=1):
+        effect_type = T02PropagationEffectType.RESTRICT_SCOPE
         status = (
             T02PropagationStatus.STOPPED
             if constraint.propagation_status is T02PropagationStatus.STOPPED
             else T02PropagationStatus.ACTIVE
         )
+        stop_reason = "constraint_stop_condition" if status is T02PropagationStatus.STOPPED else None
+        if assembly_mode is T02AssemblyMode.RAW_VS_PROPAGATED_FLATTEN_ABLATION:
+            effect_type = T02PropagationEffectType.NO_EFFECT
+            status = T02PropagationStatus.ACTIVE
+            stop_reason = None
         records.append(
             T02PropagationRecord(
                 propagation_id=f"t02-propagation:constraint:{index}",
                 trigger_binding_or_constraint=constraint.constraint_id,
                 affected_nodes_or_roles=constraint.applicability_limits,
-                effect_type=T02PropagationEffectType.RESTRICT_SCOPE,
+                effect_type=effect_type,
                 scope=constraint.scope,
-                stop_reason_or_none=(
-                    "constraint_stop_condition"
-                    if status is T02PropagationStatus.STOPPED
-                    else None
-                ),
+                stop_reason_or_none=stop_reason,
                 status=status,
                 provenance="t02.propagation.from_constraint",
             )
@@ -762,6 +768,8 @@ def _build_gate(
         forbidden.append(ForbiddenT02Shortcut.SPREADING_ACTIVATION_REBRANDING.value)
     if assembly_mode is T02AssemblyMode.HIDDEN_LOGIC_ABLATION:
         forbidden.append(ForbiddenT02Shortcut.HIDDEN_LOGIC_SHORTCUT.value)
+    if assembly_mode is T02AssemblyMode.RAW_VS_PROPAGATED_FLATTEN_ABLATION:
+        forbidden.append(ForbiddenT02Shortcut.RAW_VS_PROPAGATED_COLLAPSE.value)
     if authority_floor < 0.5 and any(
         item.status is T02BindingStatus.CONFIRMED for item in state.relation_bindings
     ):
@@ -791,6 +799,8 @@ def _build_gate(
         restrictions.append("t02_conflict_overwrite_shortcut_detected")
     if ForbiddenT02Shortcut.SCOPE_LEAK_PROPAGATION.value in forbidden:
         restrictions.append("t02_scope_leak_propagation_detected")
+    if ForbiddenT02Shortcut.RAW_VS_PROPAGATED_COLLAPSE.value in forbidden:
+        restrictions.append("t02_raw_vs_propagated_distinction_collapsed")
     return T02GateDecision(
         pre_verbal_constraint_consumer_ready=pre_verbal_ready,
         no_clean_binding_commit=no_clean_binding_commit,

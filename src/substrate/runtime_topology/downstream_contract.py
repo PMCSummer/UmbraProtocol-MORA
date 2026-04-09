@@ -155,6 +155,8 @@ class RuntimeDispatchContractView:
     t02_scope_full_silent_thought_line_implemented: bool | None
     t02_scope_repo_wide_adoption: bool | None
     t02_require_constrained_scene_consumer: bool | None
+    t02_require_raw_vs_propagated_distinction: bool | None
+    t02_raw_vs_propagated_distinct: bool | None
     reason: str
 
 
@@ -523,6 +525,12 @@ def derive_runtime_dispatch_contract_view(
         ),
         t02_require_constrained_scene_consumer=(
             None if state is None else state.t02_require_constrained_scene_consumer
+        ),
+        t02_require_raw_vs_propagated_distinction=(
+            None if state is None else state.t02_require_raw_vs_propagated_distinction
+        ),
+        t02_raw_vs_propagated_distinct=(
+            None if state is None else state.t02_raw_vs_propagated_distinct
         ),
         reason=result.decision.reason,
     )

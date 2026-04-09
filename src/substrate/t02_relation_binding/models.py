@@ -63,6 +63,7 @@ class T02AssemblyMode(str, Enum):
     GRAPH_EDGE_HEURISTIC_ABLATION = "graph_edge_heuristic_ablation"
     SPREADING_ACTIVATION_ABLATION = "spreading_activation_ablation"
     HIDDEN_LOGIC_ABLATION = "hidden_logic_ablation"
+    RAW_VS_PROPAGATED_FLATTEN_ABLATION = "raw_vs_propagated_flatten_ablation"
     NO_STOP_CONDITIONS_ABLATION = "no_stop_conditions_ablation"
     NO_CONFLICT_PRESERVATION_ABLATION = "no_conflict_preservation_ablation"
 
@@ -71,6 +72,7 @@ class ForbiddenT02Shortcut(str, Enum):
     GRAPH_EDGE_HEURISTIC_REBRANDING = "graph_edge_heuristic_rebranding"
     SPREADING_ACTIVATION_REBRANDING = "spreading_activation_rebranding"
     HIDDEN_LOGIC_SHORTCUT = "hidden_logic_shortcut"
+    RAW_VS_PROPAGATED_COLLAPSE = "raw_vs_propagated_collapse"
     AUTHORITY_LEAK_PROPAGATION = "authority_leak_propagation"
     SCOPE_LEAK_PROPAGATION = "scope_leak_propagation"
     SILENT_CONFLICT_OVERWRITE = "silent_conflict_overwrite"

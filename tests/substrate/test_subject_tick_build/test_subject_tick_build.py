@@ -699,3 +699,78 @@ def test_subject_tick_contract_view_exposes_t02_raw_vs_constrained_distinction()
     assert view.t02_scope_o01_implemented is False
     assert view.t02_scope_full_silent_thought_line_implemented is False
     assert view.t02_scope_repo_wide_adoption is False
+    assert view.t02_require_raw_vs_propagated_distinction in {True, False}
+    assert view.t02_raw_vs_propagated_distinct in {True, False}
+
+
+def test_subject_tick_t02_raw_vs_propagated_integrity_requirement_is_second_load_bearing_consequence() -> None:
+    enriched_context = SubjectTickContext(
+        require_t02_raw_vs_propagated_distinction=True,
+        emit_world_action_candidate=True,
+        world_adapter_input=WorldAdapterInput(
+            adapter_presence=True,
+            adapter_available=True,
+            observation_packet=build_world_observation_packet(
+                observation_id="obs-t02-raw-vs-propagated",
+                source_ref="world.sensor.subject_tick_test",
+                observed_at="2026-04-18T10:00:00+00:00",
+                payload_ref="payload:t02-raw-vs-propagated",
+            ),
+        ),
+    )
+    required_distinct = _result(
+        "rt-t02-raw-propagated-required-distinct",
+        unresolved=False,
+        context=enriched_context,
+    )
+    flattened = _result(
+        "rt-t02-raw-propagated-flattened",
+        unresolved=False,
+        context=replace(
+            enriched_context,
+            t02_assembly_mode="raw_vs_propagated_flatten_ablation",
+        ),
+    )
+    assert required_distinct.state.final_execution_outcome == SubjectTickOutcome.CONTINUE
+    assert flattened.state.final_execution_outcome == SubjectTickOutcome.REVALIDATE
+    assert flattened.state.t02_raw_vs_propagated_distinct is False
+    assert any(
+        checkpoint.checkpoint_id == "rt01.t02_raw_vs_propagated_integrity_checkpoint"
+        and checkpoint.status.value == "enforced_detour"
+        for checkpoint in flattened.state.execution_checkpoints
+    )
+
+
+def test_subject_tick_t02_raw_vs_propagated_integrity_can_be_ablated_and_degrades_contract() -> None:
+    enriched_context = SubjectTickContext(
+        require_t02_raw_vs_propagated_distinction=True,
+        emit_world_action_candidate=True,
+        world_adapter_input=WorldAdapterInput(
+            adapter_presence=True,
+            adapter_available=True,
+            observation_packet=build_world_observation_packet(
+                observation_id="obs-t02-raw-vs-propagated-ablation",
+                source_ref="world.sensor.subject_tick_test",
+                observed_at="2026-04-18T10:00:10+00:00",
+                payload_ref="payload:t02-raw-vs-propagated-ablation",
+            ),
+        ),
+        t02_assembly_mode="raw_vs_propagated_flatten_ablation",
+    )
+    flattened = _result(
+        "rt-t02-raw-propagated-flattened-enforced",
+        unresolved=False,
+        context=enriched_context,
+    )
+    bypassed = _result(
+        "rt-t02-raw-propagated-flattened-bypassed",
+        unresolved=False,
+        context=replace(
+            enriched_context,
+            disable_t02_enforcement=True,
+            disable_gate_application=True,
+            disable_downstream_obedience_enforcement=True,
+        ),
+    )
+    assert flattened.state.final_execution_outcome == SubjectTickOutcome.REVALIDATE
+    assert bypassed.state.final_execution_outcome == SubjectTickOutcome.CONTINUE
