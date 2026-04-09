@@ -49,6 +49,8 @@ def evaluate_subject_tick_downstream_gate(
         SubjectTickRestrictionCode.S_FORBIDDEN_SHORTCUTS_MUST_BE_READ,
         SubjectTickRestrictionCode.A_LINE_NORMALIZATION_CONTRACT_MUST_BE_READ,
         SubjectTickRestrictionCode.A_FORBIDDEN_SHORTCUTS_MUST_BE_READ,
+        SubjectTickRestrictionCode.M_MINIMAL_CONTOUR_CONTRACT_MUST_BE_READ,
+        SubjectTickRestrictionCode.M_FORBIDDEN_SHORTCUTS_MUST_BE_READ,
     ]
     usability = SubjectTickUsabilityClass.USABLE_BOUNDED
     accepted = True
@@ -169,6 +171,30 @@ def evaluate_subject_tick_downstream_gate(
             accepted = False
             usability = SubjectTickUsabilityClass.BLOCKED
             reason = "capability claim requested while a-line substrate remains underconstrained"
+    if state.m_require_memory_safe_claim and not state.m_safe_memory_claim_allowed:
+        restrictions.append(
+            SubjectTickRestrictionCode.M_SAFE_MEMORY_CLAIM_REQUIRES_LIFECYCLE_BASIS
+        )
+        restrictions.append(SubjectTickRestrictionCode.DOWNSTREAM_AUTHORITY_DEGRADED)
+        if state.final_execution_outcome == SubjectTickOutcome.CONTINUE:
+            accepted = False
+            usability = SubjectTickUsabilityClass.BLOCKED
+            reason = (
+                "safe memory claim requested but m-minimal lifecycle does not provide safe bounded basis"
+            )
+    if state.m_require_memory_safe_claim and (
+        state.m_review_required
+        or state.m_stale_risk in {"medium", "high"}
+        or state.m_conflict_risk in {"medium", "high"}
+    ):
+        restrictions.append(
+            SubjectTickRestrictionCode.M_SAFE_MEMORY_CLAIM_REQUIRES_LIFECYCLE_BASIS
+        )
+        restrictions.append(SubjectTickRestrictionCode.DOWNSTREAM_AUTHORITY_DEGRADED)
+        if state.final_execution_outcome == SubjectTickOutcome.CONTINUE:
+            accepted = False
+            usability = SubjectTickUsabilityClass.BLOCKED
+            reason = "safe memory claim requested while memory surface is stale/conflicted/review-bound"
 
     return SubjectTickGateDecision(
         accepted=accepted,

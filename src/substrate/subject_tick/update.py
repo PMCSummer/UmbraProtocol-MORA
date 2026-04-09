@@ -4,6 +4,7 @@ from dataclasses import replace
 from typing import Iterable
 
 from substrate.a_line_normalization import build_a_line_normalization
+from substrate.m_minimal import build_m_minimal
 from substrate.affordances import (
     create_default_capability_state,
     generate_regulation_affordances,
@@ -127,6 +128,7 @@ ATTEMPTED_SUBJECT_TICK_PATHS: tuple[str, ...] = (
     "subject_tick.evaluate_world_entry_contract",
     "subject_tick.evaluate_s_minimal_contour",
     "subject_tick.evaluate_a_line_normalization",
+    "subject_tick.evaluate_m_minimal_contour",
     "subject_tick.world_seam_enforcement",
     "subject_tick.resolve_bounded_runtime_outcome",
     "subject_tick.downstream_gate",
@@ -1059,6 +1061,58 @@ def execute_subject_tick(
             reason=a_checkpoint_reason,
         )
     )
+    m_minimal_result = build_m_minimal(
+        tick_id=tick_id,
+        world_entry_result=world_entry_result,
+        s_minimal_result=s_minimal_result,
+        a_line_result=a_line_result,
+        c05_validity_action=c05_validity_action,
+        source_lineage=lineage,
+    )
+    m_checkpoint_status = SubjectTickCheckpointStatus.ALLOWED
+    m_checkpoint_reason = m_minimal_result.gate.reason
+    if not context.disable_m_minimal_enforcement:
+        if (
+            context.require_memory_safe_claim
+            and not m_minimal_result.gate.safe_memory_claim_allowed
+            and halt_reason is None
+        ):
+            m_checkpoint_status = SubjectTickCheckpointStatus.ENFORCED_DETOUR
+            if (
+                m_minimal_result.state.review_required
+                or m_minimal_result.state.stale_risk.value in {"medium", "high"}
+                or m_minimal_result.state.conflict_risk.value in {"medium", "high"}
+            ):
+                revalidation_needed = True
+                m_checkpoint_reason = (
+                    "safe memory claim requested but memory lifecycle is stale/conflict/review-bound"
+                )
+                if active_execution_mode != "halt_execution":
+                    active_execution_mode = "revalidate_scope"
+            else:
+                repair_needed = True
+                m_checkpoint_reason = (
+                    "safe memory claim requested but no safe memory lifecycle basis is available"
+                )
+                if active_execution_mode not in {"halt_execution", "revalidate_scope"}:
+                    active_execution_mode = "repair_runtime_path"
+    else:
+        m_checkpoint_status = SubjectTickCheckpointStatus.ENFORCED_DETOUR
+        m_checkpoint_reason = "m-minimal contour enforcement disabled in ablation context"
+    checkpoints.append(
+        SubjectTickCheckpointResult(
+            checkpoint_id="rt01.m_minimal_contour_checkpoint",
+            source_contract="m_minimal.memory_lifecycle",
+            status=m_checkpoint_status,
+            required_action=(
+                "require_memory_safe_claim"
+                if context.require_memory_safe_claim
+                else "m_minimal_optional"
+            ),
+            applied_action=active_execution_mode,
+            reason=m_checkpoint_reason,
+        )
+    )
 
     if halt_reason is not None:
         final_outcome = SubjectTickOutcome.HALT
@@ -1332,6 +1386,70 @@ def execute_subject_tick(
         a_scope_reason=a_line_result.scope_marker.reason,
         a_reason=a_line_result.reason,
         a_require_capability_claim=context.require_a_line_capability_claim,
+        m_memory_item_id=m_minimal_result.state.memory_item_id,
+        m_memory_packet_id=m_minimal_result.state.memory_packet_id,
+        m_lifecycle_status=m_minimal_result.state.lifecycle_status.value,
+        m_retention_class=m_minimal_result.state.retention_class.value,
+        m_bounded_persistence_allowed=m_minimal_result.state.bounded_persistence_allowed,
+        m_temporary_carry_allowed=m_minimal_result.state.temporary_carry_allowed,
+        m_review_required=m_minimal_result.state.review_required,
+        m_reactivation_eligible=m_minimal_result.state.reactivation_eligible,
+        m_decay_eligible=m_minimal_result.state.decay_eligible,
+        m_pruning_eligible=m_minimal_result.state.pruning_eligible,
+        m_stale_risk=m_minimal_result.state.stale_risk.value,
+        m_conflict_risk=m_minimal_result.state.conflict_risk.value,
+        m_confidence=m_minimal_result.state.confidence,
+        m_reliability=m_minimal_result.state.reliability,
+        m_degraded=m_minimal_result.state.degraded,
+        m_underconstrained=m_minimal_result.state.underconstrained,
+        m_safe_memory_claim_allowed=m_minimal_result.gate.safe_memory_claim_allowed,
+        m_bounded_retained_claim_allowed=(
+            m_minimal_result.gate.bounded_retained_claim_allowed
+        ),
+        m_no_safe_memory_claim=m_minimal_result.gate.no_safe_memory_claim,
+        m_forbidden_shortcuts=m_minimal_result.gate.forbidden_shortcuts,
+        m_restrictions=m_minimal_result.gate.restrictions,
+        m_m01_admission_ready=m_minimal_result.admission.admission_ready_for_m01,
+        m_m01_blockers=m_minimal_result.admission.blockers,
+        m_m01_structurally_present_but_not_ready=(
+            m_minimal_result.admission.structurally_present_but_not_ready
+        ),
+        m_m01_stale_risk_unacceptable=(
+            m_minimal_result.admission.stale_risk_unacceptable
+        ),
+        m_m01_conflict_risk_unacceptable=(
+            m_minimal_result.admission.conflict_risk_unacceptable
+        ),
+        m_m01_reactivation_requires_review=(
+            m_minimal_result.admission.reactivation_requires_review
+        ),
+        m_m01_temporary_carry_not_stable_enough=(
+            m_minimal_result.admission.temporary_carry_not_stable_enough
+        ),
+        m_m01_no_safe_memory_basis=m_minimal_result.admission.no_safe_memory_basis,
+        m_m01_provenance_insufficient=(
+            m_minimal_result.admission.provenance_insufficient
+        ),
+        m_m01_lifecycle_underconstrained=(
+            m_minimal_result.admission.lifecycle_underconstrained
+        ),
+        m_m01_implemented=m_minimal_result.admission.m01_implemented,
+        m_m02_implemented=m_minimal_result.admission.m02_implemented,
+        m_m03_implemented=m_minimal_result.admission.m03_implemented,
+        m_scope=m_minimal_result.scope_marker.scope,
+        m_scope_rt01_contour_only=m_minimal_result.scope_marker.rt01_contour_only,
+        m_scope_m_minimal_only=m_minimal_result.scope_marker.m_minimal_only,
+        m_scope_readiness_gate_only=m_minimal_result.scope_marker.readiness_gate_only,
+        m_scope_m01_implemented=m_minimal_result.scope_marker.m01_implemented,
+        m_scope_m02_implemented=m_minimal_result.scope_marker.m02_implemented,
+        m_scope_m03_implemented=m_minimal_result.scope_marker.m03_implemented,
+        m_scope_full_memory_stack_implemented=(
+            m_minimal_result.scope_marker.full_memory_stack_implemented
+        ),
+        m_scope_repo_wide_adoption=m_minimal_result.scope_marker.repo_wide_adoption,
+        m_scope_reason=m_minimal_result.scope_marker.reason,
+        m_reason=m_minimal_result.reason,
+        m_require_memory_safe_claim=context.require_memory_safe_claim,
         execution_stance=execution_stance,
         execution_checkpoints=tuple(checkpoints),
         downstream_step_results=step_results,
@@ -1393,6 +1511,7 @@ def execute_subject_tick(
         world_entry_result=world_entry_result,
         self_contour_result=s_minimal_result,
         a_line_result=a_line_result,
+        m_minimal_result=m_minimal_result,
         abstain=abstain,
         abstain_reason=abstain_reason,
         no_planner_orchestrator_dependency=True,

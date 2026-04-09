@@ -70,6 +70,33 @@ class RuntimeDispatchContractView:
     a_scope_a05_touched: bool | None
     a_scope_full_agency_stack_implemented: bool | None
     a_scope_repo_wide_adoption: bool | None
+    m_memory_item_id: str | None
+    m_lifecycle_status: str | None
+    m_retention_class: str | None
+    m_review_required: bool | None
+    m_stale_risk: str | None
+    m_conflict_risk: str | None
+    m_no_safe_memory_claim: bool | None
+    m_forbidden_shortcuts: tuple[str, ...] | None
+    m_m01_admission_ready: bool | None
+    m_m01_blockers: tuple[str, ...] | None
+    m_m01_structurally_present_but_not_ready: bool | None
+    m_m01_stale_risk_unacceptable: bool | None
+    m_m01_conflict_risk_unacceptable: bool | None
+    m_m01_reactivation_requires_review: bool | None
+    m_m01_temporary_carry_not_stable_enough: bool | None
+    m_m01_no_safe_memory_basis: bool | None
+    m_m01_provenance_insufficient: bool | None
+    m_m01_lifecycle_underconstrained: bool | None
+    m_scope: str | None
+    m_scope_rt01_contour_only: bool | None
+    m_scope_m_minimal_only: bool | None
+    m_scope_readiness_gate_only: bool | None
+    m_scope_m01_implemented: bool | None
+    m_scope_m02_implemented: bool | None
+    m_scope_m03_implemented: bool | None
+    m_scope_full_memory_stack_implemented: bool | None
+    m_scope_repo_wide_adoption: bool | None
     reason: str
 
 
@@ -206,6 +233,57 @@ def derive_runtime_dispatch_contract_view(
         ),
         a_scope_repo_wide_adoption=(
             None if state is None else state.a_scope_repo_wide_adoption
+        ),
+        m_memory_item_id=(None if state is None else state.m_memory_item_id),
+        m_lifecycle_status=(None if state is None else state.m_lifecycle_status),
+        m_retention_class=(None if state is None else state.m_retention_class),
+        m_review_required=(None if state is None else state.m_review_required),
+        m_stale_risk=(None if state is None else state.m_stale_risk),
+        m_conflict_risk=(None if state is None else state.m_conflict_risk),
+        m_no_safe_memory_claim=(None if state is None else state.m_no_safe_memory_claim),
+        m_forbidden_shortcuts=(None if state is None else state.m_forbidden_shortcuts),
+        m_m01_admission_ready=(None if state is None else state.m_m01_admission_ready),
+        m_m01_blockers=(None if state is None else state.m_m01_blockers),
+        m_m01_structurally_present_but_not_ready=(
+            None if state is None else state.m_m01_structurally_present_but_not_ready
+        ),
+        m_m01_stale_risk_unacceptable=(
+            None if state is None else state.m_m01_stale_risk_unacceptable
+        ),
+        m_m01_conflict_risk_unacceptable=(
+            None if state is None else state.m_m01_conflict_risk_unacceptable
+        ),
+        m_m01_reactivation_requires_review=(
+            None if state is None else state.m_m01_reactivation_requires_review
+        ),
+        m_m01_temporary_carry_not_stable_enough=(
+            None if state is None else state.m_m01_temporary_carry_not_stable_enough
+        ),
+        m_m01_no_safe_memory_basis=(
+            None if state is None else state.m_m01_no_safe_memory_basis
+        ),
+        m_m01_provenance_insufficient=(
+            None if state is None else state.m_m01_provenance_insufficient
+        ),
+        m_m01_lifecycle_underconstrained=(
+            None if state is None else state.m_m01_lifecycle_underconstrained
+        ),
+        m_scope=(None if state is None else state.m_scope),
+        m_scope_rt01_contour_only=(
+            None if state is None else state.m_scope_rt01_contour_only
+        ),
+        m_scope_m_minimal_only=(None if state is None else state.m_scope_m_minimal_only),
+        m_scope_readiness_gate_only=(
+            None if state is None else state.m_scope_readiness_gate_only
+        ),
+        m_scope_m01_implemented=(None if state is None else state.m_scope_m01_implemented),
+        m_scope_m02_implemented=(None if state is None else state.m_scope_m02_implemented),
+        m_scope_m03_implemented=(None if state is None else state.m_scope_m03_implemented),
+        m_scope_full_memory_stack_implemented=(
+            None if state is None else state.m_scope_full_memory_stack_implemented
+        ),
+        m_scope_repo_wide_adoption=(
+            None if state is None else state.m_scope_repo_wide_adoption
         ),
         reason=result.decision.reason,
     )

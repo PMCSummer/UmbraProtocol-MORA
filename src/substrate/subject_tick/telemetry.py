@@ -179,6 +179,56 @@ def build_subject_tick_telemetry(
         a_scope_reason=state.a_scope_reason,
         a_reason=state.a_reason,
         a_require_capability_claim=state.a_require_capability_claim,
+        m_memory_item_id=state.m_memory_item_id,
+        m_memory_packet_id=state.m_memory_packet_id,
+        m_lifecycle_status=state.m_lifecycle_status,
+        m_retention_class=state.m_retention_class,
+        m_bounded_persistence_allowed=state.m_bounded_persistence_allowed,
+        m_temporary_carry_allowed=state.m_temporary_carry_allowed,
+        m_review_required=state.m_review_required,
+        m_reactivation_eligible=state.m_reactivation_eligible,
+        m_decay_eligible=state.m_decay_eligible,
+        m_pruning_eligible=state.m_pruning_eligible,
+        m_stale_risk=state.m_stale_risk,
+        m_conflict_risk=state.m_conflict_risk,
+        m_confidence=state.m_confidence,
+        m_reliability=state.m_reliability,
+        m_degraded=state.m_degraded,
+        m_underconstrained=state.m_underconstrained,
+        m_safe_memory_claim_allowed=state.m_safe_memory_claim_allowed,
+        m_bounded_retained_claim_allowed=state.m_bounded_retained_claim_allowed,
+        m_no_safe_memory_claim=state.m_no_safe_memory_claim,
+        m_forbidden_shortcuts=state.m_forbidden_shortcuts,
+        m_restrictions=state.m_restrictions,
+        m_m01_admission_ready=state.m_m01_admission_ready,
+        m_m01_blockers=state.m_m01_blockers,
+        m_m01_structurally_present_but_not_ready=(
+            state.m_m01_structurally_present_but_not_ready
+        ),
+        m_m01_stale_risk_unacceptable=state.m_m01_stale_risk_unacceptable,
+        m_m01_conflict_risk_unacceptable=state.m_m01_conflict_risk_unacceptable,
+        m_m01_reactivation_requires_review=state.m_m01_reactivation_requires_review,
+        m_m01_temporary_carry_not_stable_enough=(
+            state.m_m01_temporary_carry_not_stable_enough
+        ),
+        m_m01_no_safe_memory_basis=state.m_m01_no_safe_memory_basis,
+        m_m01_provenance_insufficient=state.m_m01_provenance_insufficient,
+        m_m01_lifecycle_underconstrained=state.m_m01_lifecycle_underconstrained,
+        m_m01_implemented=state.m_m01_implemented,
+        m_m02_implemented=state.m_m02_implemented,
+        m_m03_implemented=state.m_m03_implemented,
+        m_scope=state.m_scope,
+        m_scope_rt01_contour_only=state.m_scope_rt01_contour_only,
+        m_scope_m_minimal_only=state.m_scope_m_minimal_only,
+        m_scope_readiness_gate_only=state.m_scope_readiness_gate_only,
+        m_scope_m01_implemented=state.m_scope_m01_implemented,
+        m_scope_m02_implemented=state.m_scope_m02_implemented,
+        m_scope_m03_implemented=state.m_scope_m03_implemented,
+        m_scope_full_memory_stack_implemented=state.m_scope_full_memory_stack_implemented,
+        m_scope_repo_wide_adoption=state.m_scope_repo_wide_adoption,
+        m_scope_reason=state.m_scope_reason,
+        m_reason=state.m_reason,
+        m_require_memory_safe_claim=state.m_require_memory_safe_claim,
         execution_stance=state.execution_stance,
         execution_checkpoints=state.execution_checkpoints,
         final_execution_outcome=state.final_execution_outcome,
@@ -377,6 +427,62 @@ def subject_tick_result_snapshot(result: SubjectTickResult) -> dict[str, object]
             "a_scope_reason": state.a_scope_reason,
             "a_reason": state.a_reason,
             "a_require_capability_claim": state.a_require_capability_claim,
+            "m_memory_item_id": state.m_memory_item_id,
+            "m_memory_packet_id": state.m_memory_packet_id,
+            "m_lifecycle_status": state.m_lifecycle_status,
+            "m_retention_class": state.m_retention_class,
+            "m_bounded_persistence_allowed": state.m_bounded_persistence_allowed,
+            "m_temporary_carry_allowed": state.m_temporary_carry_allowed,
+            "m_review_required": state.m_review_required,
+            "m_reactivation_eligible": state.m_reactivation_eligible,
+            "m_decay_eligible": state.m_decay_eligible,
+            "m_pruning_eligible": state.m_pruning_eligible,
+            "m_stale_risk": state.m_stale_risk,
+            "m_conflict_risk": state.m_conflict_risk,
+            "m_confidence": state.m_confidence,
+            "m_reliability": state.m_reliability,
+            "m_degraded": state.m_degraded,
+            "m_underconstrained": state.m_underconstrained,
+            "m_safe_memory_claim_allowed": state.m_safe_memory_claim_allowed,
+            "m_bounded_retained_claim_allowed": state.m_bounded_retained_claim_allowed,
+            "m_no_safe_memory_claim": state.m_no_safe_memory_claim,
+            "m_forbidden_shortcuts": state.m_forbidden_shortcuts,
+            "m_restrictions": state.m_restrictions,
+            "m_m01_admission_ready": state.m_m01_admission_ready,
+            "m_m01_blockers": state.m_m01_blockers,
+            "m_m01_structurally_present_but_not_ready": (
+                state.m_m01_structurally_present_but_not_ready
+            ),
+            "m_m01_stale_risk_unacceptable": state.m_m01_stale_risk_unacceptable,
+            "m_m01_conflict_risk_unacceptable": state.m_m01_conflict_risk_unacceptable,
+            "m_m01_reactivation_requires_review": (
+                state.m_m01_reactivation_requires_review
+            ),
+            "m_m01_temporary_carry_not_stable_enough": (
+                state.m_m01_temporary_carry_not_stable_enough
+            ),
+            "m_m01_no_safe_memory_basis": state.m_m01_no_safe_memory_basis,
+            "m_m01_provenance_insufficient": state.m_m01_provenance_insufficient,
+            "m_m01_lifecycle_underconstrained": (
+                state.m_m01_lifecycle_underconstrained
+            ),
+            "m_m01_implemented": state.m_m01_implemented,
+            "m_m02_implemented": state.m_m02_implemented,
+            "m_m03_implemented": state.m_m03_implemented,
+            "m_scope": state.m_scope,
+            "m_scope_rt01_contour_only": state.m_scope_rt01_contour_only,
+            "m_scope_m_minimal_only": state.m_scope_m_minimal_only,
+            "m_scope_readiness_gate_only": state.m_scope_readiness_gate_only,
+            "m_scope_m01_implemented": state.m_scope_m01_implemented,
+            "m_scope_m02_implemented": state.m_scope_m02_implemented,
+            "m_scope_m03_implemented": state.m_scope_m03_implemented,
+            "m_scope_full_memory_stack_implemented": (
+                state.m_scope_full_memory_stack_implemented
+            ),
+            "m_scope_repo_wide_adoption": state.m_scope_repo_wide_adoption,
+            "m_scope_reason": state.m_scope_reason,
+            "m_reason": state.m_reason,
+            "m_require_memory_safe_claim": state.m_require_memory_safe_claim,
             "execution_stance": state.execution_stance.value,
             "execution_checkpoints": tuple(
                 {
@@ -595,6 +701,85 @@ def subject_tick_result_snapshot(result: SubjectTickResult) -> dict[str, object]
                 "reason": result.a_line_result.scope_marker.reason,
             },
             "reason": result.a_line_result.reason,
+        },
+        "m_minimal_result": {
+            "memory_item_id": result.m_minimal_result.state.memory_item_id,
+            "memory_packet_id": result.m_minimal_result.state.memory_packet_id,
+            "lifecycle_status": result.m_minimal_result.state.lifecycle_status.value,
+            "retention_class": result.m_minimal_result.state.retention_class.value,
+            "bounded_persistence_allowed": (
+                result.m_minimal_result.state.bounded_persistence_allowed
+            ),
+            "temporary_carry_allowed": result.m_minimal_result.state.temporary_carry_allowed,
+            "review_required": result.m_minimal_result.state.review_required,
+            "reactivation_eligible": result.m_minimal_result.state.reactivation_eligible,
+            "decay_eligible": result.m_minimal_result.state.decay_eligible,
+            "pruning_eligible": result.m_minimal_result.state.pruning_eligible,
+            "stale_risk": result.m_minimal_result.state.stale_risk.value,
+            "conflict_risk": result.m_minimal_result.state.conflict_risk.value,
+            "confidence": result.m_minimal_result.state.confidence,
+            "reliability": result.m_minimal_result.state.reliability,
+            "degraded": result.m_minimal_result.state.degraded,
+            "underconstrained": result.m_minimal_result.state.underconstrained,
+            "safe_memory_claim_allowed": (
+                result.m_minimal_result.gate.safe_memory_claim_allowed
+            ),
+            "bounded_retained_claim_allowed": (
+                result.m_minimal_result.gate.bounded_retained_claim_allowed
+            ),
+            "no_safe_memory_claim": result.m_minimal_result.gate.no_safe_memory_claim,
+            "forbidden_shortcuts": result.m_minimal_result.gate.forbidden_shortcuts,
+            "restrictions": result.m_minimal_result.gate.restrictions,
+            "admission": {
+                "admission_ready_for_m01": (
+                    result.m_minimal_result.admission.admission_ready_for_m01
+                ),
+                "blockers": result.m_minimal_result.admission.blockers,
+                "structurally_present_but_not_ready": (
+                    result.m_minimal_result.admission.structurally_present_but_not_ready
+                ),
+                "stale_risk_unacceptable": (
+                    result.m_minimal_result.admission.stale_risk_unacceptable
+                ),
+                "conflict_risk_unacceptable": (
+                    result.m_minimal_result.admission.conflict_risk_unacceptable
+                ),
+                "reactivation_requires_review": (
+                    result.m_minimal_result.admission.reactivation_requires_review
+                ),
+                "temporary_carry_not_stable_enough": (
+                    result.m_minimal_result.admission.temporary_carry_not_stable_enough
+                ),
+                "no_safe_memory_basis": (
+                    result.m_minimal_result.admission.no_safe_memory_basis
+                ),
+                "provenance_insufficient": (
+                    result.m_minimal_result.admission.provenance_insufficient
+                ),
+                "lifecycle_underconstrained": (
+                    result.m_minimal_result.admission.lifecycle_underconstrained
+                ),
+                "m01_implemented": result.m_minimal_result.admission.m01_implemented,
+                "m02_implemented": result.m_minimal_result.admission.m02_implemented,
+                "m03_implemented": result.m_minimal_result.admission.m03_implemented,
+                "restrictions": result.m_minimal_result.admission.restrictions,
+                "reason": result.m_minimal_result.admission.reason,
+            },
+            "scope_marker": {
+                "scope": result.m_minimal_result.scope_marker.scope,
+                "rt01_contour_only": result.m_minimal_result.scope_marker.rt01_contour_only,
+                "m_minimal_only": result.m_minimal_result.scope_marker.m_minimal_only,
+                "readiness_gate_only": result.m_minimal_result.scope_marker.readiness_gate_only,
+                "m01_implemented": result.m_minimal_result.scope_marker.m01_implemented,
+                "m02_implemented": result.m_minimal_result.scope_marker.m02_implemented,
+                "m03_implemented": result.m_minimal_result.scope_marker.m03_implemented,
+                "full_memory_stack_implemented": (
+                    result.m_minimal_result.scope_marker.full_memory_stack_implemented
+                ),
+                "repo_wide_adoption": result.m_minimal_result.scope_marker.repo_wide_adoption,
+                "reason": result.m_minimal_result.scope_marker.reason,
+            },
+            "reason": result.m_minimal_result.reason,
         },
         "downstream_gate": {
             "accepted": result.downstream_gate.accepted,
@@ -818,6 +1003,70 @@ def subject_tick_result_snapshot(result: SubjectTickResult) -> dict[str, object]
             "a_scope_reason": result.telemetry.a_scope_reason,
             "a_reason": result.telemetry.a_reason,
             "a_require_capability_claim": result.telemetry.a_require_capability_claim,
+            "m_memory_item_id": result.telemetry.m_memory_item_id,
+            "m_memory_packet_id": result.telemetry.m_memory_packet_id,
+            "m_lifecycle_status": result.telemetry.m_lifecycle_status,
+            "m_retention_class": result.telemetry.m_retention_class,
+            "m_bounded_persistence_allowed": (
+                result.telemetry.m_bounded_persistence_allowed
+            ),
+            "m_temporary_carry_allowed": result.telemetry.m_temporary_carry_allowed,
+            "m_review_required": result.telemetry.m_review_required,
+            "m_reactivation_eligible": result.telemetry.m_reactivation_eligible,
+            "m_decay_eligible": result.telemetry.m_decay_eligible,
+            "m_pruning_eligible": result.telemetry.m_pruning_eligible,
+            "m_stale_risk": result.telemetry.m_stale_risk,
+            "m_conflict_risk": result.telemetry.m_conflict_risk,
+            "m_confidence": result.telemetry.m_confidence,
+            "m_reliability": result.telemetry.m_reliability,
+            "m_degraded": result.telemetry.m_degraded,
+            "m_underconstrained": result.telemetry.m_underconstrained,
+            "m_safe_memory_claim_allowed": result.telemetry.m_safe_memory_claim_allowed,
+            "m_bounded_retained_claim_allowed": (
+                result.telemetry.m_bounded_retained_claim_allowed
+            ),
+            "m_no_safe_memory_claim": result.telemetry.m_no_safe_memory_claim,
+            "m_forbidden_shortcuts": result.telemetry.m_forbidden_shortcuts,
+            "m_restrictions": result.telemetry.m_restrictions,
+            "m_m01_admission_ready": result.telemetry.m_m01_admission_ready,
+            "m_m01_blockers": result.telemetry.m_m01_blockers,
+            "m_m01_structurally_present_but_not_ready": (
+                result.telemetry.m_m01_structurally_present_but_not_ready
+            ),
+            "m_m01_stale_risk_unacceptable": result.telemetry.m_m01_stale_risk_unacceptable,
+            "m_m01_conflict_risk_unacceptable": (
+                result.telemetry.m_m01_conflict_risk_unacceptable
+            ),
+            "m_m01_reactivation_requires_review": (
+                result.telemetry.m_m01_reactivation_requires_review
+            ),
+            "m_m01_temporary_carry_not_stable_enough": (
+                result.telemetry.m_m01_temporary_carry_not_stable_enough
+            ),
+            "m_m01_no_safe_memory_basis": result.telemetry.m_m01_no_safe_memory_basis,
+            "m_m01_provenance_insufficient": (
+                result.telemetry.m_m01_provenance_insufficient
+            ),
+            "m_m01_lifecycle_underconstrained": (
+                result.telemetry.m_m01_lifecycle_underconstrained
+            ),
+            "m_m01_implemented": result.telemetry.m_m01_implemented,
+            "m_m02_implemented": result.telemetry.m_m02_implemented,
+            "m_m03_implemented": result.telemetry.m_m03_implemented,
+            "m_scope": result.telemetry.m_scope,
+            "m_scope_rt01_contour_only": result.telemetry.m_scope_rt01_contour_only,
+            "m_scope_m_minimal_only": result.telemetry.m_scope_m_minimal_only,
+            "m_scope_readiness_gate_only": result.telemetry.m_scope_readiness_gate_only,
+            "m_scope_m01_implemented": result.telemetry.m_scope_m01_implemented,
+            "m_scope_m02_implemented": result.telemetry.m_scope_m02_implemented,
+            "m_scope_m03_implemented": result.telemetry.m_scope_m03_implemented,
+            "m_scope_full_memory_stack_implemented": (
+                result.telemetry.m_scope_full_memory_stack_implemented
+            ),
+            "m_scope_repo_wide_adoption": result.telemetry.m_scope_repo_wide_adoption,
+            "m_scope_reason": result.telemetry.m_scope_reason,
+            "m_reason": result.telemetry.m_reason,
+            "m_require_memory_safe_claim": result.telemetry.m_require_memory_safe_claim,
             "execution_stance": result.telemetry.execution_stance.value,
             "execution_checkpoints": tuple(
                 {

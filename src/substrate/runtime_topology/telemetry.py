@@ -111,6 +111,43 @@ def runtime_dispatch_snapshot(result: RuntimeDispatchResult) -> dict[str, object
                     state.a_scope_full_agency_stack_implemented
                 ),
                 "a_scope_repo_wide_adoption": state.a_scope_repo_wide_adoption,
+                "m_memory_item_id": state.m_memory_item_id,
+                "m_lifecycle_status": state.m_lifecycle_status,
+                "m_retention_class": state.m_retention_class,
+                "m_review_required": state.m_review_required,
+                "m_stale_risk": state.m_stale_risk,
+                "m_conflict_risk": state.m_conflict_risk,
+                "m_no_safe_memory_claim": state.m_no_safe_memory_claim,
+                "m_forbidden_shortcuts": state.m_forbidden_shortcuts,
+                "m_m01_admission_ready": state.m_m01_admission_ready,
+                "m_m01_blockers": state.m_m01_blockers,
+                "m_m01_structurally_present_but_not_ready": (
+                    state.m_m01_structurally_present_but_not_ready
+                ),
+                "m_m01_stale_risk_unacceptable": state.m_m01_stale_risk_unacceptable,
+                "m_m01_conflict_risk_unacceptable": state.m_m01_conflict_risk_unacceptable,
+                "m_m01_reactivation_requires_review": (
+                    state.m_m01_reactivation_requires_review
+                ),
+                "m_m01_temporary_carry_not_stable_enough": (
+                    state.m_m01_temporary_carry_not_stable_enough
+                ),
+                "m_m01_no_safe_memory_basis": state.m_m01_no_safe_memory_basis,
+                "m_m01_provenance_insufficient": state.m_m01_provenance_insufficient,
+                "m_m01_lifecycle_underconstrained": (
+                    state.m_m01_lifecycle_underconstrained
+                ),
+                "m_scope": state.m_scope,
+                "m_scope_rt01_contour_only": state.m_scope_rt01_contour_only,
+                "m_scope_m_minimal_only": state.m_scope_m_minimal_only,
+                "m_scope_readiness_gate_only": state.m_scope_readiness_gate_only,
+                "m_scope_m01_implemented": state.m_scope_m01_implemented,
+                "m_scope_m02_implemented": state.m_scope_m02_implemented,
+                "m_scope_m03_implemented": state.m_scope_m03_implemented,
+                "m_scope_full_memory_stack_implemented": (
+                    state.m_scope_full_memory_stack_implemented
+                ),
+                "m_scope_repo_wide_adoption": state.m_scope_repo_wide_adoption,
             }
         ),
         "persist_transition_accepted": (

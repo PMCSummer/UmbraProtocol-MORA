@@ -101,10 +101,12 @@ def test_runtime_topology_bundle_and_graph_are_materialized() -> None:
     assert "rt01.world_entry_checkpoint" in graph.mandatory_checkpoint_ids
     assert "rt01.s_minimal_contour_checkpoint" in graph.mandatory_checkpoint_ids
     assert "rt01.a_line_normalization_checkpoint" in graph.mandatory_checkpoint_ids
+    assert "rt01.m_minimal_contour_checkpoint" in graph.mandatory_checkpoint_ids
     assert "world_adapter.state" in graph.source_of_truth_surfaces
     assert "world_entry_contract.episode" in graph.source_of_truth_surfaces
     assert "s_minimal_contour.boundary_state" in graph.source_of_truth_surfaces
     assert "a_line_normalization.capability_state" in graph.source_of_truth_surfaces
+    assert "m_minimal.lifecycle_state" in graph.source_of_truth_surfaces
 
 
 def test_dispatch_happy_path_runs_lawful_production_contour() -> None:
@@ -455,6 +457,25 @@ def test_dispatch_contract_view_and_snapshot_are_inspectable() -> None:
     assert view.a_scope_a05_touched is False
     assert view.a_scope_full_agency_stack_implemented is False
     assert view.a_scope_repo_wide_adoption is False
+    assert view.m_memory_item_id is not None
+    assert view.m_scope == "rt01_contour_only"
+    assert view.m_scope_rt01_contour_only is True
+    assert view.m_scope_m_minimal_only is True
+    assert view.m_scope_readiness_gate_only is True
+    assert view.m_scope_m01_implemented is False
+    assert view.m_scope_m02_implemented is False
+    assert view.m_scope_m03_implemented is False
+    assert view.m_scope_full_memory_stack_implemented is False
+    assert view.m_scope_repo_wide_adoption is False
+    assert isinstance(view.m_m01_blockers, tuple)
+    assert view.m_m01_structurally_present_but_not_ready in {True, False}
+    assert view.m_m01_stale_risk_unacceptable in {True, False}
+    assert view.m_m01_conflict_risk_unacceptable in {True, False}
+    assert view.m_m01_reactivation_requires_review in {True, False}
+    assert view.m_m01_temporary_carry_not_stable_enough in {True, False}
+    assert view.m_m01_no_safe_memory_basis in {True, False}
+    assert view.m_m01_provenance_insufficient in {True, False}
+    assert view.m_m01_lifecycle_underconstrained in {True, False}
     assert view.a_a04_structurally_present_but_not_ready in {True, False}
     assert view.a_a04_capability_basis_missing in {True, False}
     assert view.a_a04_world_dependency_unmet in {True, False}
@@ -500,6 +521,24 @@ def test_dispatch_contract_view_and_snapshot_are_inspectable() -> None:
     assert snapshot["subject_tick_state"]["a_a04_underconstrained_capability_surface"] in {True, False}
     assert snapshot["subject_tick_state"]["a_a04_external_means_not_justified"] in {True, False}
     assert isinstance(snapshot["subject_tick_state"]["a_a04_blockers"], tuple)
+    assert snapshot["subject_tick_state"]["m_scope"] == "rt01_contour_only"
+    assert snapshot["subject_tick_state"]["m_scope_rt01_contour_only"] is True
+    assert snapshot["subject_tick_state"]["m_scope_m_minimal_only"] is True
+    assert snapshot["subject_tick_state"]["m_scope_readiness_gate_only"] is True
+    assert snapshot["subject_tick_state"]["m_scope_m01_implemented"] is False
+    assert snapshot["subject_tick_state"]["m_scope_m02_implemented"] is False
+    assert snapshot["subject_tick_state"]["m_scope_m03_implemented"] is False
+    assert snapshot["subject_tick_state"]["m_scope_full_memory_stack_implemented"] is False
+    assert snapshot["subject_tick_state"]["m_scope_repo_wide_adoption"] is False
+    assert isinstance(snapshot["subject_tick_state"]["m_m01_blockers"], tuple)
+    assert snapshot["subject_tick_state"]["m_m01_structurally_present_but_not_ready"] in {True, False}
+    assert snapshot["subject_tick_state"]["m_m01_stale_risk_unacceptable"] in {True, False}
+    assert snapshot["subject_tick_state"]["m_m01_conflict_risk_unacceptable"] in {True, False}
+    assert snapshot["subject_tick_state"]["m_m01_reactivation_requires_review"] in {True, False}
+    assert snapshot["subject_tick_state"]["m_m01_temporary_carry_not_stable_enough"] in {True, False}
+    assert snapshot["subject_tick_state"]["m_m01_no_safe_memory_basis"] in {True, False}
+    assert snapshot["subject_tick_state"]["m_m01_provenance_insufficient"] in {True, False}
+    assert snapshot["subject_tick_state"]["m_m01_lifecycle_underconstrained"] in {True, False}
     assert snapshot["bundle"]["runtime_entry"] == "runtime_topology.dispatch_runtime_tick"
 
 

@@ -154,6 +154,52 @@ class SubjectTickContractView:
     a_scope_reason: str
     a_reason: str
     a_require_capability_claim: bool
+    m_memory_item_id: str
+    m_memory_packet_id: str
+    m_lifecycle_status: str
+    m_retention_class: str
+    m_bounded_persistence_allowed: bool
+    m_temporary_carry_allowed: bool
+    m_review_required: bool
+    m_reactivation_eligible: bool
+    m_decay_eligible: bool
+    m_pruning_eligible: bool
+    m_stale_risk: str
+    m_conflict_risk: str
+    m_confidence: float
+    m_reliability: str
+    m_degraded: bool
+    m_underconstrained: bool
+    m_safe_memory_claim_allowed: bool
+    m_bounded_retained_claim_allowed: bool
+    m_no_safe_memory_claim: bool
+    m_forbidden_shortcuts: tuple[str, ...]
+    m_restrictions: tuple[str, ...]
+    m_m01_admission_ready: bool
+    m_m01_blockers: tuple[str, ...]
+    m_m01_structurally_present_but_not_ready: bool
+    m_m01_stale_risk_unacceptable: bool
+    m_m01_conflict_risk_unacceptable: bool
+    m_m01_reactivation_requires_review: bool
+    m_m01_temporary_carry_not_stable_enough: bool
+    m_m01_no_safe_memory_basis: bool
+    m_m01_provenance_insufficient: bool
+    m_m01_lifecycle_underconstrained: bool
+    m_m01_implemented: bool
+    m_m02_implemented: bool
+    m_m03_implemented: bool
+    m_scope: str
+    m_scope_rt01_contour_only: bool
+    m_scope_m_minimal_only: bool
+    m_scope_readiness_gate_only: bool
+    m_scope_m01_implemented: bool
+    m_scope_m02_implemented: bool
+    m_scope_m03_implemented: bool
+    m_scope_full_memory_stack_implemented: bool
+    m_scope_repo_wide_adoption: bool
+    m_scope_reason: str
+    m_reason: str
+    m_require_memory_safe_claim: bool
     execution_stance: str
     execution_checkpoints: tuple[str, ...]
     final_execution_outcome: SubjectTickOutcome
@@ -360,6 +406,56 @@ def derive_subject_tick_contract_view(
         a_scope_reason=state.a_scope_reason,
         a_reason=state.a_reason,
         a_require_capability_claim=state.a_require_capability_claim,
+        m_memory_item_id=state.m_memory_item_id,
+        m_memory_packet_id=state.m_memory_packet_id,
+        m_lifecycle_status=state.m_lifecycle_status,
+        m_retention_class=state.m_retention_class,
+        m_bounded_persistence_allowed=state.m_bounded_persistence_allowed,
+        m_temporary_carry_allowed=state.m_temporary_carry_allowed,
+        m_review_required=state.m_review_required,
+        m_reactivation_eligible=state.m_reactivation_eligible,
+        m_decay_eligible=state.m_decay_eligible,
+        m_pruning_eligible=state.m_pruning_eligible,
+        m_stale_risk=state.m_stale_risk,
+        m_conflict_risk=state.m_conflict_risk,
+        m_confidence=state.m_confidence,
+        m_reliability=state.m_reliability,
+        m_degraded=state.m_degraded,
+        m_underconstrained=state.m_underconstrained,
+        m_safe_memory_claim_allowed=state.m_safe_memory_claim_allowed,
+        m_bounded_retained_claim_allowed=state.m_bounded_retained_claim_allowed,
+        m_no_safe_memory_claim=state.m_no_safe_memory_claim,
+        m_forbidden_shortcuts=state.m_forbidden_shortcuts,
+        m_restrictions=state.m_restrictions,
+        m_m01_admission_ready=state.m_m01_admission_ready,
+        m_m01_blockers=state.m_m01_blockers,
+        m_m01_structurally_present_but_not_ready=(
+            state.m_m01_structurally_present_but_not_ready
+        ),
+        m_m01_stale_risk_unacceptable=state.m_m01_stale_risk_unacceptable,
+        m_m01_conflict_risk_unacceptable=state.m_m01_conflict_risk_unacceptable,
+        m_m01_reactivation_requires_review=state.m_m01_reactivation_requires_review,
+        m_m01_temporary_carry_not_stable_enough=(
+            state.m_m01_temporary_carry_not_stable_enough
+        ),
+        m_m01_no_safe_memory_basis=state.m_m01_no_safe_memory_basis,
+        m_m01_provenance_insufficient=state.m_m01_provenance_insufficient,
+        m_m01_lifecycle_underconstrained=state.m_m01_lifecycle_underconstrained,
+        m_m01_implemented=state.m_m01_implemented,
+        m_m02_implemented=state.m_m02_implemented,
+        m_m03_implemented=state.m_m03_implemented,
+        m_scope=state.m_scope,
+        m_scope_rt01_contour_only=state.m_scope_rt01_contour_only,
+        m_scope_m_minimal_only=state.m_scope_m_minimal_only,
+        m_scope_readiness_gate_only=state.m_scope_readiness_gate_only,
+        m_scope_m01_implemented=state.m_scope_m01_implemented,
+        m_scope_m02_implemented=state.m_scope_m02_implemented,
+        m_scope_m03_implemented=state.m_scope_m03_implemented,
+        m_scope_full_memory_stack_implemented=state.m_scope_full_memory_stack_implemented,
+        m_scope_repo_wide_adoption=state.m_scope_repo_wide_adoption,
+        m_scope_reason=state.m_scope_reason,
+        m_reason=state.m_reason,
+        m_require_memory_safe_claim=state.m_require_memory_safe_claim,
         execution_stance=state.execution_stance.value,
         execution_checkpoints=tuple(
             f"{checkpoint.checkpoint_id}:{checkpoint.status.value}"

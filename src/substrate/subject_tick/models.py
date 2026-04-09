@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from substrate.a_line_normalization import ALineNormalizationResult
+    from substrate.m_minimal import MMinimalResult
     from substrate.self_contour import SMinimalContourResult
     from substrate.world_adapter import WorldAdapterInput, WorldAdapterResult
     from substrate.world_entry_contract import WorldEntryContractResult
@@ -85,6 +86,11 @@ class SubjectTickRestrictionCode(StrEnum):
     A_FORBIDDEN_SHORTCUTS_MUST_BE_READ = "a_forbidden_shortcuts_must_be_read"
     A_CAPABILITY_CLAIM_REQUIRES_BASIS = "a_capability_claim_requires_basis"
     A_POLICY_GATED_CAPABILITY_REQUIRES_GATE = "a_policy_gated_capability_requires_gate"
+    M_MINIMAL_CONTOUR_CONTRACT_MUST_BE_READ = "m_minimal_contour_contract_must_be_read"
+    M_FORBIDDEN_SHORTCUTS_MUST_BE_READ = "m_forbidden_shortcuts_must_be_read"
+    M_SAFE_MEMORY_CLAIM_REQUIRES_LIFECYCLE_BASIS = (
+        "m_safe_memory_claim_requires_lifecycle_basis"
+    )
     DOWNSTREAM_AUTHORITY_DEGRADED = "downstream_authority_degraded"
 
 
@@ -169,6 +175,8 @@ class SubjectTickContext:
     disable_s_minimal_enforcement: bool = False
     require_a_line_capability_claim: bool = False
     disable_a_line_enforcement: bool = False
+    require_memory_safe_claim: bool = False
+    disable_m_minimal_enforcement: bool = False
     source_lineage: tuple[str, ...] = ()
 
 
@@ -342,6 +350,52 @@ class SubjectTickState:
     a_scope_reason: str
     a_reason: str
     a_require_capability_claim: bool
+    m_memory_item_id: str
+    m_memory_packet_id: str
+    m_lifecycle_status: str
+    m_retention_class: str
+    m_bounded_persistence_allowed: bool
+    m_temporary_carry_allowed: bool
+    m_review_required: bool
+    m_reactivation_eligible: bool
+    m_decay_eligible: bool
+    m_pruning_eligible: bool
+    m_stale_risk: str
+    m_conflict_risk: str
+    m_confidence: float
+    m_reliability: str
+    m_degraded: bool
+    m_underconstrained: bool
+    m_safe_memory_claim_allowed: bool
+    m_bounded_retained_claim_allowed: bool
+    m_no_safe_memory_claim: bool
+    m_forbidden_shortcuts: tuple[str, ...]
+    m_restrictions: tuple[str, ...]
+    m_m01_admission_ready: bool
+    m_m01_blockers: tuple[str, ...]
+    m_m01_structurally_present_but_not_ready: bool
+    m_m01_stale_risk_unacceptable: bool
+    m_m01_conflict_risk_unacceptable: bool
+    m_m01_reactivation_requires_review: bool
+    m_m01_temporary_carry_not_stable_enough: bool
+    m_m01_no_safe_memory_basis: bool
+    m_m01_provenance_insufficient: bool
+    m_m01_lifecycle_underconstrained: bool
+    m_m01_implemented: bool
+    m_m02_implemented: bool
+    m_m03_implemented: bool
+    m_scope: str
+    m_scope_rt01_contour_only: bool
+    m_scope_m_minimal_only: bool
+    m_scope_readiness_gate_only: bool
+    m_scope_m01_implemented: bool
+    m_scope_m02_implemented: bool
+    m_scope_m03_implemented: bool
+    m_scope_full_memory_stack_implemented: bool
+    m_scope_repo_wide_adoption: bool
+    m_scope_reason: str
+    m_reason: str
+    m_require_memory_safe_claim: bool
     execution_stance: SubjectTickExecutionStance
     execution_checkpoints: tuple[SubjectTickCheckpointResult, ...]
     downstream_step_results: tuple[SubjectTickStepResult, ...]
@@ -513,6 +567,52 @@ class SubjectTickTelemetry:
     a_scope_reason: str
     a_reason: str
     a_require_capability_claim: bool
+    m_memory_item_id: str
+    m_memory_packet_id: str
+    m_lifecycle_status: str
+    m_retention_class: str
+    m_bounded_persistence_allowed: bool
+    m_temporary_carry_allowed: bool
+    m_review_required: bool
+    m_reactivation_eligible: bool
+    m_decay_eligible: bool
+    m_pruning_eligible: bool
+    m_stale_risk: str
+    m_conflict_risk: str
+    m_confidence: float
+    m_reliability: str
+    m_degraded: bool
+    m_underconstrained: bool
+    m_safe_memory_claim_allowed: bool
+    m_bounded_retained_claim_allowed: bool
+    m_no_safe_memory_claim: bool
+    m_forbidden_shortcuts: tuple[str, ...]
+    m_restrictions: tuple[str, ...]
+    m_m01_admission_ready: bool
+    m_m01_blockers: tuple[str, ...]
+    m_m01_structurally_present_but_not_ready: bool
+    m_m01_stale_risk_unacceptable: bool
+    m_m01_conflict_risk_unacceptable: bool
+    m_m01_reactivation_requires_review: bool
+    m_m01_temporary_carry_not_stable_enough: bool
+    m_m01_no_safe_memory_basis: bool
+    m_m01_provenance_insufficient: bool
+    m_m01_lifecycle_underconstrained: bool
+    m_m01_implemented: bool
+    m_m02_implemented: bool
+    m_m03_implemented: bool
+    m_scope: str
+    m_scope_rt01_contour_only: bool
+    m_scope_m_minimal_only: bool
+    m_scope_readiness_gate_only: bool
+    m_scope_m01_implemented: bool
+    m_scope_m02_implemented: bool
+    m_scope_m03_implemented: bool
+    m_scope_full_memory_stack_implemented: bool
+    m_scope_repo_wide_adoption: bool
+    m_scope_reason: str
+    m_reason: str
+    m_require_memory_safe_claim: bool
     execution_stance: SubjectTickExecutionStance
     execution_checkpoints: tuple[SubjectTickCheckpointResult, ...]
     final_execution_outcome: SubjectTickOutcome
@@ -544,6 +644,7 @@ class SubjectTickResult:
     world_entry_result: WorldEntryContractResult
     self_contour_result: SMinimalContourResult
     a_line_result: ALineNormalizationResult
+    m_minimal_result: MMinimalResult
     abstain: bool
     abstain_reason: str | None
     no_planner_orchestrator_dependency: bool
