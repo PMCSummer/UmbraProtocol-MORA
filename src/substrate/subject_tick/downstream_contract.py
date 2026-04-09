@@ -285,6 +285,38 @@ class SubjectTickContractView:
     t02_require_constrained_scene_consumer: bool | None
     t02_require_raw_vs_propagated_distinction: bool | None
     t02_raw_vs_propagated_distinct: bool | None
+    t03_competition_id: str | None
+    t03_convergence_status: str | None
+    t03_current_leader_hypothesis_id: str | None
+    t03_provisional_frontrunner_hypothesis_id: str | None
+    t03_tied_competitor_count: int | None
+    t03_blocked_hypothesis_count: int | None
+    t03_eliminated_hypothesis_count: int | None
+    t03_reactivated_hypothesis_count: int | None
+    t03_honest_nonconvergence: bool | None
+    t03_bounded_plurality: bool | None
+    t03_convergence_consumer_ready: bool | None
+    t03_frontier_consumer_ready: bool | None
+    t03_nonconvergence_preserved: bool | None
+    t03_forbidden_shortcuts: tuple[str, ...] | None
+    t03_restrictions: tuple[str, ...] | None
+    t03_publication_current_leader: str | None
+    t03_publication_competitive_neighborhood: tuple[str, ...] | None
+    t03_publication_unresolved_conflicts: tuple[str, ...] | None
+    t03_publication_open_slots: tuple[str, ...] | None
+    t03_publication_stability_status: str | None
+    t03_scope: str | None
+    t03_scope_rt01_contour_only: bool | None
+    t03_scope_t03_first_slice_only: bool | None
+    t03_scope_t04_implemented: bool | None
+    t03_scope_o01_implemented: bool | None
+    t03_scope_o02_implemented: bool | None
+    t03_scope_o03_implemented: bool | None
+    t03_scope_full_silent_thought_line_implemented: bool | None
+    t03_scope_repo_wide_adoption: bool | None
+    t03_require_convergence_consumer: bool | None
+    t03_require_frontier_consumer: bool | None
+    t03_require_nonconvergence_preservation: bool | None
     execution_stance: str
     execution_checkpoints: tuple[str, ...]
     final_execution_outcome: SubjectTickOutcome
@@ -320,9 +352,11 @@ def derive_subject_tick_contract_view(
     if isinstance(subject_tick_state_or_result, SubjectTickResult):
         state = subject_tick_state_or_result.state
         t02_result = subject_tick_state_or_result.t02_result
+        t03_result = subject_tick_state_or_result.t03_result
     elif isinstance(subject_tick_state_or_result, SubjectTickState):
         state = subject_tick_state_or_result
         t02_result = None
+        t03_result = None
     else:
         raise TypeError(
             "derive_subject_tick_contract_view requires SubjectTickState/SubjectTickResult"
@@ -712,6 +746,106 @@ def derive_subject_tick_contract_view(
             state.t02_require_raw_vs_propagated_distinction
         ),
         t02_raw_vs_propagated_distinct=state.t02_raw_vs_propagated_distinct,
+        t03_competition_id=(
+            None if t03_result is None else t03_result.state.competition_id
+        ),
+        t03_convergence_status=(
+            None if t03_result is None else t03_result.state.convergence_status.value
+        ),
+        t03_current_leader_hypothesis_id=(
+            None if t03_result is None else t03_result.state.current_leader_hypothesis_id
+        ),
+        t03_provisional_frontrunner_hypothesis_id=(
+            None
+            if t03_result is None
+            else t03_result.state.provisional_frontrunner_hypothesis_id
+        ),
+        t03_tied_competitor_count=(
+            None if t03_result is None else len(t03_result.state.tied_competitor_ids)
+        ),
+        t03_blocked_hypothesis_count=(
+            None if t03_result is None else len(t03_result.state.blocked_hypothesis_ids)
+        ),
+        t03_eliminated_hypothesis_count=(
+            None if t03_result is None else len(t03_result.state.eliminated_hypothesis_ids)
+        ),
+        t03_reactivated_hypothesis_count=(
+            None if t03_result is None else len(t03_result.state.reactivated_hypothesis_ids)
+        ),
+        t03_honest_nonconvergence=(
+            None if t03_result is None else t03_result.state.honest_nonconvergence
+        ),
+        t03_bounded_plurality=(
+            None if t03_result is None else t03_result.state.bounded_plurality
+        ),
+        t03_convergence_consumer_ready=(
+            None if t03_result is None else t03_result.gate.convergence_consumer_ready
+        ),
+        t03_frontier_consumer_ready=(
+            None if t03_result is None else t03_result.gate.frontier_consumer_ready
+        ),
+        t03_nonconvergence_preserved=(
+            None if t03_result is None else t03_result.gate.nonconvergence_preserved
+        ),
+        t03_forbidden_shortcuts=(
+            None if t03_result is None else t03_result.gate.forbidden_shortcuts
+        ),
+        t03_restrictions=(
+            None if t03_result is None else t03_result.gate.restrictions
+        ),
+        t03_publication_current_leader=(
+            None if t03_result is None else t03_result.state.publication_frontier.current_leader
+        ),
+        t03_publication_competitive_neighborhood=(
+            None
+            if t03_result is None
+            else t03_result.state.publication_frontier.competitive_neighborhood
+        ),
+        t03_publication_unresolved_conflicts=(
+            None
+            if t03_result is None
+            else t03_result.state.publication_frontier.unresolved_conflicts
+        ),
+        t03_publication_open_slots=(
+            None if t03_result is None else t03_result.state.publication_frontier.open_slots
+        ),
+        t03_publication_stability_status=(
+            None
+            if t03_result is None
+            else t03_result.state.publication_frontier.stability_status
+        ),
+        t03_scope=(None if t03_result is None else t03_result.scope_marker.scope),
+        t03_scope_rt01_contour_only=(
+            None if t03_result is None else t03_result.scope_marker.rt01_contour_only
+        ),
+        t03_scope_t03_first_slice_only=(
+            None if t03_result is None else t03_result.scope_marker.t03_first_slice_only
+        ),
+        t03_scope_t04_implemented=(
+            None if t03_result is None else t03_result.scope_marker.t04_implemented
+        ),
+        t03_scope_o01_implemented=(
+            None if t03_result is None else t03_result.scope_marker.o01_implemented
+        ),
+        t03_scope_o02_implemented=(
+            None if t03_result is None else t03_result.scope_marker.o02_implemented
+        ),
+        t03_scope_o03_implemented=(
+            None if t03_result is None else t03_result.scope_marker.o03_implemented
+        ),
+        t03_scope_full_silent_thought_line_implemented=(
+            None
+            if t03_result is None
+            else t03_result.scope_marker.full_silent_thought_line_implemented
+        ),
+        t03_scope_repo_wide_adoption=(
+            None if t03_result is None else t03_result.scope_marker.repo_wide_adoption
+        ),
+        t03_require_convergence_consumer=state.t03_require_convergence_consumer,
+        t03_require_frontier_consumer=state.t03_require_frontier_consumer,
+        t03_require_nonconvergence_preservation=(
+            state.t03_require_nonconvergence_preservation
+        ),
         execution_stance=state.execution_stance.value,
         execution_checkpoints=tuple(
             f"{checkpoint.checkpoint_id}:{checkpoint.status.value}"
@@ -728,8 +862,8 @@ def derive_subject_tick_contract_view(
         reason=(
             "runtime contour contract requires C04/C05 claims, world-entry basis, s-minimal "
             "self/world boundary, a-line normalization, m-minimal lifecycle, n-minimal "
-            "narrative commitment, t01 semantic field checkpoints, and t02 raw-vs-propagated "
-            "distinction surfaces to be read"
+            "narrative commitment, t01 semantic field checkpoints, t02 raw-vs-propagated "
+            "distinction, and t03 hypothesis competition frontier surfaces to be read"
         ),
     )
 

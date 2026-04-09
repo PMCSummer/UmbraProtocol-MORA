@@ -12,6 +12,7 @@ if TYPE_CHECKING:
     from substrate.self_contour import SMinimalContourResult
     from substrate.t01_semantic_field import T01ActiveFieldResult
     from substrate.t02_relation_binding import T02ConstrainedSceneResult
+    from substrate.t03_hypothesis_competition import T03CompetitionResult
     from substrate.world_adapter import WorldAdapterInput, WorldAdapterResult
     from substrate.world_entry_contract import WorldEntryContractResult
 
@@ -106,6 +107,14 @@ class SubjectTickRestrictionCode(StrEnum):
     T02_CONSTRAINED_SCENE_REQUIRED_FOR_CONSUMER = "t02_constrained_scene_required_for_consumer"
     T02_RAW_VS_PROPAGATED_DISTINCTION_REQUIRED = (
         "t02_raw_vs_propagated_distinction_required"
+    )
+    T03_HYPOTHESIS_COMPETITION_CONTRACT_MUST_BE_READ = (
+        "t03_hypothesis_competition_contract_must_be_read"
+    )
+    T03_CONVERGENCE_CONSUMER_REQUIRED = "t03_convergence_consumer_required"
+    T03_FRONTIER_CONSUMER_REQUIRED = "t03_frontier_consumer_required"
+    T03_NONCONVERGENCE_PRESERVATION_REQUIRED = (
+        "t03_nonconvergence_preservation_required"
     )
     DOWNSTREAM_AUTHORITY_DEGRADED = "downstream_authority_degraded"
 
@@ -203,6 +212,11 @@ class SubjectTickContext:
     require_t02_raw_vs_propagated_distinction: bool = False
     t02_assembly_mode: str | None = None
     disable_t02_enforcement: bool = False
+    require_t03_convergence_consumer: bool = False
+    require_t03_frontier_consumer: bool = False
+    require_t03_nonconvergence_preservation: bool = False
+    t03_competition_mode: str | None = None
+    disable_t03_enforcement: bool = False
     source_lineage: tuple[str, ...] = ()
 
 
@@ -488,6 +502,40 @@ class SubjectTickState:
     t02_require_constrained_scene_consumer: bool
     t02_require_raw_vs_propagated_distinction: bool
     t02_raw_vs_propagated_distinct: bool
+    t03_competition_id: str
+    t03_convergence_status: str
+    t03_current_leader_hypothesis_id: str | None
+    t03_provisional_frontrunner_hypothesis_id: str | None
+    t03_tied_competitor_count: int
+    t03_blocked_hypothesis_count: int
+    t03_eliminated_hypothesis_count: int
+    t03_reactivated_hypothesis_count: int
+    t03_honest_nonconvergence: bool
+    t03_bounded_plurality: bool
+    t03_convergence_consumer_ready: bool
+    t03_frontier_consumer_ready: bool
+    t03_nonconvergence_preserved: bool
+    t03_forbidden_shortcuts: tuple[str, ...]
+    t03_restrictions: tuple[str, ...]
+    t03_publication_current_leader: str | None
+    t03_publication_competitive_neighborhood: tuple[str, ...]
+    t03_publication_unresolved_conflicts: tuple[str, ...]
+    t03_publication_open_slots: tuple[str, ...]
+    t03_publication_stability_status: str
+    t03_scope: str
+    t03_scope_rt01_contour_only: bool
+    t03_scope_t03_first_slice_only: bool
+    t03_scope_t04_implemented: bool
+    t03_scope_o01_implemented: bool
+    t03_scope_o02_implemented: bool
+    t03_scope_o03_implemented: bool
+    t03_scope_full_silent_thought_line_implemented: bool
+    t03_scope_repo_wide_adoption: bool
+    t03_scope_reason: str
+    t03_reason: str
+    t03_require_convergence_consumer: bool
+    t03_require_frontier_consumer: bool
+    t03_require_nonconvergence_preservation: bool
     execution_stance: SubjectTickExecutionStance
     execution_checkpoints: tuple[SubjectTickCheckpointResult, ...]
     downstream_step_results: tuple[SubjectTickStepResult, ...]
@@ -771,6 +819,40 @@ class SubjectTickTelemetry:
     t02_require_constrained_scene_consumer: bool
     t02_require_raw_vs_propagated_distinction: bool
     t02_raw_vs_propagated_distinct: bool
+    t03_competition_id: str
+    t03_convergence_status: str
+    t03_current_leader_hypothesis_id: str | None
+    t03_provisional_frontrunner_hypothesis_id: str | None
+    t03_tied_competitor_count: int
+    t03_blocked_hypothesis_count: int
+    t03_eliminated_hypothesis_count: int
+    t03_reactivated_hypothesis_count: int
+    t03_honest_nonconvergence: bool
+    t03_bounded_plurality: bool
+    t03_convergence_consumer_ready: bool
+    t03_frontier_consumer_ready: bool
+    t03_nonconvergence_preserved: bool
+    t03_forbidden_shortcuts: tuple[str, ...]
+    t03_restrictions: tuple[str, ...]
+    t03_publication_current_leader: str | None
+    t03_publication_competitive_neighborhood: tuple[str, ...]
+    t03_publication_unresolved_conflicts: tuple[str, ...]
+    t03_publication_open_slots: tuple[str, ...]
+    t03_publication_stability_status: str
+    t03_scope: str
+    t03_scope_rt01_contour_only: bool
+    t03_scope_t03_first_slice_only: bool
+    t03_scope_t04_implemented: bool
+    t03_scope_o01_implemented: bool
+    t03_scope_o02_implemented: bool
+    t03_scope_o03_implemented: bool
+    t03_scope_full_silent_thought_line_implemented: bool
+    t03_scope_repo_wide_adoption: bool
+    t03_scope_reason: str
+    t03_reason: str
+    t03_require_convergence_consumer: bool
+    t03_require_frontier_consumer: bool
+    t03_require_nonconvergence_preservation: bool
     execution_stance: SubjectTickExecutionStance
     execution_checkpoints: tuple[SubjectTickCheckpointResult, ...]
     final_execution_outcome: SubjectTickOutcome
@@ -806,6 +888,7 @@ class SubjectTickResult:
     n_minimal_result: NMinimalResult
     t01_result: T01ActiveFieldResult
     t02_result: T02ConstrainedSceneResult
+    t03_result: T03CompetitionResult
     abstain: bool
     abstain_reason: str | None
     no_planner_orchestrator_dependency: bool

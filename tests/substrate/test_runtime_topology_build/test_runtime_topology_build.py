@@ -98,7 +98,7 @@ def test_runtime_topology_bundle_and_graph_are_materialized() -> None:
         "domains.continuity",
         "domains.validity",
     )
-    assert graph.runtime_order == ("R", "C01", "C02", "C03", "C04", "C05", "T01", "T02", "RT01")
+    assert graph.runtime_order == ("R", "C01", "C02", "C03", "C04", "C05", "T01", "T02", "T03", "RT01")
     assert "rt01.downstream_obedience_checkpoint" in graph.mandatory_checkpoint_ids
     assert "rt01.world_seam_checkpoint" in graph.mandatory_checkpoint_ids
     assert "rt01.world_entry_checkpoint" in graph.mandatory_checkpoint_ids
@@ -109,6 +109,7 @@ def test_runtime_topology_bundle_and_graph_are_materialized() -> None:
     assert "rt01.t01_semantic_field_checkpoint" in graph.mandatory_checkpoint_ids
     assert "rt01.t02_relation_binding_checkpoint" in graph.mandatory_checkpoint_ids
     assert "rt01.t02_raw_vs_propagated_integrity_checkpoint" in graph.mandatory_checkpoint_ids
+    assert "rt01.t03_hypothesis_competition_checkpoint" in graph.mandatory_checkpoint_ids
     assert "world_adapter.state" in graph.source_of_truth_surfaces
     assert "world_entry_contract.episode" in graph.source_of_truth_surfaces
     assert "s_minimal_contour.boundary_state" in graph.source_of_truth_surfaces
@@ -118,6 +119,8 @@ def test_runtime_topology_bundle_and_graph_are_materialized() -> None:
     assert "t01_semantic_field.active_scene" in graph.source_of_truth_surfaces
     assert "t02_relation_binding.constrained_scene" in graph.source_of_truth_surfaces
     assert "t02_relation_binding.raw_vs_propagated_distinction" in graph.source_of_truth_surfaces
+    assert "t03_hypothesis_competition.competition_ledger" in graph.source_of_truth_surfaces
+    assert "t03_hypothesis_competition.publication_frontier" in graph.source_of_truth_surfaces
 
 
 def test_dispatch_happy_path_runs_lawful_production_contour() -> None:
@@ -518,6 +521,19 @@ def test_dispatch_contract_view_and_snapshot_are_inspectable() -> None:
     assert view.t02_require_constrained_scene_consumer in {True, False}
     assert view.t02_require_raw_vs_propagated_distinction in {True, False}
     assert view.t02_raw_vs_propagated_distinct in {True, False}
+    assert view.t03_competition_id is not None
+    assert view.t03_convergence_status is not None
+    assert view.t03_tied_competitor_count is not None
+    assert view.t03_publication_competitive_neighborhood is not None
+    assert view.t03_scope == "rt01_contour_only"
+    assert view.t03_scope_rt01_contour_only is True
+    assert view.t03_scope_t03_first_slice_only is True
+    assert view.t03_scope_t04_implemented is False
+    assert view.t03_scope_o01_implemented is False
+    assert view.t03_scope_o02_implemented is False
+    assert view.t03_scope_o03_implemented is False
+    assert view.t03_scope_full_silent_thought_line_implemented is False
+    assert view.t03_scope_repo_wide_adoption is False
     assert require_dispatch_bounded_n_scope(view) is view
     assert isinstance(view.m_m01_blockers, tuple)
     assert view.m_m01_structurally_present_but_not_ready in {True, False}
@@ -621,6 +637,20 @@ def test_dispatch_contract_view_and_snapshot_are_inspectable() -> None:
         in {True, False}
     )
     assert snapshot["subject_tick_state"]["t02_raw_vs_propagated_distinct"] in {True, False}
+    assert snapshot["subject_tick_state"]["t03_competition_id"] is not None
+    assert snapshot["subject_tick_state"]["t03_convergence_status"] is not None
+    assert snapshot["subject_tick_state"]["t03_scope"] == "rt01_contour_only"
+    assert snapshot["subject_tick_state"]["t03_scope_rt01_contour_only"] is True
+    assert snapshot["subject_tick_state"]["t03_scope_t03_first_slice_only"] is True
+    assert snapshot["subject_tick_state"]["t03_scope_t04_implemented"] is False
+    assert snapshot["subject_tick_state"]["t03_scope_o01_implemented"] is False
+    assert snapshot["subject_tick_state"]["t03_scope_o02_implemented"] is False
+    assert snapshot["subject_tick_state"]["t03_scope_o03_implemented"] is False
+    assert (
+        snapshot["subject_tick_state"]["t03_scope_full_silent_thought_line_implemented"]
+        is False
+    )
+    assert snapshot["subject_tick_state"]["t03_scope_repo_wide_adoption"] is False
     assert isinstance(snapshot["subject_tick_state"]["n_n01_blockers"], tuple)
     assert isinstance(snapshot["subject_tick_state"]["m_m01_blockers"], tuple)
     assert snapshot["subject_tick_state"]["m_m01_structurally_present_but_not_ready"] in {True, False}
@@ -791,4 +821,74 @@ def test_dispatch_t02_raw_vs_propagated_integrity_requirement_is_load_bearing() 
         checkpoint.checkpoint_id == "rt01.t02_raw_vs_propagated_integrity_checkpoint"
         and checkpoint.status.value == "enforced_detour"
         for checkpoint in flattened.subject_tick_result.state.execution_checkpoints
+    )
+
+
+def test_dispatch_t03_convergence_consumer_requirement_is_load_bearing() -> None:
+    baseline = dispatch_runtime_tick(
+        RuntimeDispatchRequest(
+            tick_input=_tick_input("runtime-topology-t03-consumer"),
+            context=SubjectTickContext(
+                world_adapter_input=WorldAdapterInput(
+                    adapter_presence=False,
+                    adapter_available=False,
+                )
+            ),
+            route_class=RuntimeRouteClass.PRODUCTION_CONTOUR,
+        )
+    )
+    required = dispatch_runtime_tick(
+        RuntimeDispatchRequest(
+            tick_input=_tick_input("runtime-topology-t03-consumer"),
+            context=SubjectTickContext(
+                require_t03_convergence_consumer=True,
+                world_adapter_input=WorldAdapterInput(
+                    adapter_presence=False,
+                    adapter_available=False,
+                ),
+            ),
+            route_class=RuntimeRouteClass.PRODUCTION_CONTOUR,
+        )
+    )
+    assert baseline.subject_tick_result is not None
+    assert required.subject_tick_result is not None
+    assert baseline.subject_tick_result.state.final_execution_outcome == SubjectTickOutcome.CONTINUE
+    assert required.subject_tick_result.state.final_execution_outcome in {
+        SubjectTickOutcome.REPAIR,
+        SubjectTickOutcome.REVALIDATE,
+    }
+    assert any(
+        checkpoint.checkpoint_id == "rt01.t03_hypothesis_competition_checkpoint"
+        and checkpoint.status.value == "enforced_detour"
+        for checkpoint in required.subject_tick_result.state.execution_checkpoints
+    )
+
+
+def test_dispatch_t03_nonconvergence_preservation_requirement_is_load_bearing() -> None:
+    baseline = dispatch_runtime_tick(
+        RuntimeDispatchRequest(
+            tick_input=_tick_input("runtime-topology-t03-nonconv"),
+            route_class=RuntimeRouteClass.PRODUCTION_CONTOUR,
+        )
+    )
+    required = dispatch_runtime_tick(
+        RuntimeDispatchRequest(
+            tick_input=_tick_input("runtime-topology-t03-nonconv"),
+            context=SubjectTickContext(
+                require_t03_nonconvergence_preservation=True,
+                t03_competition_mode="greedy_argmax_ablation",
+            ),
+            route_class=RuntimeRouteClass.TEST_ONLY_ABLATION,
+            allow_test_only_route=True,
+            allow_non_production_consumer_opt_in=True,
+        )
+    )
+    assert baseline.subject_tick_result is not None
+    assert required.subject_tick_result is not None
+    assert baseline.subject_tick_result.state.final_execution_outcome == SubjectTickOutcome.CONTINUE
+    assert required.subject_tick_result.state.final_execution_outcome == SubjectTickOutcome.REVALIDATE
+    assert any(
+        checkpoint.checkpoint_id == "rt01.t03_hypothesis_competition_checkpoint"
+        and checkpoint.status.value == "enforced_detour"
+        for checkpoint in required.subject_tick_result.state.execution_checkpoints
     )

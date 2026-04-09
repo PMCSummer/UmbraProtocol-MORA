@@ -305,6 +305,46 @@ def build_subject_tick_telemetry(
             state.t02_require_raw_vs_propagated_distinction
         ),
         t02_raw_vs_propagated_distinct=state.t02_raw_vs_propagated_distinct,
+        t03_competition_id=state.t03_competition_id,
+        t03_convergence_status=state.t03_convergence_status,
+        t03_current_leader_hypothesis_id=state.t03_current_leader_hypothesis_id,
+        t03_provisional_frontrunner_hypothesis_id=(
+            state.t03_provisional_frontrunner_hypothesis_id
+        ),
+        t03_tied_competitor_count=state.t03_tied_competitor_count,
+        t03_blocked_hypothesis_count=state.t03_blocked_hypothesis_count,
+        t03_eliminated_hypothesis_count=state.t03_eliminated_hypothesis_count,
+        t03_reactivated_hypothesis_count=state.t03_reactivated_hypothesis_count,
+        t03_honest_nonconvergence=state.t03_honest_nonconvergence,
+        t03_bounded_plurality=state.t03_bounded_plurality,
+        t03_convergence_consumer_ready=state.t03_convergence_consumer_ready,
+        t03_frontier_consumer_ready=state.t03_frontier_consumer_ready,
+        t03_nonconvergence_preserved=state.t03_nonconvergence_preserved,
+        t03_forbidden_shortcuts=state.t03_forbidden_shortcuts,
+        t03_restrictions=state.t03_restrictions,
+        t03_publication_current_leader=state.t03_publication_current_leader,
+        t03_publication_competitive_neighborhood=state.t03_publication_competitive_neighborhood,
+        t03_publication_unresolved_conflicts=state.t03_publication_unresolved_conflicts,
+        t03_publication_open_slots=state.t03_publication_open_slots,
+        t03_publication_stability_status=state.t03_publication_stability_status,
+        t03_scope=state.t03_scope,
+        t03_scope_rt01_contour_only=state.t03_scope_rt01_contour_only,
+        t03_scope_t03_first_slice_only=state.t03_scope_t03_first_slice_only,
+        t03_scope_t04_implemented=state.t03_scope_t04_implemented,
+        t03_scope_o01_implemented=state.t03_scope_o01_implemented,
+        t03_scope_o02_implemented=state.t03_scope_o02_implemented,
+        t03_scope_o03_implemented=state.t03_scope_o03_implemented,
+        t03_scope_full_silent_thought_line_implemented=(
+            state.t03_scope_full_silent_thought_line_implemented
+        ),
+        t03_scope_repo_wide_adoption=state.t03_scope_repo_wide_adoption,
+        t03_scope_reason=state.t03_scope_reason,
+        t03_reason=state.t03_reason,
+        t03_require_convergence_consumer=state.t03_require_convergence_consumer,
+        t03_require_frontier_consumer=state.t03_require_frontier_consumer,
+        t03_require_nonconvergence_preservation=(
+            state.t03_require_nonconvergence_preservation
+        ),
         execution_stance=state.execution_stance,
         execution_checkpoints=state.execution_checkpoints,
         final_execution_outcome=state.final_execution_outcome,
@@ -639,6 +679,50 @@ def subject_tick_result_snapshot(result: SubjectTickResult) -> dict[str, object]
                 state.t02_require_raw_vs_propagated_distinction
             ),
             "t02_raw_vs_propagated_distinct": state.t02_raw_vs_propagated_distinct,
+            "t03_competition_id": state.t03_competition_id,
+            "t03_convergence_status": state.t03_convergence_status,
+            "t03_current_leader_hypothesis_id": state.t03_current_leader_hypothesis_id,
+            "t03_provisional_frontrunner_hypothesis_id": (
+                state.t03_provisional_frontrunner_hypothesis_id
+            ),
+            "t03_tied_competitor_count": state.t03_tied_competitor_count,
+            "t03_blocked_hypothesis_count": state.t03_blocked_hypothesis_count,
+            "t03_eliminated_hypothesis_count": state.t03_eliminated_hypothesis_count,
+            "t03_reactivated_hypothesis_count": state.t03_reactivated_hypothesis_count,
+            "t03_honest_nonconvergence": state.t03_honest_nonconvergence,
+            "t03_bounded_plurality": state.t03_bounded_plurality,
+            "t03_convergence_consumer_ready": state.t03_convergence_consumer_ready,
+            "t03_frontier_consumer_ready": state.t03_frontier_consumer_ready,
+            "t03_nonconvergence_preserved": state.t03_nonconvergence_preserved,
+            "t03_forbidden_shortcuts": state.t03_forbidden_shortcuts,
+            "t03_restrictions": state.t03_restrictions,
+            "t03_publication_current_leader": state.t03_publication_current_leader,
+            "t03_publication_competitive_neighborhood": (
+                state.t03_publication_competitive_neighborhood
+            ),
+            "t03_publication_unresolved_conflicts": (
+                state.t03_publication_unresolved_conflicts
+            ),
+            "t03_publication_open_slots": state.t03_publication_open_slots,
+            "t03_publication_stability_status": state.t03_publication_stability_status,
+            "t03_scope": state.t03_scope,
+            "t03_scope_rt01_contour_only": state.t03_scope_rt01_contour_only,
+            "t03_scope_t03_first_slice_only": state.t03_scope_t03_first_slice_only,
+            "t03_scope_t04_implemented": state.t03_scope_t04_implemented,
+            "t03_scope_o01_implemented": state.t03_scope_o01_implemented,
+            "t03_scope_o02_implemented": state.t03_scope_o02_implemented,
+            "t03_scope_o03_implemented": state.t03_scope_o03_implemented,
+            "t03_scope_full_silent_thought_line_implemented": (
+                state.t03_scope_full_silent_thought_line_implemented
+            ),
+            "t03_scope_repo_wide_adoption": state.t03_scope_repo_wide_adoption,
+            "t03_scope_reason": state.t03_scope_reason,
+            "t03_reason": state.t03_reason,
+            "t03_require_convergence_consumer": state.t03_require_convergence_consumer,
+            "t03_require_frontier_consumer": state.t03_require_frontier_consumer,
+            "t03_require_nonconvergence_preservation": (
+                state.t03_require_nonconvergence_preservation
+            ),
             "execution_stance": state.execution_stance.value,
             "execution_checkpoints": tuple(
                 {
@@ -1078,6 +1162,54 @@ def subject_tick_result_snapshot(result: SubjectTickResult) -> dict[str, object]
             },
             "reason": result.t02_result.reason,
         },
+        "t03_hypothesis_competition_result": {
+            "competition_id": result.t03_result.state.competition_id,
+            "source_t01_scene_id": result.t03_result.state.source_t01_scene_id,
+            "source_t02_constrained_scene_id": result.t03_result.state.source_t02_constrained_scene_id,
+            "convergence_status": result.t03_result.state.convergence_status.value,
+            "current_leader_hypothesis_id": result.t03_result.state.current_leader_hypothesis_id,
+            "provisional_frontrunner_hypothesis_id": (
+                result.t03_result.state.provisional_frontrunner_hypothesis_id
+            ),
+            "tied_competitor_ids": result.t03_result.state.tied_competitor_ids,
+            "blocked_hypothesis_ids": result.t03_result.state.blocked_hypothesis_ids,
+            "eliminated_hypothesis_ids": result.t03_result.state.eliminated_hypothesis_ids,
+            "reactivated_hypothesis_ids": result.t03_result.state.reactivated_hypothesis_ids,
+            "honest_nonconvergence": result.t03_result.state.honest_nonconvergence,
+            "bounded_plurality": result.t03_result.state.bounded_plurality,
+            "publication_frontier": {
+                "current_leader": result.t03_result.state.publication_frontier.current_leader,
+                "competitive_neighborhood": (
+                    result.t03_result.state.publication_frontier.competitive_neighborhood
+                ),
+                "unresolved_conflicts": (
+                    result.t03_result.state.publication_frontier.unresolved_conflicts
+                ),
+                "open_slots": result.t03_result.state.publication_frontier.open_slots,
+                "authority_profile": result.t03_result.state.publication_frontier.authority_profile,
+                "stability_status": result.t03_result.state.publication_frontier.stability_status,
+            },
+            "convergence_consumer_ready": result.t03_result.gate.convergence_consumer_ready,
+            "frontier_consumer_ready": result.t03_result.gate.frontier_consumer_ready,
+            "nonconvergence_preserved": result.t03_result.gate.nonconvergence_preserved,
+            "forbidden_shortcuts": result.t03_result.gate.forbidden_shortcuts,
+            "restrictions": result.t03_result.gate.restrictions,
+            "scope_marker": {
+                "scope": result.t03_result.scope_marker.scope,
+                "rt01_contour_only": result.t03_result.scope_marker.rt01_contour_only,
+                "t03_first_slice_only": result.t03_result.scope_marker.t03_first_slice_only,
+                "t04_implemented": result.t03_result.scope_marker.t04_implemented,
+                "o01_implemented": result.t03_result.scope_marker.o01_implemented,
+                "o02_implemented": result.t03_result.scope_marker.o02_implemented,
+                "o03_implemented": result.t03_result.scope_marker.o03_implemented,
+                "full_silent_thought_line_implemented": (
+                    result.t03_result.scope_marker.full_silent_thought_line_implemented
+                ),
+                "repo_wide_adoption": result.t03_result.scope_marker.repo_wide_adoption,
+                "reason": result.t03_result.scope_marker.reason,
+            },
+            "reason": result.t03_result.reason,
+        },
         "downstream_gate": {
             "accepted": result.downstream_gate.accepted,
             "usability_class": result.downstream_gate.usability_class.value,
@@ -1445,6 +1577,54 @@ def subject_tick_result_snapshot(result: SubjectTickResult) -> dict[str, object]
             ),
             "t02_raw_vs_propagated_distinct": (
                 result.telemetry.t02_raw_vs_propagated_distinct
+            ),
+            "t03_competition_id": result.telemetry.t03_competition_id,
+            "t03_convergence_status": result.telemetry.t03_convergence_status,
+            "t03_current_leader_hypothesis_id": (
+                result.telemetry.t03_current_leader_hypothesis_id
+            ),
+            "t03_provisional_frontrunner_hypothesis_id": (
+                result.telemetry.t03_provisional_frontrunner_hypothesis_id
+            ),
+            "t03_tied_competitor_count": result.telemetry.t03_tied_competitor_count,
+            "t03_blocked_hypothesis_count": result.telemetry.t03_blocked_hypothesis_count,
+            "t03_eliminated_hypothesis_count": result.telemetry.t03_eliminated_hypothesis_count,
+            "t03_reactivated_hypothesis_count": result.telemetry.t03_reactivated_hypothesis_count,
+            "t03_honest_nonconvergence": result.telemetry.t03_honest_nonconvergence,
+            "t03_bounded_plurality": result.telemetry.t03_bounded_plurality,
+            "t03_convergence_consumer_ready": result.telemetry.t03_convergence_consumer_ready,
+            "t03_frontier_consumer_ready": result.telemetry.t03_frontier_consumer_ready,
+            "t03_nonconvergence_preserved": result.telemetry.t03_nonconvergence_preserved,
+            "t03_forbidden_shortcuts": result.telemetry.t03_forbidden_shortcuts,
+            "t03_restrictions": result.telemetry.t03_restrictions,
+            "t03_publication_current_leader": result.telemetry.t03_publication_current_leader,
+            "t03_publication_competitive_neighborhood": (
+                result.telemetry.t03_publication_competitive_neighborhood
+            ),
+            "t03_publication_unresolved_conflicts": (
+                result.telemetry.t03_publication_unresolved_conflicts
+            ),
+            "t03_publication_open_slots": result.telemetry.t03_publication_open_slots,
+            "t03_publication_stability_status": result.telemetry.t03_publication_stability_status,
+            "t03_scope": result.telemetry.t03_scope,
+            "t03_scope_rt01_contour_only": result.telemetry.t03_scope_rt01_contour_only,
+            "t03_scope_t03_first_slice_only": result.telemetry.t03_scope_t03_first_slice_only,
+            "t03_scope_t04_implemented": result.telemetry.t03_scope_t04_implemented,
+            "t03_scope_o01_implemented": result.telemetry.t03_scope_o01_implemented,
+            "t03_scope_o02_implemented": result.telemetry.t03_scope_o02_implemented,
+            "t03_scope_o03_implemented": result.telemetry.t03_scope_o03_implemented,
+            "t03_scope_full_silent_thought_line_implemented": (
+                result.telemetry.t03_scope_full_silent_thought_line_implemented
+            ),
+            "t03_scope_repo_wide_adoption": result.telemetry.t03_scope_repo_wide_adoption,
+            "t03_scope_reason": result.telemetry.t03_scope_reason,
+            "t03_reason": result.telemetry.t03_reason,
+            "t03_require_convergence_consumer": (
+                result.telemetry.t03_require_convergence_consumer
+            ),
+            "t03_require_frontier_consumer": result.telemetry.t03_require_frontier_consumer,
+            "t03_require_nonconvergence_preservation": (
+                result.telemetry.t03_require_nonconvergence_preservation
             ),
             "execution_stance": result.telemetry.execution_stance.value,
             "execution_checkpoints": tuple(

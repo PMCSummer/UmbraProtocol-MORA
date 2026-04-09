@@ -8,6 +8,7 @@ def runtime_dispatch_snapshot(result: RuntimeDispatchResult) -> dict[str, object
         raise TypeError("runtime_dispatch_snapshot requires RuntimeDispatchResult")
     state = None if result.subject_tick_result is None else result.subject_tick_result.state
     t02_result = None if result.subject_tick_result is None else result.subject_tick_result.t02_result
+    t03_result = None if result.subject_tick_result is None else result.subject_tick_result.t03_result
     return {
         "decision": {
             "accepted": result.decision.accepted,
@@ -300,6 +301,108 @@ def runtime_dispatch_snapshot(result: RuntimeDispatchResult) -> dict[str, object
                 ),
                 "t02_raw_vs_propagated_distinct": (
                     state.t02_raw_vs_propagated_distinct
+                ),
+                "t03_competition_id": (
+                    None if t03_result is None else t03_result.state.competition_id
+                ),
+                "t03_convergence_status": (
+                    None if t03_result is None else t03_result.state.convergence_status.value
+                ),
+                "t03_current_leader_hypothesis_id": (
+                    None if t03_result is None else t03_result.state.current_leader_hypothesis_id
+                ),
+                "t03_provisional_frontrunner_hypothesis_id": (
+                    None
+                    if t03_result is None
+                    else t03_result.state.provisional_frontrunner_hypothesis_id
+                ),
+                "t03_tied_competitor_count": (
+                    None if t03_result is None else len(t03_result.state.tied_competitor_ids)
+                ),
+                "t03_blocked_hypothesis_count": (
+                    None if t03_result is None else len(t03_result.state.blocked_hypothesis_ids)
+                ),
+                "t03_eliminated_hypothesis_count": (
+                    None if t03_result is None else len(t03_result.state.eliminated_hypothesis_ids)
+                ),
+                "t03_reactivated_hypothesis_count": (
+                    None if t03_result is None else len(t03_result.state.reactivated_hypothesis_ids)
+                ),
+                "t03_honest_nonconvergence": (
+                    None if t03_result is None else t03_result.state.honest_nonconvergence
+                ),
+                "t03_bounded_plurality": (
+                    None if t03_result is None else t03_result.state.bounded_plurality
+                ),
+                "t03_convergence_consumer_ready": (
+                    None if t03_result is None else t03_result.gate.convergence_consumer_ready
+                ),
+                "t03_frontier_consumer_ready": (
+                    None if t03_result is None else t03_result.gate.frontier_consumer_ready
+                ),
+                "t03_nonconvergence_preserved": (
+                    None if t03_result is None else t03_result.gate.nonconvergence_preserved
+                ),
+                "t03_forbidden_shortcuts": (
+                    None if t03_result is None else t03_result.gate.forbidden_shortcuts
+                ),
+                "t03_restrictions": (
+                    None if t03_result is None else t03_result.gate.restrictions
+                ),
+                "t03_publication_current_leader": (
+                    None if t03_result is None else t03_result.state.publication_frontier.current_leader
+                ),
+                "t03_publication_competitive_neighborhood": (
+                    None
+                    if t03_result is None
+                    else t03_result.state.publication_frontier.competitive_neighborhood
+                ),
+                "t03_publication_unresolved_conflicts": (
+                    None
+                    if t03_result is None
+                    else t03_result.state.publication_frontier.unresolved_conflicts
+                ),
+                "t03_publication_open_slots": (
+                    None if t03_result is None else t03_result.state.publication_frontier.open_slots
+                ),
+                "t03_publication_stability_status": (
+                    None
+                    if t03_result is None
+                    else t03_result.state.publication_frontier.stability_status
+                ),
+                "t03_scope": (
+                    None if t03_result is None else t03_result.scope_marker.scope
+                ),
+                "t03_scope_rt01_contour_only": (
+                    None if t03_result is None else t03_result.scope_marker.rt01_contour_only
+                ),
+                "t03_scope_t03_first_slice_only": (
+                    None if t03_result is None else t03_result.scope_marker.t03_first_slice_only
+                ),
+                "t03_scope_t04_implemented": (
+                    None if t03_result is None else t03_result.scope_marker.t04_implemented
+                ),
+                "t03_scope_o01_implemented": (
+                    None if t03_result is None else t03_result.scope_marker.o01_implemented
+                ),
+                "t03_scope_o02_implemented": (
+                    None if t03_result is None else t03_result.scope_marker.o02_implemented
+                ),
+                "t03_scope_o03_implemented": (
+                    None if t03_result is None else t03_result.scope_marker.o03_implemented
+                ),
+                "t03_scope_full_silent_thought_line_implemented": (
+                    None
+                    if t03_result is None
+                    else t03_result.scope_marker.full_silent_thought_line_implemented
+                ),
+                "t03_scope_repo_wide_adoption": (
+                    None if t03_result is None else t03_result.scope_marker.repo_wide_adoption
+                ),
+                "t03_require_convergence_consumer": state.t03_require_convergence_consumer,
+                "t03_require_frontier_consumer": state.t03_require_frontier_consumer,
+                "t03_require_nonconvergence_preservation": (
+                    state.t03_require_nonconvergence_preservation
                 ),
             }
         ),

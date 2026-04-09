@@ -57,6 +57,7 @@ def evaluate_subject_tick_downstream_gate(
         SubjectTickRestrictionCode.T01_FORBIDDEN_SHORTCUTS_MUST_BE_READ,
         SubjectTickRestrictionCode.T02_RELATION_BINDING_CONTRACT_MUST_BE_READ,
         SubjectTickRestrictionCode.T02_FORBIDDEN_SHORTCUTS_MUST_BE_READ,
+        SubjectTickRestrictionCode.T03_HYPOTHESIS_COMPETITION_CONTRACT_MUST_BE_READ,
     ]
     usability = SubjectTickUsabilityClass.USABLE_BOUNDED
     accepted = True
@@ -324,6 +325,54 @@ def evaluate_subject_tick_downstream_gate(
             usability = SubjectTickUsabilityClass.BLOCKED
             reason = (
                 "t02 raw-vs-propagated integrity checkpoint requires detour before downstream continuation"
+            )
+    t03_checkpoint = next(
+        (
+            checkpoint
+            for checkpoint in state.execution_checkpoints
+            if checkpoint.checkpoint_id == "rt01.t03_hypothesis_competition_checkpoint"
+        ),
+        None,
+    )
+    if t03_checkpoint is not None and t03_checkpoint.status.value != "allowed":
+        restrictions.append(SubjectTickRestrictionCode.T03_CONVERGENCE_CONSUMER_REQUIRED)
+        restrictions.append(SubjectTickRestrictionCode.DOWNSTREAM_AUTHORITY_DEGRADED)
+        if state.final_execution_outcome == SubjectTickOutcome.CONTINUE:
+            accepted = False
+            usability = SubjectTickUsabilityClass.BLOCKED
+            reason = (
+                "t03 hypothesis competition checkpoint requires detour before downstream continuation"
+            )
+    if (
+        state.t03_require_convergence_consumer
+        and not state.t03_convergence_consumer_ready
+    ):
+        restrictions.append(SubjectTickRestrictionCode.T03_CONVERGENCE_CONSUMER_REQUIRED)
+        restrictions.append(SubjectTickRestrictionCode.DOWNSTREAM_AUTHORITY_DEGRADED)
+        if state.final_execution_outcome == SubjectTickOutcome.CONTINUE:
+            accepted = False
+            usability = SubjectTickUsabilityClass.BLOCKED
+            reason = "t03 convergence consumer requested but no lawful converged leader is consumable"
+    if state.t03_require_frontier_consumer and not state.t03_frontier_consumer_ready:
+        restrictions.append(SubjectTickRestrictionCode.T03_FRONTIER_CONSUMER_REQUIRED)
+        restrictions.append(SubjectTickRestrictionCode.DOWNSTREAM_AUTHORITY_DEGRADED)
+        if state.final_execution_outcome == SubjectTickOutcome.CONTINUE:
+            accepted = False
+            usability = SubjectTickUsabilityClass.BLOCKED
+            reason = "t03 frontier consumer requested but publication frontier is not consumable"
+    if (
+        state.t03_require_nonconvergence_preservation
+        and not state.t03_nonconvergence_preserved
+    ):
+        restrictions.append(
+            SubjectTickRestrictionCode.T03_NONCONVERGENCE_PRESERVATION_REQUIRED
+        )
+        restrictions.append(SubjectTickRestrictionCode.DOWNSTREAM_AUTHORITY_DEGRADED)
+        if state.final_execution_outcome == SubjectTickOutcome.CONTINUE:
+            accepted = False
+            usability = SubjectTickUsabilityClass.BLOCKED
+            reason = (
+                "t03 nonconvergence preservation requested but frontier collapsed under ambiguity"
             )
 
     return SubjectTickGateDecision(

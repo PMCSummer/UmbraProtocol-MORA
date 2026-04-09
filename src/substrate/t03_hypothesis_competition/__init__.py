@@ -1,0 +1,51 @@
+from substrate.t03_hypothesis_competition.downstream_contract import (
+    T03CompetitionContractView,
+    T03PreverbalCompetitionConsumerView,
+    derive_t03_competition_contract_view,
+    derive_t03_competition_signature,
+    derive_t03_preverbal_competition_consumer_view,
+    require_t03_convergence_consumer_ready,
+    require_t03_frontier_consumer_ready,
+)
+from substrate.t03_hypothesis_competition.models import (
+    ForbiddenT03Shortcut,
+    T03CompetitionMode,
+    T03CompetitionOperation,
+    T03CompetitionResult,
+    T03CompetitionState,
+    T03ConvergenceStatus,
+    T03GateDecision,
+    T03HypothesisCandidate,
+    T03HypothesisStatus,
+    T03PublicationFrontierSnapshot,
+    T03ScopeMarker,
+    T03StabilityState,
+    T03Telemetry,
+)
+from substrate.t03_hypothesis_competition.policy import build_t03_hypothesis_competition
+from substrate.t03_hypothesis_competition.telemetry import t03_hypothesis_competition_snapshot
+
+__all__ = [
+    "ForbiddenT03Shortcut",
+    "T03CompetitionContractView",
+    "T03CompetitionMode",
+    "T03CompetitionOperation",
+    "T03CompetitionResult",
+    "T03CompetitionState",
+    "T03ConvergenceStatus",
+    "T03GateDecision",
+    "T03HypothesisCandidate",
+    "T03HypothesisStatus",
+    "T03PreverbalCompetitionConsumerView",
+    "T03PublicationFrontierSnapshot",
+    "T03ScopeMarker",
+    "T03StabilityState",
+    "T03Telemetry",
+    "build_t03_hypothesis_competition",
+    "derive_t03_competition_contract_view",
+    "derive_t03_competition_signature",
+    "derive_t03_preverbal_competition_consumer_view",
+    "require_t03_convergence_consumer_ready",
+    "require_t03_frontier_consumer_ready",
+    "t03_hypothesis_competition_snapshot",
+]

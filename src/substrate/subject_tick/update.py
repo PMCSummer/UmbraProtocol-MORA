@@ -15,6 +15,11 @@ from substrate.t02_relation_binding import (
     build_t02_constrained_scene,
     derive_t02_preverbal_constraint_consumer_view,
 )
+from substrate.t03_hypothesis_competition import (
+    T03CompetitionMode,
+    build_t03_hypothesis_competition,
+    derive_t03_preverbal_competition_consumer_view,
+)
 from substrate.affordances import (
     create_default_capability_state,
     generate_regulation_affordances,
@@ -142,6 +147,7 @@ ATTEMPTED_SUBJECT_TICK_PATHS: tuple[str, ...] = (
     "subject_tick.evaluate_n_minimal_contour",
     "subject_tick.evaluate_t01_semantic_field",
     "subject_tick.evaluate_t02_relation_binding",
+    "subject_tick.evaluate_t03_hypothesis_competition",
     "subject_tick.world_seam_enforcement",
     "subject_tick.resolve_bounded_runtime_outcome",
     "subject_tick.downstream_gate",
@@ -1370,6 +1376,102 @@ def execute_subject_tick(
             reason=t02_integrity_checkpoint_reason,
         )
     )
+    t03_competition_mode = _resolve_t03_competition_mode(context.t03_competition_mode)
+    t03_result = build_t03_hypothesis_competition(
+        tick_id=tick_id,
+        t01_result=t01_result,
+        t02_result=t02_result,
+        world_entry_result=world_entry_result,
+        s_minimal_result=s_minimal_result,
+        a_line_result=a_line_result,
+        m_minimal_result=m_minimal_result,
+        n_minimal_result=n_minimal_result,
+        c05_validity_action=c05_validity_action,
+        competition_mode=t03_competition_mode,
+        source_lineage=lineage,
+    )
+    t03_preverbal_view = derive_t03_preverbal_competition_consumer_view(t03_result)
+    t03_checkpoint_status = SubjectTickCheckpointStatus.ALLOWED
+    t03_checkpoint_reason = t03_result.gate.reason
+    if not context.disable_t03_enforcement:
+        if (
+            context.require_t03_convergence_consumer
+            and not t03_preverbal_view.can_consume_convergence
+            and halt_reason is None
+        ):
+            t03_checkpoint_status = SubjectTickCheckpointStatus.ENFORCED_DETOUR
+            if t03_result.state.honest_nonconvergence:
+                revalidation_needed = True
+                t03_checkpoint_reason = (
+                    "t03 convergence consumer requested but frontier remains honestly non-converged; revalidate detour enforced"
+                )
+                if active_execution_mode != "halt_execution":
+                    active_execution_mode = "revalidate_scope"
+            else:
+                repair_needed = True
+                t03_checkpoint_reason = (
+                    "t03 convergence consumer requested but no lawful local converged leader is consumable"
+                )
+                if active_execution_mode not in {"halt_execution", "revalidate_scope"}:
+                    active_execution_mode = "repair_runtime_path"
+        if (
+            context.require_t03_frontier_consumer
+            and not t03_preverbal_view.frontier_consumer_ready
+            and halt_reason is None
+        ):
+            t03_checkpoint_status = SubjectTickCheckpointStatus.ENFORCED_DETOUR
+            repair_needed = True
+            t03_checkpoint_reason = (
+                "t03 frontier consumer requested but publication frontier is structurally incomplete"
+            )
+            if active_execution_mode not in {"halt_execution", "revalidate_scope"}:
+                active_execution_mode = "repair_runtime_path"
+        if (
+            context.require_t03_nonconvergence_preservation
+            and not t03_preverbal_view.nonconvergence_preserved
+            and halt_reason is None
+        ):
+            t03_checkpoint_status = SubjectTickCheckpointStatus.ENFORCED_DETOUR
+            revalidation_needed = True
+            t03_checkpoint_reason = (
+                "t03 nonconvergence preservation requested but unresolved competition frontier was collapsed"
+            )
+            if active_execution_mode != "halt_execution":
+                active_execution_mode = "revalidate_scope"
+    else:
+        t03_checkpoint_status = SubjectTickCheckpointStatus.ENFORCED_DETOUR
+        t03_checkpoint_reason = (
+            "t03 hypothesis competition enforcement disabled in ablation context"
+        )
+    checkpoints.append(
+        SubjectTickCheckpointResult(
+            checkpoint_id="rt01.t03_hypothesis_competition_checkpoint",
+            source_contract="t03_hypothesis_competition.silent_convergence",
+            status=t03_checkpoint_status,
+            required_action=(
+                "require_t03_convergence_and_frontier_and_nonconvergence_preservation"
+                if (
+                    context.require_t03_convergence_consumer
+                    and context.require_t03_frontier_consumer
+                    and context.require_t03_nonconvergence_preservation
+                )
+                else "require_t03_convergence_and_frontier_consumer"
+                if (
+                    context.require_t03_convergence_consumer
+                    and context.require_t03_frontier_consumer
+                )
+                else "require_t03_convergence_consumer"
+                if context.require_t03_convergence_consumer
+                else "require_t03_frontier_consumer"
+                if context.require_t03_frontier_consumer
+                else "require_t03_nonconvergence_preservation"
+                if context.require_t03_nonconvergence_preservation
+                else "t03_optional"
+            ),
+            applied_action=active_execution_mode,
+            reason=t03_checkpoint_reason,
+        )
+    )
 
     if halt_reason is not None:
         final_outcome = SubjectTickOutcome.HALT
@@ -1789,6 +1891,52 @@ def execute_subject_tick(
             context.require_t02_raw_vs_propagated_distinction
         ),
         t02_raw_vs_propagated_distinct=t02_raw_vs_propagated_distinct,
+        t03_competition_id=t03_result.state.competition_id,
+        t03_convergence_status=t03_result.state.convergence_status.value,
+        t03_current_leader_hypothesis_id=t03_result.state.current_leader_hypothesis_id,
+        t03_provisional_frontrunner_hypothesis_id=(
+            t03_result.state.provisional_frontrunner_hypothesis_id
+        ),
+        t03_tied_competitor_count=len(t03_result.state.tied_competitor_ids),
+        t03_blocked_hypothesis_count=len(t03_result.state.blocked_hypothesis_ids),
+        t03_eliminated_hypothesis_count=len(t03_result.state.eliminated_hypothesis_ids),
+        t03_reactivated_hypothesis_count=len(t03_result.state.reactivated_hypothesis_ids),
+        t03_honest_nonconvergence=t03_result.state.honest_nonconvergence,
+        t03_bounded_plurality=t03_result.state.bounded_plurality,
+        t03_convergence_consumer_ready=t03_result.gate.convergence_consumer_ready,
+        t03_frontier_consumer_ready=t03_result.gate.frontier_consumer_ready,
+        t03_nonconvergence_preserved=t03_result.gate.nonconvergence_preserved,
+        t03_forbidden_shortcuts=t03_result.gate.forbidden_shortcuts,
+        t03_restrictions=t03_result.gate.restrictions,
+        t03_publication_current_leader=t03_result.state.publication_frontier.current_leader,
+        t03_publication_competitive_neighborhood=(
+            t03_result.state.publication_frontier.competitive_neighborhood
+        ),
+        t03_publication_unresolved_conflicts=(
+            t03_result.state.publication_frontier.unresolved_conflicts
+        ),
+        t03_publication_open_slots=t03_result.state.publication_frontier.open_slots,
+        t03_publication_stability_status=(
+            t03_result.state.publication_frontier.stability_status
+        ),
+        t03_scope=t03_result.scope_marker.scope,
+        t03_scope_rt01_contour_only=t03_result.scope_marker.rt01_contour_only,
+        t03_scope_t03_first_slice_only=t03_result.scope_marker.t03_first_slice_only,
+        t03_scope_t04_implemented=t03_result.scope_marker.t04_implemented,
+        t03_scope_o01_implemented=t03_result.scope_marker.o01_implemented,
+        t03_scope_o02_implemented=t03_result.scope_marker.o02_implemented,
+        t03_scope_o03_implemented=t03_result.scope_marker.o03_implemented,
+        t03_scope_full_silent_thought_line_implemented=(
+            t03_result.scope_marker.full_silent_thought_line_implemented
+        ),
+        t03_scope_repo_wide_adoption=t03_result.scope_marker.repo_wide_adoption,
+        t03_scope_reason=t03_result.scope_marker.reason,
+        t03_reason=t03_result.reason,
+        t03_require_convergence_consumer=context.require_t03_convergence_consumer,
+        t03_require_frontier_consumer=context.require_t03_frontier_consumer,
+        t03_require_nonconvergence_preservation=(
+            context.require_t03_nonconvergence_preservation
+        ),
         execution_stance=execution_stance,
         execution_checkpoints=tuple(checkpoints),
         downstream_step_results=step_results,
@@ -1820,7 +1968,7 @@ def execute_subject_tick(
         attempted_paths=ATTEMPTED_SUBJECT_TICK_PATHS,
         downstream_gate=gate,
         causal_basis=(
-            "bounded runtime execution spine enforces roadmap authority roles for C04/C05, consumes world-entry, s-minimal, a-line, m-minimal, n-minimal, t01 semantic-field and t02 relation-binding gates, and keeps D01 observability-only over fixed R->C order"
+            "bounded runtime execution spine enforces roadmap authority roles for C04/C05, consumes world-entry, s-minimal, a-line, m-minimal, n-minimal, t01 semantic-field, t02 relation-binding, and t03 hypothesis-competition gates, and keeps D01 observability-only over fixed R->C order"
         ),
     )
     abstain = final_outcome in {SubjectTickOutcome.REPAIR, SubjectTickOutcome.REVALIDATE}
@@ -1854,6 +2002,7 @@ def execute_subject_tick(
         n_minimal_result=n_minimal_result,
         t01_result=t01_result,
         t02_result=t02_result,
+        t03_result=t03_result,
         abstain=abstain,
         abstain_reason=abstain_reason,
         no_planner_orchestrator_dependency=True,
@@ -2127,6 +2276,18 @@ def _resolve_t02_assembly_mode(token: str | None) -> T02AssemblyMode:
         return T02AssemblyMode(normalized)
     except ValueError:
         return T02AssemblyMode.BOUNDED_CONSTRAINT_PROPAGATION
+
+
+def _resolve_t03_competition_mode(token: str | None) -> T03CompetitionMode:
+    if token is None:
+        return T03CompetitionMode.BOUNDED_COMPETITION
+    normalized = str(token).strip()
+    if not normalized:
+        return T03CompetitionMode.BOUNDED_COMPETITION
+    try:
+        return T03CompetitionMode(normalized)
+    except ValueError:
+        return T03CompetitionMode.BOUNDED_COMPETITION
 
 
 def _phase_step(
