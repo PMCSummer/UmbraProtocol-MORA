@@ -74,6 +74,43 @@ def runtime_dispatch_snapshot(result: RuntimeDispatchResult) -> dict[str, object
                 "s_scope_s01_s05_implemented": state.s_scope_s01_s05_implemented,
                 "s_scope_full_self_model_implemented": state.s_scope_full_self_model_implemented,
                 "s_scope_repo_wide_adoption": state.s_scope_repo_wide_adoption,
+                "a_capability_id": state.a_capability_id,
+                "a_capability_status": state.a_capability_status,
+                "a_underconstrained": state.a_underconstrained,
+                "a_no_safe_capability_claim": state.a_no_safe_capability_claim,
+                "a_policy_conditioned_capability_present": (
+                    state.a_policy_conditioned_capability_present
+                ),
+                "a_forbidden_shortcuts": state.a_forbidden_shortcuts,
+                "a_a04_admission_ready": state.a_a04_admission_ready,
+                "a_a04_blockers": state.a_a04_blockers,
+                "a_a04_structurally_present_but_not_ready": (
+                    state.a_a04_structurally_present_but_not_ready
+                ),
+                "a_a04_capability_basis_missing": state.a_a04_capability_basis_missing,
+                "a_a04_world_dependency_unmet": state.a_a04_world_dependency_unmet,
+                "a_a04_self_dependency_unmet": state.a_a04_self_dependency_unmet,
+                "a_a04_policy_legitimacy_unmet": (
+                    state.a_a04_policy_legitimacy_unmet
+                ),
+                "a_a04_underconstrained_capability_surface": (
+                    state.a_a04_underconstrained_capability_surface
+                ),
+                "a_a04_external_means_not_justified": (
+                    state.a_a04_external_means_not_justified
+                ),
+                "a_scope": state.a_scope,
+                "a_scope_rt01_contour_only": state.a_scope_rt01_contour_only,
+                "a_scope_a_line_normalization_only": (
+                    state.a_scope_a_line_normalization_only
+                ),
+                "a_scope_readiness_gate_only": state.a_scope_readiness_gate_only,
+                "a_scope_a04_implemented": state.a_scope_a04_implemented,
+                "a_scope_a05_touched": state.a_scope_a05_touched,
+                "a_scope_full_agency_stack_implemented": (
+                    state.a_scope_full_agency_stack_implemented
+                ),
+                "a_scope_repo_wide_adoption": state.a_scope_repo_wide_adoption,
             }
         ),
         "persist_transition_accepted": (

@@ -128,6 +128,57 @@ def build_subject_tick_telemetry(
         s_require_world_side_claim=state.s_require_world_side_claim,
         s_require_self_controlled_transition_claim=state.s_require_self_controlled_transition_claim,
         s_strict_mixed_attribution_guard=state.s_strict_mixed_attribution_guard,
+        a_capability_id=state.a_capability_id,
+        a_affordance_id=state.a_affordance_id,
+        a_capability_class=state.a_capability_class,
+        a_capability_status=state.a_capability_status,
+        a_availability_basis_present=state.a_availability_basis_present,
+        a_world_dependency_present=state.a_world_dependency_present,
+        a_self_dependency_present=state.a_self_dependency_present,
+        a_controllability_dependency_present=state.a_controllability_dependency_present,
+        a_legitimacy_dependency_present=state.a_legitimacy_dependency_present,
+        a_confidence=state.a_confidence,
+        a_degraded=state.a_degraded,
+        a_underconstrained=state.a_underconstrained,
+        a_available_capability_claim_allowed=state.a_available_capability_claim_allowed,
+        a_world_conditioned_capability_claim_allowed=(
+            state.a_world_conditioned_capability_claim_allowed
+        ),
+        a_self_conditioned_capability_claim_allowed=(
+            state.a_self_conditioned_capability_claim_allowed
+        ),
+        a_policy_conditioned_capability_present=state.a_policy_conditioned_capability_present,
+        a_no_safe_capability_claim=state.a_no_safe_capability_claim,
+        a_forbidden_shortcuts=state.a_forbidden_shortcuts,
+        a_restrictions=state.a_restrictions,
+        a_a04_admission_ready=state.a_a04_admission_ready,
+        a_a04_blockers=state.a_a04_blockers,
+        a_a04_structurally_present_but_not_ready=(
+            state.a_a04_structurally_present_but_not_ready
+        ),
+        a_a04_capability_basis_missing=state.a_a04_capability_basis_missing,
+        a_a04_world_dependency_unmet=state.a_a04_world_dependency_unmet,
+        a_a04_self_dependency_unmet=state.a_a04_self_dependency_unmet,
+        a_a04_policy_legitimacy_unmet=state.a_a04_policy_legitimacy_unmet,
+        a_a04_underconstrained_capability_surface=(
+            state.a_a04_underconstrained_capability_surface
+        ),
+        a_a04_external_means_not_justified=(
+            state.a_a04_external_means_not_justified
+        ),
+        a_a04_implemented=state.a_a04_implemented,
+        a_a05_touched=state.a_a05_touched,
+        a_scope=state.a_scope,
+        a_scope_rt01_contour_only=state.a_scope_rt01_contour_only,
+        a_scope_a_line_normalization_only=state.a_scope_a_line_normalization_only,
+        a_scope_readiness_gate_only=state.a_scope_readiness_gate_only,
+        a_scope_a04_implemented=state.a_scope_a04_implemented,
+        a_scope_a05_touched=state.a_scope_a05_touched,
+        a_scope_full_agency_stack_implemented=state.a_scope_full_agency_stack_implemented,
+        a_scope_repo_wide_adoption=state.a_scope_repo_wide_adoption,
+        a_scope_reason=state.a_scope_reason,
+        a_reason=state.a_reason,
+        a_require_capability_claim=state.a_require_capability_claim,
         execution_stance=state.execution_stance,
         execution_checkpoints=state.execution_checkpoints,
         final_execution_outcome=state.final_execution_outcome,
@@ -271,6 +322,61 @@ def subject_tick_result_snapshot(result: SubjectTickResult) -> dict[str, object]
                 state.s_require_self_controlled_transition_claim
             ),
             "s_strict_mixed_attribution_guard": state.s_strict_mixed_attribution_guard,
+            "a_capability_id": state.a_capability_id,
+            "a_affordance_id": state.a_affordance_id,
+            "a_capability_class": state.a_capability_class,
+            "a_capability_status": state.a_capability_status,
+            "a_availability_basis_present": state.a_availability_basis_present,
+            "a_world_dependency_present": state.a_world_dependency_present,
+            "a_self_dependency_present": state.a_self_dependency_present,
+            "a_controllability_dependency_present": state.a_controllability_dependency_present,
+            "a_legitimacy_dependency_present": state.a_legitimacy_dependency_present,
+            "a_confidence": state.a_confidence,
+            "a_degraded": state.a_degraded,
+            "a_underconstrained": state.a_underconstrained,
+            "a_available_capability_claim_allowed": state.a_available_capability_claim_allowed,
+            "a_world_conditioned_capability_claim_allowed": (
+                state.a_world_conditioned_capability_claim_allowed
+            ),
+            "a_self_conditioned_capability_claim_allowed": (
+                state.a_self_conditioned_capability_claim_allowed
+            ),
+            "a_policy_conditioned_capability_present": (
+                state.a_policy_conditioned_capability_present
+            ),
+            "a_no_safe_capability_claim": state.a_no_safe_capability_claim,
+            "a_forbidden_shortcuts": state.a_forbidden_shortcuts,
+            "a_restrictions": state.a_restrictions,
+            "a_a04_admission_ready": state.a_a04_admission_ready,
+            "a_a04_blockers": state.a_a04_blockers,
+            "a_a04_structurally_present_but_not_ready": (
+                state.a_a04_structurally_present_but_not_ready
+            ),
+            "a_a04_capability_basis_missing": state.a_a04_capability_basis_missing,
+            "a_a04_world_dependency_unmet": state.a_a04_world_dependency_unmet,
+            "a_a04_self_dependency_unmet": state.a_a04_self_dependency_unmet,
+            "a_a04_policy_legitimacy_unmet": state.a_a04_policy_legitimacy_unmet,
+            "a_a04_underconstrained_capability_surface": (
+                state.a_a04_underconstrained_capability_surface
+            ),
+            "a_a04_external_means_not_justified": (
+                state.a_a04_external_means_not_justified
+            ),
+            "a_a04_implemented": state.a_a04_implemented,
+            "a_a05_touched": state.a_a05_touched,
+            "a_scope": state.a_scope,
+            "a_scope_rt01_contour_only": state.a_scope_rt01_contour_only,
+            "a_scope_a_line_normalization_only": state.a_scope_a_line_normalization_only,
+            "a_scope_readiness_gate_only": state.a_scope_readiness_gate_only,
+            "a_scope_a04_implemented": state.a_scope_a04_implemented,
+            "a_scope_a05_touched": state.a_scope_a05_touched,
+            "a_scope_full_agency_stack_implemented": (
+                state.a_scope_full_agency_stack_implemented
+            ),
+            "a_scope_repo_wide_adoption": state.a_scope_repo_wide_adoption,
+            "a_scope_reason": state.a_scope_reason,
+            "a_reason": state.a_reason,
+            "a_require_capability_claim": state.a_require_capability_claim,
             "execution_stance": state.execution_stance.value,
             "execution_checkpoints": tuple(
                 {
@@ -409,6 +515,86 @@ def subject_tick_result_snapshot(result: SubjectTickResult) -> dict[str, object]
                 "reason": result.self_contour_result.scope_marker.reason,
             },
             "reason": result.self_contour_result.reason,
+        },
+        "a_line_result": {
+            "capability_id": result.a_line_result.state.capability_id,
+            "affordance_id": result.a_line_result.state.affordance_id,
+            "capability_class": result.a_line_result.state.capability_class.value,
+            "capability_status": result.a_line_result.state.capability_status.value,
+            "availability_basis_present": result.a_line_result.state.availability_basis_present,
+            "world_dependency_present": result.a_line_result.state.world_dependency_present,
+            "self_dependency_present": result.a_line_result.state.self_dependency_present,
+            "controllability_dependency_present": (
+                result.a_line_result.state.controllability_dependency_present
+            ),
+            "legitimacy_dependency_present": (
+                result.a_line_result.state.legitimacy_dependency_present
+            ),
+            "confidence": result.a_line_result.state.confidence,
+            "degraded": result.a_line_result.state.degraded,
+            "underconstrained": result.a_line_result.state.underconstrained,
+            "available_capability_claim_allowed": (
+                result.a_line_result.gate.available_capability_claim_allowed
+            ),
+            "world_conditioned_capability_claim_allowed": (
+                result.a_line_result.gate.world_conditioned_capability_claim_allowed
+            ),
+            "self_conditioned_capability_claim_allowed": (
+                result.a_line_result.gate.self_conditioned_capability_claim_allowed
+            ),
+            "policy_conditioned_capability_present": (
+                result.a_line_result.gate.policy_conditioned_capability_present
+            ),
+            "no_safe_capability_claim": result.a_line_result.gate.no_safe_capability_claim,
+            "forbidden_shortcuts": result.a_line_result.gate.forbidden_shortcuts,
+            "restrictions": result.a_line_result.gate.restrictions,
+            "a04_readiness": {
+                "admission_ready_for_a04": (
+                    result.a_line_result.a04_readiness.admission_ready_for_a04
+                ),
+                "blockers": result.a_line_result.a04_readiness.blockers,
+                "structurally_present_but_not_ready": (
+                    result.a_line_result.a04_readiness.structurally_present_but_not_ready
+                ),
+                "capability_basis_missing": (
+                    result.a_line_result.a04_readiness.capability_basis_missing
+                ),
+                "world_dependency_unmet": (
+                    result.a_line_result.a04_readiness.world_dependency_unmet
+                ),
+                "self_dependency_unmet": (
+                    result.a_line_result.a04_readiness.self_dependency_unmet
+                ),
+                "policy_legitimacy_unmet": (
+                    result.a_line_result.a04_readiness.policy_legitimacy_unmet
+                ),
+                "underconstrained_capability_surface": (
+                    result.a_line_result.a04_readiness.underconstrained_capability_surface
+                ),
+                "external_means_not_justified": (
+                    result.a_line_result.a04_readiness.external_means_not_justified
+                ),
+                "a04_implemented": result.a_line_result.a04_readiness.a04_implemented,
+                "a05_touched": result.a_line_result.a04_readiness.a05_touched,
+                "restrictions": result.a_line_result.a04_readiness.restrictions,
+                "reason": result.a_line_result.a04_readiness.reason,
+            },
+            "scope_marker": {
+                "scope": result.a_line_result.scope_marker.scope,
+                "rt01_contour_only": result.a_line_result.scope_marker.rt01_contour_only,
+                "a_line_normalization_only": (
+                    result.a_line_result.scope_marker.a_line_normalization_only
+                ),
+                "readiness_gate_only": result.a_line_result.scope_marker.readiness_gate_only,
+                "a04_implemented": result.a_line_result.scope_marker.a04_implemented,
+                "a05_touched": result.a_line_result.scope_marker.a05_touched,
+                "full_agency_stack_implemented": (
+                    result.a_line_result.scope_marker.full_agency_stack_implemented
+                ),
+                "repo_wide_adoption": result.a_line_result.scope_marker.repo_wide_adoption,
+                "reason": result.a_line_result.scope_marker.reason,
+            },
+            "reason": result.a_line_result.reason,
         },
         "downstream_gate": {
             "accepted": result.downstream_gate.accepted,
@@ -561,6 +747,77 @@ def subject_tick_result_snapshot(result: SubjectTickResult) -> dict[str, object]
                 result.telemetry.s_require_self_controlled_transition_claim
             ),
             "s_strict_mixed_attribution_guard": result.telemetry.s_strict_mixed_attribution_guard,
+            "a_capability_id": result.telemetry.a_capability_id,
+            "a_affordance_id": result.telemetry.a_affordance_id,
+            "a_capability_class": result.telemetry.a_capability_class,
+            "a_capability_status": result.telemetry.a_capability_status,
+            "a_availability_basis_present": result.telemetry.a_availability_basis_present,
+            "a_world_dependency_present": result.telemetry.a_world_dependency_present,
+            "a_self_dependency_present": result.telemetry.a_self_dependency_present,
+            "a_controllability_dependency_present": (
+                result.telemetry.a_controllability_dependency_present
+            ),
+            "a_legitimacy_dependency_present": (
+                result.telemetry.a_legitimacy_dependency_present
+            ),
+            "a_confidence": result.telemetry.a_confidence,
+            "a_degraded": result.telemetry.a_degraded,
+            "a_underconstrained": result.telemetry.a_underconstrained,
+            "a_available_capability_claim_allowed": (
+                result.telemetry.a_available_capability_claim_allowed
+            ),
+            "a_world_conditioned_capability_claim_allowed": (
+                result.telemetry.a_world_conditioned_capability_claim_allowed
+            ),
+            "a_self_conditioned_capability_claim_allowed": (
+                result.telemetry.a_self_conditioned_capability_claim_allowed
+            ),
+            "a_policy_conditioned_capability_present": (
+                result.telemetry.a_policy_conditioned_capability_present
+            ),
+            "a_no_safe_capability_claim": result.telemetry.a_no_safe_capability_claim,
+            "a_forbidden_shortcuts": result.telemetry.a_forbidden_shortcuts,
+            "a_restrictions": result.telemetry.a_restrictions,
+            "a_a04_admission_ready": result.telemetry.a_a04_admission_ready,
+            "a_a04_blockers": result.telemetry.a_a04_blockers,
+            "a_a04_structurally_present_but_not_ready": (
+                result.telemetry.a_a04_structurally_present_but_not_ready
+            ),
+            "a_a04_capability_basis_missing": (
+                result.telemetry.a_a04_capability_basis_missing
+            ),
+            "a_a04_world_dependency_unmet": (
+                result.telemetry.a_a04_world_dependency_unmet
+            ),
+            "a_a04_self_dependency_unmet": (
+                result.telemetry.a_a04_self_dependency_unmet
+            ),
+            "a_a04_policy_legitimacy_unmet": (
+                result.telemetry.a_a04_policy_legitimacy_unmet
+            ),
+            "a_a04_underconstrained_capability_surface": (
+                result.telemetry.a_a04_underconstrained_capability_surface
+            ),
+            "a_a04_external_means_not_justified": (
+                result.telemetry.a_a04_external_means_not_justified
+            ),
+            "a_a04_implemented": result.telemetry.a_a04_implemented,
+            "a_a05_touched": result.telemetry.a_a05_touched,
+            "a_scope": result.telemetry.a_scope,
+            "a_scope_rt01_contour_only": result.telemetry.a_scope_rt01_contour_only,
+            "a_scope_a_line_normalization_only": (
+                result.telemetry.a_scope_a_line_normalization_only
+            ),
+            "a_scope_readiness_gate_only": result.telemetry.a_scope_readiness_gate_only,
+            "a_scope_a04_implemented": result.telemetry.a_scope_a04_implemented,
+            "a_scope_a05_touched": result.telemetry.a_scope_a05_touched,
+            "a_scope_full_agency_stack_implemented": (
+                result.telemetry.a_scope_full_agency_stack_implemented
+            ),
+            "a_scope_repo_wide_adoption": result.telemetry.a_scope_repo_wide_adoption,
+            "a_scope_reason": result.telemetry.a_scope_reason,
+            "a_reason": result.telemetry.a_reason,
+            "a_require_capability_claim": result.telemetry.a_require_capability_claim,
             "execution_stance": result.telemetry.execution_stance.value,
             "execution_checkpoints": tuple(
                 {

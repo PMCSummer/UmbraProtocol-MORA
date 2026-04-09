@@ -47,6 +47,8 @@ def evaluate_subject_tick_downstream_gate(
         SubjectTickRestrictionCode.W_ENTRY_ADMISSION_CRITERIA_MUST_BE_READ,
         SubjectTickRestrictionCode.S_MINIMAL_CONTOUR_CONTRACT_MUST_BE_READ,
         SubjectTickRestrictionCode.S_FORBIDDEN_SHORTCUTS_MUST_BE_READ,
+        SubjectTickRestrictionCode.A_LINE_NORMALIZATION_CONTRACT_MUST_BE_READ,
+        SubjectTickRestrictionCode.A_FORBIDDEN_SHORTCUTS_MUST_BE_READ,
     ]
     usability = SubjectTickUsabilityClass.USABLE_BOUNDED
     accepted = True
@@ -144,6 +146,29 @@ def evaluate_subject_tick_downstream_gate(
             accepted = False
             usability = SubjectTickUsabilityClass.BLOCKED
             reason = "mixed self/world attribution requires explicit uncertainty marking before continue"
+    if state.a_require_capability_claim and not state.a_available_capability_claim_allowed:
+        restrictions.append(SubjectTickRestrictionCode.A_CAPABILITY_CLAIM_REQUIRES_BASIS)
+        restrictions.append(SubjectTickRestrictionCode.DOWNSTREAM_AUTHORITY_DEGRADED)
+        if state.final_execution_outcome == SubjectTickOutcome.CONTINUE:
+            accepted = False
+            usability = SubjectTickUsabilityClass.BLOCKED
+            reason = "capability claim requested but a-line normalization marks basis as unavailable"
+    if state.a_require_capability_claim and state.a_policy_conditioned_capability_present:
+        restrictions.append(
+            SubjectTickRestrictionCode.A_POLICY_GATED_CAPABILITY_REQUIRES_GATE
+        )
+        restrictions.append(SubjectTickRestrictionCode.DOWNSTREAM_AUTHORITY_DEGRADED)
+        if state.final_execution_outcome == SubjectTickOutcome.CONTINUE:
+            accepted = False
+            usability = SubjectTickUsabilityClass.BLOCKED
+            reason = "policy-conditioned capability cannot be consumed as free available capability"
+    if state.a_require_capability_claim and state.a_underconstrained:
+        restrictions.append(SubjectTickRestrictionCode.A_CAPABILITY_CLAIM_REQUIRES_BASIS)
+        restrictions.append(SubjectTickRestrictionCode.DOWNSTREAM_AUTHORITY_DEGRADED)
+        if state.final_execution_outcome == SubjectTickOutcome.CONTINUE:
+            accepted = False
+            usability = SubjectTickUsabilityClass.BLOCKED
+            reason = "capability claim requested while a-line substrate remains underconstrained"
 
     return SubjectTickGateDecision(
         accepted=accepted,

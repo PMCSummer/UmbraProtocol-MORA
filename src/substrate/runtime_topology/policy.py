@@ -69,6 +69,18 @@ def build_minimal_runtime_tick_graph() -> RuntimeTickGraph:
                 checkpoint_ids=("rt01.s_minimal_contour_checkpoint",),
             ),
             RuntimeContourNode(
+                node_id="node.a_line",
+                phase_id="A_MINIMAL",
+                authority_role="affordance_capability_contract",
+                computational_role="contour_contract",
+                surfaces=(
+                    "a_line_normalization.capability_state",
+                    "a_line_normalization.forbidden_shortcuts",
+                    "a_line_normalization.a04_readiness",
+                ),
+                checkpoint_ids=("rt01.a_line_normalization_checkpoint",),
+            ),
+            RuntimeContourNode(
                 node_id="node.rt01",
                 phase_id="RT01",
                 authority_role="gating",
@@ -78,6 +90,7 @@ def build_minimal_runtime_tick_graph() -> RuntimeTickGraph:
                     "rt01.world_seam_checkpoint",
                     "rt01.world_entry_checkpoint",
                     "rt01.s_minimal_contour_checkpoint",
+                    "rt01.a_line_normalization_checkpoint",
                     "rt01.outcome_resolution_checkpoint",
                 ),
                 checkpoint_ids=(
@@ -85,6 +98,7 @@ def build_minimal_runtime_tick_graph() -> RuntimeTickGraph:
                     "rt01.world_seam_checkpoint",
                     "rt01.world_entry_checkpoint",
                     "rt01.s_minimal_contour_checkpoint",
+                    "rt01.a_line_normalization_checkpoint",
                     "rt01.outcome_resolution_checkpoint",
                 ),
             ),
@@ -105,6 +119,9 @@ def build_minimal_runtime_tick_graph() -> RuntimeTickGraph:
             RuntimeContourEdge(source_phase="WORLD_SEAM", target_phase="RT01", relation="requires"),
             RuntimeContourEdge(source_phase="WORLD_SEAM", target_phase="S_MINIMAL", relation="requires"),
             RuntimeContourEdge(source_phase="S_MINIMAL", target_phase="RT01", relation="requires"),
+            RuntimeContourEdge(source_phase="S_MINIMAL", target_phase="A_MINIMAL", relation="requires"),
+            RuntimeContourEdge(source_phase="WORLD_SEAM", target_phase="A_MINIMAL", relation="requires"),
+            RuntimeContourEdge(source_phase="A_MINIMAL", target_phase="RT01", relation="requires"),
             RuntimeContourEdge(source_phase="RT01", target_phase="F01", relation="persists_via_f01"),
         ),
         mandatory_checkpoint_ids=(
@@ -114,6 +131,7 @@ def build_minimal_runtime_tick_graph() -> RuntimeTickGraph:
             "rt01.world_seam_checkpoint",
             "rt01.world_entry_checkpoint",
             "rt01.s_minimal_contour_checkpoint",
+            "rt01.a_line_normalization_checkpoint",
             "rt01.outcome_resolution_checkpoint",
         ),
         source_of_truth_surfaces=(
@@ -122,6 +140,7 @@ def build_minimal_runtime_tick_graph() -> RuntimeTickGraph:
             "world_adapter.state",
             "world_entry_contract.episode",
             "s_minimal_contour.boundary_state",
+            "a_line_normalization.capability_state",
         ),
         reason="minimal production runtime graph for bounded RT01 contour wiring",
     )
@@ -148,6 +167,7 @@ def build_minimal_runtime_topology_bundle() -> RuntimeTopologyBundle:
             "world_seam_presence_contract",
             "world_entry_admission_contract",
             "s_minimal_boundary_attribution_contract",
+            "a_line_normalization_capability_contract",
         ),
         f01_transition_route="subject_tick.persist_subject_tick_result_via_f01",
         tick_graph=tick_graph,

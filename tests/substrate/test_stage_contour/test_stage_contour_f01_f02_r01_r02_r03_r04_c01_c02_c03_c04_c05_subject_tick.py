@@ -301,3 +301,61 @@ def test_stage_contour_s_minimal_self_side_claim_without_basis_forces_repair() -
         and checkpoint.status.value == "enforced_detour"
         for checkpoint in enforced.state.execution_checkpoints
     )
+
+
+def test_stage_contour_a_line_capability_claim_is_path_affecting() -> None:
+    missing_basis = execute_subject_tick(
+        SubjectTickInput(
+            case_id="stage-subject-tick-a-line-missing-basis",
+            energy=66.0,
+            cognitive=44.0,
+            safety=74.0,
+            unresolved_preference=False,
+        ),
+        context=SubjectTickContext(
+            require_a_line_capability_claim=True,
+        ),
+    )
+    lawful_basis = execute_subject_tick(
+        SubjectTickInput(
+            case_id="stage-subject-tick-a-line-lawful-basis",
+            energy=66.0,
+            cognitive=44.0,
+            safety=74.0,
+            unresolved_preference=False,
+        ),
+        context=SubjectTickContext(
+            require_a_line_capability_claim=True,
+            emit_world_action_candidate=True,
+            world_adapter_input=WorldAdapterInput(
+                adapter_presence=True,
+                adapter_available=True,
+                observation_packet=build_world_observation_packet(
+                    observation_id="obs-stage-a-line-lawful",
+                    source_ref="world.sensor.stage",
+                    observed_at="2026-04-09T16:10:00+00:00",
+                    payload_ref="payload:stage-a-line-lawful",
+                ),
+                effect_packet=build_world_effect_packet(
+                    effect_id="eff-stage-a-line-lawful",
+                    action_id="world-action-subject-tick-stage-subject-tick-a-line-lawful-basis-1",
+                    observed_at="2026-04-09T16:10:01+00:00",
+                    source_ref="world.effect.stage",
+                    success=True,
+                ),
+            ),
+        ),
+    )
+    assert missing_basis.state.final_execution_outcome.value in {"repair", "revalidate"}
+    assert missing_basis.state.a_available_capability_claim_allowed is False
+    assert lawful_basis.state.a_world_dependency_present is True
+    assert any(
+        checkpoint.checkpoint_id == "rt01.a_line_normalization_checkpoint"
+        and checkpoint.status.value == "enforced_detour"
+        for checkpoint in missing_basis.state.execution_checkpoints
+    )
+    assert any(
+        checkpoint.checkpoint_id == "rt01.a_line_normalization_checkpoint"
+        and checkpoint.status.value in {"allowed", "enforced_detour"}
+        for checkpoint in lawful_basis.state.execution_checkpoints
+    )

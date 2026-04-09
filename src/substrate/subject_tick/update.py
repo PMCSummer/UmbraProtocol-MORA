@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import replace
 from typing import Iterable
 
+from substrate.a_line_normalization import build_a_line_normalization
 from substrate.affordances import (
     create_default_capability_state,
     generate_regulation_affordances,
@@ -125,6 +126,7 @@ ATTEMPTED_SUBJECT_TICK_PATHS: tuple[str, ...] = (
     "subject_tick.enforce_downstream_obedience_contract",
     "subject_tick.evaluate_world_entry_contract",
     "subject_tick.evaluate_s_minimal_contour",
+    "subject_tick.evaluate_a_line_normalization",
     "subject_tick.world_seam_enforcement",
     "subject_tick.resolve_bounded_runtime_outcome",
     "subject_tick.downstream_gate",
@@ -1005,6 +1007,58 @@ def execute_subject_tick(
             reason=s_checkpoint_reason,
         )
     )
+    a_line_result = build_a_line_normalization(
+        tick_id=tick_id,
+        world_entry_result=world_entry_result,
+        s_minimal_result=s_minimal_result,
+        c04_execution_mode_claim=c04_execution_mode_claim,
+        c05_validity_action=c05_validity_action,
+        source_lineage=lineage,
+    )
+    a_checkpoint_status = SubjectTickCheckpointStatus.ALLOWED
+    a_checkpoint_reason = a_line_result.gate.reason
+    if not context.disable_a_line_enforcement:
+        if (
+            context.require_a_line_capability_claim
+            and not a_line_result.gate.available_capability_claim_allowed
+            and halt_reason is None
+        ):
+            a_checkpoint_status = SubjectTickCheckpointStatus.ENFORCED_DETOUR
+            if (
+                a_line_result.gate.underconstrained_capability
+                or a_line_result.gate.policy_conditioned_capability_present
+            ):
+                revalidation_needed = True
+                a_checkpoint_reason = (
+                    "available capability claim requested but basis remains underconstrained or policy-conditioned"
+                )
+                if active_execution_mode != "halt_execution":
+                    active_execution_mode = "revalidate_scope"
+            else:
+                repair_needed = True
+                a_checkpoint_reason = (
+                    "available capability claim requested but no safe capability basis is available"
+                )
+                if active_execution_mode not in {"halt_execution", "revalidate_scope"}:
+                    active_execution_mode = "repair_runtime_path"
+    else:
+        a_checkpoint_status = SubjectTickCheckpointStatus.ENFORCED_DETOUR
+        a_checkpoint_reason = "a-line normalization enforcement disabled in ablation context"
+
+    checkpoints.append(
+        SubjectTickCheckpointResult(
+            checkpoint_id="rt01.a_line_normalization_checkpoint",
+            source_contract="a_line_normalization.a01_a03_substrate",
+            status=a_checkpoint_status,
+            required_action=(
+                "require_a_line_capability_claim"
+                if context.require_a_line_capability_claim
+                else "a_line_optional"
+            ),
+            applied_action=active_execution_mode,
+            reason=a_checkpoint_reason,
+        )
+    )
 
     if halt_reason is not None:
         final_outcome = SubjectTickOutcome.HALT
@@ -1221,6 +1275,63 @@ def execute_subject_tick(
         s_require_world_side_claim=context.require_world_side_claim,
         s_require_self_controlled_transition_claim=context.require_self_controlled_transition_claim,
         s_strict_mixed_attribution_guard=context.strict_mixed_attribution_guard,
+        a_capability_id=a_line_result.state.capability_id,
+        a_affordance_id=a_line_result.state.affordance_id,
+        a_capability_class=a_line_result.state.capability_class.value,
+        a_capability_status=a_line_result.state.capability_status.value,
+        a_availability_basis_present=a_line_result.state.availability_basis_present,
+        a_world_dependency_present=a_line_result.state.world_dependency_present,
+        a_self_dependency_present=a_line_result.state.self_dependency_present,
+        a_controllability_dependency_present=a_line_result.state.controllability_dependency_present,
+        a_legitimacy_dependency_present=a_line_result.state.legitimacy_dependency_present,
+        a_confidence=a_line_result.state.confidence,
+        a_degraded=a_line_result.state.degraded,
+        a_underconstrained=a_line_result.state.underconstrained,
+        a_available_capability_claim_allowed=a_line_result.gate.available_capability_claim_allowed,
+        a_world_conditioned_capability_claim_allowed=(
+            a_line_result.gate.world_conditioned_capability_claim_allowed
+        ),
+        a_self_conditioned_capability_claim_allowed=(
+            a_line_result.gate.self_conditioned_capability_claim_allowed
+        ),
+        a_policy_conditioned_capability_present=(
+            a_line_result.gate.policy_conditioned_capability_present
+        ),
+        a_no_safe_capability_claim=a_line_result.gate.no_safe_capability_claim,
+        a_forbidden_shortcuts=a_line_result.gate.forbidden_shortcuts,
+        a_restrictions=a_line_result.gate.restrictions,
+        a_a04_admission_ready=a_line_result.a04_readiness.admission_ready_for_a04,
+        a_a04_blockers=a_line_result.a04_readiness.blockers,
+        a_a04_structurally_present_but_not_ready=(
+            a_line_result.a04_readiness.structurally_present_but_not_ready
+        ),
+        a_a04_capability_basis_missing=a_line_result.a04_readiness.capability_basis_missing,
+        a_a04_world_dependency_unmet=a_line_result.a04_readiness.world_dependency_unmet,
+        a_a04_self_dependency_unmet=a_line_result.a04_readiness.self_dependency_unmet,
+        a_a04_policy_legitimacy_unmet=a_line_result.a04_readiness.policy_legitimacy_unmet,
+        a_a04_underconstrained_capability_surface=(
+            a_line_result.a04_readiness.underconstrained_capability_surface
+        ),
+        a_a04_external_means_not_justified=(
+            a_line_result.a04_readiness.external_means_not_justified
+        ),
+        a_a04_implemented=a_line_result.a04_readiness.a04_implemented,
+        a_a05_touched=a_line_result.a04_readiness.a05_touched,
+        a_scope=a_line_result.scope_marker.scope,
+        a_scope_rt01_contour_only=a_line_result.scope_marker.rt01_contour_only,
+        a_scope_a_line_normalization_only=(
+            a_line_result.scope_marker.a_line_normalization_only
+        ),
+        a_scope_readiness_gate_only=a_line_result.scope_marker.readiness_gate_only,
+        a_scope_a04_implemented=a_line_result.scope_marker.a04_implemented,
+        a_scope_a05_touched=a_line_result.scope_marker.a05_touched,
+        a_scope_full_agency_stack_implemented=(
+            a_line_result.scope_marker.full_agency_stack_implemented
+        ),
+        a_scope_repo_wide_adoption=a_line_result.scope_marker.repo_wide_adoption,
+        a_scope_reason=a_line_result.scope_marker.reason,
+        a_reason=a_line_result.reason,
+        a_require_capability_claim=context.require_a_line_capability_claim,
         execution_stance=execution_stance,
         execution_checkpoints=tuple(checkpoints),
         downstream_step_results=step_results,
@@ -1252,7 +1363,7 @@ def execute_subject_tick(
         attempted_paths=ATTEMPTED_SUBJECT_TICK_PATHS,
         downstream_gate=gate,
         causal_basis=(
-            "bounded runtime execution spine enforces roadmap authority roles for C04/C05, consumes world-entry and s-minimal contour gates, and keeps D01 observability-only over fixed R->C order"
+            "bounded runtime execution spine enforces roadmap authority roles for C04/C05, consumes world-entry, s-minimal contour and a-line normalization gates, and keeps D01 observability-only over fixed R->C order"
         ),
     )
     abstain = final_outcome in {SubjectTickOutcome.REPAIR, SubjectTickOutcome.REVALIDATE}
@@ -1281,6 +1392,7 @@ def execute_subject_tick(
         world_adapter_result=world_adapter_result,
         world_entry_result=world_entry_result,
         self_contour_result=s_minimal_result,
+        a_line_result=a_line_result,
         abstain=abstain,
         abstain_reason=abstain_reason,
         no_planner_orchestrator_dependency=True,

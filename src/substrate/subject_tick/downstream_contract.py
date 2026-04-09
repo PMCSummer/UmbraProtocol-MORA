@@ -113,6 +113,47 @@ class SubjectTickContractView:
     s_require_world_side_claim: bool
     s_require_self_controlled_transition_claim: bool
     s_strict_mixed_attribution_guard: bool
+    a_capability_id: str
+    a_affordance_id: str
+    a_capability_class: str
+    a_capability_status: str
+    a_availability_basis_present: bool
+    a_world_dependency_present: bool
+    a_self_dependency_present: bool
+    a_controllability_dependency_present: bool
+    a_legitimacy_dependency_present: bool
+    a_confidence: float
+    a_degraded: bool
+    a_underconstrained: bool
+    a_available_capability_claim_allowed: bool
+    a_world_conditioned_capability_claim_allowed: bool
+    a_self_conditioned_capability_claim_allowed: bool
+    a_policy_conditioned_capability_present: bool
+    a_no_safe_capability_claim: bool
+    a_forbidden_shortcuts: tuple[str, ...]
+    a_restrictions: tuple[str, ...]
+    a_a04_admission_ready: bool
+    a_a04_blockers: tuple[str, ...]
+    a_a04_structurally_present_but_not_ready: bool
+    a_a04_capability_basis_missing: bool
+    a_a04_world_dependency_unmet: bool
+    a_a04_self_dependency_unmet: bool
+    a_a04_policy_legitimacy_unmet: bool
+    a_a04_underconstrained_capability_surface: bool
+    a_a04_external_means_not_justified: bool
+    a_a04_implemented: bool
+    a_a05_touched: bool
+    a_scope: str
+    a_scope_rt01_contour_only: bool
+    a_scope_a_line_normalization_only: bool
+    a_scope_readiness_gate_only: bool
+    a_scope_a04_implemented: bool
+    a_scope_a05_touched: bool
+    a_scope_full_agency_stack_implemented: bool
+    a_scope_repo_wide_adoption: bool
+    a_scope_reason: str
+    a_reason: str
+    a_require_capability_claim: bool
     execution_stance: str
     execution_checkpoints: tuple[str, ...]
     final_execution_outcome: SubjectTickOutcome
@@ -266,6 +307,59 @@ def derive_subject_tick_contract_view(
             state.s_require_self_controlled_transition_claim
         ),
         s_strict_mixed_attribution_guard=state.s_strict_mixed_attribution_guard,
+        a_capability_id=state.a_capability_id,
+        a_affordance_id=state.a_affordance_id,
+        a_capability_class=state.a_capability_class,
+        a_capability_status=state.a_capability_status,
+        a_availability_basis_present=state.a_availability_basis_present,
+        a_world_dependency_present=state.a_world_dependency_present,
+        a_self_dependency_present=state.a_self_dependency_present,
+        a_controllability_dependency_present=state.a_controllability_dependency_present,
+        a_legitimacy_dependency_present=state.a_legitimacy_dependency_present,
+        a_confidence=state.a_confidence,
+        a_degraded=state.a_degraded,
+        a_underconstrained=state.a_underconstrained,
+        a_available_capability_claim_allowed=state.a_available_capability_claim_allowed,
+        a_world_conditioned_capability_claim_allowed=(
+            state.a_world_conditioned_capability_claim_allowed
+        ),
+        a_self_conditioned_capability_claim_allowed=(
+            state.a_self_conditioned_capability_claim_allowed
+        ),
+        a_policy_conditioned_capability_present=(
+            state.a_policy_conditioned_capability_present
+        ),
+        a_no_safe_capability_claim=state.a_no_safe_capability_claim,
+        a_forbidden_shortcuts=state.a_forbidden_shortcuts,
+        a_restrictions=state.a_restrictions,
+        a_a04_admission_ready=state.a_a04_admission_ready,
+        a_a04_blockers=state.a_a04_blockers,
+        a_a04_structurally_present_but_not_ready=(
+            state.a_a04_structurally_present_but_not_ready
+        ),
+        a_a04_capability_basis_missing=state.a_a04_capability_basis_missing,
+        a_a04_world_dependency_unmet=state.a_a04_world_dependency_unmet,
+        a_a04_self_dependency_unmet=state.a_a04_self_dependency_unmet,
+        a_a04_policy_legitimacy_unmet=state.a_a04_policy_legitimacy_unmet,
+        a_a04_underconstrained_capability_surface=(
+            state.a_a04_underconstrained_capability_surface
+        ),
+        a_a04_external_means_not_justified=(
+            state.a_a04_external_means_not_justified
+        ),
+        a_a04_implemented=state.a_a04_implemented,
+        a_a05_touched=state.a_a05_touched,
+        a_scope=state.a_scope,
+        a_scope_rt01_contour_only=state.a_scope_rt01_contour_only,
+        a_scope_a_line_normalization_only=state.a_scope_a_line_normalization_only,
+        a_scope_readiness_gate_only=state.a_scope_readiness_gate_only,
+        a_scope_a04_implemented=state.a_scope_a04_implemented,
+        a_scope_a05_touched=state.a_scope_a05_touched,
+        a_scope_full_agency_stack_implemented=state.a_scope_full_agency_stack_implemented,
+        a_scope_repo_wide_adoption=state.a_scope_repo_wide_adoption,
+        a_scope_reason=state.a_scope_reason,
+        a_reason=state.a_reason,
+        a_require_capability_claim=state.a_require_capability_claim,
         execution_stance=state.execution_stance.value,
         execution_checkpoints=tuple(
             f"{checkpoint.checkpoint_id}:{checkpoint.status.value}"
@@ -280,8 +374,8 @@ def derive_subject_tick_contract_view(
         usability_class=gate.usability_class,
         requires_restrictions_read=True,
         reason=(
-            "runtime contour contract requires C04/C05 claims, world-entry basis and s-minimal "
-            "self/world boundary checkpoint surfaces to be read"
+            "runtime contour contract requires C04/C05 claims, world-entry basis, s-minimal "
+            "self/world boundary and a-line normalization checkpoint surfaces to be read"
         ),
     )
 

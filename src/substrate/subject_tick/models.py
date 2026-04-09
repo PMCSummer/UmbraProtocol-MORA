@@ -6,6 +6,7 @@ from enum import Enum, StrEnum
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
+    from substrate.a_line_normalization import ALineNormalizationResult
     from substrate.self_contour import SMinimalContourResult
     from substrate.world_adapter import WorldAdapterInput, WorldAdapterResult
     from substrate.world_entry_contract import WorldEntryContractResult
@@ -80,6 +81,10 @@ class SubjectTickRestrictionCode(StrEnum):
         "s_self_world_boundary_required_for_self_claims"
     )
     S_OWNERSHIP_CONTROL_DISCIPLINE_REQUIRED = "s_ownership_control_discipline_required"
+    A_LINE_NORMALIZATION_CONTRACT_MUST_BE_READ = "a_line_normalization_contract_must_be_read"
+    A_FORBIDDEN_SHORTCUTS_MUST_BE_READ = "a_forbidden_shortcuts_must_be_read"
+    A_CAPABILITY_CLAIM_REQUIRES_BASIS = "a_capability_claim_requires_basis"
+    A_POLICY_GATED_CAPABILITY_REQUIRES_GATE = "a_policy_gated_capability_requires_gate"
     DOWNSTREAM_AUTHORITY_DEGRADED = "downstream_authority_degraded"
 
 
@@ -162,6 +167,8 @@ class SubjectTickContext:
     require_self_controlled_transition_claim: bool = False
     strict_mixed_attribution_guard: bool = True
     disable_s_minimal_enforcement: bool = False
+    require_a_line_capability_claim: bool = False
+    disable_a_line_enforcement: bool = False
     source_lineage: tuple[str, ...] = ()
 
 
@@ -294,6 +301,47 @@ class SubjectTickState:
     s_require_world_side_claim: bool
     s_require_self_controlled_transition_claim: bool
     s_strict_mixed_attribution_guard: bool
+    a_capability_id: str
+    a_affordance_id: str
+    a_capability_class: str
+    a_capability_status: str
+    a_availability_basis_present: bool
+    a_world_dependency_present: bool
+    a_self_dependency_present: bool
+    a_controllability_dependency_present: bool
+    a_legitimacy_dependency_present: bool
+    a_confidence: float
+    a_degraded: bool
+    a_underconstrained: bool
+    a_available_capability_claim_allowed: bool
+    a_world_conditioned_capability_claim_allowed: bool
+    a_self_conditioned_capability_claim_allowed: bool
+    a_policy_conditioned_capability_present: bool
+    a_no_safe_capability_claim: bool
+    a_forbidden_shortcuts: tuple[str, ...]
+    a_restrictions: tuple[str, ...]
+    a_a04_admission_ready: bool
+    a_a04_blockers: tuple[str, ...]
+    a_a04_structurally_present_but_not_ready: bool
+    a_a04_capability_basis_missing: bool
+    a_a04_world_dependency_unmet: bool
+    a_a04_self_dependency_unmet: bool
+    a_a04_policy_legitimacy_unmet: bool
+    a_a04_underconstrained_capability_surface: bool
+    a_a04_external_means_not_justified: bool
+    a_a04_implemented: bool
+    a_a05_touched: bool
+    a_scope: str
+    a_scope_rt01_contour_only: bool
+    a_scope_a_line_normalization_only: bool
+    a_scope_readiness_gate_only: bool
+    a_scope_a04_implemented: bool
+    a_scope_a05_touched: bool
+    a_scope_full_agency_stack_implemented: bool
+    a_scope_repo_wide_adoption: bool
+    a_scope_reason: str
+    a_reason: str
+    a_require_capability_claim: bool
     execution_stance: SubjectTickExecutionStance
     execution_checkpoints: tuple[SubjectTickCheckpointResult, ...]
     downstream_step_results: tuple[SubjectTickStepResult, ...]
@@ -424,6 +472,47 @@ class SubjectTickTelemetry:
     s_require_world_side_claim: bool
     s_require_self_controlled_transition_claim: bool
     s_strict_mixed_attribution_guard: bool
+    a_capability_id: str
+    a_affordance_id: str
+    a_capability_class: str
+    a_capability_status: str
+    a_availability_basis_present: bool
+    a_world_dependency_present: bool
+    a_self_dependency_present: bool
+    a_controllability_dependency_present: bool
+    a_legitimacy_dependency_present: bool
+    a_confidence: float
+    a_degraded: bool
+    a_underconstrained: bool
+    a_available_capability_claim_allowed: bool
+    a_world_conditioned_capability_claim_allowed: bool
+    a_self_conditioned_capability_claim_allowed: bool
+    a_policy_conditioned_capability_present: bool
+    a_no_safe_capability_claim: bool
+    a_forbidden_shortcuts: tuple[str, ...]
+    a_restrictions: tuple[str, ...]
+    a_a04_admission_ready: bool
+    a_a04_blockers: tuple[str, ...]
+    a_a04_structurally_present_but_not_ready: bool
+    a_a04_capability_basis_missing: bool
+    a_a04_world_dependency_unmet: bool
+    a_a04_self_dependency_unmet: bool
+    a_a04_policy_legitimacy_unmet: bool
+    a_a04_underconstrained_capability_surface: bool
+    a_a04_external_means_not_justified: bool
+    a_a04_implemented: bool
+    a_a05_touched: bool
+    a_scope: str
+    a_scope_rt01_contour_only: bool
+    a_scope_a_line_normalization_only: bool
+    a_scope_readiness_gate_only: bool
+    a_scope_a04_implemented: bool
+    a_scope_a05_touched: bool
+    a_scope_full_agency_stack_implemented: bool
+    a_scope_repo_wide_adoption: bool
+    a_scope_reason: str
+    a_reason: str
+    a_require_capability_claim: bool
     execution_stance: SubjectTickExecutionStance
     execution_checkpoints: tuple[SubjectTickCheckpointResult, ...]
     final_execution_outcome: SubjectTickOutcome
@@ -454,6 +543,7 @@ class SubjectTickResult:
     world_adapter_result: WorldAdapterResult
     world_entry_result: WorldEntryContractResult
     self_contour_result: SMinimalContourResult
+    a_line_result: ALineNormalizationResult
     abstain: bool
     abstain_reason: str | None
     no_planner_orchestrator_dependency: bool
