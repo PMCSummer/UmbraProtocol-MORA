@@ -22,6 +22,14 @@ class RuntimeDispatchContractView:
     world_link_status: str | None
     world_grounded_transition_allowed: bool | None
     world_effect_feedback_correlated: bool | None
+    world_entry_episode_id: str | None
+    world_entry_w01_admission_ready: bool | None
+    world_entry_forbidden_claim_classes: tuple[str, ...] | None
+    world_entry_scope: str | None
+    world_entry_scope_admission_layer_only: bool | None
+    world_entry_scope_w01_implemented: bool | None
+    world_entry_scope_w_line_implemented: bool | None
+    world_entry_scope_repo_wide_adoption: bool | None
     reason: str
 
 
@@ -56,6 +64,26 @@ def derive_runtime_dispatch_contract_view(
         ),
         world_effect_feedback_correlated=(
             None if state is None else state.world_effect_feedback_correlated
+        ),
+        world_entry_episode_id=(None if state is None else state.world_entry_episode_id),
+        world_entry_w01_admission_ready=(
+            None if state is None else state.world_entry_w01_admission_ready
+        ),
+        world_entry_forbidden_claim_classes=(
+            None if state is None else state.world_entry_forbidden_claim_classes
+        ),
+        world_entry_scope=(None if state is None else state.world_entry_scope),
+        world_entry_scope_admission_layer_only=(
+            None if state is None else state.world_entry_scope_admission_layer_only
+        ),
+        world_entry_scope_w01_implemented=(
+            None if state is None else state.world_entry_scope_w01_implemented
+        ),
+        world_entry_scope_w_line_implemented=(
+            None if state is None else state.world_entry_scope_w_line_implemented
+        ),
+        world_entry_scope_repo_wide_adoption=(
+            None if state is None else state.world_entry_scope_repo_wide_adoption
         ),
         reason=result.decision.reason,
     )

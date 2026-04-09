@@ -64,11 +64,13 @@ def build_minimal_runtime_tick_graph() -> RuntimeTickGraph:
                 surfaces=(
                     "rt01.downstream_obedience_checkpoint",
                     "rt01.world_seam_checkpoint",
+                    "rt01.world_entry_checkpoint",
                     "rt01.outcome_resolution_checkpoint",
                 ),
                 checkpoint_ids=(
                     "rt01.downstream_obedience_checkpoint",
                     "rt01.world_seam_checkpoint",
+                    "rt01.world_entry_checkpoint",
                     "rt01.outcome_resolution_checkpoint",
                 ),
             ),
@@ -94,12 +96,14 @@ def build_minimal_runtime_tick_graph() -> RuntimeTickGraph:
             "rt01.c05_legality_checkpoint",
             "rt01.downstream_obedience_checkpoint",
             "rt01.world_seam_checkpoint",
+            "rt01.world_entry_checkpoint",
             "rt01.outcome_resolution_checkpoint",
         ),
         source_of_truth_surfaces=(
             "runtime_state.domains",
             "rt01.downstream_obedience_checkpoint",
             "world_adapter.state",
+            "world_entry_contract.episode",
         ),
         reason="minimal production runtime graph for bounded RT01 contour wiring",
     )
@@ -124,6 +128,7 @@ def build_minimal_runtime_topology_bundle() -> RuntimeTopologyBundle:
             "test_only_ablation_guard",
             "dispatch_contract_required_for_lawful_production_use",
             "world_seam_presence_contract",
+            "world_entry_admission_contract",
         ),
         f01_transition_route="subject_tick.persist_subject_tick_result_via_f01",
         tick_graph=tick_graph,

@@ -98,7 +98,9 @@ def test_runtime_topology_bundle_and_graph_are_materialized() -> None:
     assert graph.runtime_order == ("R", "C01", "C02", "C03", "C04", "C05", "RT01")
     assert "rt01.downstream_obedience_checkpoint" in graph.mandatory_checkpoint_ids
     assert "rt01.world_seam_checkpoint" in graph.mandatory_checkpoint_ids
+    assert "rt01.world_entry_checkpoint" in graph.mandatory_checkpoint_ids
     assert "world_adapter.state" in graph.source_of_truth_surfaces
+    assert "world_entry_contract.episode" in graph.source_of_truth_surfaces
 
 
 def test_dispatch_happy_path_runs_lawful_production_contour() -> None:
@@ -422,11 +424,24 @@ def test_dispatch_contract_view_and_snapshot_are_inspectable() -> None:
     assert view.production_consumer_ready is True
     assert view.route_binding_consequence == "lawful_production_contour"
     assert "rt01.downstream_obedience_checkpoint" in view.mandatory_checkpoints
+    assert view.world_entry_episode_id is not None
+    assert view.world_entry_w01_admission_ready is False
+    assert view.world_entry_scope == "rt01_contour_only"
+    assert view.world_entry_scope_admission_layer_only is True
+    assert view.world_entry_scope_w01_implemented is False
+    assert view.world_entry_scope_w_line_implemented is False
+    assert view.world_entry_scope_repo_wide_adoption is False
     assert snapshot["decision"]["route_class"] == "production_contour"
     assert snapshot["decision"]["production_consumer_ready"] is True
     assert snapshot["decision"]["route_binding_consequence"] == "lawful_production_contour"
     assert "world_link_status" in snapshot["subject_tick_state"]
     assert "world_grounded_transition_allowed" in snapshot["subject_tick_state"]
+    assert "world_entry_episode_id" in snapshot["subject_tick_state"]
+    assert snapshot["subject_tick_state"]["world_entry_scope"] == "rt01_contour_only"
+    assert snapshot["subject_tick_state"]["world_entry_scope_admission_layer_only"] is True
+    assert snapshot["subject_tick_state"]["world_entry_scope_w01_implemented"] is False
+    assert snapshot["subject_tick_state"]["world_entry_scope_w_line_implemented"] is False
+    assert snapshot["subject_tick_state"]["world_entry_scope_repo_wide_adoption"] is False
     assert snapshot["bundle"]["runtime_entry"] == "runtime_topology.dispatch_runtime_tick"
 
 

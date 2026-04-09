@@ -110,6 +110,7 @@ from substrate.viability_control import (
     evaluate_viability_downstream_gate,
 )
 from substrate.world_adapter import run_world_adapter_cycle
+from substrate.world_entry_contract import build_world_entry_contract
 
 
 ATTEMPTED_SUBJECT_TICK_PATHS: tuple[str, ...] = (
@@ -121,6 +122,7 @@ ATTEMPTED_SUBJECT_TICK_PATHS: tuple[str, ...] = (
     "subject_tick.run_c05_temporal_validity",
     "subject_tick.enforce_c04_c05_contract_obedience",
     "subject_tick.enforce_downstream_obedience_contract",
+    "subject_tick.evaluate_world_entry_contract",
     "subject_tick.world_seam_enforcement",
     "subject_tick.resolve_bounded_runtime_outcome",
     "subject_tick.downstream_gate",
@@ -837,32 +839,37 @@ def execute_subject_tick(
         ),
         source_lineage=lineage,
     )
+    world_entry_result = build_world_entry_contract(
+        tick_id=tick_id,
+        world_adapter_result=world_adapter_result,
+        source_lineage=lineage,
+    )
     world_checkpoint_status = SubjectTickCheckpointStatus.ALLOWED
-    world_checkpoint_reason = world_adapter_result.gate.reason
+    world_checkpoint_reason = world_entry_result.reason
     if not context.disable_world_seam_enforcement:
         if (
             context.require_world_grounded_transition
-            and not world_adapter_result.gate.world_grounded_transition_allowed
+            and not world_entry_result.world_grounded_transition_admissible
             and halt_reason is None
         ):
             repair_needed = True
             world_checkpoint_status = SubjectTickCheckpointStatus.ENFORCED_DETOUR
             world_checkpoint_reason = (
-                "world grounded transition required but world seam is unavailable/degraded/unobserved"
+                "world grounded transition required but lawful world-entry episode basis is unavailable"
             )
             if active_execution_mode not in {"halt_execution", "revalidate_scope"}:
                 active_execution_mode = "repair_runtime_path"
 
         if (
             context.require_world_effect_feedback_for_success_claim
-            and not world_adapter_result.gate.externally_effected_change_claim_allowed
+            and not world_entry_result.world_effect_success_admissible
             and halt_reason is None
             and not repair_needed
         ):
             revalidation_needed = True
             world_checkpoint_status = SubjectTickCheckpointStatus.ENFORCED_DETOUR
             world_checkpoint_reason = (
-                "world effect feedback required for externally effected change claim"
+                "world effect feedback required for success claim but lawful correlated success basis is unavailable"
             )
             if active_execution_mode != "halt_execution":
                 active_execution_mode = "revalidate_scope"
@@ -873,15 +880,35 @@ def execute_subject_tick(
     checkpoints.append(
         SubjectTickCheckpointResult(
             checkpoint_id="rt01.world_seam_checkpoint",
-            source_contract="world_adapter.external_seam",
+            source_contract="world_entry_contract.admission",
             status=world_checkpoint_status,
             required_action=(
-                "require_world_grounded_transition"
+                "require_world_effect_feedback_for_success_claim"
+                if context.require_world_effect_feedback_for_success_claim
+                else "require_world_grounded_transition"
                 if context.require_world_grounded_transition
-                else "world_seam_optional"
+                else "world_entry_optional"
             ),
             applied_action=active_execution_mode,
             reason=world_checkpoint_reason,
+        )
+    )
+    checkpoints.append(
+        SubjectTickCheckpointResult(
+            checkpoint_id="rt01.world_entry_checkpoint",
+            source_contract="world_entry_contract.admission",
+            status=(
+                SubjectTickCheckpointStatus.ALLOWED
+                if world_entry_result.w01_admission.admission_ready
+                else SubjectTickCheckpointStatus.ENFORCED_DETOUR
+            ),
+            required_action="forbidden_world_claims_must_be_machine_readable",
+            applied_action=(
+                "w_entry_admission_ready"
+                if world_entry_result.w01_admission.admission_ready
+                else "w_entry_admission_not_ready"
+            ),
+            reason=world_entry_result.w01_admission.reason,
         )
     )
 
@@ -1032,6 +1059,33 @@ def execute_subject_tick(
             context.require_world_effect_feedback_for_success_claim
         ),
         world_adapter_reason=world_adapter_result.gate.reason,
+        world_entry_episode_id=world_entry_result.episode.world_episode_id,
+        world_entry_presence_mode=world_entry_result.episode.world_presence_mode.value,
+        world_entry_episode_scope=world_entry_result.episode.episode_scope,
+        world_entry_observation_basis_present=world_entry_result.episode.observation_basis_present,
+        world_entry_action_trace_present=world_entry_result.episode.action_trace_present,
+        world_entry_effect_basis_present=world_entry_result.episode.effect_basis_present,
+        world_entry_effect_feedback_correlated=world_entry_result.episode.effect_feedback_correlated,
+        world_entry_confidence=world_entry_result.episode.confidence,
+        world_entry_reliability=world_entry_result.episode.reliability,
+        world_entry_degraded=world_entry_result.episode.degraded,
+        world_entry_incomplete=world_entry_result.episode.incomplete,
+        world_entry_forbidden_claim_classes=world_entry_result.forbidden_claim_classes,
+        world_entry_world_grounded_transition_admissible=(
+            world_entry_result.world_grounded_transition_admissible
+        ),
+        world_entry_world_effect_success_admissible=(
+            world_entry_result.world_effect_success_admissible
+        ),
+        world_entry_w01_admission_ready=world_entry_result.w01_admission.admission_ready,
+        world_entry_w01_admission_restrictions=world_entry_result.w01_admission.restrictions,
+        world_entry_scope=world_entry_result.scope_marker.scope,
+        world_entry_scope_admission_layer_only=world_entry_result.scope_marker.admission_layer_only,
+        world_entry_scope_w01_implemented=world_entry_result.scope_marker.w01_implemented,
+        world_entry_scope_w_line_implemented=world_entry_result.scope_marker.w_line_implemented,
+        world_entry_scope_repo_wide_adoption=world_entry_result.scope_marker.repo_wide_adoption,
+        world_entry_scope_reason=world_entry_result.scope_marker.reason,
+        world_entry_reason=world_entry_result.w01_admission.reason,
         execution_stance=execution_stance,
         execution_checkpoints=tuple(checkpoints),
         downstream_step_results=step_results,
@@ -1090,6 +1144,7 @@ def execute_subject_tick(
         c04_result=mode_arbitration,
         c05_result=temporal_validity,
         world_adapter_result=world_adapter_result,
+        world_entry_result=world_entry_result,
         abstain=abstain,
         abstain_reason=abstain_reason,
         no_planner_orchestrator_dependency=True,

@@ -49,6 +49,14 @@ def runtime_dispatch_snapshot(result: RuntimeDispatchResult) -> dict[str, object
                 "world_link_status": state.world_link_status,
                 "world_grounded_transition_allowed": state.world_grounded_transition_allowed,
                 "world_effect_feedback_correlated": state.world_effect_feedback_correlated,
+                "world_entry_episode_id": state.world_entry_episode_id,
+                "world_entry_w01_admission_ready": state.world_entry_w01_admission_ready,
+                "world_entry_forbidden_claim_classes": state.world_entry_forbidden_claim_classes,
+                "world_entry_scope": state.world_entry_scope,
+                "world_entry_scope_admission_layer_only": state.world_entry_scope_admission_layer_only,
+                "world_entry_scope_w01_implemented": state.world_entry_scope_w01_implemented,
+                "world_entry_scope_w_line_implemented": state.world_entry_scope_w_line_implemented,
+                "world_entry_scope_repo_wide_adoption": state.world_entry_scope_repo_wide_adoption,
             }
         ),
         "persist_transition_accepted": (

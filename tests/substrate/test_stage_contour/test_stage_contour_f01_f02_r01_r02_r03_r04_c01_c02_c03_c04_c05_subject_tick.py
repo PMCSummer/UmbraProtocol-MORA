@@ -155,6 +155,8 @@ def test_stage_contour_world_seam_presence_changes_runtime_legality_path() -> No
     )
     assert absent.state.final_execution_outcome.value == "repair"
     assert present.state.final_execution_outcome.value == "continue"
+    assert absent.state.world_entry_episode_id.startswith("world-episode:")
+    assert present.state.world_entry_episode_id.startswith("world-episode:")
     assert any(
         checkpoint.checkpoint_id == "rt01.world_seam_checkpoint"
         and checkpoint.status.value == "enforced_detour"
@@ -164,6 +166,10 @@ def test_stage_contour_world_seam_presence_changes_runtime_legality_path() -> No
         checkpoint.checkpoint_id == "rt01.world_seam_checkpoint"
         and checkpoint.status.value == "allowed"
         for checkpoint in present.state.execution_checkpoints
+    )
+    assert any(
+        checkpoint.checkpoint_id == "rt01.world_entry_checkpoint"
+        for checkpoint in absent.state.execution_checkpoints
     )
 
 
@@ -231,9 +237,11 @@ def test_stage_contour_world_effect_action_mismatch_forces_revalidate_when_feedb
         ),
     )
     assert matched.state.world_effect_feedback_correlated is True
+    assert matched.state.world_entry_world_effect_success_admissible is True
     assert matched.state.final_execution_outcome.value == "continue"
     assert mismatched.state.world_effect_feedback_correlated is False
     assert mismatched.state.world_externally_effected_change_claim_allowed is False
+    assert mismatched.state.world_entry_world_effect_success_admissible is False
     assert mismatched.state.final_execution_outcome.value == "revalidate"
     assert any(
         checkpoint.checkpoint_id == "rt01.world_seam_checkpoint"

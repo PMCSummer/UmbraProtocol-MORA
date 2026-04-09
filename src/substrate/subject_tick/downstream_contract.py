@@ -49,6 +49,29 @@ class SubjectTickContractView:
     world_require_grounded_transition: bool
     world_require_effect_feedback_for_success_claim: bool
     world_adapter_reason: str
+    world_entry_episode_id: str
+    world_entry_presence_mode: str
+    world_entry_episode_scope: str
+    world_entry_observation_basis_present: bool
+    world_entry_action_trace_present: bool
+    world_entry_effect_basis_present: bool
+    world_entry_effect_feedback_correlated: bool
+    world_entry_confidence: float
+    world_entry_reliability: str
+    world_entry_degraded: bool
+    world_entry_incomplete: bool
+    world_entry_forbidden_claim_classes: tuple[str, ...]
+    world_entry_world_grounded_transition_admissible: bool
+    world_entry_world_effect_success_admissible: bool
+    world_entry_w01_admission_ready: bool
+    world_entry_w01_admission_restrictions: tuple[str, ...]
+    world_entry_scope: str
+    world_entry_scope_admission_layer_only: bool
+    world_entry_scope_w01_implemented: bool
+    world_entry_scope_w_line_implemented: bool
+    world_entry_scope_repo_wide_adoption: bool
+    world_entry_scope_reason: str
+    world_entry_reason: str
     execution_stance: str
     execution_checkpoints: tuple[str, ...]
     final_execution_outcome: SubjectTickOutcome
@@ -132,6 +155,33 @@ def derive_subject_tick_contract_view(
             state.world_require_effect_feedback_for_success_claim
         ),
         world_adapter_reason=state.world_adapter_reason,
+        world_entry_episode_id=state.world_entry_episode_id,
+        world_entry_presence_mode=state.world_entry_presence_mode,
+        world_entry_episode_scope=state.world_entry_episode_scope,
+        world_entry_observation_basis_present=state.world_entry_observation_basis_present,
+        world_entry_action_trace_present=state.world_entry_action_trace_present,
+        world_entry_effect_basis_present=state.world_entry_effect_basis_present,
+        world_entry_effect_feedback_correlated=state.world_entry_effect_feedback_correlated,
+        world_entry_confidence=state.world_entry_confidence,
+        world_entry_reliability=state.world_entry_reliability,
+        world_entry_degraded=state.world_entry_degraded,
+        world_entry_incomplete=state.world_entry_incomplete,
+        world_entry_forbidden_claim_classes=state.world_entry_forbidden_claim_classes,
+        world_entry_world_grounded_transition_admissible=(
+            state.world_entry_world_grounded_transition_admissible
+        ),
+        world_entry_world_effect_success_admissible=(
+            state.world_entry_world_effect_success_admissible
+        ),
+        world_entry_w01_admission_ready=state.world_entry_w01_admission_ready,
+        world_entry_w01_admission_restrictions=state.world_entry_w01_admission_restrictions,
+        world_entry_scope=state.world_entry_scope,
+        world_entry_scope_admission_layer_only=state.world_entry_scope_admission_layer_only,
+        world_entry_scope_w01_implemented=state.world_entry_scope_w01_implemented,
+        world_entry_scope_w_line_implemented=state.world_entry_scope_w_line_implemented,
+        world_entry_scope_repo_wide_adoption=state.world_entry_scope_repo_wide_adoption,
+        world_entry_scope_reason=state.world_entry_scope_reason,
+        world_entry_reason=state.world_entry_reason,
         execution_stance=state.execution_stance.value,
         execution_checkpoints=tuple(
             f"{checkpoint.checkpoint_id}:{checkpoint.status.value}"

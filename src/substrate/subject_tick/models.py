@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from substrate.world_adapter import WorldAdapterInput, WorldAdapterResult
+    from substrate.world_entry_contract import WorldEntryContractResult
 
 
 class SubjectTickOutcome(str, Enum):
@@ -69,6 +70,9 @@ class SubjectTickRestrictionCode(StrEnum):
     WORLD_EFFECT_FEEDBACK_REQUIRED_FOR_SUCCESS_CLAIM = (
         "world_effect_feedback_required_for_success_claim"
     )
+    W_ENTRY_CONTRACT_MUST_BE_READ = "w_entry_contract_must_be_read"
+    W_ENTRY_FORBIDDEN_CLAIMS_MUST_BE_READ = "w_entry_forbidden_claims_must_be_read"
+    W_ENTRY_ADMISSION_CRITERIA_MUST_BE_READ = "w_entry_admission_criteria_must_be_read"
     DOWNSTREAM_AUTHORITY_DEGRADED = "downstream_authority_degraded"
 
 
@@ -214,6 +218,29 @@ class SubjectTickState:
     world_require_grounded_transition: bool
     world_require_effect_feedback_for_success_claim: bool
     world_adapter_reason: str
+    world_entry_episode_id: str
+    world_entry_presence_mode: str
+    world_entry_episode_scope: str
+    world_entry_observation_basis_present: bool
+    world_entry_action_trace_present: bool
+    world_entry_effect_basis_present: bool
+    world_entry_effect_feedback_correlated: bool
+    world_entry_confidence: float
+    world_entry_reliability: str
+    world_entry_degraded: bool
+    world_entry_incomplete: bool
+    world_entry_forbidden_claim_classes: tuple[str, ...]
+    world_entry_world_grounded_transition_admissible: bool
+    world_entry_world_effect_success_admissible: bool
+    world_entry_w01_admission_ready: bool
+    world_entry_w01_admission_restrictions: tuple[str, ...]
+    world_entry_scope: str
+    world_entry_scope_admission_layer_only: bool
+    world_entry_scope_w01_implemented: bool
+    world_entry_scope_w_line_implemented: bool
+    world_entry_scope_repo_wide_adoption: bool
+    world_entry_scope_reason: str
+    world_entry_reason: str
     execution_stance: SubjectTickExecutionStance
     execution_checkpoints: tuple[SubjectTickCheckpointResult, ...]
     downstream_step_results: tuple[SubjectTickStepResult, ...]
@@ -280,6 +307,29 @@ class SubjectTickTelemetry:
     world_require_grounded_transition: bool
     world_require_effect_feedback_for_success_claim: bool
     world_adapter_reason: str
+    world_entry_episode_id: str
+    world_entry_presence_mode: str
+    world_entry_episode_scope: str
+    world_entry_observation_basis_present: bool
+    world_entry_action_trace_present: bool
+    world_entry_effect_basis_present: bool
+    world_entry_effect_feedback_correlated: bool
+    world_entry_confidence: float
+    world_entry_reliability: str
+    world_entry_degraded: bool
+    world_entry_incomplete: bool
+    world_entry_forbidden_claim_classes: tuple[str, ...]
+    world_entry_world_grounded_transition_admissible: bool
+    world_entry_world_effect_success_admissible: bool
+    world_entry_w01_admission_ready: bool
+    world_entry_w01_admission_restrictions: tuple[str, ...]
+    world_entry_scope: str
+    world_entry_scope_admission_layer_only: bool
+    world_entry_scope_w01_implemented: bool
+    world_entry_scope_w_line_implemented: bool
+    world_entry_scope_repo_wide_adoption: bool
+    world_entry_scope_reason: str
+    world_entry_reason: str
     execution_stance: SubjectTickExecutionStance
     execution_checkpoints: tuple[SubjectTickCheckpointResult, ...]
     final_execution_outcome: SubjectTickOutcome
@@ -308,6 +358,7 @@ class SubjectTickResult:
     c04_result: object
     c05_result: object
     world_adapter_result: WorldAdapterResult
+    world_entry_result: WorldEntryContractResult
     abstain: bool
     abstain_reason: str | None
     no_planner_orchestrator_dependency: bool

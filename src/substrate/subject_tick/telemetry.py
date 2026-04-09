@@ -60,6 +60,33 @@ def build_subject_tick_telemetry(
             state.world_require_effect_feedback_for_success_claim
         ),
         world_adapter_reason=state.world_adapter_reason,
+        world_entry_episode_id=state.world_entry_episode_id,
+        world_entry_presence_mode=state.world_entry_presence_mode,
+        world_entry_episode_scope=state.world_entry_episode_scope,
+        world_entry_observation_basis_present=state.world_entry_observation_basis_present,
+        world_entry_action_trace_present=state.world_entry_action_trace_present,
+        world_entry_effect_basis_present=state.world_entry_effect_basis_present,
+        world_entry_effect_feedback_correlated=state.world_entry_effect_feedback_correlated,
+        world_entry_confidence=state.world_entry_confidence,
+        world_entry_reliability=state.world_entry_reliability,
+        world_entry_degraded=state.world_entry_degraded,
+        world_entry_incomplete=state.world_entry_incomplete,
+        world_entry_forbidden_claim_classes=state.world_entry_forbidden_claim_classes,
+        world_entry_world_grounded_transition_admissible=(
+            state.world_entry_world_grounded_transition_admissible
+        ),
+        world_entry_world_effect_success_admissible=(
+            state.world_entry_world_effect_success_admissible
+        ),
+        world_entry_w01_admission_ready=state.world_entry_w01_admission_ready,
+        world_entry_w01_admission_restrictions=state.world_entry_w01_admission_restrictions,
+        world_entry_scope=state.world_entry_scope,
+        world_entry_scope_admission_layer_only=state.world_entry_scope_admission_layer_only,
+        world_entry_scope_w01_implemented=state.world_entry_scope_w01_implemented,
+        world_entry_scope_w_line_implemented=state.world_entry_scope_w_line_implemented,
+        world_entry_scope_repo_wide_adoption=state.world_entry_scope_repo_wide_adoption,
+        world_entry_scope_reason=state.world_entry_scope_reason,
+        world_entry_reason=state.world_entry_reason,
         execution_stance=state.execution_stance,
         execution_checkpoints=state.execution_checkpoints,
         final_execution_outcome=state.final_execution_outcome,
@@ -133,6 +160,33 @@ def subject_tick_result_snapshot(result: SubjectTickResult) -> dict[str, object]
                 state.world_require_effect_feedback_for_success_claim
             ),
             "world_adapter_reason": state.world_adapter_reason,
+            "world_entry_episode_id": state.world_entry_episode_id,
+            "world_entry_presence_mode": state.world_entry_presence_mode,
+            "world_entry_episode_scope": state.world_entry_episode_scope,
+            "world_entry_observation_basis_present": state.world_entry_observation_basis_present,
+            "world_entry_action_trace_present": state.world_entry_action_trace_present,
+            "world_entry_effect_basis_present": state.world_entry_effect_basis_present,
+            "world_entry_effect_feedback_correlated": state.world_entry_effect_feedback_correlated,
+            "world_entry_confidence": state.world_entry_confidence,
+            "world_entry_reliability": state.world_entry_reliability,
+            "world_entry_degraded": state.world_entry_degraded,
+            "world_entry_incomplete": state.world_entry_incomplete,
+            "world_entry_forbidden_claim_classes": state.world_entry_forbidden_claim_classes,
+            "world_entry_world_grounded_transition_admissible": (
+                state.world_entry_world_grounded_transition_admissible
+            ),
+            "world_entry_world_effect_success_admissible": (
+                state.world_entry_world_effect_success_admissible
+            ),
+            "world_entry_w01_admission_ready": state.world_entry_w01_admission_ready,
+            "world_entry_w01_admission_restrictions": state.world_entry_w01_admission_restrictions,
+            "world_entry_scope": state.world_entry_scope,
+            "world_entry_scope_admission_layer_only": state.world_entry_scope_admission_layer_only,
+            "world_entry_scope_w01_implemented": state.world_entry_scope_w01_implemented,
+            "world_entry_scope_w_line_implemented": state.world_entry_scope_w_line_implemented,
+            "world_entry_scope_repo_wide_adoption": state.world_entry_scope_repo_wide_adoption,
+            "world_entry_scope_reason": state.world_entry_scope_reason,
+            "world_entry_reason": state.world_entry_reason,
             "execution_stance": state.execution_stance.value,
             "execution_checkpoints": tuple(
                 {
@@ -191,6 +245,32 @@ def subject_tick_result_snapshot(result: SubjectTickResult) -> dict[str, object]
             "restrictions": result.world_adapter_result.gate.restrictions,
             "reason": result.world_adapter_result.gate.reason,
         },
+        "world_entry_result": {
+            "episode_id": result.world_entry_result.episode.world_episode_id,
+            "world_presence_mode": result.world_entry_result.episode.world_presence_mode.value,
+            "observation_basis_present": result.world_entry_result.episode.observation_basis_present,
+            "action_trace_present": result.world_entry_result.episode.action_trace_present,
+            "effect_basis_present": result.world_entry_result.episode.effect_basis_present,
+            "effect_feedback_correlated": result.world_entry_result.episode.effect_feedback_correlated,
+            "forbidden_claim_classes": result.world_entry_result.forbidden_claim_classes,
+            "world_grounded_transition_admissible": (
+                result.world_entry_result.world_grounded_transition_admissible
+            ),
+            "world_effect_success_admissible": (
+                result.world_entry_result.world_effect_success_admissible
+            ),
+            "w01_admission_ready": result.world_entry_result.w01_admission.admission_ready,
+            "w01_admission_restrictions": result.world_entry_result.w01_admission.restrictions,
+            "scope_marker": {
+                "scope": result.world_entry_result.scope_marker.scope,
+                "admission_layer_only": result.world_entry_result.scope_marker.admission_layer_only,
+                "w01_implemented": result.world_entry_result.scope_marker.w01_implemented,
+                "w_line_implemented": result.world_entry_result.scope_marker.w_line_implemented,
+                "repo_wide_adoption": result.world_entry_result.scope_marker.repo_wide_adoption,
+                "reason": result.world_entry_result.scope_marker.reason,
+            },
+            "reason": result.world_entry_result.reason,
+        },
         "downstream_gate": {
             "accepted": result.downstream_gate.accepted,
             "usability_class": result.downstream_gate.usability_class.value,
@@ -248,6 +328,47 @@ def subject_tick_result_snapshot(result: SubjectTickResult) -> dict[str, object]
                 result.telemetry.world_require_effect_feedback_for_success_claim
             ),
             "world_adapter_reason": result.telemetry.world_adapter_reason,
+            "world_entry_episode_id": result.telemetry.world_entry_episode_id,
+            "world_entry_presence_mode": result.telemetry.world_entry_presence_mode,
+            "world_entry_episode_scope": result.telemetry.world_entry_episode_scope,
+            "world_entry_observation_basis_present": (
+                result.telemetry.world_entry_observation_basis_present
+            ),
+            "world_entry_action_trace_present": result.telemetry.world_entry_action_trace_present,
+            "world_entry_effect_basis_present": result.telemetry.world_entry_effect_basis_present,
+            "world_entry_effect_feedback_correlated": (
+                result.telemetry.world_entry_effect_feedback_correlated
+            ),
+            "world_entry_confidence": result.telemetry.world_entry_confidence,
+            "world_entry_reliability": result.telemetry.world_entry_reliability,
+            "world_entry_degraded": result.telemetry.world_entry_degraded,
+            "world_entry_incomplete": result.telemetry.world_entry_incomplete,
+            "world_entry_forbidden_claim_classes": (
+                result.telemetry.world_entry_forbidden_claim_classes
+            ),
+            "world_entry_world_grounded_transition_admissible": (
+                result.telemetry.world_entry_world_grounded_transition_admissible
+            ),
+            "world_entry_world_effect_success_admissible": (
+                result.telemetry.world_entry_world_effect_success_admissible
+            ),
+            "world_entry_w01_admission_ready": result.telemetry.world_entry_w01_admission_ready,
+            "world_entry_w01_admission_restrictions": (
+                result.telemetry.world_entry_w01_admission_restrictions
+            ),
+            "world_entry_scope": result.telemetry.world_entry_scope,
+            "world_entry_scope_admission_layer_only": (
+                result.telemetry.world_entry_scope_admission_layer_only
+            ),
+            "world_entry_scope_w01_implemented": result.telemetry.world_entry_scope_w01_implemented,
+            "world_entry_scope_w_line_implemented": (
+                result.telemetry.world_entry_scope_w_line_implemented
+            ),
+            "world_entry_scope_repo_wide_adoption": (
+                result.telemetry.world_entry_scope_repo_wide_adoption
+            ),
+            "world_entry_scope_reason": result.telemetry.world_entry_scope_reason,
+            "world_entry_reason": result.telemetry.world_entry_reason,
             "execution_stance": result.telemetry.execution_stance.value,
             "execution_checkpoints": tuple(
                 {
