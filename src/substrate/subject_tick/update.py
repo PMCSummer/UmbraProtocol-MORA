@@ -110,6 +110,7 @@ from substrate.viability_control import (
     evaluate_viability_downstream_gate,
 )
 from substrate.world_adapter import run_world_adapter_cycle
+from substrate.self_contour import build_s_minimal_contour
 from substrate.world_entry_contract import build_world_entry_contract
 
 
@@ -123,6 +124,7 @@ ATTEMPTED_SUBJECT_TICK_PATHS: tuple[str, ...] = (
     "subject_tick.enforce_c04_c05_contract_obedience",
     "subject_tick.enforce_downstream_obedience_contract",
     "subject_tick.evaluate_world_entry_contract",
+    "subject_tick.evaluate_s_minimal_contour",
     "subject_tick.world_seam_enforcement",
     "subject_tick.resolve_bounded_runtime_outcome",
     "subject_tick.downstream_gate",
@@ -911,6 +913,94 @@ def execute_subject_tick(
             reason=world_entry_result.w01_admission.reason,
         )
     )
+    s_minimal_result = build_s_minimal_contour(
+        tick_id=tick_id,
+        world_entry_result=world_entry_result,
+        world_adapter_result=world_adapter_result,
+        require_self_side_claim=context.require_self_side_claim,
+        require_world_side_claim=context.require_world_side_claim,
+        require_self_controlled_transition_claim=context.require_self_controlled_transition_claim,
+        source_lineage=lineage,
+    )
+    s_checkpoint_status = SubjectTickCheckpointStatus.ALLOWED
+    s_checkpoint_reason = s_minimal_result.gate.reason
+    if not context.disable_s_minimal_enforcement:
+        if (
+            context.require_self_controlled_transition_claim
+            and not s_minimal_result.gate.self_controlled_transition_claim_allowed
+            and halt_reason is None
+        ):
+            revalidation_needed = True
+            s_checkpoint_status = SubjectTickCheckpointStatus.ENFORCED_DETOUR
+            s_checkpoint_reason = (
+                "self-controlled transition claim requested but s-minimal contour lacks controllability basis"
+            )
+            if active_execution_mode != "halt_execution":
+                active_execution_mode = "revalidate_scope"
+        if (
+            context.require_self_side_claim
+            and not s_minimal_result.gate.self_owned_state_claim_allowed
+            and halt_reason is None
+            and not revalidation_needed
+        ):
+            repair_needed = True
+            s_checkpoint_status = SubjectTickCheckpointStatus.ENFORCED_DETOUR
+            s_checkpoint_reason = (
+                "self-side claim requested but s-minimal contour has no safe self attribution basis"
+            )
+            if active_execution_mode not in {"halt_execution", "revalidate_scope"}:
+                active_execution_mode = "repair_runtime_path"
+        if (
+            context.require_world_side_claim
+            and not (
+                s_minimal_result.gate.externally_caused_change_claim_allowed
+                or s_minimal_result.gate.world_caused_perturbation_claim_allowed
+            )
+            and halt_reason is None
+            and not revalidation_needed
+        ):
+            repair_needed = True
+            s_checkpoint_status = SubjectTickCheckpointStatus.ENFORCED_DETOUR
+            s_checkpoint_reason = (
+                "world-side claim requested but s-minimal contour has no safe world attribution basis"
+            )
+            if active_execution_mode not in {"halt_execution", "revalidate_scope"}:
+                active_execution_mode = "repair_runtime_path"
+        if (
+            context.require_self_side_claim
+            and context.require_world_side_claim
+            and "mixed_attribution_without_uncertainty_marking"
+            in s_minimal_result.gate.forbidden_shortcuts
+            and halt_reason is None
+        ):
+            revalidation_needed = True
+            s_checkpoint_status = SubjectTickCheckpointStatus.ENFORCED_DETOUR
+            s_checkpoint_reason = (
+                "simultaneous self/world claim request remains mixed; explicit uncertainty marking required"
+            )
+            if active_execution_mode != "halt_execution":
+                active_execution_mode = "revalidate_scope"
+    else:
+        s_checkpoint_status = SubjectTickCheckpointStatus.ENFORCED_DETOUR
+        s_checkpoint_reason = "s-minimal contour enforcement disabled in ablation context"
+    checkpoints.append(
+        SubjectTickCheckpointResult(
+            checkpoint_id="rt01.s_minimal_contour_checkpoint",
+            source_contract="s_minimal_contour.boundary",
+            status=s_checkpoint_status,
+            required_action=(
+                "require_self_controlled_transition_claim"
+                if context.require_self_controlled_transition_claim
+                else "require_self_side_claim"
+                if context.require_self_side_claim
+                else "require_world_side_claim"
+                if context.require_world_side_claim
+                else "s_minimal_optional"
+            ),
+            applied_action=active_execution_mode,
+            reason=s_checkpoint_reason,
+        )
+    )
 
     if halt_reason is not None:
         final_outcome = SubjectTickOutcome.HALT
@@ -1086,6 +1176,34 @@ def execute_subject_tick(
         world_entry_scope_repo_wide_adoption=world_entry_result.scope_marker.repo_wide_adoption,
         world_entry_scope_reason=world_entry_result.scope_marker.reason,
         world_entry_reason=world_entry_result.w01_admission.reason,
+        s_boundary_state_id=s_minimal_result.state.boundary_state_id,
+        s_self_attribution_basis_present=s_minimal_result.state.self_attribution_basis_present,
+        s_world_attribution_basis_present=s_minimal_result.state.world_attribution_basis_present,
+        s_controllability_estimate=s_minimal_result.state.controllability_estimate,
+        s_ownership_estimate=s_minimal_result.state.ownership_estimate,
+        s_attribution_confidence=s_minimal_result.state.attribution_confidence,
+        s_source_status=s_minimal_result.state.internal_vs_external_source_status.value,
+        s_boundary_breach_risk=s_minimal_result.state.boundary_breach_risk.value,
+        s_attribution_class=s_minimal_result.state.attribution_class.value,
+        s_no_safe_self_claim=s_minimal_result.gate.no_safe_self_claim,
+        s_no_safe_world_claim=s_minimal_result.gate.no_safe_world_claim,
+        s_degraded=s_minimal_result.state.degraded,
+        s_underconstrained=s_minimal_result.state.underconstrained,
+        s_forbidden_shortcuts=s_minimal_result.gate.forbidden_shortcuts,
+        s_restrictions=s_minimal_result.gate.restrictions,
+        s_s01_admission_ready=s_minimal_result.admission.admission_ready_for_s01,
+        s_future_s01_s05_remain_open=s_minimal_result.admission.future_s01_s05_remain_open,
+        s_full_self_model_implemented=s_minimal_result.admission.full_self_model_implemented,
+        s_scope=s_minimal_result.scope_marker.scope,
+        s_scope_minimal_contour_only=s_minimal_result.scope_marker.minimal_contour_only,
+        s_scope_s01_s05_implemented=s_minimal_result.scope_marker.s01_s05_implemented,
+        s_scope_full_self_model_implemented=s_minimal_result.scope_marker.full_self_model_implemented,
+        s_scope_repo_wide_adoption=s_minimal_result.scope_marker.repo_wide_adoption,
+        s_scope_reason=s_minimal_result.scope_marker.reason,
+        s_reason=s_minimal_result.reason,
+        s_require_self_side_claim=context.require_self_side_claim,
+        s_require_world_side_claim=context.require_world_side_claim,
+        s_require_self_controlled_transition_claim=context.require_self_controlled_transition_claim,
         execution_stance=execution_stance,
         execution_checkpoints=tuple(checkpoints),
         downstream_step_results=step_results,
@@ -1117,7 +1235,7 @@ def execute_subject_tick(
         attempted_paths=ATTEMPTED_SUBJECT_TICK_PATHS,
         downstream_gate=gate,
         causal_basis=(
-            "bounded runtime execution spine enforces roadmap authority roles for C04/C05 and keeps D01 observability-only over fixed R->C order"
+            "bounded runtime execution spine enforces roadmap authority roles for C04/C05, consumes world-entry and s-minimal contour gates, and keeps D01 observability-only over fixed R->C order"
         ),
     )
     abstain = final_outcome in {SubjectTickOutcome.REPAIR, SubjectTickOutcome.REVALIDATE}
@@ -1145,6 +1263,7 @@ def execute_subject_tick(
         c05_result=temporal_validity,
         world_adapter_result=world_adapter_result,
         world_entry_result=world_entry_result,
+        self_contour_result=s_minimal_result,
         abstain=abstain,
         abstain_reason=abstain_reason,
         no_planner_orchestrator_dependency=True,

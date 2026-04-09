@@ -248,3 +248,56 @@ def test_stage_contour_world_effect_action_mismatch_forces_revalidate_when_feedb
         and checkpoint.status.value == "enforced_detour"
         for checkpoint in mismatched.state.execution_checkpoints
     )
+
+
+def test_stage_contour_s_minimal_self_side_claim_without_basis_forces_repair() -> None:
+    baseline = execute_subject_tick(
+        SubjectTickInput(
+            case_id="stage-subject-tick-s-minimal-baseline",
+            energy=66.0,
+            cognitive=44.0,
+            safety=74.0,
+            unresolved_preference=False,
+        ),
+        context=SubjectTickContext(
+            world_adapter_input=WorldAdapterInput(
+                adapter_presence=True,
+                adapter_available=True,
+                observation_packet=build_world_observation_packet(
+                    observation_id="obs-stage-s-minimal-baseline",
+                    source_ref="world.sensor.stage",
+                    observed_at="2026-04-09T12:20:00+00:00",
+                    payload_ref="payload:stage-s-minimal-baseline",
+                ),
+            ),
+        ),
+    )
+    enforced = execute_subject_tick(
+        SubjectTickInput(
+            case_id="stage-subject-tick-s-minimal-enforced",
+            energy=66.0,
+            cognitive=44.0,
+            safety=74.0,
+            unresolved_preference=False,
+        ),
+        context=SubjectTickContext(
+            require_self_side_claim=True,
+            world_adapter_input=WorldAdapterInput(
+                adapter_presence=True,
+                adapter_available=True,
+                observation_packet=build_world_observation_packet(
+                    observation_id="obs-stage-s-minimal-enforced",
+                    source_ref="world.sensor.stage",
+                    observed_at="2026-04-09T12:20:10+00:00",
+                    payload_ref="payload:stage-s-minimal-enforced",
+                ),
+            ),
+        ),
+    )
+    assert baseline.state.final_execution_outcome.value == "continue"
+    assert enforced.state.final_execution_outcome.value == "repair"
+    assert any(
+        checkpoint.checkpoint_id == "rt01.s_minimal_contour_checkpoint"
+        and checkpoint.status.value == "enforced_detour"
+        for checkpoint in enforced.state.execution_checkpoints
+    )

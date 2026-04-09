@@ -57,6 +57,18 @@ def runtime_dispatch_snapshot(result: RuntimeDispatchResult) -> dict[str, object
                 "world_entry_scope_w01_implemented": state.world_entry_scope_w01_implemented,
                 "world_entry_scope_w_line_implemented": state.world_entry_scope_w_line_implemented,
                 "world_entry_scope_repo_wide_adoption": state.world_entry_scope_repo_wide_adoption,
+                "s_boundary_state_id": state.s_boundary_state_id,
+                "s_attribution_class": state.s_attribution_class,
+                "s_underconstrained": state.s_underconstrained,
+                "s_no_safe_self_claim": state.s_no_safe_self_claim,
+                "s_no_safe_world_claim": state.s_no_safe_world_claim,
+                "s_forbidden_shortcuts": state.s_forbidden_shortcuts,
+                "s_s01_admission_ready": state.s_s01_admission_ready,
+                "s_scope": state.s_scope,
+                "s_scope_minimal_contour_only": state.s_scope_minimal_contour_only,
+                "s_scope_s01_s05_implemented": state.s_scope_s01_s05_implemented,
+                "s_scope_full_self_model_implemented": state.s_scope_full_self_model_implemented,
+                "s_scope_repo_wide_adoption": state.s_scope_repo_wide_adoption,
             }
         ),
         "persist_transition_accepted": (

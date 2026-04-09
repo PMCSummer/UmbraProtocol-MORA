@@ -72,6 +72,34 @@ class SubjectTickContractView:
     world_entry_scope_repo_wide_adoption: bool
     world_entry_scope_reason: str
     world_entry_reason: str
+    s_boundary_state_id: str
+    s_self_attribution_basis_present: bool
+    s_world_attribution_basis_present: bool
+    s_controllability_estimate: float
+    s_ownership_estimate: float
+    s_attribution_confidence: float
+    s_source_status: str
+    s_boundary_breach_risk: str
+    s_attribution_class: str
+    s_no_safe_self_claim: bool
+    s_no_safe_world_claim: bool
+    s_degraded: bool
+    s_underconstrained: bool
+    s_forbidden_shortcuts: tuple[str, ...]
+    s_restrictions: tuple[str, ...]
+    s_s01_admission_ready: bool
+    s_future_s01_s05_remain_open: bool
+    s_full_self_model_implemented: bool
+    s_scope: str
+    s_scope_minimal_contour_only: bool
+    s_scope_s01_s05_implemented: bool
+    s_scope_full_self_model_implemented: bool
+    s_scope_repo_wide_adoption: bool
+    s_scope_reason: str
+    s_reason: str
+    s_require_self_side_claim: bool
+    s_require_world_side_claim: bool
+    s_require_self_controlled_transition_claim: bool
     execution_stance: str
     execution_checkpoints: tuple[str, ...]
     final_execution_outcome: SubjectTickOutcome
@@ -182,6 +210,36 @@ def derive_subject_tick_contract_view(
         world_entry_scope_repo_wide_adoption=state.world_entry_scope_repo_wide_adoption,
         world_entry_scope_reason=state.world_entry_scope_reason,
         world_entry_reason=state.world_entry_reason,
+        s_boundary_state_id=state.s_boundary_state_id,
+        s_self_attribution_basis_present=state.s_self_attribution_basis_present,
+        s_world_attribution_basis_present=state.s_world_attribution_basis_present,
+        s_controllability_estimate=state.s_controllability_estimate,
+        s_ownership_estimate=state.s_ownership_estimate,
+        s_attribution_confidence=state.s_attribution_confidence,
+        s_source_status=state.s_source_status,
+        s_boundary_breach_risk=state.s_boundary_breach_risk,
+        s_attribution_class=state.s_attribution_class,
+        s_no_safe_self_claim=state.s_no_safe_self_claim,
+        s_no_safe_world_claim=state.s_no_safe_world_claim,
+        s_degraded=state.s_degraded,
+        s_underconstrained=state.s_underconstrained,
+        s_forbidden_shortcuts=state.s_forbidden_shortcuts,
+        s_restrictions=state.s_restrictions,
+        s_s01_admission_ready=state.s_s01_admission_ready,
+        s_future_s01_s05_remain_open=state.s_future_s01_s05_remain_open,
+        s_full_self_model_implemented=state.s_full_self_model_implemented,
+        s_scope=state.s_scope,
+        s_scope_minimal_contour_only=state.s_scope_minimal_contour_only,
+        s_scope_s01_s05_implemented=state.s_scope_s01_s05_implemented,
+        s_scope_full_self_model_implemented=state.s_scope_full_self_model_implemented,
+        s_scope_repo_wide_adoption=state.s_scope_repo_wide_adoption,
+        s_scope_reason=state.s_scope_reason,
+        s_reason=state.s_reason,
+        s_require_self_side_claim=state.s_require_self_side_claim,
+        s_require_world_side_claim=state.s_require_world_side_claim,
+        s_require_self_controlled_transition_claim=(
+            state.s_require_self_controlled_transition_claim
+        ),
         execution_stance=state.execution_stance.value,
         execution_checkpoints=tuple(
             f"{checkpoint.checkpoint_id}:{checkpoint.status.value}"
@@ -195,7 +253,10 @@ def derive_subject_tick_contract_view(
         restrictions=tuple(code.value for code in gate.restrictions),
         usability_class=gate.usability_class,
         requires_restrictions_read=True,
-        reason="runtime contour contract requires C04/C05 claims plus checkpointed execution stance surfaces to be read",
+        reason=(
+            "runtime contour contract requires C04/C05 claims, world-entry basis and s-minimal "
+            "self/world boundary checkpoint surfaces to be read"
+        ),
     )
 
 

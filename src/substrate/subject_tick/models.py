@@ -6,6 +6,7 @@ from enum import Enum, StrEnum
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
+    from substrate.self_contour import SMinimalContourResult
     from substrate.world_adapter import WorldAdapterInput, WorldAdapterResult
     from substrate.world_entry_contract import WorldEntryContractResult
 
@@ -73,6 +74,12 @@ class SubjectTickRestrictionCode(StrEnum):
     W_ENTRY_CONTRACT_MUST_BE_READ = "w_entry_contract_must_be_read"
     W_ENTRY_FORBIDDEN_CLAIMS_MUST_BE_READ = "w_entry_forbidden_claims_must_be_read"
     W_ENTRY_ADMISSION_CRITERIA_MUST_BE_READ = "w_entry_admission_criteria_must_be_read"
+    S_MINIMAL_CONTOUR_CONTRACT_MUST_BE_READ = "s_minimal_contour_contract_must_be_read"
+    S_FORBIDDEN_SHORTCUTS_MUST_BE_READ = "s_forbidden_shortcuts_must_be_read"
+    S_SELF_WORLD_BOUNDARY_REQUIRED_FOR_SELF_CLAIMS = (
+        "s_self_world_boundary_required_for_self_claims"
+    )
+    S_OWNERSHIP_CONTROL_DISCIPLINE_REQUIRED = "s_ownership_control_discipline_required"
     DOWNSTREAM_AUTHORITY_DEGRADED = "downstream_authority_degraded"
 
 
@@ -150,6 +157,10 @@ class SubjectTickContext:
     require_world_effect_feedback_for_success_claim: bool = False
     emit_world_action_candidate: bool = False
     disable_world_seam_enforcement: bool = False
+    require_self_side_claim: bool = False
+    require_world_side_claim: bool = False
+    require_self_controlled_transition_claim: bool = False
+    disable_s_minimal_enforcement: bool = False
     source_lineage: tuple[str, ...] = ()
 
 
@@ -241,6 +252,34 @@ class SubjectTickState:
     world_entry_scope_repo_wide_adoption: bool
     world_entry_scope_reason: str
     world_entry_reason: str
+    s_boundary_state_id: str
+    s_self_attribution_basis_present: bool
+    s_world_attribution_basis_present: bool
+    s_controllability_estimate: float
+    s_ownership_estimate: float
+    s_attribution_confidence: float
+    s_source_status: str
+    s_boundary_breach_risk: str
+    s_attribution_class: str
+    s_no_safe_self_claim: bool
+    s_no_safe_world_claim: bool
+    s_degraded: bool
+    s_underconstrained: bool
+    s_forbidden_shortcuts: tuple[str, ...]
+    s_restrictions: tuple[str, ...]
+    s_s01_admission_ready: bool
+    s_future_s01_s05_remain_open: bool
+    s_full_self_model_implemented: bool
+    s_scope: str
+    s_scope_minimal_contour_only: bool
+    s_scope_s01_s05_implemented: bool
+    s_scope_full_self_model_implemented: bool
+    s_scope_repo_wide_adoption: bool
+    s_scope_reason: str
+    s_reason: str
+    s_require_self_side_claim: bool
+    s_require_world_side_claim: bool
+    s_require_self_controlled_transition_claim: bool
     execution_stance: SubjectTickExecutionStance
     execution_checkpoints: tuple[SubjectTickCheckpointResult, ...]
     downstream_step_results: tuple[SubjectTickStepResult, ...]
@@ -330,6 +369,34 @@ class SubjectTickTelemetry:
     world_entry_scope_repo_wide_adoption: bool
     world_entry_scope_reason: str
     world_entry_reason: str
+    s_boundary_state_id: str
+    s_self_attribution_basis_present: bool
+    s_world_attribution_basis_present: bool
+    s_controllability_estimate: float
+    s_ownership_estimate: float
+    s_attribution_confidence: float
+    s_source_status: str
+    s_boundary_breach_risk: str
+    s_attribution_class: str
+    s_no_safe_self_claim: bool
+    s_no_safe_world_claim: bool
+    s_degraded: bool
+    s_underconstrained: bool
+    s_forbidden_shortcuts: tuple[str, ...]
+    s_restrictions: tuple[str, ...]
+    s_s01_admission_ready: bool
+    s_future_s01_s05_remain_open: bool
+    s_full_self_model_implemented: bool
+    s_scope: str
+    s_scope_minimal_contour_only: bool
+    s_scope_s01_s05_implemented: bool
+    s_scope_full_self_model_implemented: bool
+    s_scope_repo_wide_adoption: bool
+    s_scope_reason: str
+    s_reason: str
+    s_require_self_side_claim: bool
+    s_require_world_side_claim: bool
+    s_require_self_controlled_transition_claim: bool
     execution_stance: SubjectTickExecutionStance
     execution_checkpoints: tuple[SubjectTickCheckpointResult, ...]
     final_execution_outcome: SubjectTickOutcome
@@ -359,6 +426,7 @@ class SubjectTickResult:
     c05_result: object
     world_adapter_result: WorldAdapterResult
     world_entry_result: WorldEntryContractResult
+    self_contour_result: SMinimalContourResult
     abstain: bool
     abstain_reason: str | None
     no_planner_orchestrator_dependency: bool

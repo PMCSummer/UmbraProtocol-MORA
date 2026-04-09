@@ -45,6 +45,8 @@ def evaluate_subject_tick_downstream_gate(
         SubjectTickRestrictionCode.W_ENTRY_CONTRACT_MUST_BE_READ,
         SubjectTickRestrictionCode.W_ENTRY_FORBIDDEN_CLAIMS_MUST_BE_READ,
         SubjectTickRestrictionCode.W_ENTRY_ADMISSION_CRITERIA_MUST_BE_READ,
+        SubjectTickRestrictionCode.S_MINIMAL_CONTOUR_CONTRACT_MUST_BE_READ,
+        SubjectTickRestrictionCode.S_FORBIDDEN_SHORTCUTS_MUST_BE_READ,
     ]
     usability = SubjectTickUsabilityClass.USABLE_BOUNDED
     accepted = True
@@ -97,6 +99,45 @@ def evaluate_subject_tick_downstream_gate(
             accepted = False
             usability = SubjectTickUsabilityClass.BLOCKED
             reason = "world effect feedback required for externally effected claim but effect observation is absent"
+    if state.s_require_self_side_claim and not state.s_no_safe_self_claim:
+        restrictions.append(SubjectTickRestrictionCode.S_SELF_WORLD_BOUNDARY_REQUIRED_FOR_SELF_CLAIMS)
+    if state.s_require_self_controlled_transition_claim:
+        restrictions.append(SubjectTickRestrictionCode.S_OWNERSHIP_CONTROL_DISCIPLINE_REQUIRED)
+    if state.s_require_self_side_claim and state.s_no_safe_self_claim:
+        restrictions.append(SubjectTickRestrictionCode.S_SELF_WORLD_BOUNDARY_REQUIRED_FOR_SELF_CLAIMS)
+        restrictions.append(SubjectTickRestrictionCode.DOWNSTREAM_AUTHORITY_DEGRADED)
+        if state.final_execution_outcome == SubjectTickOutcome.CONTINUE:
+            accepted = False
+            usability = SubjectTickUsabilityClass.BLOCKED
+            reason = "self-side claim requested but s-minimal contour has no safe self attribution basis"
+    if state.s_require_world_side_claim and state.s_no_safe_world_claim:
+        restrictions.append(SubjectTickRestrictionCode.S_SELF_WORLD_BOUNDARY_REQUIRED_FOR_SELF_CLAIMS)
+        restrictions.append(SubjectTickRestrictionCode.DOWNSTREAM_AUTHORITY_DEGRADED)
+        if state.final_execution_outcome == SubjectTickOutcome.CONTINUE:
+            accepted = False
+            usability = SubjectTickUsabilityClass.BLOCKED
+            reason = "world-side claim requested but s-minimal contour has no safe world attribution basis"
+    if (
+        state.s_require_self_controlled_transition_claim
+        and state.s_attribution_class != "self_controlled_transition_claim"
+    ):
+        restrictions.append(SubjectTickRestrictionCode.S_OWNERSHIP_CONTROL_DISCIPLINE_REQUIRED)
+        restrictions.append(SubjectTickRestrictionCode.DOWNSTREAM_AUTHORITY_DEGRADED)
+        if state.final_execution_outcome == SubjectTickOutcome.CONTINUE:
+            accepted = False
+            usability = SubjectTickUsabilityClass.BLOCKED
+            reason = "self-controlled transition requested but s-minimal contour lacks lawful controllability basis"
+    if (
+        state.s_require_self_side_claim
+        and state.s_require_world_side_claim
+        and "mixed_attribution_without_uncertainty_marking" in state.s_forbidden_shortcuts
+    ):
+        restrictions.append(SubjectTickRestrictionCode.S_OWNERSHIP_CONTROL_DISCIPLINE_REQUIRED)
+        restrictions.append(SubjectTickRestrictionCode.DOWNSTREAM_AUTHORITY_DEGRADED)
+        if state.final_execution_outcome == SubjectTickOutcome.CONTINUE:
+            accepted = False
+            usability = SubjectTickUsabilityClass.BLOCKED
+            reason = "mixed self/world attribution requires explicit uncertainty marking before continue"
 
     return SubjectTickGateDecision(
         accepted=accepted,

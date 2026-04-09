@@ -30,6 +30,18 @@ class RuntimeDispatchContractView:
     world_entry_scope_w01_implemented: bool | None
     world_entry_scope_w_line_implemented: bool | None
     world_entry_scope_repo_wide_adoption: bool | None
+    s_boundary_state_id: str | None
+    s_attribution_class: str | None
+    s_underconstrained: bool | None
+    s_no_safe_self_claim: bool | None
+    s_no_safe_world_claim: bool | None
+    s_forbidden_shortcuts: tuple[str, ...] | None
+    s_s01_admission_ready: bool | None
+    s_scope: str | None
+    s_scope_minimal_contour_only: bool | None
+    s_scope_s01_s05_implemented: bool | None
+    s_scope_full_self_model_implemented: bool | None
+    s_scope_repo_wide_adoption: bool | None
     reason: str
 
 
@@ -84,6 +96,26 @@ def derive_runtime_dispatch_contract_view(
         ),
         world_entry_scope_repo_wide_adoption=(
             None if state is None else state.world_entry_scope_repo_wide_adoption
+        ),
+        s_boundary_state_id=(None if state is None else state.s_boundary_state_id),
+        s_attribution_class=(None if state is None else state.s_attribution_class),
+        s_underconstrained=(None if state is None else state.s_underconstrained),
+        s_no_safe_self_claim=(None if state is None else state.s_no_safe_self_claim),
+        s_no_safe_world_claim=(None if state is None else state.s_no_safe_world_claim),
+        s_forbidden_shortcuts=(None if state is None else state.s_forbidden_shortcuts),
+        s_s01_admission_ready=(None if state is None else state.s_s01_admission_ready),
+        s_scope=(None if state is None else state.s_scope),
+        s_scope_minimal_contour_only=(
+            None if state is None else state.s_scope_minimal_contour_only
+        ),
+        s_scope_s01_s05_implemented=(
+            None if state is None else state.s_scope_s01_s05_implemented
+        ),
+        s_scope_full_self_model_implemented=(
+            None if state is None else state.s_scope_full_self_model_implemented
+        ),
+        s_scope_repo_wide_adoption=(
+            None if state is None else state.s_scope_repo_wide_adoption
         ),
         reason=result.decision.reason,
     )
