@@ -1,11 +1,11 @@
-# RT01 Contour Map (RT01/S02/T01/T02/T03 focus)
+# RT01 Contour Map (RT01/S02/S03/T01/T02/T03 focus)
 
 ## Runtime Order (EXPLICIT)
 Source: `src/substrate/runtime_topology/policy.py::build_minimal_runtime_tick_graph`
 
 | Order |
 |---|
-| `R -> C01 -> C02 -> C03 -> C04 -> C05 -> S01 -> S02 -> T01 -> T02 -> T03 -> T04 -> RT01` |
+| `R -> C01 -> C02 -> C03 -> C04 -> C05 -> S01 -> S02 -> S03 -> T01 -> T02 -> T03 -> T04 -> RT01` |
 
 ## Route Classes
 Source: `src/substrate/runtime_topology/policy.py::evaluate_runtime_dispatch_decision` (+ dispatch tests)
@@ -30,6 +30,7 @@ Source: `src/substrate/runtime_topology/policy.py::mandatory_checkpoint_ids`
 - `rt01.n_minimal_contour_checkpoint`
 - `rt01.s01_efference_copy_checkpoint` *(direct adjacent, out-of-focus for this map)*
 - `rt01.s02_prediction_boundary_checkpoint` *(direct adjacent, now tracked in this map)*
+- `rt01.s03_ownership_weighted_learning_checkpoint` *(direct adjacent, now tracked in this map)*
 - `rt01.t01_semantic_field_checkpoint`
 - `rt01.t02_relation_binding_checkpoint`
 - `rt01.t02_raw_vs_propagated_integrity_checkpoint`
@@ -47,6 +48,9 @@ Source: `src/substrate/runtime_topology/policy.py::source_of_truth_surfaces`
 - `s01_efference_copy.prediction_validity` *(direct adjacent, out-of-focus for this map)*
 - `s02_prediction_boundary.seam_ledger` *(direct adjacent, now tracked in this map)*
 - `s02_prediction_boundary.controllability_vs_predictability` *(direct adjacent, now tracked in this map)*
+- `s03_ownership_weighted_learning.learning_attribution_ledger` *(direct adjacent, now tracked in this map)*
+- `s03_ownership_weighted_learning.target_update_routes` *(direct adjacent, now tracked in this map)*
+- `s03_ownership_weighted_learning.freeze_or_defer_state` *(direct adjacent, now tracked in this map)*
 - `t01_semantic_field.active_scene`
 - `t02_relation_binding.constrained_scene`
 - `t02_relation_binding.raw_vs_propagated_distinction`
@@ -71,6 +75,7 @@ Source: `src/substrate/runtime_topology/policy.py::source_of_truth_surfaces`
   - `src/substrate/subject_tick/telemetry.py`
 - Phase packages:
   - `src/substrate/s02_prediction_boundary/*` *(direct adjacent, now tracked in this map)*
+  - `src/substrate/s03_ownership_weighted_learning/*` *(direct adjacent, now tracked in this map)*
   - `src/substrate/t01_semantic_field/*`
   - `src/substrate/t02_relation_binding/*`
   - `src/substrate/t03_hypothesis_competition/*`
@@ -85,6 +90,8 @@ Source: `src/substrate/runtime_topology/policy.py::source_of_truth_surfaces`
   - `tests/substrate/test_t03_hypothesis_competition_build/test_t03_hypothesis_competition_build.py`
 - S02 direct-adjacent owner tests:
   - `tests/substrate/test_s02_prediction_boundary_build/test_s02_prediction_boundary_build.py`
+- S03 direct-adjacent owner tests:
+  - `tests/substrate/test_s03_ownership_weighted_learning_build/test_s03_ownership_weighted_learning_build.py`
 - Stage contour checks:
   - `tests/substrate/test_stage_contour/test_stage_contour_f01_f02_r01_r02_r03_r04_c01_c02_c03_c04_c05_subject_tick.py`
 - Direct-adjacent S01 hardening checks (same owner packs, out-of-focus for this map):
@@ -94,6 +101,10 @@ Source: `src/substrate/runtime_topology/policy.py::source_of_truth_surfaces`
   - `pytest -q tests/substrate/test_s02_prediction_boundary_build/test_s02_prediction_boundary_build.py`
   - `pytest -q tests/substrate/test_subject_tick_build/test_subject_tick_build.py -k s02`
   - `pytest -q tests/substrate/test_runtime_topology_build/test_runtime_topology_build.py -k s02`
+- Direct-adjacent S03 hardening/build checks (same owner packs + owner pack):
+  - `pytest -q tests/substrate/test_s03_ownership_weighted_learning_build/test_s03_ownership_weighted_learning_build.py`
+  - `pytest -q tests/substrate/test_subject_tick_build/test_subject_tick_build.py -k s03`
+  - `pytest -q tests/substrate/test_runtime_topology_build/test_runtime_topology_build.py -k s03`
 - Direct-adjacent T04 hardening checks (same owner packs, out-of-focus for this map):
   - `pytest -q tests/substrate/test_subject_tick_build/test_subject_tick_build.py -k t04`
   - `pytest -q tests/substrate/test_runtime_topology_build/test_runtime_topology_build.py -k t04`
@@ -103,5 +114,6 @@ Source: `src/substrate/runtime_topology/policy.py::source_of_truth_surfaces`
 - T01/T02/T03 seams: do not implement downstream phases (`T02/T03/O01` from T01, `T03/O01` from T02, `O01/O02/O03` from T03).
 - ADR-T03 boundary: first bounded T03 slice only; no `T04`, no `O*`, no planner/theorem prover.
 - S01/T04 presence in runtime order/checkpoints is a direct adjacency; do not widen this map to S01/T04 phase semantics unless explicitly requested.
-- S02 presence in runtime order/checkpoints is a direct adjacency; keep S02 claims RT01-local and do not expand into S03/S04/S05 semantics from this map.
+- S02 presence in runtime order/checkpoints is a direct adjacency; keep S02 claims RT01-local and do not expand S02 semantics into S04/S05 semantics from this map.
+- S03 presence in runtime order/checkpoints is a direct adjacency to T-line routing; keep S03 claims RT01-local and do not expand into S04/S05/global learner semantics from this map.
 - Do not claim repo-wide rollout from this contour map.

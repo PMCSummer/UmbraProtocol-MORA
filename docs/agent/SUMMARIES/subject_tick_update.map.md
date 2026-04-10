@@ -11,6 +11,7 @@ File: `src/substrate/subject_tick/update.py`
 | Non-T integration gates (outside this map focus) | `rt01.world_seam_checkpoint`, `rt01.world_entry_checkpoint`, `rt01.s_minimal_contour_checkpoint`, `rt01.a_line_normalization_checkpoint`, `rt01.m_minimal_contour_checkpoint`, `rt01.n_minimal_contour_checkpoint` | non-T mandatory checkpoints | world/s/a/m/n flags |
 | S01 adjacent consume + gate *(out-of-focus)* | `build_s01_efference_copy`, `rt01.s01_efference_copy_checkpoint` | `rt01.s01_efference_copy_checkpoint` | `require_s01_comparison_consumer`, `require_s01_unexpected_change_consumer`, `require_s01_prediction_validity_consumer` |
 | S02 adjacent consume + gate *(direct adjacent)* | `build_s02_prediction_boundary`, `s02_view`, `rt01.s02_prediction_boundary_checkpoint` | `rt01.s02_prediction_boundary_checkpoint` | `require_s02_boundary_consumer`, `require_s02_controllability_consumer`, `require_s02_mixed_source_consumer` |
+| S03 adjacent consume + gate *(direct adjacent)* | `build_s03_ownership_weighted_learning`, `s03_view`, `rt01.s03_ownership_weighted_learning_checkpoint` | `rt01.s03_ownership_weighted_learning_checkpoint` | `require_s03_learning_packet_consumer`, `require_s03_mixed_update_consumer`, `require_s03_freeze_obedience_consumer` |
 | T01 consume + gate | `build_t01_active_semantic_field`, `t01_preverbal_view`, `rt01.t01_semantic_field_checkpoint` | `rt01.t01_semantic_field_checkpoint` | `require_t01_preverbal_scene_consumer`, `require_t01_scene_comparison_consumer` |
 | T02 consume + gate | `build_t02_constrained_scene`, `t02_preverbal_view`, `rt01.t02_relation_binding_checkpoint` | `rt01.t02_relation_binding_checkpoint` | `require_t02_constrained_scene_consumer` |
 | T02 integrity gate | `t02_raw_vs_propagated_distinct`, `rt01.t02_raw_vs_propagated_integrity_checkpoint` | `rt01.t02_raw_vs_propagated_integrity_checkpoint` | `require_t02_raw_vs_propagated_distinction` |
@@ -29,8 +30,10 @@ File: `src/substrate/subject_tick/update.py`
 - `build_t04_attention_schema`
 - `build_s01_efference_copy`
 - `build_s02_prediction_boundary`
+- `build_s03_ownership_weighted_learning`
 - `require_s01_`
 - `require_s02_`
+- `require_s03_`
 - `require_t01_`, `require_t02_`, `require_t03_`
 - `require_t04_`
 - `rt01.outcome_resolution_checkpoint`
@@ -40,6 +43,8 @@ File: `src/substrate/subject_tick/update.py`
 - T03-only change (without T03->T04 integration edits): skip T04 block.
 - T03-only change (without S01 integration edits): skip S01 block.
 - T03-only change (without S02 integration edits): skip S02 block.
+- T03-only change (without S03 integration edits): skip S03 block.
+- S03-only change: skip T01/T02/T03/T04 blocks unless S03->T01 gating semantics moved.
 - T02-only change: skip T03 block and non-T blocks.
 - Runtime topology-only change: reread only checkpoint ids and source contracts touched by dispatch tests.
 - Doc-only change: do not reread full function; check this map + `CHECKPOINT_INDEX.md`.

@@ -30,6 +30,7 @@ Declared in `build_minimal_runtime_tick_graph()`:
 - `rt01.n_minimal_contour_checkpoint`
 - `rt01.s01_efference_copy_checkpoint`
 - `rt01.s02_prediction_boundary_checkpoint`
+- `rt01.s03_ownership_weighted_learning_checkpoint`
 - `rt01.t01_semantic_field_checkpoint`
 - `rt01.t02_relation_binding_checkpoint`
 - `rt01.t02_raw_vs_propagated_integrity_checkpoint`
@@ -51,6 +52,9 @@ Declared in `build_minimal_runtime_tick_graph()`:
 - `s01_efference_copy.prediction_validity`
 - `s02_prediction_boundary.seam_ledger`
 - `s02_prediction_boundary.controllability_vs_predictability`
+- `s03_ownership_weighted_learning.learning_attribution_ledger`
+- `s03_ownership_weighted_learning.target_update_routes`
+- `s03_ownership_weighted_learning.freeze_or_defer_state`
 - `t01_semantic_field.active_scene`
 - `t02_relation_binding.constrained_scene`
 - `t02_relation_binding.raw_vs_propagated_distinction`
@@ -61,8 +65,8 @@ Declared in `build_minimal_runtime_tick_graph()`:
 
 ## Search anchors (fast)
 - Runtime order: `runtime_order=(`
-- S01/S02/T01/T02/T03/T04 nodes: `node.s01_efference_copy`, `node.s02_prediction_boundary`, `node.t01_semantic_field`, `node.t02_relation_binding`, `node.t03_hypothesis_competition`, `node.t04_attention_schema`
-- S01/S02/T01/T02/T03/T04 edges: `C04", target_phase="S01"`, `C05", target_phase="S01"`, `S01", target_phase="S02"`, `S02", target_phase="T01"`, `T01", target_phase="T02"`, `T02", target_phase="T03"`, `T03", target_phase="T04"`, `T04", target_phase="RT01"`
+- S01/S02/S03/T01/T02/T03/T04 nodes: `node.s01_efference_copy`, `node.s02_prediction_boundary`, `node.s03_ownership_weighted_learning`, `node.t01_semantic_field`, `node.t02_relation_binding`, `node.t03_hypothesis_competition`, `node.t04_attention_schema`
+- S01/S02/S03/T01/T02/T03/T04 edges: `C04", target_phase="S01"`, `C05", target_phase="S01"`, `S01", target_phase="S02"`, `S02", target_phase="S03"`, `C04", target_phase="S03"`, `C05", target_phase="S03"`, `S03", target_phase="T01"`, `T01", target_phase="T02"`, `T02", target_phase="T03"`, `T03", target_phase="T04"`, `T04", target_phase="RT01"`
 - Mandatory checkpoints: `mandatory_checkpoint_ids=`
 - SoT surfaces: `source_of_truth_surfaces=`
 - Route restrictions: `RuntimeDispatchRestriction.`

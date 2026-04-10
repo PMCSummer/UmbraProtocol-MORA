@@ -1,6 +1,6 @@
 # Consumer Requirement Index (`require_*`)
 
-Scope: load-bearing flags for RT01/S02/T01/T02/T03 contour only.
+Scope: load-bearing flags for RT01/S02/T01/T02/T03 contour only (with S03 noted as direct-adjacent out-of-focus).
 
 Primary sources:
 - `src/substrate/subject_tick/models.py`
@@ -29,6 +29,9 @@ Primary sources:
 
 These flags are explicit in `SubjectTickContext`, but outside this RT01/S02/T01/T02/T03-focused requirement index:
 - direct-adjacent out-of-focus flags:
+  - `require_s03_learning_packet_consumer`
+  - `require_s03_mixed_update_consumer`
+  - `require_s03_freeze_obedience_consumer`
   - `require_t04_focus_ownership_consumer`
   - `require_t04_reportable_focus_consumer`
   - `require_t04_peripheral_preservation`
@@ -46,6 +49,6 @@ These flags are explicit in `SubjectTickContext`, but outside this RT01/S02/T01/
   - `require_available_affordance` (TODO)
   - `require_strong_regulation_claim` (TODO)
 
-Note (EXPLICIT): the three `require_t04_*` flags are now state-backed in RT01/dispatch contract views and have direct owner tests, but remain out-of-scope for this T01/T02/T03-focused index.
+Note (EXPLICIT): `require_s03_*` and `require_t04_*` flags are now state-backed in RT01/dispatch contract views and have direct owner tests, but remain out-of-scope for this T01/T02/T03-focused index.
 
 Reason: kept out to prevent contour expansion and keep index operational for T01/T02/T03 passes.
