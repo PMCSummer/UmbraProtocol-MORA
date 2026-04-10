@@ -28,6 +28,7 @@ Declared in `build_minimal_runtime_tick_graph()`:
 - `rt01.a_line_normalization_checkpoint`
 - `rt01.m_minimal_contour_checkpoint`
 - `rt01.n_minimal_contour_checkpoint`
+- `rt01.s01_efference_copy_checkpoint`
 - `rt01.t01_semantic_field_checkpoint`
 - `rt01.t02_relation_binding_checkpoint`
 - `rt01.t02_raw_vs_propagated_integrity_checkpoint`
@@ -44,6 +45,9 @@ Declared in `build_minimal_runtime_tick_graph()`:
 - `a_line_normalization.capability_state`
 - `m_minimal.lifecycle_state`
 - `n_minimal.commitment_state`
+- `s01_efference_copy.latest_comparison`
+- `s01_efference_copy.pending_predictions`
+- `s01_efference_copy.prediction_validity`
 - `t01_semantic_field.active_scene`
 - `t02_relation_binding.constrained_scene`
 - `t02_relation_binding.raw_vs_propagated_distinction`
@@ -54,8 +58,8 @@ Declared in `build_minimal_runtime_tick_graph()`:
 
 ## Search anchors (fast)
 - Runtime order: `runtime_order=(`
-- T01/T02/T03/T04 nodes: `node.t01_semantic_field`, `node.t02_relation_binding`, `node.t03_hypothesis_competition`, `node.t04_attention_schema`
-- T01/T02/T03/T04 edges: `T01", target_phase="T02"`, `T02", target_phase="T03"`, `T03", target_phase="T04"`, `T04", target_phase="RT01"`
+- S01/T01/T02/T03/T04 nodes: `node.s01_efference_copy`, `node.t01_semantic_field`, `node.t02_relation_binding`, `node.t03_hypothesis_competition`, `node.t04_attention_schema`
+- S01/T01/T02/T03/T04 edges: `C04", target_phase="S01"`, `C05", target_phase="S01"`, `S01", target_phase="RT01"`, `T01", target_phase="T02"`, `T02", target_phase="T03"`, `T03", target_phase="T04"`, `T04", target_phase="RT01"`
 - Mandatory checkpoints: `mandatory_checkpoint_ids=`
 - SoT surfaces: `source_of_truth_surfaces=`
 - Route restrictions: `RuntimeDispatchRestriction.`

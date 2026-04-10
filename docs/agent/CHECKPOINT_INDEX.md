@@ -37,9 +37,21 @@ These are mandatory in `runtime_topology/policy.py`, but not core T01/T02/T03 in
 - `rt01.a_line_normalization_checkpoint`
 - `rt01.m_minimal_contour_checkpoint`
 - `rt01.n_minimal_contour_checkpoint`
+- `rt01.s01_efference_copy_checkpoint` *(direct adjacent to T01 in runtime order; out-of-focus for this index)*
 - `rt01.t04_attention_schema_checkpoint` *(direct adjacent to T03 in runtime order; out-of-focus for this index)*
 
 Direct-adjacent hardening note (EXPLICIT):
+- `rt01.s01_efference_copy_checkpoint` has explicit path-affecting proof in owner tests for:
+  - `require_s01_comparison_consumer`
+  - `require_s01_unexpected_change_consumer` *(including non-ablation production-route test pair)*
+  - `require_s01_prediction_validity_consumer`
+- Direct tests:
+  - `test_subject_tick_s01_comparison_consumer_requirement_is_path_affecting`
+  - `test_subject_tick_s01_unexpected_change_consumer_requirement_is_path_affecting_without_ablation_registration_toggle`
+  - `test_subject_tick_s01_prediction_validity_consumer_requirement_is_path_affecting`
+  - `test_dispatch_s01_comparison_consumer_requirement_is_load_bearing`
+  - `test_dispatch_s01_unexpected_change_consumer_requirement_is_load_bearing_without_ablation_registration_toggle`
+  - `test_dispatch_s01_prediction_validity_consumer_requirement_is_load_bearing`
 - `rt01.t04_attention_schema_checkpoint` now has state-backed consumer flags in RT01/dispatch contract views:
   - `t04_require_focus_ownership_consumer`
   - `t04_require_reportable_focus_consumer`
