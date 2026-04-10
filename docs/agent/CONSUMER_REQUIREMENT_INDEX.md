@@ -1,6 +1,6 @@
 # Consumer Requirement Index (`require_*`)
 
-Scope: load-bearing flags for RT01/T01/T02/T03 contour only.
+Scope: load-bearing flags for RT01/S02/T01/T02/T03 contour only.
 
 Primary sources:
 - `src/substrate/subject_tick/models.py`
@@ -14,6 +14,9 @@ Primary sources:
 
 | flag name | phase/package | owner file | checkpoint(s) affected | contract/consumer view used | likely outcome when unmet | direct tests | confidence |
 |---|---|---|---|---|---|---|---|
+| `require_s02_boundary_consumer` | `S02` | `src/substrate/subject_tick/update.py` | `rt01.s02_prediction_boundary_checkpoint` | `derive_s02_boundary_consumer_view(...).boundary_consumer_ready` | `revalidate` detour when seam remains uncertain/stale | `test_subject_tick_s02_boundary_consumer_requirement_is_path_affecting`, `test_dispatch_s02_boundary_consumer_requirement_is_load_bearing` | EXPLICIT |
+| `require_s02_controllability_consumer` | `S02` | `src/substrate/subject_tick/update.py` | `rt01.s02_prediction_boundary_checkpoint` | `derive_s02_boundary_consumer_view(...).controllability_consumer_ready` | `repair` detour when controllability basis is not distinct from predictability-only signal | `test_subject_tick_s02_controllability_consumer_requirement_is_path_affecting`, `test_dispatch_s02_controllability_consumer_requirement_is_load_bearing` | EXPLICIT |
+| `require_s02_mixed_source_consumer` | `S02` | `src/substrate/subject_tick/update.py` | `rt01.s02_prediction_boundary_checkpoint` | `derive_s02_boundary_consumer_view(...).mixed_source_consumer_ready` | `revalidate` detour when mixed source boundary is not preserved; allowed path when mixed boundary is present | `test_subject_tick_s02_mixed_source_consumer_requirement_is_path_affecting`, `test_subject_tick_s02_mixed_source_consumer_positive_path_is_load_bearing_without_detour`, `test_dispatch_s02_mixed_source_consumer_requirement_is_load_bearing`, `test_dispatch_s02_mixed_source_consumer_positive_path_is_load_bearing_without_detour` | EXPLICIT |
 | `require_t01_preverbal_scene_consumer` | `T01` | `src/substrate/subject_tick/update.py` | `rt01.t01_semantic_field_checkpoint` | `derive_t01_preverbal_consumer_view(...).can_consume_scene` | detour (`repair`/`revalidate` depending on cause) | `test_subject_tick_t01_unresolved_laundering_under_consumer_pressure_forces_detour` | EXPLICIT |
 | `require_t01_scene_comparison_consumer` | `T01` | `src/substrate/subject_tick/update.py` | `rt01.t01_semantic_field_checkpoint` | `derive_t01_preverbal_consumer_view(...).comparison_consumer_ready` | detour when comparison surface not consumable | `test_subject_tick_t01_second_scene_comparison_consumer_requirement_is_path_affecting`, `test_dispatch_t01_scene_comparison_consumer_requirement_is_load_bearing` | EXPLICIT |
 | `require_t02_constrained_scene_consumer` | `T02` | `src/substrate/subject_tick/update.py` | `rt01.t02_relation_binding_checkpoint` | `derive_t02_preverbal_constraint_consumer_view(...).can_consume_constrained_scene` | `repair`/`revalidate` detour | `test_subject_tick_t02_constrained_scene_consumer_requirement_is_path_affecting`, `test_dispatch_t02_constrained_scene_consumer_requirement_is_load_bearing` | EXPLICIT |
@@ -24,7 +27,7 @@ Primary sources:
 
 ## B) Non-load-bearing or unresolved for this narrowed index
 
-These flags are explicit in `SubjectTickContext`, but outside this RT01/T01/T02/T03-focused requirement index:
+These flags are explicit in `SubjectTickContext`, but outside this RT01/S02/T01/T02/T03-focused requirement index:
 - direct-adjacent out-of-focus flags:
   - `require_t04_focus_ownership_consumer`
   - `require_t04_reportable_focus_consumer`

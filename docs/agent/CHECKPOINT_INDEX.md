@@ -1,9 +1,10 @@
-# Checkpoint Index (RT01/T01/T02/T03 contour)
+# Checkpoint Index (RT01/S02/T01/T02/T03 contour)
 
 Source basis:
 - `src/substrate/runtime_topology/policy.py` (`mandatory_checkpoint_ids`)
 - `src/substrate/subject_tick/update.py` (checkpoint producers + path effects)
 - direct tests in:
+  - `tests/substrate/test_s02_prediction_boundary_build/test_s02_prediction_boundary_build.py`
   - `tests/substrate/test_subject_tick_build/test_subject_tick_build.py`
   - `tests/substrate/test_runtime_topology_build/test_runtime_topology_build.py`
   - `tests/substrate/test_t03_hypothesis_competition_build/test_t03_hypothesis_competition_build.py`
@@ -19,10 +20,11 @@ Source basis:
 | `rt01.critical_gate_checkpoint` | `rt01.phase_contract_gates` | `src/substrate/subject_tick/update.py` | `RT01` | none | critical gate mismatch enforces detour | `test_subject_tick_critical_gate_checkpoint_is_path_affecting_not_label_only` | EXPLICIT |
 | `rt01.outcome_resolution_checkpoint` | `rt01.runtime_outcome` | `src/substrate/subject_tick/update.py` | `RT01` | none | final bounded stance/outcome mapping (`continue/repair/revalidate/halt`) | `test_subject_tick_basic_continue_path`, `test_subject_tick_basic_revalidate_path_from_c05`, `test_subject_tick_basic_halt_path_from_c05_legality_block` | EXPLICIT |
 
-## B) Direct T01/T02/T03 integration checkpoints
+## B) Direct S02/T01/T02/T03 integration checkpoints
 
 | checkpoint_id | source_contract | owner file(s) | producer phase | consumer trigger(s) | path-affecting behavior | direct tests | confidence |
 |---|---|---|---|---|---|---|---|
+| `rt01.s02_prediction_boundary_checkpoint` | `s02_prediction_boundary.self_vs_world_seam` | `src/substrate/subject_tick/update.py` | `S02` consumed by `RT01` | `require_s02_boundary_consumer`, `require_s02_controllability_consumer`, `require_s02_mixed_source_consumer` | unmet boundary/controllability/mixed-source readiness enforces detour; positive mixed-source consumer path stays allowed when `mixed_source_boundary` is preserved | `test_subject_tick_s02_boundary_consumer_requirement_is_path_affecting`, `test_subject_tick_s02_controllability_consumer_requirement_is_path_affecting`, `test_subject_tick_s02_mixed_source_consumer_requirement_is_path_affecting`, `test_subject_tick_s02_mixed_source_consumer_positive_path_is_load_bearing_without_detour`, `test_dispatch_s02_boundary_consumer_requirement_is_load_bearing`, `test_dispatch_s02_controllability_consumer_requirement_is_load_bearing`, `test_dispatch_s02_mixed_source_consumer_requirement_is_load_bearing`, `test_dispatch_s02_mixed_source_consumer_positive_path_is_load_bearing_without_detour` | EXPLICIT |
 | `rt01.t01_semantic_field_checkpoint` | `t01_semantic_field.active_non_verbal_scene` | `src/substrate/subject_tick/update.py` | `T01` consumed by `RT01` | `require_t01_preverbal_scene_consumer`, `require_t01_scene_comparison_consumer` | non-consumable scene/comparison or unresolved laundering under pressure enforces detour | `test_subject_tick_t01_unresolved_laundering_under_consumer_pressure_forces_detour`, `test_subject_tick_t01_second_scene_comparison_consumer_requirement_is_path_affecting`, `test_dispatch_t01_scene_comparison_consumer_requirement_is_load_bearing` | EXPLICIT |
 | `rt01.t02_relation_binding_checkpoint` | `t02_relation_binding.constraint_propagation` | `src/substrate/subject_tick/update.py` | `T02` consumed by `RT01` | `require_t02_constrained_scene_consumer` | no-clean/non-consumable constrained scene enforces `repair/revalidate` detour | `test_subject_tick_t02_constrained_scene_consumer_requirement_is_path_affecting`, `test_dispatch_t02_constrained_scene_consumer_requirement_is_load_bearing` | EXPLICIT |
 | `rt01.t02_raw_vs_propagated_integrity_checkpoint` | `t02_relation_binding.raw_vs_propagated_distinction` | `src/substrate/subject_tick/update.py` | `T02` consumed by `RT01` | `require_t02_raw_vs_propagated_distinction` | collapsed raw-vs-propagated distinction enforces `revalidate` detour | `test_subject_tick_t02_raw_vs_propagated_integrity_requirement_is_second_load_bearing_consequence`, `test_dispatch_t02_raw_vs_propagated_integrity_requirement_is_load_bearing` | EXPLICIT |

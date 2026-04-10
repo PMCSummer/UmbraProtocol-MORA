@@ -73,6 +73,76 @@ def test_s02_contrast_predictability_vs_controllability_is_explicit() -> None:
     assert controllable_entry.controllability_estimate > predictable_entry.controllability_estimate
 
 
+def test_s02_matched_pair_predictability_and_controllability_diverge_in_final_status() -> None:
+    controllable_first = _s01_observed(
+        "matched-pair-controllable",
+        tick_index=1,
+        emit_world_action_candidate=True,
+        world_effect_feedback_correlated=True,
+    )
+    controllable_second = _s01_observed(
+        "matched-pair-controllable",
+        tick_index=3,
+        emit_world_action_candidate=True,
+        world_effect_feedback_correlated=True,
+    )
+    predictable_first = _s01_observed(
+        "matched-pair-predictable",
+        tick_index=1,
+        emit_world_action_candidate=False,
+        world_effect_feedback_correlated=False,
+    )
+    predictable_second = _s01_observed(
+        "matched-pair-predictable",
+        tick_index=3,
+        emit_world_action_candidate=False,
+        world_effect_feedback_correlated=False,
+    )
+
+    controllable_seed = build_s02(
+        case_id="matched-pair-controllable",
+        tick_index=2,
+        s01_result=controllable_first,
+        effector_available=True,
+    )
+    predictable_seed = build_s02(
+        case_id="matched-pair-predictable",
+        tick_index=2,
+        s01_result=predictable_first,
+        effector_available=False,
+    )
+
+    controllable = build_s02(
+        case_id="matched-pair-controllable",
+        tick_index=4,
+        s01_result=controllable_second,
+        effector_available=True,
+        prior_state=controllable_seed.state,
+    )
+    predictable = build_s02(
+        case_id="matched-pair-predictable",
+        tick_index=4,
+        s01_result=predictable_second,
+        effector_available=False,
+        prior_state=predictable_seed.state,
+    )
+
+    channel = S01ComparisonAxis.WORLD_EFFECT_FEEDBACK.value
+    controllable_entry = _entry(controllable, channel)
+    predictable_entry = _entry(predictable, channel)
+
+    assert abs(
+        controllable_entry.prediction_reliability_estimate
+        - predictable_entry.prediction_reliability_estimate
+    ) <= 0.05
+    assert controllable_entry.boundary_status is S02BoundaryStatus.INSIDE_SELF_PREDICTIVE_SEAM
+    assert (
+        predictable_entry.boundary_status
+        is S02BoundaryStatus.PREDICTABLE_BUT_NOT_SELF_DRIVEN
+    )
+    assert controllable_entry.boundary_status != predictable_entry.boundary_status
+
+
 def test_s02_repeated_evidence_aggregation_strengthens_local_seam() -> None:
     first_observed = _s01_observed(
         "aggregation",
@@ -225,6 +295,64 @@ def test_s02_stale_boundary_requires_revalidation_and_does_not_stay_strong() -> 
     stale_entry = _entry(stale, channel)
     assert stale_entry.boundary_status is S02BoundaryStatus.SEAM_INVALIDATED_FOR_CONTEXT
     assert "stale_seam_carried_without_revalidation" not in stale.gate.forbidden_shortcuts
+
+
+def test_s02_degraded_observation_only_invalidates_boundary_without_other_shift_flags() -> None:
+    observed = _s01_observed(
+        "degraded-only",
+        tick_index=1,
+        emit_world_action_candidate=True,
+        world_effect_feedback_correlated=True,
+    )
+    strong = build_s02(
+        case_id="degraded-only",
+        tick_index=2,
+        s01_result=observed,
+        effector_available=True,
+    )
+    degraded_only = build_s02(
+        case_id="degraded-only",
+        tick_index=3,
+        s01_result=observed,
+        effector_available=True,
+        observation_degraded=True,
+        context_shift_detected=False,
+        c05_revalidation_required=False,
+        c05_dependency_contaminated=False,
+        prior_state=strong.state,
+    )
+    channel = S01ComparisonAxis.WORLD_EFFECT_FEEDBACK.value
+    entry = _entry(degraded_only, channel)
+    assert entry.boundary_status is S02BoundaryStatus.SEAM_INVALIDATED_FOR_CONTEXT
+
+
+def test_s02_dependency_contamination_only_invalidates_boundary_without_context_shift() -> None:
+    observed = _s01_observed(
+        "dependency-only",
+        tick_index=1,
+        emit_world_action_candidate=True,
+        world_effect_feedback_correlated=True,
+    )
+    strong = build_s02(
+        case_id="dependency-only",
+        tick_index=2,
+        s01_result=observed,
+        effector_available=True,
+    )
+    contaminated_only = build_s02(
+        case_id="dependency-only",
+        tick_index=3,
+        s01_result=observed,
+        effector_available=True,
+        c05_dependency_contaminated=True,
+        c05_revalidation_required=False,
+        context_shift_detected=False,
+        observation_degraded=False,
+        prior_state=strong.state,
+    )
+    channel = S01ComparisonAxis.WORLD_EFFECT_FEEDBACK.value
+    entry = _entry(contaminated_only, channel)
+    assert entry.boundary_status is S02BoundaryStatus.SEAM_INVALIDATED_FOR_CONTEXT
 
 
 def test_s02_ablation_without_controllability_signal_collapses_self_side_claim() -> None:

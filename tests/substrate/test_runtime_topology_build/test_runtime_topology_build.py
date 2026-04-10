@@ -1421,6 +1421,116 @@ def test_dispatch_s02_mixed_source_consumer_requirement_is_load_bearing() -> Non
     )
 
 
+def test_dispatch_s02_mixed_source_consumer_positive_path_is_load_bearing_without_detour() -> None:
+    def _adapter(case_id: str) -> WorldAdapterInput:
+        action = build_world_action_candidate(
+            tick_id=f"{case_id}-action",
+            execution_mode="continue_stream",
+        )
+        effect = build_world_effect_packet(
+            effect_id=f"eff-{case_id}",
+            action_id=action.action_id,
+            observed_at="2026-04-20T10:30:00+00:00",
+            source_ref="world.sensor.runtime_topology_s02_mixed_positive",
+            success=True,
+        )
+        return WorldAdapterInput(
+            adapter_presence=True,
+            adapter_available=True,
+            observation_packet=build_world_observation_packet(
+                observation_id=f"obs-{case_id}",
+                source_ref="world.sensor.runtime_topology_s02_mixed_positive",
+                observed_at="2026-04-20T10:30:00+00:00",
+                payload_ref=f"payload:{case_id}",
+            ),
+            action_packet=action,
+            effect_packet=effect,
+        )
+
+    bootstrap = dispatch_runtime_tick(
+        RuntimeDispatchRequest(
+            tick_input=_tick_input("runtime-topology-s02-mixed-positive-bootstrap"),
+            route_class=RuntimeRouteClass.PRODUCTION_CONTOUR,
+        )
+    )
+    assert bootstrap.subject_tick_result is not None
+    controllable_seed = build_s01(
+        case_id="runtime-topology-s02-mixed-positive-controllable-seed",
+        tick_index=1,
+        c04_selected_mode="continue_stream",
+        emit_world_action_candidate=True,
+        world_effect_feedback_correlated=False,
+    )
+    external_seed = build_s01(
+        case_id="runtime-topology-s02-mixed-positive-external-seed",
+        tick_index=1,
+        c04_selected_mode="idle",
+        emit_world_action_candidate=False,
+        world_effect_feedback_correlated=False,
+    )
+    internal = dispatch_runtime_tick(
+        RuntimeDispatchRequest(
+            tick_input=_tick_input("runtime-topology-s02-mixed-positive-internal"),
+            context=SubjectTickContext(
+                prior_subject_tick_state=bootstrap.subject_tick_result.state,
+                prior_s01_state=controllable_seed.state,
+                emit_world_action_candidate=True,
+                world_adapter_input=_adapter("runtime-topology-s02-mixed-positive-internal"),
+            ),
+            route_class=RuntimeRouteClass.PRODUCTION_CONTOUR,
+        )
+    )
+    assert internal.subject_tick_result is not None
+    baseline = dispatch_runtime_tick(
+        RuntimeDispatchRequest(
+            tick_input=_tick_input("runtime-topology-s02-mixed-positive-baseline"),
+            context=SubjectTickContext(
+                prior_subject_tick_state=internal.subject_tick_result.state,
+                prior_s01_state=external_seed.state,
+                prior_s02_state=internal.subject_tick_result.s02_result.state,
+                emit_world_action_candidate=True,
+                world_adapter_input=_adapter("runtime-topology-s02-mixed-positive-baseline"),
+            ),
+            route_class=RuntimeRouteClass.PRODUCTION_CONTOUR,
+        )
+    )
+    required = dispatch_runtime_tick(
+        RuntimeDispatchRequest(
+            tick_input=_tick_input("runtime-topology-s02-mixed-positive-required"),
+            context=SubjectTickContext(
+                prior_subject_tick_state=internal.subject_tick_result.state,
+                prior_s01_state=external_seed.state,
+                prior_s02_state=internal.subject_tick_result.s02_result.state,
+                emit_world_action_candidate=True,
+                require_s02_mixed_source_consumer=True,
+                world_adapter_input=_adapter("runtime-topology-s02-mixed-positive-required"),
+            ),
+            route_class=RuntimeRouteClass.PRODUCTION_CONTOUR,
+        )
+    )
+    assert baseline.subject_tick_result is not None
+    assert required.subject_tick_result is not None
+    baseline_checkpoint = next(
+        checkpoint
+        for checkpoint in baseline.subject_tick_result.state.execution_checkpoints
+        if checkpoint.checkpoint_id == "rt01.s02_prediction_boundary_checkpoint"
+    )
+    required_checkpoint = next(
+        checkpoint
+        for checkpoint in required.subject_tick_result.state.execution_checkpoints
+        if checkpoint.checkpoint_id == "rt01.s02_prediction_boundary_checkpoint"
+    )
+    assert (
+        required.subject_tick_result.s02_result.state.active_boundary_status.value
+        == "mixed_source_boundary"
+    )
+    assert required.subject_tick_result.s02_result.gate.mixed_source_consumer_ready is True
+    assert baseline_checkpoint.status.value == "allowed"
+    assert required_checkpoint.status.value == "allowed"
+    assert baseline.subject_tick_result.state.final_execution_outcome == SubjectTickOutcome.CONTINUE
+    assert required.subject_tick_result.state.final_execution_outcome == SubjectTickOutcome.CONTINUE
+
+
 def test_dispatch_contract_view_exposes_s02_prediction_boundary_surface() -> None:
     result = dispatch_runtime_tick(
         RuntimeDispatchRequest(
