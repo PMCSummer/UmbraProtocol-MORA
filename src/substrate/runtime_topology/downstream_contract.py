@@ -753,9 +753,15 @@ def derive_runtime_dispatch_contract_view(
         t04_scope_repo_wide_adoption=(
             None if t04_result is None else t04_result.scope_marker.repo_wide_adoption
         ),
-        t04_require_focus_ownership_consumer=None,
-        t04_require_reportable_focus_consumer=None,
-        t04_require_peripheral_preservation=None,
+        t04_require_focus_ownership_consumer=(
+            None if state is None else state.t04_require_focus_ownership_consumer
+        ),
+        t04_require_reportable_focus_consumer=(
+            None if state is None else state.t04_require_reportable_focus_consumer
+        ),
+        t04_require_peripheral_preservation=(
+            None if state is None else state.t04_require_peripheral_preservation
+        ),
         reason=result.decision.reason,
     )
 

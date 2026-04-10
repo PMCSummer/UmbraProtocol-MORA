@@ -932,8 +932,48 @@ def test_subject_tick_t04_reportable_focus_consumer_requirement_is_path_affectin
     )
 
 
+def test_subject_tick_t04_peripheral_preservation_requirement_is_path_affecting() -> None:
+    baseline = _result(
+        "rt-t04-peripheral-baseline",
+        unresolved=True,
+        context=SubjectTickContext(
+            t03_competition_mode="forced_single_winner_ablation",
+        ),
+    )
+    required = _result(
+        "rt-t04-peripheral-required",
+        unresolved=True,
+        context=SubjectTickContext(
+            require_t04_peripheral_preservation=True,
+            t03_competition_mode="forced_single_winner_ablation",
+        ),
+    )
+    baseline_checkpoint = next(
+        checkpoint
+        for checkpoint in baseline.state.execution_checkpoints
+        if checkpoint.checkpoint_id == "rt01.t04_attention_schema_checkpoint"
+    )
+    required_checkpoint = next(
+        checkpoint
+        for checkpoint in required.state.execution_checkpoints
+        if checkpoint.checkpoint_id == "rt01.t04_attention_schema_checkpoint"
+    )
+    assert baseline_checkpoint.status.value != "enforced_detour"
+    assert required_checkpoint.status.value == "enforced_detour"
+    assert required.state.final_execution_outcome == SubjectTickOutcome.REVALIDATE
+    assert "peripheral-preservation consumer requested" in required_checkpoint.reason
+
+
 def test_subject_tick_contract_view_exposes_t04_attention_schema_surface() -> None:
-    result = _result("rt-t04-contract-view", unresolved=False)
+    result = _result(
+        "rt-t04-contract-view",
+        unresolved=False,
+        context=SubjectTickContext(
+            require_t04_focus_ownership_consumer=True,
+            require_t04_reportable_focus_consumer=True,
+            require_t04_peripheral_preservation=True,
+        ),
+    )
     view = derive_subject_tick_contract_view(result)
     assert view.t04_schema_id is not None
     assert view.t04_focus_targets_count is not None
@@ -947,3 +987,6 @@ def test_subject_tick_contract_view_exposes_t04_attention_schema_surface() -> No
     assert view.t04_scope_o03_implemented is False
     assert view.t04_scope_full_attention_line_implemented is False
     assert view.t04_scope_repo_wide_adoption is False
+    assert view.t04_require_focus_ownership_consumer is True
+    assert view.t04_require_reportable_focus_consumer is True
+    assert view.t04_require_peripheral_preservation is True

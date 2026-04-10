@@ -979,10 +979,56 @@ def test_dispatch_t04_focus_ownership_consumer_requirement_is_load_bearing() -> 
     )
 
 
+def test_dispatch_t04_peripheral_preservation_requirement_is_load_bearing() -> None:
+    baseline = dispatch_runtime_tick(
+        RuntimeDispatchRequest(
+            tick_input=_tick_input("runtime-topology-t04-peripheral"),
+            context=SubjectTickContext(
+                t03_competition_mode="forced_single_winner_ablation",
+            ),
+            route_class=RuntimeRouteClass.TEST_ONLY_ABLATION,
+            allow_test_only_route=True,
+            allow_non_production_consumer_opt_in=True,
+        )
+    )
+    required = dispatch_runtime_tick(
+        RuntimeDispatchRequest(
+            tick_input=_tick_input("runtime-topology-t04-peripheral"),
+            context=SubjectTickContext(
+                require_t04_peripheral_preservation=True,
+                t03_competition_mode="forced_single_winner_ablation",
+            ),
+            route_class=RuntimeRouteClass.TEST_ONLY_ABLATION,
+            allow_test_only_route=True,
+            allow_non_production_consumer_opt_in=True,
+        )
+    )
+    assert baseline.subject_tick_result is not None
+    assert required.subject_tick_result is not None
+    baseline_checkpoint = next(
+        checkpoint
+        for checkpoint in baseline.subject_tick_result.state.execution_checkpoints
+        if checkpoint.checkpoint_id == "rt01.t04_attention_schema_checkpoint"
+    )
+    required_checkpoint = next(
+        checkpoint
+        for checkpoint in required.subject_tick_result.state.execution_checkpoints
+        if checkpoint.checkpoint_id == "rt01.t04_attention_schema_checkpoint"
+    )
+    assert baseline_checkpoint.status.value != "enforced_detour"
+    assert required_checkpoint.status.value == "enforced_detour"
+    assert required.subject_tick_result.state.final_execution_outcome == SubjectTickOutcome.REVALIDATE
+
+
 def test_dispatch_contract_view_exposes_t04_attention_schema_surface() -> None:
     result = dispatch_runtime_tick(
         RuntimeDispatchRequest(
             tick_input=_tick_input("runtime-topology-t04-contract-view"),
+            context=SubjectTickContext(
+                require_t04_focus_ownership_consumer=True,
+                require_t04_reportable_focus_consumer=True,
+                require_t04_peripheral_preservation=True,
+            ),
             route_class=RuntimeRouteClass.PRODUCTION_CONTOUR,
         )
     )
@@ -1000,6 +1046,9 @@ def test_dispatch_contract_view_exposes_t04_attention_schema_surface() -> None:
     assert view.t04_scope_o03_implemented is False
     assert view.t04_scope_full_attention_line_implemented is False
     assert view.t04_scope_repo_wide_adoption is False
+    assert view.t04_require_focus_ownership_consumer is True
+    assert view.t04_require_reportable_focus_consumer is True
+    assert view.t04_require_peripheral_preservation is True
     assert snapshot["subject_tick_state"]["t04_schema_id"] is not None
     assert snapshot["subject_tick_state"]["t04_scope"] == "rt01_contour_only"
     assert snapshot["subject_tick_state"]["t04_scope_rt01_contour_only"] is True

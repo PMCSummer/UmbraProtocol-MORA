@@ -545,6 +545,9 @@ class SubjectTickState:
     t03_require_convergence_consumer: bool
     t03_require_frontier_consumer: bool
     t03_require_nonconvergence_preservation: bool
+    t04_require_focus_ownership_consumer: bool
+    t04_require_reportable_focus_consumer: bool
+    t04_require_peripheral_preservation: bool
     execution_stance: SubjectTickExecutionStance
     execution_checkpoints: tuple[SubjectTickCheckpointResult, ...]
     downstream_step_results: tuple[SubjectTickStepResult, ...]

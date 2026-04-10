@@ -383,7 +383,13 @@ def _build_gate(
         or t03_result.state.publication_frontier.unresolved_conflicts
         or t03_result.state.publication_frontier.open_slots
     )
-    peripheral_preservation_ready = bool(not uncertainty_present or peripheral_targets)
+    forced_single_winner_shortcut = bool(
+        "forced_single_winner_under_ambiguity" in t03_result.gate.forbidden_shortcuts
+    )
+    peripheral_preservation_ready = bool(
+        (not uncertainty_present or peripheral_targets)
+        and not forced_single_winner_shortcut
+    )
     restrictions: list[str] = [
         "t04_attention_schema_contract_must_be_read",
         "t04_focus_peripheral_split_must_be_read",

@@ -2021,6 +2021,15 @@ def execute_subject_tick(
         t03_require_nonconvergence_preservation=(
             context.require_t03_nonconvergence_preservation
         ),
+        t04_require_focus_ownership_consumer=(
+            context.require_t04_focus_ownership_consumer
+        ),
+        t04_require_reportable_focus_consumer=(
+            context.require_t04_reportable_focus_consumer
+        ),
+        t04_require_peripheral_preservation=(
+            context.require_t04_peripheral_preservation
+        ),
         execution_stance=execution_stance,
         execution_checkpoints=tuple(checkpoints),
         downstream_step_results=step_results,

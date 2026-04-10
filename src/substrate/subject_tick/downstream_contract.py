@@ -935,9 +935,15 @@ def derive_subject_tick_contract_view(
         t04_scope_repo_wide_adoption=(
             None if t04_result is None else t04_result.scope_marker.repo_wide_adoption
         ),
-        t04_require_focus_ownership_consumer=None,
-        t04_require_reportable_focus_consumer=None,
-        t04_require_peripheral_preservation=None,
+        t04_require_focus_ownership_consumer=(
+            state.t04_require_focus_ownership_consumer
+        ),
+        t04_require_reportable_focus_consumer=(
+            state.t04_require_reportable_focus_consumer
+        ),
+        t04_require_peripheral_preservation=(
+            state.t04_require_peripheral_preservation
+        ),
         execution_stance=state.execution_stance.value,
         execution_checkpoints=tuple(
             f"{checkpoint.checkpoint_id}:{checkpoint.status.value}"
