@@ -25,6 +25,10 @@ Primary sources:
 ## B) Non-load-bearing or unresolved for this narrowed index
 
 These flags are explicit in `SubjectTickContext`, but outside this RT01/T01/T02/T03-focused requirement index:
+- direct-adjacent out-of-focus flags:
+  - `require_t04_focus_ownership_consumer`
+  - `require_t04_reportable_focus_consumer`
+  - `require_t04_peripheral_preservation`
 - world-entry flags:
   - `require_world_grounded_transition`
   - `require_world_effect_feedback_for_success_claim`

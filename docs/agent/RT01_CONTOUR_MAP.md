@@ -1,11 +1,11 @@
-# RT01 Contour Map (RT01/T01/T02/T03)
+# RT01 Contour Map (RT01/T01/T02/T03 focus)
 
 ## Runtime Order (EXPLICIT)
 Source: `src/substrate/runtime_topology/policy.py::build_minimal_runtime_tick_graph`
 
 | Order |
 |---|
-| `R -> C01 -> C02 -> C03 -> C04 -> C05 -> T01 -> T02 -> T03 -> RT01` |
+| `R -> C01 -> C02 -> C03 -> C04 -> C05 -> T01 -> T02 -> T03 -> T04 -> RT01` |
 
 ## Route Classes
 Source: `src/substrate/runtime_topology/policy.py::evaluate_runtime_dispatch_decision` (+ dispatch tests)
@@ -32,6 +32,7 @@ Source: `src/substrate/runtime_topology/policy.py::mandatory_checkpoint_ids`
 - `rt01.t02_relation_binding_checkpoint`
 - `rt01.t02_raw_vs_propagated_integrity_checkpoint`
 - `rt01.t03_hypothesis_competition_checkpoint`
+- `rt01.t04_attention_schema_checkpoint` *(direct adjacent, out-of-focus for this map)*
 - `rt01.outcome_resolution_checkpoint`
 
 ## Source-of-Truth Surfaces
@@ -44,6 +45,8 @@ Source: `src/substrate/runtime_topology/policy.py::source_of_truth_surfaces`
 - `t02_relation_binding.raw_vs_propagated_distinction`
 - `t03_hypothesis_competition.competition_ledger`
 - `t03_hypothesis_competition.publication_frontier`
+- `t04_attention_schema.focus_ownership` *(direct adjacent, out-of-focus for this map)*
+- `t04_attention_schema.focus_targets` *(direct adjacent, out-of-focus for this map)*
 - Other contour dependencies (outside T01/T02/T03 focus): `world_adapter.state`, `world_entry_contract.episode`, `s_minimal_contour.boundary_state`, `a_line_normalization.capability_state`, `m_minimal.lifecycle_state`, `n_minimal.commitment_state`
 
 ## Owner Files (EXPLICIT)
@@ -63,6 +66,7 @@ Source: `src/substrate/runtime_topology/policy.py::source_of_truth_surfaces`
   - `src/substrate/t01_semantic_field/*`
   - `src/substrate/t02_relation_binding/*`
   - `src/substrate/t03_hypothesis_competition/*`
+  - `src/substrate/t04_attention_schema/*` *(direct adjacent, out-of-focus for this map)*
 
 ## Direct Tests (EXPLICIT)
 - Runtime topology owner tests:
@@ -78,4 +82,5 @@ Source: `src/substrate/runtime_topology/policy.py::source_of_truth_surfaces`
 - RT01 seam: do not move mode semantics from C04 or validity semantics from C05 into RT01.
 - T01/T02/T03 seams: do not implement downstream phases (`T02/T03/O01` from T01, `T03/O01` from T02, `O01/O02/O03` from T03).
 - ADR-T03 boundary: first bounded T03 slice only; no `T04`, no `O*`, no planner/theorem prover.
+- T04 presence in runtime order/checkpoints is a direct adjacency; do not widen this map to T04 phase semantics unless explicitly requested.
 - Do not claim repo-wide rollout from this contour map.

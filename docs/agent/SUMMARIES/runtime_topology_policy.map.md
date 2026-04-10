@@ -32,6 +32,7 @@ Declared in `build_minimal_runtime_tick_graph()`:
 - `rt01.t02_relation_binding_checkpoint`
 - `rt01.t02_raw_vs_propagated_integrity_checkpoint`
 - `rt01.t03_hypothesis_competition_checkpoint`
+- `rt01.t04_attention_schema_checkpoint` *(direct adjacent, out-of-focus for T01/T02/T03 work)*
 - `rt01.outcome_resolution_checkpoint`
 
 ## Source-of-truth surfaces (EXPLICIT)
@@ -48,11 +49,13 @@ Declared in `build_minimal_runtime_tick_graph()`:
 - `t02_relation_binding.raw_vs_propagated_distinction`
 - `t03_hypothesis_competition.competition_ledger`
 - `t03_hypothesis_competition.publication_frontier`
+- `t04_attention_schema.focus_ownership` *(direct adjacent, out-of-focus for T01/T02/T03 work)*
+- `t04_attention_schema.focus_targets` *(direct adjacent, out-of-focus for T01/T02/T03 work)*
 
 ## Search anchors (fast)
 - Runtime order: `runtime_order=(`
-- T01/T02/T03 nodes: `node.t01_semantic_field`, `node.t02_relation_binding`, `node.t03_hypothesis_competition`
-- T01/T02/T03 edges: `T01", target_phase="T02"`, `T02", target_phase="T03"`, `T03", target_phase="RT01"`
+- T01/T02/T03/T04 nodes: `node.t01_semantic_field`, `node.t02_relation_binding`, `node.t03_hypothesis_competition`, `node.t04_attention_schema`
+- T01/T02/T03/T04 edges: `T01", target_phase="T02"`, `T02", target_phase="T03"`, `T03", target_phase="T04"`, `T04", target_phase="RT01"`
 - Mandatory checkpoints: `mandatory_checkpoint_ids=`
 - SoT surfaces: `source_of_truth_surfaces=`
 - Route restrictions: `RuntimeDispatchRestriction.`
