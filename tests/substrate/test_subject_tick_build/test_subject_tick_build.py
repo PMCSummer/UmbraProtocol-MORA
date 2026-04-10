@@ -1207,3 +1207,103 @@ def test_subject_tick_s01_prediction_validity_consumer_requirement_is_path_affec
         and checkpoint.status.value == "enforced_detour"
         for checkpoint in required.state.execution_checkpoints
     )
+
+
+def test_subject_tick_s02_checkpoint_is_present_and_contract_view_exposes_surface() -> None:
+    result = _result("rt-s02-checkpoint", unresolved=False)
+    view = derive_subject_tick_contract_view(result)
+    assert any(
+        checkpoint.checkpoint_id == "rt01.s02_prediction_boundary_checkpoint"
+        for checkpoint in result.state.execution_checkpoints
+    )
+    assert view.s02_boundary_id.startswith("s02-boundary:")
+    assert view.s02_scope == "rt01_contour_only"
+    assert view.s02_scope_rt01_contour_only is True
+    assert view.s02_scope_s02_first_slice_only is True
+    assert view.s02_scope_s03_implemented is False
+    assert view.s02_scope_s04_implemented is False
+    assert view.s02_scope_s05_implemented is False
+    assert view.s02_scope_full_self_model_implemented is False
+    assert view.s02_scope_repo_wide_adoption is False
+
+
+def test_subject_tick_s02_boundary_consumer_requirement_is_path_affecting() -> None:
+    baseline = _result("rt-s02-boundary-baseline", unresolved=False)
+    required = _result(
+        "rt-s02-boundary-required",
+        unresolved=False,
+        context=SubjectTickContext(require_s02_boundary_consumer=True),
+    )
+    assert baseline.state.final_execution_outcome == SubjectTickOutcome.CONTINUE
+    assert required.state.final_execution_outcome == SubjectTickOutcome.REVALIDATE
+    assert any(
+        checkpoint.checkpoint_id == "rt01.s02_prediction_boundary_checkpoint"
+        and checkpoint.status.value == "enforced_detour"
+        for checkpoint in required.state.execution_checkpoints
+    )
+
+
+def test_subject_tick_s02_controllability_consumer_requirement_is_path_affecting() -> None:
+    seed = build_s01(
+        case_id="rt-s02-controllability-seed",
+        tick_index=1,
+        emit_world_action_candidate=False,
+        world_effect_feedback_correlated=False,
+    )
+    baseline = _result(
+        "rt-s02-controllability-baseline",
+        unresolved=False,
+        context=SubjectTickContext(
+            prior_s01_state=seed.state,
+            emit_world_action_candidate=False,
+        ),
+    )
+    required = _result(
+        "rt-s02-controllability-required",
+        unresolved=False,
+        context=SubjectTickContext(
+            prior_s01_state=seed.state,
+            emit_world_action_candidate=False,
+            require_s02_controllability_consumer=True,
+        ),
+    )
+    assert baseline.state.final_execution_outcome == SubjectTickOutcome.CONTINUE
+    assert required.state.final_execution_outcome == SubjectTickOutcome.REPAIR
+    assert any(
+        checkpoint.checkpoint_id == "rt01.s02_prediction_boundary_checkpoint"
+        and checkpoint.status.value == "enforced_detour"
+        for checkpoint in required.state.execution_checkpoints
+    )
+
+
+def test_subject_tick_s02_mixed_source_consumer_requirement_is_path_affecting() -> None:
+    seed = build_s01(
+        case_id="rt-s02-mixed-seed",
+        tick_index=1,
+        emit_world_action_candidate=False,
+        world_effect_feedback_correlated=False,
+    )
+    baseline = _result(
+        "rt-s02-mixed-baseline",
+        unresolved=False,
+        context=SubjectTickContext(
+            prior_s01_state=seed.state,
+            emit_world_action_candidate=False,
+        ),
+    )
+    required = _result(
+        "rt-s02-mixed-required",
+        unresolved=False,
+        context=SubjectTickContext(
+            prior_s01_state=seed.state,
+            emit_world_action_candidate=False,
+            require_s02_mixed_source_consumer=True,
+        ),
+    )
+    assert baseline.state.final_execution_outcome == SubjectTickOutcome.CONTINUE
+    assert required.state.final_execution_outcome == SubjectTickOutcome.REVALIDATE
+    assert any(
+        checkpoint.checkpoint_id == "rt01.s02_prediction_boundary_checkpoint"
+        and checkpoint.status.value == "enforced_detour"
+        for checkpoint in required.state.execution_checkpoints
+    )

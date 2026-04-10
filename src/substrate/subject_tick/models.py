@@ -6,6 +6,10 @@ from enum import Enum, StrEnum
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
+    from substrate.s02_prediction_boundary import (
+        S02PredictionBoundaryResult,
+        S02PredictionBoundaryState,
+    )
     from substrate.s01_efference_copy import S01EfferenceCopyResult, S01EfferenceCopyState
     from substrate.a_line_normalization import ALineNormalizationResult
     from substrate.m_minimal import MMinimalResult
@@ -126,6 +130,12 @@ class SubjectTickRestrictionCode(StrEnum):
     S01_COMPARISON_CONSUMER_REQUIRED = "s01_comparison_consumer_required"
     S01_UNEXPECTED_CHANGE_CONSUMER_REQUIRED = "s01_unexpected_change_consumer_required"
     S01_PREDICTION_VALIDITY_CONSUMER_REQUIRED = "s01_prediction_validity_consumer_required"
+    S02_PREDICTION_BOUNDARY_CONTRACT_MUST_BE_READ = (
+        "s02_prediction_boundary_contract_must_be_read"
+    )
+    S02_BOUNDARY_CONSUMER_REQUIRED = "s02_boundary_consumer_required"
+    S02_CONTROLLABILITY_CONSUMER_REQUIRED = "s02_controllability_consumer_required"
+    S02_MIXED_SOURCE_CONSUMER_REQUIRED = "s02_mixed_source_consumer_required"
     DOWNSTREAM_AUTHORITY_DEGRADED = "downstream_authority_degraded"
 
 
@@ -181,6 +191,7 @@ class SubjectTickContext:
     prior_mode_state: object | None = None
     prior_temporal_validity_state: object | None = None
     prior_s01_state: S01EfferenceCopyState | None = None
+    prior_s02_state: S02PredictionBoundaryState | None = None
     dependency_trigger_hits: tuple[str, ...] = ()
     context_shift_markers: tuple[str, ...] = ()
     contradicted_source_refs: tuple[str, ...] = ()
@@ -237,6 +248,10 @@ class SubjectTickContext:
     require_s01_prediction_validity_consumer: bool = False
     disable_s01_enforcement: bool = False
     disable_s01_prediction_registration: bool = False
+    require_s02_boundary_consumer: bool = False
+    require_s02_controllability_consumer: bool = False
+    require_s02_mixed_source_consumer: bool = False
+    disable_s02_enforcement: bool = False
     source_lineage: tuple[str, ...] = ()
 
 
@@ -530,6 +545,34 @@ class SubjectTickState:
     s01_require_comparison_consumer: bool
     s01_require_unexpected_change_consumer: bool
     s01_require_prediction_validity_consumer: bool
+    s02_boundary_id: str
+    s02_active_boundary_status: str
+    s02_boundary_uncertain: bool
+    s02_insufficient_coverage: bool
+    s02_no_clean_seam_claim: bool
+    s02_controllability_estimate: float
+    s02_prediction_reliability_estimate: float
+    s02_external_dominance_estimate: float
+    s02_mixed_source_score: float
+    s02_boundary_confidence: float
+    s02_boundary_consumer_ready: bool
+    s02_controllability_consumer_ready: bool
+    s02_mixed_source_consumer_ready: bool
+    s02_forbidden_shortcuts: tuple[str, ...]
+    s02_restrictions: tuple[str, ...]
+    s02_scope: str
+    s02_scope_rt01_contour_only: bool
+    s02_scope_s02_first_slice_only: bool
+    s02_scope_s03_implemented: bool
+    s02_scope_s04_implemented: bool
+    s02_scope_s05_implemented: bool
+    s02_scope_full_self_model_implemented: bool
+    s02_scope_repo_wide_adoption: bool
+    s02_scope_reason: str
+    s02_reason: str
+    s02_require_boundary_consumer: bool
+    s02_require_controllability_consumer: bool
+    s02_require_mixed_source_consumer: bool
     t02_require_constrained_scene_consumer: bool
     t02_require_raw_vs_propagated_distinction: bool
     t02_raw_vs_propagated_distinct: bool
@@ -921,6 +964,7 @@ class SubjectTickResult:
     m_minimal_result: MMinimalResult
     n_minimal_result: NMinimalResult
     s01_result: S01EfferenceCopyResult
+    s02_result: S02PredictionBoundaryResult
     t01_result: T01ActiveFieldResult
     t02_result: T02ConstrainedSceneResult
     t03_result: T03CompetitionResult

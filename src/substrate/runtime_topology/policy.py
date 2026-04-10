@@ -26,6 +26,7 @@ def build_minimal_runtime_tick_graph() -> RuntimeTickGraph:
             "C04",
             "C05",
             "S01",
+            "S02",
             "T01",
             "T02",
             "T03",
@@ -130,6 +131,18 @@ def build_minimal_runtime_tick_graph() -> RuntimeTickGraph:
                 checkpoint_ids=("rt01.s01_efference_copy_checkpoint",),
             ),
             RuntimeContourNode(
+                node_id="node.s02_prediction_boundary",
+                phase_id="S02",
+                authority_role="prediction_boundary_seam_contract",
+                computational_role="boundary_ledger_aggregator",
+                surfaces=(
+                    "s02_prediction_boundary.seam_ledger",
+                    "s02_prediction_boundary.controllability_vs_predictability",
+                    "s02_prediction_boundary.mixed_source_boundary",
+                ),
+                checkpoint_ids=("rt01.s02_prediction_boundary_checkpoint",),
+            ),
+            RuntimeContourNode(
                 node_id="node.t01_semantic_field",
                 phase_id="T01",
                 authority_role="semantic_field_contract",
@@ -197,6 +210,7 @@ def build_minimal_runtime_tick_graph() -> RuntimeTickGraph:
                     "rt01.m_minimal_contour_checkpoint",
                     "rt01.n_minimal_contour_checkpoint",
                     "rt01.t01_semantic_field_checkpoint",
+                    "rt01.s02_prediction_boundary_checkpoint",
                     "rt01.t02_relation_binding_checkpoint",
                     "rt01.t02_raw_vs_propagated_integrity_checkpoint",
                     "rt01.t03_hypothesis_competition_checkpoint",
@@ -212,6 +226,7 @@ def build_minimal_runtime_tick_graph() -> RuntimeTickGraph:
                     "rt01.m_minimal_contour_checkpoint",
                     "rt01.n_minimal_contour_checkpoint",
                     "rt01.t01_semantic_field_checkpoint",
+                    "rt01.s02_prediction_boundary_checkpoint",
                     "rt01.t02_relation_binding_checkpoint",
                     "rt01.t02_raw_vs_propagated_integrity_checkpoint",
                     "rt01.t03_hypothesis_competition_checkpoint",
@@ -235,7 +250,11 @@ def build_minimal_runtime_tick_graph() -> RuntimeTickGraph:
             RuntimeContourEdge(source_phase="C05", target_phase="RT01", relation="gates"),
             RuntimeContourEdge(source_phase="C04", target_phase="S01", relation="arbitrates"),
             RuntimeContourEdge(source_phase="C05", target_phase="S01", relation="requests_revalidation"),
+            RuntimeContourEdge(source_phase="C04", target_phase="S02", relation="arbitrates"),
+            RuntimeContourEdge(source_phase="C05", target_phase="S02", relation="requests_revalidation"),
             RuntimeContourEdge(source_phase="S01", target_phase="RT01", relation="modulates"),
+            RuntimeContourEdge(source_phase="S01", target_phase="S02", relation="requires"),
+            RuntimeContourEdge(source_phase="S02", target_phase="T01", relation="requires"),
             RuntimeContourEdge(source_phase="WORLD_SEAM", target_phase="RT01", relation="requires"),
             RuntimeContourEdge(source_phase="WORLD_SEAM", target_phase="S_MINIMAL", relation="requires"),
             RuntimeContourEdge(source_phase="S_MINIMAL", target_phase="RT01", relation="requires"),
@@ -272,6 +291,7 @@ def build_minimal_runtime_tick_graph() -> RuntimeTickGraph:
             "rt01.m_minimal_contour_checkpoint",
             "rt01.n_minimal_contour_checkpoint",
             "rt01.s01_efference_copy_checkpoint",
+            "rt01.s02_prediction_boundary_checkpoint",
             "rt01.t01_semantic_field_checkpoint",
             "rt01.t02_relation_binding_checkpoint",
             "rt01.t02_raw_vs_propagated_integrity_checkpoint",
@@ -289,6 +309,8 @@ def build_minimal_runtime_tick_graph() -> RuntimeTickGraph:
             "m_minimal.lifecycle_state",
             "n_minimal.commitment_state",
             "s01_efference_copy.latest_comparison",
+            "s02_prediction_boundary.seam_ledger",
+            "s02_prediction_boundary.controllability_vs_predictability",
             "t01_semantic_field.active_scene",
             "t02_relation_binding.constrained_scene",
             "t02_relation_binding.raw_vs_propagated_distinction",
@@ -326,6 +348,7 @@ def build_minimal_runtime_topology_bundle() -> RuntimeTopologyBundle:
             "m_minimal_memory_lifecycle_contract",
             "n_minimal_narrative_commitment_contract",
             "s01_efference_copy_comparator_contract",
+            "s02_prediction_boundary_self_vs_world_seam_contract",
             "t01_semantic_field_contract",
             "t02_relation_binding_constraint_propagation_contract",
             "t02_raw_vs_propagated_integrity_contract",
@@ -493,6 +516,7 @@ def _context_has_ablation_flags(context: SubjectTickContext | None) -> bool:
         or context.disable_n_minimal_enforcement
         or context.disable_s01_enforcement
         or context.disable_s01_prediction_registration
+        or context.disable_s02_enforcement
         or context.disable_t01_unresolved_slot_maintenance
         or context.disable_t01_field_enforcement
         or (

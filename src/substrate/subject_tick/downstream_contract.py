@@ -274,6 +274,34 @@ class SubjectTickContractView:
     s01_require_comparison_consumer: bool
     s01_require_unexpected_change_consumer: bool
     s01_require_prediction_validity_consumer: bool
+    s02_boundary_id: str
+    s02_active_boundary_status: str
+    s02_boundary_uncertain: bool
+    s02_insufficient_coverage: bool
+    s02_no_clean_seam_claim: bool
+    s02_controllability_estimate: float
+    s02_prediction_reliability_estimate: float
+    s02_external_dominance_estimate: float
+    s02_mixed_source_score: float
+    s02_boundary_confidence: float
+    s02_boundary_consumer_ready: bool
+    s02_controllability_consumer_ready: bool
+    s02_mixed_source_consumer_ready: bool
+    s02_forbidden_shortcuts: tuple[str, ...]
+    s02_restrictions: tuple[str, ...]
+    s02_scope: str
+    s02_scope_rt01_contour_only: bool
+    s02_scope_s02_first_slice_only: bool
+    s02_scope_s03_implemented: bool
+    s02_scope_s04_implemented: bool
+    s02_scope_s05_implemented: bool
+    s02_scope_full_self_model_implemented: bool
+    s02_scope_repo_wide_adoption: bool
+    s02_scope_reason: str
+    s02_reason: str
+    s02_require_boundary_consumer: bool
+    s02_require_controllability_consumer: bool
+    s02_require_mixed_source_consumer: bool
     t02_constrained_scene_id: str | None
     t02_scene_status: str | None
     t02_preverbal_constraint_consumer_ready: bool | None
@@ -703,6 +731,34 @@ def derive_subject_tick_contract_view(
         s01_require_prediction_validity_consumer=(
             state.s01_require_prediction_validity_consumer
         ),
+        s02_boundary_id=state.s02_boundary_id,
+        s02_active_boundary_status=state.s02_active_boundary_status,
+        s02_boundary_uncertain=state.s02_boundary_uncertain,
+        s02_insufficient_coverage=state.s02_insufficient_coverage,
+        s02_no_clean_seam_claim=state.s02_no_clean_seam_claim,
+        s02_controllability_estimate=state.s02_controllability_estimate,
+        s02_prediction_reliability_estimate=state.s02_prediction_reliability_estimate,
+        s02_external_dominance_estimate=state.s02_external_dominance_estimate,
+        s02_mixed_source_score=state.s02_mixed_source_score,
+        s02_boundary_confidence=state.s02_boundary_confidence,
+        s02_boundary_consumer_ready=state.s02_boundary_consumer_ready,
+        s02_controllability_consumer_ready=state.s02_controllability_consumer_ready,
+        s02_mixed_source_consumer_ready=state.s02_mixed_source_consumer_ready,
+        s02_forbidden_shortcuts=state.s02_forbidden_shortcuts,
+        s02_restrictions=state.s02_restrictions,
+        s02_scope=state.s02_scope,
+        s02_scope_rt01_contour_only=state.s02_scope_rt01_contour_only,
+        s02_scope_s02_first_slice_only=state.s02_scope_s02_first_slice_only,
+        s02_scope_s03_implemented=state.s02_scope_s03_implemented,
+        s02_scope_s04_implemented=state.s02_scope_s04_implemented,
+        s02_scope_s05_implemented=state.s02_scope_s05_implemented,
+        s02_scope_full_self_model_implemented=state.s02_scope_full_self_model_implemented,
+        s02_scope_repo_wide_adoption=state.s02_scope_repo_wide_adoption,
+        s02_scope_reason=state.s02_scope_reason,
+        s02_reason=state.s02_reason,
+        s02_require_boundary_consumer=state.s02_require_boundary_consumer,
+        s02_require_controllability_consumer=state.s02_require_controllability_consumer,
+        s02_require_mixed_source_consumer=state.s02_require_mixed_source_consumer,
         t02_constrained_scene_id=(
             None if t02_result is None else t02_result.state.constrained_scene_id
         ),
@@ -987,10 +1043,10 @@ def derive_subject_tick_contract_view(
         requires_restrictions_read=True,
         reason=(
             "runtime contour contract requires C04/C05 claims, world-entry basis, s-minimal "
-            "self/world boundary, a-line normalization, m-minimal lifecycle, n-minimal "
-            "narrative commitment, t01 semantic field checkpoints, t02 raw-vs-propagated "
-            "distinction, t03 hypothesis competition frontier, and t04 attention schema "
-            "focus-ownership surfaces to be read"
+            "self/world boundary, s01 comparator and s02 prediction-boundary seam, a-line "
+            "normalization, m-minimal lifecycle, n-minimal narrative commitment, t01 semantic "
+            "field checkpoints, t02 raw-vs-propagated distinction, t03 hypothesis competition "
+            "frontier, and t04 attention schema focus-ownership surfaces to be read"
         ),
     )
 

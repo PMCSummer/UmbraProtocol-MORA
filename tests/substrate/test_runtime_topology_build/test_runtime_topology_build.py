@@ -108,6 +108,7 @@ def test_runtime_topology_bundle_and_graph_are_materialized() -> None:
         "C04",
         "C05",
         "S01",
+        "S02",
         "T01",
         "T02",
         "T03",
@@ -122,6 +123,7 @@ def test_runtime_topology_bundle_and_graph_are_materialized() -> None:
     assert "rt01.m_minimal_contour_checkpoint" in graph.mandatory_checkpoint_ids
     assert "rt01.n_minimal_contour_checkpoint" in graph.mandatory_checkpoint_ids
     assert "rt01.s01_efference_copy_checkpoint" in graph.mandatory_checkpoint_ids
+    assert "rt01.s02_prediction_boundary_checkpoint" in graph.mandatory_checkpoint_ids
     assert "rt01.t01_semantic_field_checkpoint" in graph.mandatory_checkpoint_ids
     assert "rt01.t02_relation_binding_checkpoint" in graph.mandatory_checkpoint_ids
     assert "rt01.t02_raw_vs_propagated_integrity_checkpoint" in graph.mandatory_checkpoint_ids
@@ -134,6 +136,11 @@ def test_runtime_topology_bundle_and_graph_are_materialized() -> None:
     assert "m_minimal.lifecycle_state" in graph.source_of_truth_surfaces
     assert "n_minimal.commitment_state" in graph.source_of_truth_surfaces
     assert "s01_efference_copy.latest_comparison" in graph.source_of_truth_surfaces
+    assert "s02_prediction_boundary.seam_ledger" in graph.source_of_truth_surfaces
+    assert (
+        "s02_prediction_boundary.controllability_vs_predictability"
+        in graph.source_of_truth_surfaces
+    )
     assert "t01_semantic_field.active_scene" in graph.source_of_truth_surfaces
     assert "t02_relation_binding.constrained_scene" in graph.source_of_truth_surfaces
     assert "t02_relation_binding.raw_vs_propagated_distinction" in graph.source_of_truth_surfaces
@@ -1309,3 +1316,134 @@ def test_dispatch_contract_view_exposes_s01_efference_surface() -> None:
     assert view.s01_pending_predictions_count == state.s01_pending_predictions_count
     assert view.s01_comparisons_count == state.s01_comparisons_count
     assert view.s01_require_prediction_validity_consumer is True
+
+
+def test_dispatch_s02_boundary_consumer_requirement_is_load_bearing() -> None:
+    baseline = dispatch_runtime_tick(
+        RuntimeDispatchRequest(
+            tick_input=_tick_input("runtime-topology-s02-boundary"),
+            route_class=RuntimeRouteClass.PRODUCTION_CONTOUR,
+        )
+    )
+    required = dispatch_runtime_tick(
+        RuntimeDispatchRequest(
+            tick_input=_tick_input("runtime-topology-s02-boundary"),
+            context=SubjectTickContext(require_s02_boundary_consumer=True),
+            route_class=RuntimeRouteClass.PRODUCTION_CONTOUR,
+        )
+    )
+    assert baseline.subject_tick_result is not None
+    assert required.subject_tick_result is not None
+    assert baseline.subject_tick_result.state.final_execution_outcome == SubjectTickOutcome.CONTINUE
+    assert required.subject_tick_result.state.final_execution_outcome == SubjectTickOutcome.REVALIDATE
+    assert any(
+        checkpoint.checkpoint_id == "rt01.s02_prediction_boundary_checkpoint"
+        and checkpoint.status.value == "enforced_detour"
+        for checkpoint in required.subject_tick_result.state.execution_checkpoints
+    )
+
+
+def test_dispatch_s02_controllability_consumer_requirement_is_load_bearing() -> None:
+    seed = build_s01(
+        case_id="runtime-topology-s02-controllability-seed",
+        tick_index=1,
+        emit_world_action_candidate=False,
+        world_effect_feedback_correlated=False,
+    )
+    baseline = dispatch_runtime_tick(
+        RuntimeDispatchRequest(
+            tick_input=_tick_input("runtime-topology-s02-controllability"),
+            context=SubjectTickContext(
+                prior_s01_state=seed.state,
+                emit_world_action_candidate=False,
+            ),
+            route_class=RuntimeRouteClass.PRODUCTION_CONTOUR,
+        )
+    )
+    required = dispatch_runtime_tick(
+        RuntimeDispatchRequest(
+            tick_input=_tick_input("runtime-topology-s02-controllability"),
+            context=SubjectTickContext(
+                prior_s01_state=seed.state,
+                emit_world_action_candidate=False,
+                require_s02_controllability_consumer=True,
+            ),
+            route_class=RuntimeRouteClass.PRODUCTION_CONTOUR,
+        )
+    )
+    assert baseline.subject_tick_result is not None
+    assert required.subject_tick_result is not None
+    assert baseline.subject_tick_result.state.final_execution_outcome == SubjectTickOutcome.CONTINUE
+    assert required.subject_tick_result.state.final_execution_outcome == SubjectTickOutcome.REPAIR
+    assert any(
+        checkpoint.checkpoint_id == "rt01.s02_prediction_boundary_checkpoint"
+        and checkpoint.status.value == "enforced_detour"
+        for checkpoint in required.subject_tick_result.state.execution_checkpoints
+    )
+
+
+def test_dispatch_s02_mixed_source_consumer_requirement_is_load_bearing() -> None:
+    seed = build_s01(
+        case_id="runtime-topology-s02-mixed-seed",
+        tick_index=1,
+        emit_world_action_candidate=False,
+        world_effect_feedback_correlated=False,
+    )
+    baseline = dispatch_runtime_tick(
+        RuntimeDispatchRequest(
+            tick_input=_tick_input("runtime-topology-s02-mixed"),
+            context=SubjectTickContext(
+                prior_s01_state=seed.state,
+                emit_world_action_candidate=False,
+            ),
+            route_class=RuntimeRouteClass.PRODUCTION_CONTOUR,
+        )
+    )
+    required = dispatch_runtime_tick(
+        RuntimeDispatchRequest(
+            tick_input=_tick_input("runtime-topology-s02-mixed"),
+            context=SubjectTickContext(
+                prior_s01_state=seed.state,
+                emit_world_action_candidate=False,
+                require_s02_mixed_source_consumer=True,
+            ),
+            route_class=RuntimeRouteClass.PRODUCTION_CONTOUR,
+        )
+    )
+    assert baseline.subject_tick_result is not None
+    assert required.subject_tick_result is not None
+    assert baseline.subject_tick_result.state.final_execution_outcome == SubjectTickOutcome.CONTINUE
+    assert required.subject_tick_result.state.final_execution_outcome == SubjectTickOutcome.REVALIDATE
+    assert any(
+        checkpoint.checkpoint_id == "rt01.s02_prediction_boundary_checkpoint"
+        and checkpoint.status.value == "enforced_detour"
+        for checkpoint in required.subject_tick_result.state.execution_checkpoints
+    )
+
+
+def test_dispatch_contract_view_exposes_s02_prediction_boundary_surface() -> None:
+    result = dispatch_runtime_tick(
+        RuntimeDispatchRequest(
+            tick_input=_tick_input("runtime-topology-s02-contract-view"),
+            context=SubjectTickContext(
+                require_s02_boundary_consumer=True,
+                require_s02_controllability_consumer=True,
+                require_s02_mixed_source_consumer=True,
+            ),
+            route_class=RuntimeRouteClass.PRODUCTION_CONTOUR,
+        )
+    )
+    view = derive_runtime_dispatch_contract_view(result)
+    assert view.s02_boundary_id is not None
+    assert view.s02_active_boundary_status is not None
+    assert view.s02_scope == "rt01_contour_only"
+    assert view.s02_scope_rt01_contour_only is True
+    assert view.s02_scope_s02_first_slice_only is True
+    assert view.s02_scope_s03_implemented is False
+    assert view.s02_scope_s04_implemented is False
+    assert view.s02_scope_s05_implemented is False
+    assert view.s02_scope_full_self_model_implemented is False
+    assert view.s02_scope_repo_wide_adoption is False
+    assert view.s02_require_boundary_consumer is True
+    assert view.s02_require_controllability_consumer is True
+    assert view.s02_require_mixed_source_consumer is True

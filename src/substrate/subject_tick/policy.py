@@ -60,6 +60,7 @@ def evaluate_subject_tick_downstream_gate(
         SubjectTickRestrictionCode.T03_HYPOTHESIS_COMPETITION_CONTRACT_MUST_BE_READ,
         SubjectTickRestrictionCode.T04_ATTENTION_SCHEMA_CONTRACT_MUST_BE_READ,
         SubjectTickRestrictionCode.S01_EFFERENCE_COPY_CONTRACT_MUST_BE_READ,
+        SubjectTickRestrictionCode.S02_PREDICTION_BOUNDARY_CONTRACT_MUST_BE_READ,
     ]
     usability = SubjectTickUsabilityClass.USABLE_BOUNDED
     accepted = True
@@ -443,6 +444,53 @@ def evaluate_subject_tick_downstream_gate(
             accepted = False
             usability = SubjectTickUsabilityClass.BLOCKED
             reason = "s01 efference-copy checkpoint requires detour before downstream continuation"
+
+    s02_checkpoint = next(
+        (
+            checkpoint
+            for checkpoint in state.execution_checkpoints
+            if checkpoint.checkpoint_id == "rt01.s02_prediction_boundary_checkpoint"
+        ),
+        None,
+    )
+    if state.s02_require_boundary_consumer and not state.s02_boundary_consumer_ready:
+        restrictions.append(SubjectTickRestrictionCode.S02_BOUNDARY_CONSUMER_REQUIRED)
+        restrictions.append(SubjectTickRestrictionCode.DOWNSTREAM_AUTHORITY_DEGRADED)
+        if state.final_execution_outcome == SubjectTickOutcome.CONTINUE:
+            accepted = False
+            usability = SubjectTickUsabilityClass.BLOCKED
+            reason = "s02 boundary consumer requested but no clean seam boundary is consumable"
+    if (
+        state.s02_require_controllability_consumer
+        and not state.s02_controllability_consumer_ready
+    ):
+        restrictions.append(SubjectTickRestrictionCode.S02_CONTROLLABILITY_CONSUMER_REQUIRED)
+        restrictions.append(SubjectTickRestrictionCode.DOWNSTREAM_AUTHORITY_DEGRADED)
+        if state.final_execution_outcome == SubjectTickOutcome.CONTINUE:
+            accepted = False
+            usability = SubjectTickUsabilityClass.BLOCKED
+            reason = "s02 controllability consumer requested but controllability basis is unavailable"
+    if state.s02_require_mixed_source_consumer and not state.s02_mixed_source_consumer_ready:
+        restrictions.append(SubjectTickRestrictionCode.S02_MIXED_SOURCE_CONSUMER_REQUIRED)
+        restrictions.append(SubjectTickRestrictionCode.DOWNSTREAM_AUTHORITY_DEGRADED)
+        if state.final_execution_outcome == SubjectTickOutcome.CONTINUE:
+            accepted = False
+            usability = SubjectTickUsabilityClass.BLOCKED
+            reason = "s02 mixed-source consumer requested but mixed boundary is not preserved"
+    if s02_checkpoint is not None and s02_checkpoint.status.value != "allowed":
+        if "boundary" in s02_checkpoint.required_action:
+            restrictions.append(SubjectTickRestrictionCode.S02_BOUNDARY_CONSUMER_REQUIRED)
+        if "controllability" in s02_checkpoint.required_action:
+            restrictions.append(
+                SubjectTickRestrictionCode.S02_CONTROLLABILITY_CONSUMER_REQUIRED
+            )
+        if "mixed_source" in s02_checkpoint.required_action:
+            restrictions.append(SubjectTickRestrictionCode.S02_MIXED_SOURCE_CONSUMER_REQUIRED)
+        restrictions.append(SubjectTickRestrictionCode.DOWNSTREAM_AUTHORITY_DEGRADED)
+        if state.final_execution_outcome == SubjectTickOutcome.CONTINUE:
+            accepted = False
+            usability = SubjectTickUsabilityClass.BLOCKED
+            reason = "s02 prediction boundary checkpoint requires detour before downstream continuation"
 
     return SubjectTickGateDecision(
         accepted=accepted,

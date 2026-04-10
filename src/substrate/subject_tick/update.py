@@ -132,6 +132,10 @@ from substrate.viability_control import (
 )
 from substrate.world_adapter import run_world_adapter_cycle
 from substrate.self_contour import build_s_minimal_contour
+from substrate.s02_prediction_boundary import (
+    build_s02_prediction_boundary,
+    derive_s02_boundary_consumer_view,
+)
 from substrate.s01_efference_copy import (
     S01EfferenceCopyState,
     build_s01_efference_copy,
@@ -150,6 +154,7 @@ ATTEMPTED_SUBJECT_TICK_PATHS: tuple[str, ...] = (
     "subject_tick.enforce_downstream_obedience_contract",
     "subject_tick.evaluate_world_entry_contract",
     "subject_tick.evaluate_s01_efference_copy",
+    "subject_tick.evaluate_s02_prediction_boundary",
     "subject_tick.evaluate_s_minimal_contour",
     "subject_tick.evaluate_a_line_normalization",
     "subject_tick.evaluate_m_minimal_contour",
@@ -1046,6 +1051,103 @@ def execute_subject_tick(
             ),
             applied_action=active_execution_mode,
             reason=s01_checkpoint_reason,
+        )
+    )
+    s02_result = build_s02_prediction_boundary(
+        tick_id=tick_id,
+        tick_index=tick_index,
+        s01_result=s01_result,
+        c04_selected_mode=c04_execution_mode_claim,
+        c05_validity_action=c05_validity_action,
+        c05_revalidation_required=bool(
+            temporal_validity.state.revalidation_item_ids
+            or temporal_validity.state.selective_scope_targets
+            or temporal_validity.state.selective_scope_uncertain
+            or temporal_validity.state.insufficient_basis_for_revalidation
+        ),
+        c05_dependency_contaminated=bool(
+            temporal_validity.state.dependency_contaminated_item_ids
+            or temporal_validity.state.no_safe_reuse_item_ids
+        ),
+        context_shift_detected=bool(context.context_shift_markers),
+        effector_available=bool(context.emit_world_action_candidate),
+        observation_degraded=bool(
+            world_entry_result.episode.degraded or world_entry_result.episode.incomplete
+        ),
+        prior_state=context.prior_s02_state,
+        source_lineage=lineage,
+        context_scope=("c04_mode", c04_execution_mode_claim, "c05_action", c05_validity_action),
+    )
+    s02_view = derive_s02_boundary_consumer_view(s02_result)
+    s02_checkpoint_status = SubjectTickCheckpointStatus.ALLOWED
+    s02_checkpoint_reason = s02_result.gate.reason
+    if not context.disable_s02_enforcement:
+        if (
+            context.require_s02_boundary_consumer
+            and not s02_view.can_consume_boundary
+            and halt_reason is None
+        ):
+            revalidation_needed = True
+            s02_checkpoint_status = SubjectTickCheckpointStatus.ENFORCED_DETOUR
+            s02_checkpoint_reason = (
+                "s02 boundary consumer requested but prediction seam is uncertain/stale; revalidate detour enforced"
+            )
+            if active_execution_mode != "halt_execution":
+                active_execution_mode = "revalidate_scope"
+        if (
+            context.require_s02_controllability_consumer
+            and not s02_view.can_consume_controllability
+            and halt_reason is None
+        ):
+            repair_needed = True
+            s02_checkpoint_status = SubjectTickCheckpointStatus.ENFORCED_DETOUR
+            s02_checkpoint_reason = (
+                "s02 controllability consumer requested but controllability basis is not distinguishable from predictability"
+            )
+            if active_execution_mode not in {"halt_execution", "revalidate_scope"}:
+                active_execution_mode = "repair_runtime_path"
+        if (
+            context.require_s02_mixed_source_consumer
+            and not s02_view.can_consume_mixed_source
+            and halt_reason is None
+        ):
+            revalidation_needed = True
+            s02_checkpoint_status = SubjectTickCheckpointStatus.ENFORCED_DETOUR
+            s02_checkpoint_reason = (
+                "s02 mixed-source consumer requested but mixed boundary is not preserved"
+            )
+            if active_execution_mode != "halt_execution":
+                active_execution_mode = "revalidate_scope"
+    else:
+        s02_checkpoint_status = SubjectTickCheckpointStatus.ENFORCED_DETOUR
+        s02_checkpoint_reason = "s02 prediction boundary enforcement disabled in ablation context"
+    checkpoints.append(
+        SubjectTickCheckpointResult(
+            checkpoint_id="rt01.s02_prediction_boundary_checkpoint",
+            source_contract="s02_prediction_boundary.self_vs_world_seam",
+            status=s02_checkpoint_status,
+            required_action=(
+                "require_s02_boundary_and_controllability_and_mixed_source_consumer"
+                if (
+                    context.require_s02_boundary_consumer
+                    and context.require_s02_controllability_consumer
+                    and context.require_s02_mixed_source_consumer
+                )
+                else "require_s02_boundary_and_controllability_consumer"
+                if (
+                    context.require_s02_boundary_consumer
+                    and context.require_s02_controllability_consumer
+                )
+                else "require_s02_boundary_consumer"
+                if context.require_s02_boundary_consumer
+                else "require_s02_controllability_consumer"
+                if context.require_s02_controllability_consumer
+                else "require_s02_mixed_source_consumer"
+                if context.require_s02_mixed_source_consumer
+                else "s02_optional"
+            ),
+            applied_action=active_execution_mode,
+            reason=s02_checkpoint_reason,
         )
     )
     s_minimal_result = build_s_minimal_contour(
@@ -2096,6 +2198,63 @@ def execute_subject_tick(
         s01_require_prediction_validity_consumer=(
             context.require_s01_prediction_validity_consumer
         ),
+        s02_boundary_id=s02_result.state.boundary_id,
+        s02_active_boundary_status=s02_result.state.active_boundary_status.value,
+        s02_boundary_uncertain=s02_result.state.boundary_uncertain,
+        s02_insufficient_coverage=s02_result.state.insufficient_coverage,
+        s02_no_clean_seam_claim=s02_result.state.no_clean_seam_claim,
+        s02_controllability_estimate=(
+            0.0
+            if not s02_result.state.seam_entries
+            else max(item.controllability_estimate for item in s02_result.state.seam_entries)
+        ),
+        s02_prediction_reliability_estimate=(
+            0.0
+            if not s02_result.state.seam_entries
+            else max(
+                item.prediction_reliability_estimate
+                for item in s02_result.state.seam_entries
+            )
+        ),
+        s02_external_dominance_estimate=(
+            0.0
+            if not s02_result.state.seam_entries
+            else max(item.external_dominance_estimate for item in s02_result.state.seam_entries)
+        ),
+        s02_mixed_source_score=(
+            0.0
+            if not s02_result.state.seam_entries
+            else max(item.mixed_source_score for item in s02_result.state.seam_entries)
+        ),
+        s02_boundary_confidence=(
+            0.0
+            if not s02_result.state.seam_entries
+            else max(item.boundary_confidence for item in s02_result.state.seam_entries)
+        ),
+        s02_boundary_consumer_ready=s02_result.gate.boundary_consumer_ready,
+        s02_controllability_consumer_ready=(
+            s02_result.gate.controllability_consumer_ready
+        ),
+        s02_mixed_source_consumer_ready=s02_result.gate.mixed_source_consumer_ready,
+        s02_forbidden_shortcuts=s02_result.gate.forbidden_shortcuts,
+        s02_restrictions=s02_result.gate.restrictions,
+        s02_scope=s02_result.scope_marker.scope,
+        s02_scope_rt01_contour_only=s02_result.scope_marker.rt01_contour_only,
+        s02_scope_s02_first_slice_only=s02_result.scope_marker.s02_first_slice_only,
+        s02_scope_s03_implemented=s02_result.scope_marker.s03_implemented,
+        s02_scope_s04_implemented=s02_result.scope_marker.s04_implemented,
+        s02_scope_s05_implemented=s02_result.scope_marker.s05_implemented,
+        s02_scope_full_self_model_implemented=(
+            s02_result.scope_marker.full_self_model_implemented
+        ),
+        s02_scope_repo_wide_adoption=s02_result.scope_marker.repo_wide_adoption,
+        s02_scope_reason=s02_result.scope_marker.reason,
+        s02_reason=s02_result.reason,
+        s02_require_boundary_consumer=context.require_s02_boundary_consumer,
+        s02_require_controllability_consumer=(
+            context.require_s02_controllability_consumer
+        ),
+        s02_require_mixed_source_consumer=context.require_s02_mixed_source_consumer,
         t02_require_constrained_scene_consumer=(
             context.require_t02_constrained_scene_consumer
         ),
@@ -2189,7 +2348,7 @@ def execute_subject_tick(
         attempted_paths=ATTEMPTED_SUBJECT_TICK_PATHS,
         downstream_gate=gate,
         causal_basis=(
-            "bounded runtime execution spine enforces roadmap authority roles for C04/C05, consumes world-entry, s01 efference-copy, s-minimal, a-line, m-minimal, n-minimal, t01 semantic-field, t02 relation-binding, t03 hypothesis-competition, and t04 attention-schema gates, and keeps D01 observability-only over fixed R->C order"
+            "bounded runtime execution spine enforces roadmap authority roles for C04/C05, consumes world-entry, s01 efference-copy, s02 prediction-boundary seam, s-minimal, a-line, m-minimal, n-minimal, t01 semantic-field, t02 relation-binding, t03 hypothesis-competition, and t04 attention-schema gates, and keeps D01 observability-only over fixed R->C order"
         ),
     )
     abstain = final_outcome in {SubjectTickOutcome.REPAIR, SubjectTickOutcome.REVALIDATE}
@@ -2222,6 +2381,7 @@ def execute_subject_tick(
         m_minimal_result=m_minimal_result,
         n_minimal_result=n_minimal_result,
         s01_result=s01_result,
+        s02_result=s02_result,
         t01_result=t01_result,
         t02_result=t02_result,
         t03_result=t03_result,

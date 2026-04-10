@@ -146,6 +146,32 @@ class RuntimeDispatchContractView:
     s01_require_comparison_consumer: bool | None
     s01_require_unexpected_change_consumer: bool | None
     s01_require_prediction_validity_consumer: bool | None
+    s02_boundary_id: str | None
+    s02_active_boundary_status: str | None
+    s02_boundary_uncertain: bool | None
+    s02_insufficient_coverage: bool | None
+    s02_no_clean_seam_claim: bool | None
+    s02_controllability_estimate: float | None
+    s02_prediction_reliability_estimate: float | None
+    s02_external_dominance_estimate: float | None
+    s02_mixed_source_score: float | None
+    s02_boundary_confidence: float | None
+    s02_boundary_consumer_ready: bool | None
+    s02_controllability_consumer_ready: bool | None
+    s02_mixed_source_consumer_ready: bool | None
+    s02_forbidden_shortcuts: tuple[str, ...] | None
+    s02_restrictions: tuple[str, ...] | None
+    s02_scope: str | None
+    s02_scope_rt01_contour_only: bool | None
+    s02_scope_s02_first_slice_only: bool | None
+    s02_scope_s03_implemented: bool | None
+    s02_scope_s04_implemented: bool | None
+    s02_scope_s05_implemented: bool | None
+    s02_scope_full_self_model_implemented: bool | None
+    s02_scope_repo_wide_adoption: bool | None
+    s02_require_boundary_consumer: bool | None
+    s02_require_controllability_consumer: bool | None
+    s02_require_mixed_source_consumer: bool | None
     t02_constrained_scene_id: str | None
     t02_scene_status: str | None
     t02_preverbal_constraint_consumer_ready: bool | None
@@ -530,6 +556,70 @@ def derive_runtime_dispatch_contract_view(
         ),
         s01_require_prediction_validity_consumer=(
             None if state is None else state.s01_require_prediction_validity_consumer
+        ),
+        s02_boundary_id=(None if state is None else state.s02_boundary_id),
+        s02_active_boundary_status=(
+            None if state is None else state.s02_active_boundary_status
+        ),
+        s02_boundary_uncertain=(None if state is None else state.s02_boundary_uncertain),
+        s02_insufficient_coverage=(
+            None if state is None else state.s02_insufficient_coverage
+        ),
+        s02_no_clean_seam_claim=(
+            None if state is None else state.s02_no_clean_seam_claim
+        ),
+        s02_controllability_estimate=(
+            None if state is None else state.s02_controllability_estimate
+        ),
+        s02_prediction_reliability_estimate=(
+            None if state is None else state.s02_prediction_reliability_estimate
+        ),
+        s02_external_dominance_estimate=(
+            None if state is None else state.s02_external_dominance_estimate
+        ),
+        s02_mixed_source_score=(None if state is None else state.s02_mixed_source_score),
+        s02_boundary_confidence=(None if state is None else state.s02_boundary_confidence),
+        s02_boundary_consumer_ready=(
+            None if state is None else state.s02_boundary_consumer_ready
+        ),
+        s02_controllability_consumer_ready=(
+            None if state is None else state.s02_controllability_consumer_ready
+        ),
+        s02_mixed_source_consumer_ready=(
+            None if state is None else state.s02_mixed_source_consumer_ready
+        ),
+        s02_forbidden_shortcuts=(None if state is None else state.s02_forbidden_shortcuts),
+        s02_restrictions=(None if state is None else state.s02_restrictions),
+        s02_scope=(None if state is None else state.s02_scope),
+        s02_scope_rt01_contour_only=(
+            None if state is None else state.s02_scope_rt01_contour_only
+        ),
+        s02_scope_s02_first_slice_only=(
+            None if state is None else state.s02_scope_s02_first_slice_only
+        ),
+        s02_scope_s03_implemented=(
+            None if state is None else state.s02_scope_s03_implemented
+        ),
+        s02_scope_s04_implemented=(
+            None if state is None else state.s02_scope_s04_implemented
+        ),
+        s02_scope_s05_implemented=(
+            None if state is None else state.s02_scope_s05_implemented
+        ),
+        s02_scope_full_self_model_implemented=(
+            None if state is None else state.s02_scope_full_self_model_implemented
+        ),
+        s02_scope_repo_wide_adoption=(
+            None if state is None else state.s02_scope_repo_wide_adoption
+        ),
+        s02_require_boundary_consumer=(
+            None if state is None else state.s02_require_boundary_consumer
+        ),
+        s02_require_controllability_consumer=(
+            None if state is None else state.s02_require_controllability_consumer
+        ),
+        s02_require_mixed_source_consumer=(
+            None if state is None else state.s02_require_mixed_source_consumer
         ),
         t02_constrained_scene_id=(
             None if t02_result is None else t02_result.state.constrained_scene_id
