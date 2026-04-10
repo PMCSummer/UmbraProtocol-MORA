@@ -1495,3 +1495,159 @@ def test_subject_tick_s03_positive_consumer_ready_path_has_no_detour() -> None:
     )
     assert result.state.final_execution_outcome == SubjectTickOutcome.CONTINUE
     assert checkpoint.status.value == "allowed"
+
+
+def test_subject_tick_s03_mixed_update_consumer_positive_path_is_load_bearing_without_detour() -> None:
+    def _adapter(case_id: str) -> WorldAdapterInput:
+        action = build_world_action_candidate(
+            tick_id=f"{case_id}-action",
+            execution_mode="continue_stream",
+        )
+        effect = build_world_effect_packet(
+            effect_id=f"eff-{case_id}",
+            action_id=action.action_id,
+            observed_at="2026-04-21T09:00:00+00:00",
+            source_ref="world.sensor.subject_tick_s03_mixed_positive",
+            success=True,
+        )
+        return WorldAdapterInput(
+            adapter_presence=True,
+            adapter_available=True,
+            observation_packet=build_world_observation_packet(
+                observation_id=f"obs-{case_id}",
+                source_ref="world.sensor.subject_tick_s03_mixed_positive",
+                observed_at="2026-04-21T09:00:00+00:00",
+                payload_ref=f"payload:{case_id}",
+            ),
+            action_packet=action,
+            effect_packet=effect,
+        )
+
+    bootstrap = _result("rt-s03-mixed-positive-bootstrap", unresolved=False)
+    controllable_seed = build_s01(
+        case_id="rt-s03-mixed-positive-controllable-seed",
+        tick_index=1,
+        c04_selected_mode="continue_stream",
+        emit_world_action_candidate=True,
+        world_effect_feedback_correlated=False,
+    )
+    external_seed = build_s01(
+        case_id="rt-s03-mixed-positive-external-seed",
+        tick_index=1,
+        c04_selected_mode="idle",
+        emit_world_action_candidate=False,
+        world_effect_feedback_correlated=False,
+    )
+    internal = _result(
+        "rt-s03-mixed-positive-internal",
+        unresolved=False,
+        context=SubjectTickContext(
+            prior_subject_tick_state=bootstrap.state,
+            prior_s01_state=controllable_seed.state,
+            emit_world_action_candidate=True,
+            world_adapter_input=_adapter("rt-s03-mixed-positive-internal"),
+        ),
+    )
+    baseline = _result(
+        "rt-s03-mixed-positive-baseline",
+        unresolved=False,
+        context=SubjectTickContext(
+            prior_subject_tick_state=internal.state,
+            prior_s01_state=external_seed.state,
+            prior_s02_state=internal.s02_result.state,
+            emit_world_action_candidate=True,
+            world_adapter_input=_adapter("rt-s03-mixed-positive-baseline"),
+        ),
+    )
+    required = _result(
+        "rt-s03-mixed-positive-required",
+        unresolved=False,
+        context=SubjectTickContext(
+            prior_subject_tick_state=internal.state,
+            prior_s01_state=external_seed.state,
+            prior_s02_state=internal.s02_result.state,
+            emit_world_action_candidate=True,
+            require_s03_mixed_update_consumer=True,
+            world_adapter_input=_adapter("rt-s03-mixed-positive-required"),
+        ),
+    )
+    baseline_checkpoint = next(
+        checkpoint
+        for checkpoint in baseline.state.execution_checkpoints
+        if checkpoint.checkpoint_id == "rt01.s03_ownership_weighted_learning_checkpoint"
+    )
+    required_checkpoint = next(
+        checkpoint
+        for checkpoint in required.state.execution_checkpoints
+        if checkpoint.checkpoint_id == "rt01.s03_ownership_weighted_learning_checkpoint"
+    )
+    assert required.state.s03_latest_update_class == "mixed_split_update"
+    assert required.state.s03_mixed_update_consumer_ready is True
+    assert baseline_checkpoint.status.value == "allowed"
+    assert required_checkpoint.status.value == "allowed"
+    assert baseline.state.final_execution_outcome == SubjectTickOutcome.CONTINUE
+    assert required.state.final_execution_outcome == SubjectTickOutcome.CONTINUE
+
+
+def test_subject_tick_s03_learning_packet_consumer_requirement_is_path_affecting_without_ablation() -> None:
+    baseline = _result(
+        "rt-s03-learning-no-ablation-baseline",
+        unresolved=False,
+        context=SubjectTickContext(context_shift_markers=("shift:s03-learning-no-ablation",)),
+    )
+    required = _result(
+        "rt-s03-learning-no-ablation-required",
+        unresolved=False,
+        context=SubjectTickContext(
+            context_shift_markers=("shift:s03-learning-no-ablation",),
+            require_s03_learning_packet_consumer=True,
+        ),
+    )
+    baseline_checkpoint = next(
+        checkpoint
+        for checkpoint in baseline.state.execution_checkpoints
+        if checkpoint.checkpoint_id == "rt01.s03_ownership_weighted_learning_checkpoint"
+    )
+    required_checkpoint = next(
+        checkpoint
+        for checkpoint in required.state.execution_checkpoints
+        if checkpoint.checkpoint_id == "rt01.s03_ownership_weighted_learning_checkpoint"
+    )
+    assert baseline.state.s03_learning_packet_consumer_ready is False
+    assert required.state.s03_learning_packet_consumer_ready is False
+    assert baseline_checkpoint.status.value == "allowed"
+    assert required_checkpoint.status.value == "enforced_detour"
+    assert baseline.state.final_execution_outcome == SubjectTickOutcome.CONTINUE
+    assert required.state.final_execution_outcome == SubjectTickOutcome.REPAIR
+
+
+def test_subject_tick_s03_freeze_obedience_consumer_requirement_is_path_affecting_without_ablation() -> None:
+    baseline = _result(
+        "rt-s03-freeze-no-ablation-baseline",
+        unresolved=False,
+        context=SubjectTickContext(context_shift_markers=("shift:s03-freeze-no-ablation",)),
+    )
+    required = _result(
+        "rt-s03-freeze-no-ablation-required",
+        unresolved=False,
+        context=SubjectTickContext(
+            context_shift_markers=("shift:s03-freeze-no-ablation",),
+            require_s03_freeze_obedience_consumer=True,
+        ),
+    )
+    baseline_checkpoint = next(
+        checkpoint
+        for checkpoint in baseline.state.execution_checkpoints
+        if checkpoint.checkpoint_id == "rt01.s03_ownership_weighted_learning_checkpoint"
+    )
+    required_checkpoint = next(
+        checkpoint
+        for checkpoint in required.state.execution_checkpoints
+        if checkpoint.checkpoint_id == "rt01.s03_ownership_weighted_learning_checkpoint"
+    )
+    assert baseline.state.s03_freeze_obedience_consumer_ready is False
+    assert required.state.s03_freeze_obedience_consumer_ready is False
+    assert baseline_checkpoint.status.value == "allowed"
+    assert required_checkpoint.status.value == "enforced_detour"
+    assert baseline.state.final_execution_outcome == SubjectTickOutcome.CONTINUE
+    assert required.state.final_execution_outcome == SubjectTickOutcome.REVALIDATE
