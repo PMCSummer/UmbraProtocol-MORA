@@ -35,6 +35,7 @@ from substrate.subject_tick import (
 from substrate.transition import execute_transition
 from substrate.world_adapter import WorldAdapterInput, build_world_observation_packet
 from substrate.world_adapter import build_world_action_candidate, build_world_effect_packet
+from tests.substrate.s01_efference_copy_testkit import build_s01
 
 
 def _bootstrapped_state():
@@ -1168,6 +1169,89 @@ def test_dispatch_s01_unexpected_change_consumer_requirement_is_load_bearing() -
     assert required.subject_tick_result.state.final_execution_outcome == SubjectTickOutcome.REPAIR
 
 
+def test_dispatch_s01_unexpected_change_consumer_requirement_is_load_bearing_without_ablation_registration_toggle() -> None:
+    prior = build_s01(
+        case_id="runtime-topology-s01-unexpected-prod-like-prior",
+        tick_index=1,
+        register_prediction=False,
+        world_effect_feedback_correlated=False,
+    )
+    baseline_action = build_world_action_candidate(
+        tick_id="runtime-topology-s01-unexpected-prod-like-baseline",
+        execution_mode="continue_stream",
+    )
+    required_action = build_world_action_candidate(
+        tick_id="runtime-topology-s01-unexpected-prod-like-required",
+        execution_mode="continue_stream",
+    )
+    baseline = dispatch_runtime_tick(
+        RuntimeDispatchRequest(
+            tick_input=_tick_input("runtime-topology-s01-unexpected-prod-like"),
+            context=SubjectTickContext(
+                prior_s01_state=prior.state,
+                world_adapter_input=WorldAdapterInput(
+                    adapter_presence=True,
+                    adapter_available=True,
+                    observation_packet=build_world_observation_packet(
+                        observation_id="obs-runtime-topology-s01-unexpected-prod-like-baseline",
+                        source_ref="world.sensor.runtime_topology_s01",
+                        observed_at="2026-04-20T10:10:10+00:00",
+                        payload_ref="payload:runtime-topology-s01-unexpected-prod-like-baseline",
+                    ),
+                    action_packet=baseline_action,
+                    effect_packet=build_world_effect_packet(
+                        effect_id="eff-runtime-topology-s01-unexpected-prod-like-baseline",
+                        action_id=baseline_action.action_id,
+                        observed_at="2026-04-20T10:10:10+00:00",
+                        source_ref="world.sensor.runtime_topology_s01",
+                        success=True,
+                    ),
+                ),
+            ),
+            route_class=RuntimeRouteClass.PRODUCTION_CONTOUR,
+        )
+    )
+    required = dispatch_runtime_tick(
+        RuntimeDispatchRequest(
+            tick_input=_tick_input("runtime-topology-s01-unexpected-prod-like"),
+            context=SubjectTickContext(
+                prior_s01_state=prior.state,
+                require_s01_unexpected_change_consumer=True,
+                world_adapter_input=WorldAdapterInput(
+                    adapter_presence=True,
+                    adapter_available=True,
+                    observation_packet=build_world_observation_packet(
+                        observation_id="obs-runtime-topology-s01-unexpected-prod-like-required",
+                        source_ref="world.sensor.runtime_topology_s01",
+                        observed_at="2026-04-20T10:10:11+00:00",
+                        payload_ref="payload:runtime-topology-s01-unexpected-prod-like-required",
+                    ),
+                    action_packet=required_action,
+                    effect_packet=build_world_effect_packet(
+                        effect_id="eff-runtime-topology-s01-unexpected-prod-like-required",
+                        action_id=required_action.action_id,
+                        observed_at="2026-04-20T10:10:11+00:00",
+                        source_ref="world.sensor.runtime_topology_s01",
+                        success=True,
+                    ),
+                ),
+            ),
+            route_class=RuntimeRouteClass.PRODUCTION_CONTOUR,
+        )
+    )
+    assert baseline.subject_tick_result is not None
+    assert required.subject_tick_result is not None
+    assert baseline.subject_tick_result.s01_result.state.unexpected_change_detected is True
+    assert required.subject_tick_result.s01_result.state.unexpected_change_detected is True
+    assert baseline.subject_tick_result.state.final_execution_outcome == SubjectTickOutcome.CONTINUE
+    assert required.subject_tick_result.state.final_execution_outcome == SubjectTickOutcome.REPAIR
+    assert any(
+        checkpoint.checkpoint_id == "rt01.s01_efference_copy_checkpoint"
+        and checkpoint.status.value == "enforced_detour"
+        for checkpoint in required.subject_tick_result.state.execution_checkpoints
+    )
+
+
 def test_dispatch_s01_prediction_validity_consumer_requirement_is_load_bearing() -> None:
     seed = dispatch_runtime_tick(
         RuntimeDispatchRequest(
@@ -1203,3 +1287,25 @@ def test_dispatch_s01_prediction_validity_consumer_requirement_is_load_bearing()
     assert baseline.subject_tick_result.s01_result.gate.prediction_validity_ready is False
     assert required.subject_tick_result.s01_result.gate.prediction_validity_ready is False
     assert required.subject_tick_result.state.final_execution_outcome == SubjectTickOutcome.REVALIDATE
+
+
+def test_dispatch_contract_view_exposes_s01_efference_surface() -> None:
+    result = dispatch_runtime_tick(
+        RuntimeDispatchRequest(
+            tick_input=_tick_input("runtime-topology-s01-contract-view"),
+            context=SubjectTickContext(require_s01_prediction_validity_consumer=True),
+            route_class=RuntimeRouteClass.PRODUCTION_CONTOUR,
+        )
+    )
+    view = derive_runtime_dispatch_contract_view(result)
+    assert result.subject_tick_result is not None
+    state = result.subject_tick_result.state
+    assert view.s01_latest_comparison_status == state.s01_latest_comparison_status
+    assert view.s01_comparison_ready in {True, False}
+    assert view.s01_unexpected_change_detected in {True, False}
+    assert view.s01_prediction_validity_ready in {True, False}
+    assert view.s01_comparison_blocked_by_contamination in {True, False}
+    assert view.s01_stale_prediction_detected in {True, False}
+    assert view.s01_pending_predictions_count == state.s01_pending_predictions_count
+    assert view.s01_comparisons_count == state.s01_comparisons_count
+    assert view.s01_require_prediction_validity_consumer is True

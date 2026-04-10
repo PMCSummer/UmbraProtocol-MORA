@@ -15,6 +15,7 @@ from substrate.subject_tick import (
 )
 from substrate.world_adapter import WorldAdapterInput, build_world_observation_packet
 from substrate.world_adapter import build_world_action_candidate, build_world_effect_packet
+from tests.substrate.s01_efference_copy_testkit import build_s01
 from tests.substrate.subject_tick_testkit import build_subject_tick
 
 
@@ -995,12 +996,19 @@ def test_subject_tick_contract_view_exposes_t04_attention_schema_surface() -> No
 
 def test_subject_tick_s01_checkpoint_is_present_and_inspectable() -> None:
     result = _result("rt-s01-checkpoint", unresolved=False)
+    view = derive_subject_tick_contract_view(result)
     assert result.s01_result.state.efference_id
     assert any(
         checkpoint.checkpoint_id == "rt01.s01_efference_copy_checkpoint"
         for checkpoint in result.state.execution_checkpoints
     )
     assert result.s01_result.state.strong_self_attribution_allowed is False
+    assert view.s01_latest_comparison_status is None
+    assert view.s01_comparison_ready is False
+    assert view.s01_unexpected_change_detected is False
+    assert view.s01_prediction_validity_ready is True
+    assert view.s01_pending_predictions_count >= 1
+    assert view.s01_comparisons_count == 0
 
 
 def test_subject_tick_s01_comparison_consumer_requirement_is_path_affecting() -> None:
@@ -1073,6 +1081,83 @@ def test_subject_tick_s01_unexpected_change_consumer_requirement_is_path_affecti
                     effect_id="eff-rt-s01-unexpected-req",
                     action_id=required_action.action_id,
                     observed_at="2026-04-20T10:00:01+00:00",
+                    source_ref="world.sensor.subject_tick_s01",
+                    success=True,
+                ),
+            ),
+        ),
+    )
+    assert baseline.s01_result.state.unexpected_change_detected is True
+    assert required.s01_result.state.unexpected_change_detected is True
+    assert baseline.state.final_execution_outcome == SubjectTickOutcome.CONTINUE
+    assert required.state.final_execution_outcome == SubjectTickOutcome.REPAIR
+    assert any(
+        checkpoint.checkpoint_id == "rt01.s01_efference_copy_checkpoint"
+        and checkpoint.status.value == "enforced_detour"
+        for checkpoint in required.state.execution_checkpoints
+    )
+
+
+def test_subject_tick_s01_unexpected_change_consumer_requirement_is_path_affecting_without_ablation_registration_toggle() -> None:
+    prior = build_s01(
+        case_id="rt-s01-unexpected-prod-like-prior",
+        tick_index=1,
+        register_prediction=False,
+        world_effect_feedback_correlated=False,
+    )
+    baseline_action = build_world_action_candidate(
+        tick_id="rt-s01-unexpected-prod-like-baseline",
+        execution_mode="continue_stream",
+    )
+    required_action = build_world_action_candidate(
+        tick_id="rt-s01-unexpected-prod-like-required",
+        execution_mode="continue_stream",
+    )
+    baseline = _result(
+        "rt-s01-unexpected-prod-like-baseline",
+        unresolved=False,
+        context=SubjectTickContext(
+            prior_s01_state=prior.state,
+            world_adapter_input=WorldAdapterInput(
+                adapter_presence=True,
+                adapter_available=True,
+                observation_packet=build_world_observation_packet(
+                    observation_id="obs-rt-s01-unexpected-prod-like-baseline",
+                    source_ref="world.sensor.subject_tick_s01",
+                    observed_at="2026-04-20T10:00:10+00:00",
+                    payload_ref="payload:rt-s01-unexpected-prod-like-baseline",
+                ),
+                action_packet=baseline_action,
+                effect_packet=build_world_effect_packet(
+                    effect_id="eff-rt-s01-unexpected-prod-like-baseline",
+                    action_id=baseline_action.action_id,
+                    observed_at="2026-04-20T10:00:10+00:00",
+                    source_ref="world.sensor.subject_tick_s01",
+                    success=True,
+                ),
+            ),
+        ),
+    )
+    required = _result(
+        "rt-s01-unexpected-prod-like-required",
+        unresolved=False,
+        context=SubjectTickContext(
+            prior_s01_state=prior.state,
+            require_s01_unexpected_change_consumer=True,
+            world_adapter_input=WorldAdapterInput(
+                adapter_presence=True,
+                adapter_available=True,
+                observation_packet=build_world_observation_packet(
+                    observation_id="obs-rt-s01-unexpected-prod-like-required",
+                    source_ref="world.sensor.subject_tick_s01",
+                    observed_at="2026-04-20T10:00:11+00:00",
+                    payload_ref="payload:rt-s01-unexpected-prod-like-required",
+                ),
+                action_packet=required_action,
+                effect_packet=build_world_effect_packet(
+                    effect_id="eff-rt-s01-unexpected-prod-like-required",
+                    action_id=required_action.action_id,
+                    observed_at="2026-04-20T10:00:11+00:00",
                     source_ref="world.sensor.subject_tick_s01",
                     success=True,
                 ),

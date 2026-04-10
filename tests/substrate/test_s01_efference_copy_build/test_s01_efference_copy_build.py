@@ -159,6 +159,46 @@ def test_s01_stale_prediction_is_not_reused_after_expiry() -> None:
     assert first_prediction_ids.isdisjoint(late_prediction_ids)
 
 
+def test_s01_chained_expiry_and_late_observed_change_remain_separated() -> None:
+    seed = build_s01(
+        case_id="stale-unexpected-chain",
+        tick_index=1,
+        emit_world_action_candidate=True,
+    )
+    expired = build_s01(
+        case_id="stale-unexpected-chain",
+        tick_index=4,
+        emit_world_action_candidate=False,
+        world_effect_feedback_correlated=False,
+        prior_state=seed.state,
+        register_prediction=False,
+    )
+    late_unexpected = build_s01(
+        case_id="stale-unexpected-chain",
+        tick_index=5,
+        emit_world_action_candidate=False,
+        world_effect_feedback_correlated=True,
+        prior_state=expired.state,
+        register_prediction=False,
+    )
+    assert expired.state.stale_prediction_detected is True
+    assert expired.state.unexpected_change_detected is False
+    assert any(
+        item.status == S01ComparisonStatus.EXPECTED_BUT_UNOBSERVED
+        for item in expired.state.comparisons
+    )
+    assert late_unexpected.state.stale_prediction_detected is False
+    assert late_unexpected.state.unexpected_change_detected is True
+    assert any(
+        item.status == S01ComparisonStatus.UNEXPECTED_CHANGE_DETECTED
+        for item in late_unexpected.state.comparisons
+    )
+    assert all(
+        item.status != S01ComparisonStatus.EXPECTED_BUT_UNOBSERVED
+        for item in late_unexpected.state.comparisons
+    )
+
+
 def test_s01_ablation_without_pre_observation_prediction_collapses_claimed_behavior() -> None:
     registered_first = build_s01(case_id="ablation", tick_index=1, emit_world_action_candidate=True)
     registered_second = build_s01(

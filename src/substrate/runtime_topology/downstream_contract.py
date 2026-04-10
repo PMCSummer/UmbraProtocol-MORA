@@ -135,6 +135,17 @@ class RuntimeDispatchContractView:
     t01_scope_o01_implemented: bool | None
     t01_scope_full_silent_thought_line_implemented: bool | None
     t01_scope_repo_wide_adoption: bool | None
+    s01_latest_comparison_status: str | None
+    s01_comparison_ready: bool | None
+    s01_unexpected_change_detected: bool | None
+    s01_prediction_validity_ready: bool | None
+    s01_comparison_blocked_by_contamination: bool | None
+    s01_stale_prediction_detected: bool | None
+    s01_pending_predictions_count: int | None
+    s01_comparisons_count: int | None
+    s01_require_comparison_consumer: bool | None
+    s01_require_unexpected_change_consumer: bool | None
+    s01_require_prediction_validity_consumer: bool | None
     t02_constrained_scene_id: str | None
     t02_scene_status: str | None
     t02_preverbal_constraint_consumer_ready: bool | None
@@ -486,6 +497,39 @@ def derive_runtime_dispatch_contract_view(
         ),
         t01_scope_repo_wide_adoption=(
             None if state is None else state.t01_scope_repo_wide_adoption
+        ),
+        s01_latest_comparison_status=(
+            None if state is None else state.s01_latest_comparison_status
+        ),
+        s01_comparison_ready=(
+            None if state is None else state.s01_comparison_ready
+        ),
+        s01_unexpected_change_detected=(
+            None if state is None else state.s01_unexpected_change_detected
+        ),
+        s01_prediction_validity_ready=(
+            None if state is None else state.s01_prediction_validity_ready
+        ),
+        s01_comparison_blocked_by_contamination=(
+            None if state is None else state.s01_comparison_blocked_by_contamination
+        ),
+        s01_stale_prediction_detected=(
+            None if state is None else state.s01_stale_prediction_detected
+        ),
+        s01_pending_predictions_count=(
+            None if state is None else state.s01_pending_predictions_count
+        ),
+        s01_comparisons_count=(
+            None if state is None else state.s01_comparisons_count
+        ),
+        s01_require_comparison_consumer=(
+            None if state is None else state.s01_require_comparison_consumer
+        ),
+        s01_require_unexpected_change_consumer=(
+            None if state is None else state.s01_require_unexpected_change_consumer
+        ),
+        s01_require_prediction_validity_consumer=(
+            None if state is None else state.s01_require_prediction_validity_consumer
         ),
         t02_constrained_scene_id=(
             None if t02_result is None else t02_result.state.constrained_scene_id

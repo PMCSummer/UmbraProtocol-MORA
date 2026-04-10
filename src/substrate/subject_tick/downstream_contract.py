@@ -263,6 +263,17 @@ class SubjectTickContractView:
     t01_reason: str
     t01_require_preverbal_scene_consumer: bool
     t01_require_scene_comparison_consumer: bool
+    s01_latest_comparison_status: str | None
+    s01_comparison_ready: bool
+    s01_unexpected_change_detected: bool
+    s01_prediction_validity_ready: bool
+    s01_comparison_blocked_by_contamination: bool
+    s01_stale_prediction_detected: bool
+    s01_pending_predictions_count: int
+    s01_comparisons_count: int
+    s01_require_comparison_consumer: bool
+    s01_require_unexpected_change_consumer: bool
+    s01_require_prediction_validity_consumer: bool
     t02_constrained_scene_id: str | None
     t02_scene_status: str | None
     t02_preverbal_constraint_consumer_ready: bool | None
@@ -674,6 +685,23 @@ def derive_subject_tick_contract_view(
         ),
         t01_require_scene_comparison_consumer=(
             state.t01_require_scene_comparison_consumer
+        ),
+        s01_latest_comparison_status=state.s01_latest_comparison_status,
+        s01_comparison_ready=state.s01_comparison_ready,
+        s01_unexpected_change_detected=state.s01_unexpected_change_detected,
+        s01_prediction_validity_ready=state.s01_prediction_validity_ready,
+        s01_comparison_blocked_by_contamination=(
+            state.s01_comparison_blocked_by_contamination
+        ),
+        s01_stale_prediction_detected=state.s01_stale_prediction_detected,
+        s01_pending_predictions_count=state.s01_pending_predictions_count,
+        s01_comparisons_count=state.s01_comparisons_count,
+        s01_require_comparison_consumer=state.s01_require_comparison_consumer,
+        s01_require_unexpected_change_consumer=(
+            state.s01_require_unexpected_change_consumer
+        ),
+        s01_require_prediction_validity_consumer=(
+            state.s01_require_prediction_validity_consumer
         ),
         t02_constrained_scene_id=(
             None if t02_result is None else t02_result.state.constrained_scene_id
