@@ -43,4 +43,6 @@ These flags are explicit in `SubjectTickContext`, but outside this RT01/T01/T02/
   - `require_available_affordance` (TODO)
   - `require_strong_regulation_claim` (TODO)
 
+Note (EXPLICIT): the three `require_t04_*` flags are now state-backed in RT01/dispatch contract views and have direct owner tests, but remain out-of-scope for this T01/T02/T03-focused index.
+
 Reason: kept out to prevent contour expansion and keep index operational for T01/T02/T03 passes.

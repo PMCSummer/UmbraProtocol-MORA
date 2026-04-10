@@ -39,4 +39,13 @@ These are mandatory in `runtime_topology/policy.py`, but not core T01/T02/T03 in
 - `rt01.n_minimal_contour_checkpoint`
 - `rt01.t04_attention_schema_checkpoint` *(direct adjacent to T03 in runtime order; out-of-focus for this index)*
 
-Confidence: EXPLICIT for presence in mandatory graph; path semantics intentionally out of this narrow index scope.
+Direct-adjacent hardening note (EXPLICIT):
+- `rt01.t04_attention_schema_checkpoint` now has state-backed consumer flags in RT01/dispatch contract views:
+  - `t04_require_focus_ownership_consumer`
+  - `t04_require_reportable_focus_consumer`
+  - `t04_require_peripheral_preservation`
+- Path-affecting proof for the third flag is now explicit in owner tests:
+  - `test_subject_tick_t04_peripheral_preservation_requirement_is_path_affecting`
+  - `test_dispatch_t04_peripheral_preservation_requirement_is_load_bearing`
+
+Confidence: EXPLICIT for presence in mandatory graph and direct-adjacent T04 hardening behavior; detailed T04 semantics remain out of this index scope.

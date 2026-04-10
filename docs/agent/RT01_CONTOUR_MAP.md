@@ -77,6 +77,9 @@ Source: `src/substrate/runtime_topology/policy.py::source_of_truth_surfaces`
   - `tests/substrate/test_t03_hypothesis_competition_build/test_t03_hypothesis_competition_build.py`
 - Stage contour checks:
   - `tests/substrate/test_stage_contour/test_stage_contour_f01_f02_r01_r02_r03_r04_c01_c02_c03_c04_c05_subject_tick.py`
+- Direct-adjacent T04 hardening checks (same owner packs, out-of-focus for this map):
+  - `pytest -q tests/substrate/test_subject_tick_build/test_subject_tick_build.py -k t04`
+  - `pytest -q tests/substrate/test_runtime_topology_build/test_runtime_topology_build.py -k t04`
 
 ## Forbidden Broadening Notes
 - RT01 seam: do not move mode semantics from C04 or validity semantics from C05 into RT01.

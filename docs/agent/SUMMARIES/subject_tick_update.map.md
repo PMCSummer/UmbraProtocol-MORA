@@ -14,6 +14,7 @@ File: `src/substrate/subject_tick/update.py`
 | T02 integrity gate | `t02_raw_vs_propagated_distinct`, `rt01.t02_raw_vs_propagated_integrity_checkpoint` | `rt01.t02_raw_vs_propagated_integrity_checkpoint` | `require_t02_raw_vs_propagated_distinction` |
 | T03 consume + gate | `build_t03_hypothesis_competition`, `t03_preverbal_view`, `rt01.t03_hypothesis_competition_checkpoint` | `rt01.t03_hypothesis_competition_checkpoint` | `require_t03_convergence_consumer`, `require_t03_frontier_consumer`, `require_t03_nonconvergence_preservation` |
 | T04 adjacent consume + gate *(out-of-focus)* | `build_t04_attention_schema`, `t04_preverbal_view`, `rt01.t04_attention_schema_checkpoint` | `rt01.t04_attention_schema_checkpoint` | `require_t04_focus_ownership_consumer`, `require_t04_reportable_focus_consumer`, `require_t04_peripheral_preservation` |
+| T04 require-flag state persistence *(out-of-focus)* | `t04_require_focus_ownership_consumer=`, `t04_require_reportable_focus_consumer=`, `t04_require_peripheral_preservation=` | impacts downstream contract/state snapshot exposure | none (state export anchor) |
 | Outcome finalize | `execution_stance =`, `rt01.outcome_resolution_checkpoint` | `rt01.outcome_resolution_checkpoint` | none |
 | Result + helper exports | `subject_tick_result_to_payload`, `persist_subject_tick_result_via_f01`, `build_subject_tick_runtime_domain_update`, `build_subject_tick_runtime_route_auth_context` | domain-write/auth context | none |
 
