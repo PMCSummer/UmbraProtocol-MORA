@@ -34,6 +34,7 @@ from substrate.subject_tick import (
 )
 from substrate.transition import execute_transition
 from substrate.world_adapter import WorldAdapterInput, build_world_observation_packet
+from substrate.world_adapter import build_world_action_candidate, build_world_effect_packet
 
 
 def _bootstrapped_state():
@@ -105,6 +106,7 @@ def test_runtime_topology_bundle_and_graph_are_materialized() -> None:
         "C03",
         "C04",
         "C05",
+        "S01",
         "T01",
         "T02",
         "T03",
@@ -118,6 +120,7 @@ def test_runtime_topology_bundle_and_graph_are_materialized() -> None:
     assert "rt01.a_line_normalization_checkpoint" in graph.mandatory_checkpoint_ids
     assert "rt01.m_minimal_contour_checkpoint" in graph.mandatory_checkpoint_ids
     assert "rt01.n_minimal_contour_checkpoint" in graph.mandatory_checkpoint_ids
+    assert "rt01.s01_efference_copy_checkpoint" in graph.mandatory_checkpoint_ids
     assert "rt01.t01_semantic_field_checkpoint" in graph.mandatory_checkpoint_ids
     assert "rt01.t02_relation_binding_checkpoint" in graph.mandatory_checkpoint_ids
     assert "rt01.t02_raw_vs_propagated_integrity_checkpoint" in graph.mandatory_checkpoint_ids
@@ -129,6 +132,7 @@ def test_runtime_topology_bundle_and_graph_are_materialized() -> None:
     assert "a_line_normalization.capability_state" in graph.source_of_truth_surfaces
     assert "m_minimal.lifecycle_state" in graph.source_of_truth_surfaces
     assert "n_minimal.commitment_state" in graph.source_of_truth_surfaces
+    assert "s01_efference_copy.latest_comparison" in graph.source_of_truth_surfaces
     assert "t01_semantic_field.active_scene" in graph.source_of_truth_surfaces
     assert "t02_relation_binding.constrained_scene" in graph.source_of_truth_surfaces
     assert "t02_relation_binding.raw_vs_propagated_distinction" in graph.source_of_truth_surfaces
@@ -1061,3 +1065,141 @@ def test_dispatch_contract_view_exposes_t04_attention_schema_surface() -> None:
         is False
     )
     assert snapshot["subject_tick_state"]["t04_scope_repo_wide_adoption"] is False
+
+
+def test_dispatch_s01_comparison_consumer_requirement_is_load_bearing() -> None:
+    baseline = dispatch_runtime_tick(
+        RuntimeDispatchRequest(
+            tick_input=_tick_input("runtime-topology-s01-comparison"),
+            route_class=RuntimeRouteClass.PRODUCTION_CONTOUR,
+        )
+    )
+    required = dispatch_runtime_tick(
+        RuntimeDispatchRequest(
+            tick_input=_tick_input("runtime-topology-s01-comparison"),
+            context=SubjectTickContext(require_s01_comparison_consumer=True),
+            route_class=RuntimeRouteClass.PRODUCTION_CONTOUR,
+        )
+    )
+    assert baseline.subject_tick_result is not None
+    assert required.subject_tick_result is not None
+    assert baseline.subject_tick_result.state.final_execution_outcome == SubjectTickOutcome.CONTINUE
+    assert required.subject_tick_result.state.final_execution_outcome == SubjectTickOutcome.REVALIDATE
+    assert any(
+        checkpoint.checkpoint_id == "rt01.s01_efference_copy_checkpoint"
+        and checkpoint.status.value == "enforced_detour"
+        for checkpoint in required.subject_tick_result.state.execution_checkpoints
+    )
+
+
+def test_dispatch_s01_unexpected_change_consumer_requirement_is_load_bearing() -> None:
+    baseline_action = build_world_action_candidate(
+        tick_id="runtime-topology-s01-unexpected-baseline",
+        execution_mode="continue_stream",
+    )
+    required_action = build_world_action_candidate(
+        tick_id="runtime-topology-s01-unexpected-required",
+        execution_mode="continue_stream",
+    )
+    baseline = dispatch_runtime_tick(
+        RuntimeDispatchRequest(
+            tick_input=_tick_input("runtime-topology-s01-unexpected"),
+            context=SubjectTickContext(
+                disable_s01_prediction_registration=True,
+                world_adapter_input=WorldAdapterInput(
+                    adapter_presence=True,
+                    adapter_available=True,
+                    observation_packet=build_world_observation_packet(
+                        observation_id="obs-runtime-topology-s01-unexpected",
+                        source_ref="world.sensor.runtime_topology_s01",
+                        observed_at="2026-04-20T10:10:00+00:00",
+                        payload_ref="payload:runtime-topology-s01-unexpected",
+                    ),
+                    action_packet=baseline_action,
+                    effect_packet=build_world_effect_packet(
+                        effect_id="eff-runtime-topology-s01-unexpected",
+                        action_id=baseline_action.action_id,
+                        observed_at="2026-04-20T10:10:00+00:00",
+                        source_ref="world.sensor.runtime_topology_s01",
+                        success=True,
+                    ),
+                ),
+            ),
+            route_class=RuntimeRouteClass.TEST_ONLY_ABLATION,
+            allow_test_only_route=True,
+            allow_non_production_consumer_opt_in=True,
+        )
+    )
+    required = dispatch_runtime_tick(
+        RuntimeDispatchRequest(
+            tick_input=_tick_input("runtime-topology-s01-unexpected"),
+            context=SubjectTickContext(
+                disable_s01_prediction_registration=True,
+                require_s01_unexpected_change_consumer=True,
+                world_adapter_input=WorldAdapterInput(
+                    adapter_presence=True,
+                    adapter_available=True,
+                    observation_packet=build_world_observation_packet(
+                        observation_id="obs-runtime-topology-s01-unexpected-required",
+                        source_ref="world.sensor.runtime_topology_s01",
+                        observed_at="2026-04-20T10:10:01+00:00",
+                        payload_ref="payload:runtime-topology-s01-unexpected-required",
+                    ),
+                    action_packet=required_action,
+                    effect_packet=build_world_effect_packet(
+                        effect_id="eff-runtime-topology-s01-unexpected-required",
+                        action_id=required_action.action_id,
+                        observed_at="2026-04-20T10:10:01+00:00",
+                        source_ref="world.sensor.runtime_topology_s01",
+                        success=True,
+                    ),
+                ),
+            ),
+            route_class=RuntimeRouteClass.TEST_ONLY_ABLATION,
+            allow_test_only_route=True,
+            allow_non_production_consumer_opt_in=True,
+        )
+    )
+    assert baseline.subject_tick_result is not None
+    assert required.subject_tick_result is not None
+    assert baseline.subject_tick_result.s01_result.state.unexpected_change_detected is True
+    assert required.subject_tick_result.s01_result.state.unexpected_change_detected is True
+    assert baseline.subject_tick_result.state.final_execution_outcome == SubjectTickOutcome.CONTINUE
+    assert required.subject_tick_result.state.final_execution_outcome == SubjectTickOutcome.REPAIR
+
+
+def test_dispatch_s01_prediction_validity_consumer_requirement_is_load_bearing() -> None:
+    seed = dispatch_runtime_tick(
+        RuntimeDispatchRequest(
+            tick_input=_tick_input("runtime-topology-s01-validity-seed"),
+            context=SubjectTickContext(emit_world_action_candidate=True),
+            route_class=RuntimeRouteClass.PRODUCTION_CONTOUR,
+        )
+    )
+    assert seed.subject_tick_result is not None
+    baseline = dispatch_runtime_tick(
+        RuntimeDispatchRequest(
+            tick_input=_tick_input("runtime-topology-s01-validity-follow"),
+            context=SubjectTickContext(
+                prior_s01_state=seed.subject_tick_result.s01_result.state,
+                dependency_trigger_hits=("trigger:mode_shift",),
+            ),
+            route_class=RuntimeRouteClass.PRODUCTION_CONTOUR,
+        )
+    )
+    required = dispatch_runtime_tick(
+        RuntimeDispatchRequest(
+            tick_input=_tick_input("runtime-topology-s01-validity-follow"),
+            context=SubjectTickContext(
+                prior_s01_state=seed.subject_tick_result.s01_result.state,
+                dependency_trigger_hits=("trigger:mode_shift",),
+                require_s01_prediction_validity_consumer=True,
+            ),
+            route_class=RuntimeRouteClass.PRODUCTION_CONTOUR,
+        )
+    )
+    assert baseline.subject_tick_result is not None
+    assert required.subject_tick_result is not None
+    assert baseline.subject_tick_result.s01_result.gate.prediction_validity_ready is False
+    assert required.subject_tick_result.s01_result.gate.prediction_validity_ready is False
+    assert required.subject_tick_result.state.final_execution_outcome == SubjectTickOutcome.REVALIDATE

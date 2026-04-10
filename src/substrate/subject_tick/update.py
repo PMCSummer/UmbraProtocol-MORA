@@ -132,6 +132,10 @@ from substrate.viability_control import (
 )
 from substrate.world_adapter import run_world_adapter_cycle
 from substrate.self_contour import build_s_minimal_contour
+from substrate.s01_efference_copy import (
+    S01EfferenceCopyState,
+    build_s01_efference_copy,
+)
 from substrate.world_entry_contract import build_world_entry_contract
 
 
@@ -145,6 +149,7 @@ ATTEMPTED_SUBJECT_TICK_PATHS: tuple[str, ...] = (
     "subject_tick.enforce_c04_c05_contract_obedience",
     "subject_tick.enforce_downstream_obedience_contract",
     "subject_tick.evaluate_world_entry_contract",
+    "subject_tick.evaluate_s01_efference_copy",
     "subject_tick.evaluate_s_minimal_contour",
     "subject_tick.evaluate_a_line_normalization",
     "subject_tick.evaluate_m_minimal_contour",
@@ -939,6 +944,108 @@ def execute_subject_tick(
                 else "w_entry_admission_not_ready"
             ),
             reason=world_entry_result.w01_admission.reason,
+        )
+    )
+    s01_result = build_s01_efference_copy(
+        tick_id=tick_id,
+        tick_index=tick_index,
+        c04_selected_mode=mode_arbitration.state.active_mode.value,
+        c04_execution_mode_claim=c04_execution_mode_claim,
+        c05_validity_action=c05_validity_action,
+        c05_no_safe_reuse=bool(temporal_validity.state.no_safe_reuse_item_ids),
+        c05_revalidation_required=bool(
+            temporal_validity.state.revalidation_item_ids
+            or temporal_validity.state.selective_scope_targets
+            or temporal_validity.state.selective_scope_uncertain
+            or temporal_validity.state.insufficient_basis_for_revalidation
+        ),
+        c05_dependency_contaminated=bool(
+            temporal_validity.state.dependency_contaminated_item_ids
+        ),
+        world_grounded_transition_admissible=(
+            world_entry_result.world_grounded_transition_admissible
+        ),
+        world_effect_feedback_correlated=world_entry_result.episode.effect_feedback_correlated,
+        world_confidence=world_entry_result.episode.confidence,
+        world_incomplete=world_entry_result.episode.incomplete,
+        world_degraded=world_entry_result.episode.degraded,
+        emit_world_action_candidate=context.emit_world_action_candidate,
+        prior_selected_mode=(
+            None if prior_state is None else prior_state.c04_selected_mode
+        ),
+        prior_state=(
+            context.prior_s01_state
+            if isinstance(context.prior_s01_state, S01EfferenceCopyState)
+            else None
+        ),
+        source_lineage=lineage,
+        register_prediction=not context.disable_s01_prediction_registration,
+    )
+    s01_checkpoint_status = SubjectTickCheckpointStatus.ALLOWED
+    s01_checkpoint_reason = s01_result.gate.reason
+    if not context.disable_s01_enforcement:
+        if (
+            context.require_s01_comparison_consumer
+            and not s01_result.gate.comparison_ready
+            and halt_reason is None
+        ):
+            revalidation_needed = True
+            s01_checkpoint_status = SubjectTickCheckpointStatus.ENFORCED_DETOUR
+            s01_checkpoint_reason = (
+                "s01 comparison consumer requested but no lawful intended-vs-observed entry is ready"
+            )
+            if active_execution_mode != "halt_execution":
+                active_execution_mode = "revalidate_scope"
+        if (
+            context.require_s01_prediction_validity_consumer
+            and not s01_result.gate.prediction_validity_ready
+            and halt_reason is None
+        ):
+            revalidation_needed = True
+            s01_checkpoint_status = SubjectTickCheckpointStatus.ENFORCED_DETOUR
+            s01_checkpoint_reason = (
+                "s01 prediction validity consumer requested but pending predictions are stale/contaminated"
+            )
+            if active_execution_mode != "halt_execution":
+                active_execution_mode = "revalidate_scope"
+        if (
+            context.require_s01_unexpected_change_consumer
+            and s01_result.gate.unexpected_change_detected
+            and halt_reason is None
+            and not revalidation_needed
+        ):
+            repair_needed = True
+            s01_checkpoint_status = SubjectTickCheckpointStatus.ENFORCED_DETOUR
+            s01_checkpoint_reason = (
+                "s01 unexpected observed change requires bounded repair detour before continuation"
+            )
+            if active_execution_mode not in {"halt_execution", "revalidate_scope"}:
+                active_execution_mode = "repair_runtime_path"
+    else:
+        s01_checkpoint_status = SubjectTickCheckpointStatus.ENFORCED_DETOUR
+        s01_checkpoint_reason = "s01 efference copy enforcement disabled in ablation context"
+    checkpoints.append(
+        SubjectTickCheckpointResult(
+            checkpoint_id="rt01.s01_efference_copy_checkpoint",
+            source_contract="s01_efference_copy.intended_vs_observed_change",
+            status=s01_checkpoint_status,
+            required_action=(
+                "require_s01_comparison_and_unexpected_and_prediction_validity"
+                if (
+                    context.require_s01_comparison_consumer
+                    and context.require_s01_unexpected_change_consumer
+                    and context.require_s01_prediction_validity_consumer
+                )
+                else "require_s01_comparison_consumer"
+                if context.require_s01_comparison_consumer
+                else "require_s01_unexpected_change_consumer"
+                if context.require_s01_unexpected_change_consumer
+                else "require_s01_prediction_validity_consumer"
+                if context.require_s01_prediction_validity_consumer
+                else "s01_optional"
+            ),
+            applied_action=active_execution_mode,
+            reason=s01_checkpoint_reason,
         )
     )
     s_minimal_result = build_s_minimal_contour(
@@ -1968,6 +2075,27 @@ def execute_subject_tick(
         t01_require_scene_comparison_consumer=(
             context.require_t01_scene_comparison_consumer
         ),
+        s01_latest_comparison_status=(
+            None
+            if s01_result.state.latest_comparison_status is None
+            else s01_result.state.latest_comparison_status.value
+        ),
+        s01_comparison_ready=s01_result.gate.comparison_ready,
+        s01_unexpected_change_detected=s01_result.gate.unexpected_change_detected,
+        s01_prediction_validity_ready=s01_result.gate.prediction_validity_ready,
+        s01_comparison_blocked_by_contamination=(
+            s01_result.state.comparison_blocked_by_contamination
+        ),
+        s01_stale_prediction_detected=s01_result.state.stale_prediction_detected,
+        s01_pending_predictions_count=len(s01_result.state.pending_predictions),
+        s01_comparisons_count=len(s01_result.state.comparisons),
+        s01_require_comparison_consumer=context.require_s01_comparison_consumer,
+        s01_require_unexpected_change_consumer=(
+            context.require_s01_unexpected_change_consumer
+        ),
+        s01_require_prediction_validity_consumer=(
+            context.require_s01_prediction_validity_consumer
+        ),
         t02_require_constrained_scene_consumer=(
             context.require_t02_constrained_scene_consumer
         ),
@@ -2061,7 +2189,7 @@ def execute_subject_tick(
         attempted_paths=ATTEMPTED_SUBJECT_TICK_PATHS,
         downstream_gate=gate,
         causal_basis=(
-            "bounded runtime execution spine enforces roadmap authority roles for C04/C05, consumes world-entry, s-minimal, a-line, m-minimal, n-minimal, t01 semantic-field, t02 relation-binding, t03 hypothesis-competition, and t04 attention-schema gates, and keeps D01 observability-only over fixed R->C order"
+            "bounded runtime execution spine enforces roadmap authority roles for C04/C05, consumes world-entry, s01 efference-copy, s-minimal, a-line, m-minimal, n-minimal, t01 semantic-field, t02 relation-binding, t03 hypothesis-competition, and t04 attention-schema gates, and keeps D01 observability-only over fixed R->C order"
         ),
     )
     abstain = final_outcome in {SubjectTickOutcome.REPAIR, SubjectTickOutcome.REVALIDATE}
@@ -2093,6 +2221,7 @@ def execute_subject_tick(
         a_line_result=a_line_result,
         m_minimal_result=m_minimal_result,
         n_minimal_result=n_minimal_result,
+        s01_result=s01_result,
         t01_result=t01_result,
         t02_result=t02_result,
         t03_result=t03_result,

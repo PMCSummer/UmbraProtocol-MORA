@@ -6,6 +6,7 @@ from enum import Enum, StrEnum
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
+    from substrate.s01_efference_copy import S01EfferenceCopyResult, S01EfferenceCopyState
     from substrate.a_line_normalization import ALineNormalizationResult
     from substrate.m_minimal import MMinimalResult
     from substrate.n_minimal import NMinimalResult
@@ -121,6 +122,10 @@ class SubjectTickRestrictionCode(StrEnum):
     T04_FOCUS_OWNERSHIP_CONSUMER_REQUIRED = "t04_focus_ownership_consumer_required"
     T04_REPORTABLE_FOCUS_CONSUMER_REQUIRED = "t04_reportable_focus_consumer_required"
     T04_PERIPHERAL_PRESERVATION_REQUIRED = "t04_peripheral_preservation_required"
+    S01_EFFERENCE_COPY_CONTRACT_MUST_BE_READ = "s01_efference_copy_contract_must_be_read"
+    S01_COMPARISON_CONSUMER_REQUIRED = "s01_comparison_consumer_required"
+    S01_UNEXPECTED_CHANGE_CONSUMER_REQUIRED = "s01_unexpected_change_consumer_required"
+    S01_PREDICTION_VALIDITY_CONSUMER_REQUIRED = "s01_prediction_validity_consumer_required"
     DOWNSTREAM_AUTHORITY_DEGRADED = "downstream_authority_degraded"
 
 
@@ -175,6 +180,7 @@ class SubjectTickContext:
     prior_diversification_state: object | None = None
     prior_mode_state: object | None = None
     prior_temporal_validity_state: object | None = None
+    prior_s01_state: S01EfferenceCopyState | None = None
     dependency_trigger_hits: tuple[str, ...] = ()
     context_shift_markers: tuple[str, ...] = ()
     contradicted_source_refs: tuple[str, ...] = ()
@@ -226,6 +232,11 @@ class SubjectTickContext:
     require_t04_reportable_focus_consumer: bool = False
     require_t04_peripheral_preservation: bool = False
     disable_t04_enforcement: bool = False
+    require_s01_comparison_consumer: bool = False
+    require_s01_unexpected_change_consumer: bool = False
+    require_s01_prediction_validity_consumer: bool = False
+    disable_s01_enforcement: bool = False
+    disable_s01_prediction_registration: bool = False
     source_lineage: tuple[str, ...] = ()
 
 
@@ -508,6 +519,17 @@ class SubjectTickState:
     t01_reason: str
     t01_require_preverbal_scene_consumer: bool
     t01_require_scene_comparison_consumer: bool
+    s01_latest_comparison_status: str | None
+    s01_comparison_ready: bool
+    s01_unexpected_change_detected: bool
+    s01_prediction_validity_ready: bool
+    s01_comparison_blocked_by_contamination: bool
+    s01_stale_prediction_detected: bool
+    s01_pending_predictions_count: int
+    s01_comparisons_count: int
+    s01_require_comparison_consumer: bool
+    s01_require_unexpected_change_consumer: bool
+    s01_require_prediction_validity_consumer: bool
     t02_require_constrained_scene_consumer: bool
     t02_require_raw_vs_propagated_distinction: bool
     t02_raw_vs_propagated_distinct: bool
@@ -898,6 +920,7 @@ class SubjectTickResult:
     a_line_result: ALineNormalizationResult
     m_minimal_result: MMinimalResult
     n_minimal_result: NMinimalResult
+    s01_result: S01EfferenceCopyResult
     t01_result: T01ActiveFieldResult
     t02_result: T02ConstrainedSceneResult
     t03_result: T03CompetitionResult

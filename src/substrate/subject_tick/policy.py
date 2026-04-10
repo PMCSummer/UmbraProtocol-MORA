@@ -59,6 +59,7 @@ def evaluate_subject_tick_downstream_gate(
         SubjectTickRestrictionCode.T02_FORBIDDEN_SHORTCUTS_MUST_BE_READ,
         SubjectTickRestrictionCode.T03_HYPOTHESIS_COMPETITION_CONTRACT_MUST_BE_READ,
         SubjectTickRestrictionCode.T04_ATTENTION_SCHEMA_CONTRACT_MUST_BE_READ,
+        SubjectTickRestrictionCode.S01_EFFERENCE_COPY_CONTRACT_MUST_BE_READ,
     ]
     usability = SubjectTickUsabilityClass.USABLE_BOUNDED
     accepted = True
@@ -395,6 +396,53 @@ def evaluate_subject_tick_downstream_gate(
             accepted = False
             usability = SubjectTickUsabilityClass.BLOCKED
             reason = "t04 attention schema checkpoint requires detour before downstream continuation"
+
+    s01_checkpoint = next(
+        (
+            checkpoint
+            for checkpoint in state.execution_checkpoints
+            if checkpoint.checkpoint_id == "rt01.s01_efference_copy_checkpoint"
+        ),
+        None,
+    )
+    if state.s01_require_comparison_consumer and not state.s01_comparison_ready:
+        restrictions.append(SubjectTickRestrictionCode.S01_COMPARISON_CONSUMER_REQUIRED)
+        restrictions.append(SubjectTickRestrictionCode.DOWNSTREAM_AUTHORITY_DEGRADED)
+        if state.final_execution_outcome == SubjectTickOutcome.CONTINUE:
+            accepted = False
+            usability = SubjectTickUsabilityClass.BLOCKED
+            reason = "s01 comparison consumer requested but no lawful comparison is ready"
+    if (
+        state.s01_require_prediction_validity_consumer
+        and not state.s01_prediction_validity_ready
+    ):
+        restrictions.append(
+            SubjectTickRestrictionCode.S01_PREDICTION_VALIDITY_CONSUMER_REQUIRED
+        )
+        restrictions.append(SubjectTickRestrictionCode.DOWNSTREAM_AUTHORITY_DEGRADED)
+        if state.final_execution_outcome == SubjectTickOutcome.CONTINUE:
+            accepted = False
+            usability = SubjectTickUsabilityClass.BLOCKED
+            reason = "s01 prediction validity consumer requested but prediction set is stale/contaminated"
+    if (
+        state.s01_require_unexpected_change_consumer
+        and state.s01_unexpected_change_detected
+    ):
+        restrictions.append(
+            SubjectTickRestrictionCode.S01_UNEXPECTED_CHANGE_CONSUMER_REQUIRED
+        )
+        restrictions.append(SubjectTickRestrictionCode.DOWNSTREAM_AUTHORITY_DEGRADED)
+        if state.final_execution_outcome == SubjectTickOutcome.CONTINUE:
+            accepted = False
+            usability = SubjectTickUsabilityClass.BLOCKED
+            reason = "s01 unexpected change consumer requested and unexpected observed change remains unresolved"
+    if s01_checkpoint is not None and s01_checkpoint.status.value != "allowed":
+        restrictions.append(SubjectTickRestrictionCode.S01_COMPARISON_CONSUMER_REQUIRED)
+        restrictions.append(SubjectTickRestrictionCode.DOWNSTREAM_AUTHORITY_DEGRADED)
+        if state.final_execution_outcome == SubjectTickOutcome.CONTINUE:
+            accepted = False
+            usability = SubjectTickUsabilityClass.BLOCKED
+            reason = "s01 efference-copy checkpoint requires detour before downstream continuation"
 
     return SubjectTickGateDecision(
         accepted=accepted,

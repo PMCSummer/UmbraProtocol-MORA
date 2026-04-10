@@ -18,7 +18,20 @@ def build_minimal_runtime_tick_graph() -> RuntimeTickGraph:
     return RuntimeTickGraph(
         graph_id="rt01.minimal_runtime_tick_graph.v1",
         contour_id="rt01_subject_tick_contour",
-        runtime_order=("R", "C01", "C02", "C03", "C04", "C05", "T01", "T02", "T03", "T04", "RT01"),
+        runtime_order=(
+            "R",
+            "C01",
+            "C02",
+            "C03",
+            "C04",
+            "C05",
+            "S01",
+            "T01",
+            "T02",
+            "T03",
+            "T04",
+            "RT01",
+        ),
         nodes=(
             RuntimeContourNode(
                 node_id="node.r04",
@@ -103,6 +116,18 @@ def build_minimal_runtime_tick_graph() -> RuntimeTickGraph:
                     "n_minimal.admission",
                 ),
                 checkpoint_ids=("rt01.n_minimal_contour_checkpoint",),
+            ),
+            RuntimeContourNode(
+                node_id="node.s01_efference_copy",
+                phase_id="S01",
+                authority_role="computational",
+                computational_role="evaluator",
+                surfaces=(
+                    "s01_efference_copy.latest_comparison",
+                    "s01_efference_copy.pending_predictions",
+                    "s01_efference_copy.prediction_validity",
+                ),
+                checkpoint_ids=("rt01.s01_efference_copy_checkpoint",),
             ),
             RuntimeContourNode(
                 node_id="node.t01_semantic_field",
@@ -208,6 +233,9 @@ def build_minimal_runtime_tick_graph() -> RuntimeTickGraph:
             RuntimeContourEdge(source_phase="R04", target_phase="RT01", relation="modulates"),
             RuntimeContourEdge(source_phase="C04", target_phase="RT01", relation="arbitrates"),
             RuntimeContourEdge(source_phase="C05", target_phase="RT01", relation="gates"),
+            RuntimeContourEdge(source_phase="C04", target_phase="S01", relation="arbitrates"),
+            RuntimeContourEdge(source_phase="C05", target_phase="S01", relation="requests_revalidation"),
+            RuntimeContourEdge(source_phase="S01", target_phase="RT01", relation="modulates"),
             RuntimeContourEdge(source_phase="WORLD_SEAM", target_phase="RT01", relation="requires"),
             RuntimeContourEdge(source_phase="WORLD_SEAM", target_phase="S_MINIMAL", relation="requires"),
             RuntimeContourEdge(source_phase="S_MINIMAL", target_phase="RT01", relation="requires"),
@@ -243,6 +271,7 @@ def build_minimal_runtime_tick_graph() -> RuntimeTickGraph:
             "rt01.a_line_normalization_checkpoint",
             "rt01.m_minimal_contour_checkpoint",
             "rt01.n_minimal_contour_checkpoint",
+            "rt01.s01_efference_copy_checkpoint",
             "rt01.t01_semantic_field_checkpoint",
             "rt01.t02_relation_binding_checkpoint",
             "rt01.t02_raw_vs_propagated_integrity_checkpoint",
@@ -259,6 +288,7 @@ def build_minimal_runtime_tick_graph() -> RuntimeTickGraph:
             "a_line_normalization.capability_state",
             "m_minimal.lifecycle_state",
             "n_minimal.commitment_state",
+            "s01_efference_copy.latest_comparison",
             "t01_semantic_field.active_scene",
             "t02_relation_binding.constrained_scene",
             "t02_relation_binding.raw_vs_propagated_distinction",
@@ -295,6 +325,7 @@ def build_minimal_runtime_topology_bundle() -> RuntimeTopologyBundle:
             "a_line_normalization_capability_contract",
             "m_minimal_memory_lifecycle_contract",
             "n_minimal_narrative_commitment_contract",
+            "s01_efference_copy_comparator_contract",
             "t01_semantic_field_contract",
             "t02_relation_binding_constraint_propagation_contract",
             "t02_raw_vs_propagated_integrity_contract",
@@ -460,6 +491,8 @@ def _context_has_ablation_flags(context: SubjectTickContext | None) -> bool:
         or context.disable_s_minimal_enforcement
         or context.disable_m_minimal_enforcement
         or context.disable_n_minimal_enforcement
+        or context.disable_s01_enforcement
+        or context.disable_s01_prediction_registration
         or context.disable_t01_unresolved_slot_maintenance
         or context.disable_t01_field_enforcement
         or (
