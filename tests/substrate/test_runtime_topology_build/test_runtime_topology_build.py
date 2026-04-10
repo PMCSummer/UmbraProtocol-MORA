@@ -98,7 +98,19 @@ def test_runtime_topology_bundle_and_graph_are_materialized() -> None:
         "domains.continuity",
         "domains.validity",
     )
-    assert graph.runtime_order == ("R", "C01", "C02", "C03", "C04", "C05", "T01", "T02", "T03", "RT01")
+    assert graph.runtime_order == (
+        "R",
+        "C01",
+        "C02",
+        "C03",
+        "C04",
+        "C05",
+        "T01",
+        "T02",
+        "T03",
+        "T04",
+        "RT01",
+    )
     assert "rt01.downstream_obedience_checkpoint" in graph.mandatory_checkpoint_ids
     assert "rt01.world_seam_checkpoint" in graph.mandatory_checkpoint_ids
     assert "rt01.world_entry_checkpoint" in graph.mandatory_checkpoint_ids
@@ -110,6 +122,7 @@ def test_runtime_topology_bundle_and_graph_are_materialized() -> None:
     assert "rt01.t02_relation_binding_checkpoint" in graph.mandatory_checkpoint_ids
     assert "rt01.t02_raw_vs_propagated_integrity_checkpoint" in graph.mandatory_checkpoint_ids
     assert "rt01.t03_hypothesis_competition_checkpoint" in graph.mandatory_checkpoint_ids
+    assert "rt01.t04_attention_schema_checkpoint" in graph.mandatory_checkpoint_ids
     assert "world_adapter.state" in graph.source_of_truth_surfaces
     assert "world_entry_contract.episode" in graph.source_of_truth_surfaces
     assert "s_minimal_contour.boundary_state" in graph.source_of_truth_surfaces
@@ -121,6 +134,8 @@ def test_runtime_topology_bundle_and_graph_are_materialized() -> None:
     assert "t02_relation_binding.raw_vs_propagated_distinction" in graph.source_of_truth_surfaces
     assert "t03_hypothesis_competition.competition_ledger" in graph.source_of_truth_surfaces
     assert "t03_hypothesis_competition.publication_frontier" in graph.source_of_truth_surfaces
+    assert "t04_attention_schema.focus_ownership" in graph.source_of_truth_surfaces
+    assert "t04_attention_schema.focus_targets" in graph.source_of_truth_surfaces
 
 
 def test_dispatch_happy_path_runs_lawful_production_contour() -> None:
@@ -864,6 +879,36 @@ def test_dispatch_t03_convergence_consumer_requirement_is_load_bearing() -> None
     )
 
 
+def test_dispatch_t03_frontier_consumer_requirement_is_load_bearing() -> None:
+    baseline = dispatch_runtime_tick(
+        RuntimeDispatchRequest(
+            tick_input=_tick_input("runtime-topology-t03-frontier"),
+            route_class=RuntimeRouteClass.PRODUCTION_CONTOUR,
+        )
+    )
+    required = dispatch_runtime_tick(
+        RuntimeDispatchRequest(
+            tick_input=_tick_input("runtime-topology-t03-frontier"),
+            context=SubjectTickContext(
+                require_t03_frontier_consumer=True,
+                t03_competition_mode="greedy_argmax_ablation",
+            ),
+            route_class=RuntimeRouteClass.TEST_ONLY_ABLATION,
+            allow_test_only_route=True,
+            allow_non_production_consumer_opt_in=True,
+        )
+    )
+    assert baseline.subject_tick_result is not None
+    assert required.subject_tick_result is not None
+    assert baseline.subject_tick_result.state.final_execution_outcome == SubjectTickOutcome.CONTINUE
+    assert required.subject_tick_result.state.final_execution_outcome == SubjectTickOutcome.REPAIR
+    assert any(
+        checkpoint.checkpoint_id == "rt01.t03_hypothesis_competition_checkpoint"
+        and checkpoint.status.value == "enforced_detour"
+        for checkpoint in required.subject_tick_result.state.execution_checkpoints
+    )
+
+
 def test_dispatch_t03_nonconvergence_preservation_requirement_is_load_bearing() -> None:
     baseline = dispatch_runtime_tick(
         RuntimeDispatchRequest(
@@ -892,3 +937,78 @@ def test_dispatch_t03_nonconvergence_preservation_requirement_is_load_bearing() 
         and checkpoint.status.value == "enforced_detour"
         for checkpoint in required.subject_tick_result.state.execution_checkpoints
     )
+
+
+def test_dispatch_t04_focus_ownership_consumer_requirement_is_load_bearing() -> None:
+    baseline = dispatch_runtime_tick(
+        RuntimeDispatchRequest(
+            tick_input=_tick_input("runtime-topology-t04-focus"),
+            context=SubjectTickContext(
+                world_adapter_input=WorldAdapterInput(
+                    adapter_presence=False,
+                    adapter_available=False,
+                )
+            ),
+            route_class=RuntimeRouteClass.PRODUCTION_CONTOUR,
+        )
+    )
+    required = dispatch_runtime_tick(
+        RuntimeDispatchRequest(
+            tick_input=_tick_input("runtime-topology-t04-focus"),
+            context=SubjectTickContext(
+                require_t04_focus_ownership_consumer=True,
+                world_adapter_input=WorldAdapterInput(
+                    adapter_presence=False,
+                    adapter_available=False,
+                ),
+            ),
+            route_class=RuntimeRouteClass.PRODUCTION_CONTOUR,
+        )
+    )
+    assert baseline.subject_tick_result is not None
+    assert required.subject_tick_result is not None
+    assert baseline.subject_tick_result.state.final_execution_outcome == SubjectTickOutcome.CONTINUE
+    assert required.subject_tick_result.state.final_execution_outcome in {
+        SubjectTickOutcome.REPAIR,
+        SubjectTickOutcome.REVALIDATE,
+    }
+    assert any(
+        checkpoint.checkpoint_id == "rt01.t04_attention_schema_checkpoint"
+        and checkpoint.status.value == "enforced_detour"
+        for checkpoint in required.subject_tick_result.state.execution_checkpoints
+    )
+
+
+def test_dispatch_contract_view_exposes_t04_attention_schema_surface() -> None:
+    result = dispatch_runtime_tick(
+        RuntimeDispatchRequest(
+            tick_input=_tick_input("runtime-topology-t04-contract-view"),
+            route_class=RuntimeRouteClass.PRODUCTION_CONTOUR,
+        )
+    )
+    view = derive_runtime_dispatch_contract_view(result)
+    snapshot = runtime_dispatch_snapshot(result)
+    assert view.t04_schema_id is not None
+    assert view.t04_focus_targets_count is not None
+    assert view.t04_attention_owner is not None
+    assert view.t04_focus_mode is not None
+    assert view.t04_scope == "rt01_contour_only"
+    assert view.t04_scope_rt01_contour_only is True
+    assert view.t04_scope_t04_first_slice_only is True
+    assert view.t04_scope_o01_implemented is False
+    assert view.t04_scope_o02_implemented is False
+    assert view.t04_scope_o03_implemented is False
+    assert view.t04_scope_full_attention_line_implemented is False
+    assert view.t04_scope_repo_wide_adoption is False
+    assert snapshot["subject_tick_state"]["t04_schema_id"] is not None
+    assert snapshot["subject_tick_state"]["t04_scope"] == "rt01_contour_only"
+    assert snapshot["subject_tick_state"]["t04_scope_rt01_contour_only"] is True
+    assert snapshot["subject_tick_state"]["t04_scope_t04_first_slice_only"] is True
+    assert snapshot["subject_tick_state"]["t04_scope_o01_implemented"] is False
+    assert snapshot["subject_tick_state"]["t04_scope_o02_implemented"] is False
+    assert snapshot["subject_tick_state"]["t04_scope_o03_implemented"] is False
+    assert (
+        snapshot["subject_tick_state"]["t04_scope_full_attention_line_implemented"]
+        is False
+    )
+    assert snapshot["subject_tick_state"]["t04_scope_repo_wide_adoption"] is False

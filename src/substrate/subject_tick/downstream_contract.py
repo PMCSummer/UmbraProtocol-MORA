@@ -317,6 +317,31 @@ class SubjectTickContractView:
     t03_require_convergence_consumer: bool | None
     t03_require_frontier_consumer: bool | None
     t03_require_nonconvergence_preservation: bool | None
+    t04_schema_id: str | None
+    t04_focus_targets_count: int | None
+    t04_peripheral_targets_count: int | None
+    t04_attention_owner: str | None
+    t04_focus_mode: str | None
+    t04_control_estimate: float | None
+    t04_stability_estimate: float | None
+    t04_redirect_cost: float | None
+    t04_reportability_status: str | None
+    t04_focus_ownership_consumer_ready: bool | None
+    t04_reportable_focus_consumer_ready: bool | None
+    t04_peripheral_preservation_ready: bool | None
+    t04_forbidden_shortcuts: tuple[str, ...] | None
+    t04_restrictions: tuple[str, ...] | None
+    t04_scope: str | None
+    t04_scope_rt01_contour_only: bool | None
+    t04_scope_t04_first_slice_only: bool | None
+    t04_scope_o01_implemented: bool | None
+    t04_scope_o02_implemented: bool | None
+    t04_scope_o03_implemented: bool | None
+    t04_scope_full_attention_line_implemented: bool | None
+    t04_scope_repo_wide_adoption: bool | None
+    t04_require_focus_ownership_consumer: bool | None
+    t04_require_reportable_focus_consumer: bool | None
+    t04_require_peripheral_preservation: bool | None
     execution_stance: str
     execution_checkpoints: tuple[str, ...]
     final_execution_outcome: SubjectTickOutcome
@@ -353,10 +378,12 @@ def derive_subject_tick_contract_view(
         state = subject_tick_state_or_result.state
         t02_result = subject_tick_state_or_result.t02_result
         t03_result = subject_tick_state_or_result.t03_result
+        t04_result = subject_tick_state_or_result.t04_result
     elif isinstance(subject_tick_state_or_result, SubjectTickState):
         state = subject_tick_state_or_result
         t02_result = None
         t03_result = None
+        t04_result = None
     else:
         raise TypeError(
             "derive_subject_tick_contract_view requires SubjectTickState/SubjectTickResult"
@@ -846,6 +873,71 @@ def derive_subject_tick_contract_view(
         t03_require_nonconvergence_preservation=(
             state.t03_require_nonconvergence_preservation
         ),
+        t04_schema_id=(None if t04_result is None else t04_result.state.schema_id),
+        t04_focus_targets_count=(
+            None if t04_result is None else len(t04_result.state.focus_targets)
+        ),
+        t04_peripheral_targets_count=(
+            None if t04_result is None else len(t04_result.state.peripheral_targets)
+        ),
+        t04_attention_owner=(
+            None if t04_result is None else t04_result.state.attention_owner.value
+        ),
+        t04_focus_mode=(
+            None if t04_result is None else t04_result.state.focus_mode.value
+        ),
+        t04_control_estimate=(
+            None if t04_result is None else t04_result.state.control_estimate
+        ),
+        t04_stability_estimate=(
+            None if t04_result is None else t04_result.state.stability_estimate
+        ),
+        t04_redirect_cost=(
+            None if t04_result is None else t04_result.state.redirect_cost
+        ),
+        t04_reportability_status=(
+            None if t04_result is None else t04_result.state.reportability_status.value
+        ),
+        t04_focus_ownership_consumer_ready=(
+            None if t04_result is None else t04_result.gate.focus_ownership_consumer_ready
+        ),
+        t04_reportable_focus_consumer_ready=(
+            None if t04_result is None else t04_result.gate.reportable_focus_consumer_ready
+        ),
+        t04_peripheral_preservation_ready=(
+            None if t04_result is None else t04_result.gate.peripheral_preservation_ready
+        ),
+        t04_forbidden_shortcuts=(
+            None if t04_result is None else t04_result.gate.forbidden_shortcuts
+        ),
+        t04_restrictions=(None if t04_result is None else t04_result.gate.restrictions),
+        t04_scope=(None if t04_result is None else t04_result.scope_marker.scope),
+        t04_scope_rt01_contour_only=(
+            None if t04_result is None else t04_result.scope_marker.rt01_contour_only
+        ),
+        t04_scope_t04_first_slice_only=(
+            None if t04_result is None else t04_result.scope_marker.t04_first_slice_only
+        ),
+        t04_scope_o01_implemented=(
+            None if t04_result is None else t04_result.scope_marker.o01_implemented
+        ),
+        t04_scope_o02_implemented=(
+            None if t04_result is None else t04_result.scope_marker.o02_implemented
+        ),
+        t04_scope_o03_implemented=(
+            None if t04_result is None else t04_result.scope_marker.o03_implemented
+        ),
+        t04_scope_full_attention_line_implemented=(
+            None
+            if t04_result is None
+            else t04_result.scope_marker.full_attention_line_implemented
+        ),
+        t04_scope_repo_wide_adoption=(
+            None if t04_result is None else t04_result.scope_marker.repo_wide_adoption
+        ),
+        t04_require_focus_ownership_consumer=None,
+        t04_require_reportable_focus_consumer=None,
+        t04_require_peripheral_preservation=None,
         execution_stance=state.execution_stance.value,
         execution_checkpoints=tuple(
             f"{checkpoint.checkpoint_id}:{checkpoint.status.value}"
@@ -863,7 +955,8 @@ def derive_subject_tick_contract_view(
             "runtime contour contract requires C04/C05 claims, world-entry basis, s-minimal "
             "self/world boundary, a-line normalization, m-minimal lifecycle, n-minimal "
             "narrative commitment, t01 semantic field checkpoints, t02 raw-vs-propagated "
-            "distinction, and t03 hypothesis competition frontier surfaces to be read"
+            "distinction, t03 hypothesis competition frontier, and t04 attention schema "
+            "focus-ownership surfaces to be read"
         ),
     )
 

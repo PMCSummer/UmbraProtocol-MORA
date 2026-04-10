@@ -810,6 +810,31 @@ def test_subject_tick_t03_convergence_consumer_requirement_is_path_affecting() -
     )
 
 
+def test_subject_tick_t03_frontier_consumer_requirement_is_path_affecting() -> None:
+    baseline = _result(
+        "rt-t03-frontier-baseline",
+        unresolved=False,
+        context=SubjectTickContext(
+            t03_competition_mode="greedy_argmax_ablation",
+        ),
+    )
+    required = _result(
+        "rt-t03-frontier-required",
+        unresolved=False,
+        context=SubjectTickContext(
+            require_t03_frontier_consumer=True,
+            t03_competition_mode="greedy_argmax_ablation",
+        ),
+    )
+    assert baseline.state.final_execution_outcome == SubjectTickOutcome.CONTINUE
+    assert required.state.final_execution_outcome == SubjectTickOutcome.REPAIR
+    assert any(
+        checkpoint.checkpoint_id == "rt01.t03_hypothesis_competition_checkpoint"
+        and checkpoint.status.value == "enforced_detour"
+        for checkpoint in required.state.execution_checkpoints
+    )
+
+
 def test_subject_tick_t03_nonconvergence_preservation_requirement_is_path_affecting() -> None:
     baseline = _result("rt-t03-nonconv-baseline", unresolved=False)
     required = _result(
@@ -845,3 +870,80 @@ def test_subject_tick_contract_view_exposes_t03_competition_surface() -> None:
     assert view.t03_scope_o03_implemented is False
     assert view.t03_scope_full_silent_thought_line_implemented is False
     assert view.t03_scope_repo_wide_adoption is False
+
+
+def test_subject_tick_t04_focus_ownership_consumer_requirement_is_path_affecting() -> None:
+    baseline = _result(
+        "rt-t04-focus-baseline",
+        unresolved=False,
+        context=SubjectTickContext(
+            world_adapter_input=WorldAdapterInput(
+                adapter_presence=False,
+                adapter_available=False,
+            ),
+        ),
+    )
+    required = _result(
+        "rt-t04-focus-required",
+        unresolved=False,
+        context=SubjectTickContext(
+            require_t04_focus_ownership_consumer=True,
+            world_adapter_input=WorldAdapterInput(
+                adapter_presence=False,
+                adapter_available=False,
+            ),
+        ),
+    )
+    assert baseline.state.final_execution_outcome == SubjectTickOutcome.CONTINUE
+    assert required.state.final_execution_outcome in {
+        SubjectTickOutcome.REPAIR,
+        SubjectTickOutcome.REVALIDATE,
+    }
+    assert any(
+        checkpoint.checkpoint_id == "rt01.t04_attention_schema_checkpoint"
+        and checkpoint.status.value == "enforced_detour"
+        for checkpoint in required.state.execution_checkpoints
+    )
+
+
+def test_subject_tick_t04_reportable_focus_consumer_requirement_is_path_affecting() -> None:
+    baseline = _result("rt-t04-reportable-baseline", unresolved=False)
+    required = _result(
+        "rt-t04-reportable-required",
+        unresolved=False,
+        context=SubjectTickContext(
+            require_t04_reportable_focus_consumer=True,
+            dependency_trigger_hits=("trigger:mode_shift",),
+            world_adapter_input=WorldAdapterInput(
+                adapter_presence=False,
+                adapter_available=False,
+            ),
+        ),
+    )
+    assert baseline.state.final_execution_outcome == SubjectTickOutcome.CONTINUE
+    assert required.state.final_execution_outcome in {
+        SubjectTickOutcome.REVALIDATE,
+        SubjectTickOutcome.REPAIR,
+    }
+    assert any(
+        checkpoint.checkpoint_id == "rt01.t04_attention_schema_checkpoint"
+        and checkpoint.status.value == "enforced_detour"
+        for checkpoint in required.state.execution_checkpoints
+    )
+
+
+def test_subject_tick_contract_view_exposes_t04_attention_schema_surface() -> None:
+    result = _result("rt-t04-contract-view", unresolved=False)
+    view = derive_subject_tick_contract_view(result)
+    assert view.t04_schema_id is not None
+    assert view.t04_focus_targets_count is not None
+    assert view.t04_attention_owner is not None
+    assert view.t04_focus_mode is not None
+    assert view.t04_scope == "rt01_contour_only"
+    assert view.t04_scope_rt01_contour_only is True
+    assert view.t04_scope_t04_first_slice_only is True
+    assert view.t04_scope_o01_implemented is False
+    assert view.t04_scope_o02_implemented is False
+    assert view.t04_scope_o03_implemented is False
+    assert view.t04_scope_full_attention_line_implemented is False
+    assert view.t04_scope_repo_wide_adoption is False

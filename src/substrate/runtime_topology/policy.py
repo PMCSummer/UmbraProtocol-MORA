@@ -18,7 +18,7 @@ def build_minimal_runtime_tick_graph() -> RuntimeTickGraph:
     return RuntimeTickGraph(
         graph_id="rt01.minimal_runtime_tick_graph.v1",
         contour_id="rt01_subject_tick_contour",
-        runtime_order=("R", "C01", "C02", "C03", "C04", "C05", "T01", "T02", "T03", "RT01"),
+        runtime_order=("R", "C01", "C02", "C03", "C04", "C05", "T01", "T02", "T03", "T04", "RT01"),
         nodes=(
             RuntimeContourNode(
                 node_id="node.r04",
@@ -146,6 +146,19 @@ def build_minimal_runtime_tick_graph() -> RuntimeTickGraph:
                 checkpoint_ids=("rt01.t03_hypothesis_competition_checkpoint",),
             ),
             RuntimeContourNode(
+                node_id="node.t04_attention_schema",
+                phase_id="T04",
+                authority_role="attention_schema_focus_ownership_contract",
+                computational_role="preverbal_focus_ownership_model",
+                surfaces=(
+                    "t04_attention_schema.focus_targets",
+                    "t04_attention_schema.peripheral_targets",
+                    "t04_attention_schema.focus_ownership",
+                    "t04_attention_schema.preverbal_consumer_contract",
+                ),
+                checkpoint_ids=("rt01.t04_attention_schema_checkpoint",),
+            ),
+            RuntimeContourNode(
                 node_id="node.rt01",
                 phase_id="RT01",
                 authority_role="gating",
@@ -162,6 +175,7 @@ def build_minimal_runtime_tick_graph() -> RuntimeTickGraph:
                     "rt01.t02_relation_binding_checkpoint",
                     "rt01.t02_raw_vs_propagated_integrity_checkpoint",
                     "rt01.t03_hypothesis_competition_checkpoint",
+                    "rt01.t04_attention_schema_checkpoint",
                     "rt01.outcome_resolution_checkpoint",
                 ),
                 checkpoint_ids=(
@@ -176,6 +190,7 @@ def build_minimal_runtime_tick_graph() -> RuntimeTickGraph:
                     "rt01.t02_relation_binding_checkpoint",
                     "rt01.t02_raw_vs_propagated_integrity_checkpoint",
                     "rt01.t03_hypothesis_competition_checkpoint",
+                    "rt01.t04_attention_schema_checkpoint",
                     "rt01.outcome_resolution_checkpoint",
                 ),
             ),
@@ -214,7 +229,8 @@ def build_minimal_runtime_tick_graph() -> RuntimeTickGraph:
             RuntimeContourEdge(source_phase="WORLD_SEAM", target_phase="T01", relation="requires"),
             RuntimeContourEdge(source_phase="T01", target_phase="T02", relation="requires"),
             RuntimeContourEdge(source_phase="T02", target_phase="T03", relation="requires"),
-            RuntimeContourEdge(source_phase="T03", target_phase="RT01", relation="requires"),
+            RuntimeContourEdge(source_phase="T03", target_phase="T04", relation="requires"),
+            RuntimeContourEdge(source_phase="T04", target_phase="RT01", relation="requires"),
             RuntimeContourEdge(source_phase="RT01", target_phase="F01", relation="persists_via_f01"),
         ),
         mandatory_checkpoint_ids=(
@@ -231,6 +247,7 @@ def build_minimal_runtime_tick_graph() -> RuntimeTickGraph:
             "rt01.t02_relation_binding_checkpoint",
             "rt01.t02_raw_vs_propagated_integrity_checkpoint",
             "rt01.t03_hypothesis_competition_checkpoint",
+            "rt01.t04_attention_schema_checkpoint",
             "rt01.outcome_resolution_checkpoint",
         ),
         source_of_truth_surfaces=(
@@ -247,6 +264,8 @@ def build_minimal_runtime_tick_graph() -> RuntimeTickGraph:
             "t02_relation_binding.raw_vs_propagated_distinction",
             "t03_hypothesis_competition.competition_ledger",
             "t03_hypothesis_competition.publication_frontier",
+            "t04_attention_schema.focus_ownership",
+            "t04_attention_schema.focus_targets",
         ),
         reason="minimal production runtime graph for bounded RT01 contour wiring",
     )
@@ -280,6 +299,7 @@ def build_minimal_runtime_topology_bundle() -> RuntimeTopologyBundle:
             "t02_relation_binding_constraint_propagation_contract",
             "t02_raw_vs_propagated_integrity_contract",
             "t03_hypothesis_competition_contract",
+            "t04_attention_schema_focus_ownership_contract",
         ),
         f01_transition_route="subject_tick.persist_subject_tick_result_via_f01",
         tick_graph=tick_graph,
@@ -454,4 +474,5 @@ def _context_has_ablation_flags(context: SubjectTickContext | None) -> bool:
             and str(context.t03_competition_mode).strip() != "bounded_competition"
         )
         or context.disable_t03_enforcement
+        or context.disable_t04_enforcement
     )

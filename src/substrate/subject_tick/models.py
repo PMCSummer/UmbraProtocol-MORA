@@ -13,6 +13,7 @@ if TYPE_CHECKING:
     from substrate.t01_semantic_field import T01ActiveFieldResult
     from substrate.t02_relation_binding import T02ConstrainedSceneResult
     from substrate.t03_hypothesis_competition import T03CompetitionResult
+    from substrate.t04_attention_schema import T04AttentionSchemaResult
     from substrate.world_adapter import WorldAdapterInput, WorldAdapterResult
     from substrate.world_entry_contract import WorldEntryContractResult
 
@@ -116,6 +117,10 @@ class SubjectTickRestrictionCode(StrEnum):
     T03_NONCONVERGENCE_PRESERVATION_REQUIRED = (
         "t03_nonconvergence_preservation_required"
     )
+    T04_ATTENTION_SCHEMA_CONTRACT_MUST_BE_READ = "t04_attention_schema_contract_must_be_read"
+    T04_FOCUS_OWNERSHIP_CONSUMER_REQUIRED = "t04_focus_ownership_consumer_required"
+    T04_REPORTABLE_FOCUS_CONSUMER_REQUIRED = "t04_reportable_focus_consumer_required"
+    T04_PERIPHERAL_PRESERVATION_REQUIRED = "t04_peripheral_preservation_required"
     DOWNSTREAM_AUTHORITY_DEGRADED = "downstream_authority_degraded"
 
 
@@ -217,6 +222,10 @@ class SubjectTickContext:
     require_t03_nonconvergence_preservation: bool = False
     t03_competition_mode: str | None = None
     disable_t03_enforcement: bool = False
+    require_t04_focus_ownership_consumer: bool = False
+    require_t04_reportable_focus_consumer: bool = False
+    require_t04_peripheral_preservation: bool = False
+    disable_t04_enforcement: bool = False
     source_lineage: tuple[str, ...] = ()
 
 
@@ -889,6 +898,7 @@ class SubjectTickResult:
     t01_result: T01ActiveFieldResult
     t02_result: T02ConstrainedSceneResult
     t03_result: T03CompetitionResult
+    t04_result: T04AttentionSchemaResult
     abstain: bool
     abstain_reason: str | None
     no_planner_orchestrator_dependency: bool

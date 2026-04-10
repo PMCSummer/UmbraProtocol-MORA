@@ -20,6 +20,10 @@ from substrate.t03_hypothesis_competition import (
     build_t03_hypothesis_competition,
     derive_t03_preverbal_competition_consumer_view,
 )
+from substrate.t04_attention_schema import (
+    build_t04_attention_schema,
+    derive_t04_preverbal_focus_consumer_view,
+)
 from substrate.affordances import (
     create_default_capability_state,
     generate_regulation_affordances,
@@ -148,6 +152,7 @@ ATTEMPTED_SUBJECT_TICK_PATHS: tuple[str, ...] = (
     "subject_tick.evaluate_t01_semantic_field",
     "subject_tick.evaluate_t02_relation_binding",
     "subject_tick.evaluate_t03_hypothesis_competition",
+    "subject_tick.evaluate_t04_attention_schema",
     "subject_tick.world_seam_enforcement",
     "subject_tick.resolve_bounded_runtime_outcome",
     "subject_tick.downstream_gate",
@@ -1472,6 +1477,85 @@ def execute_subject_tick(
             reason=t03_checkpoint_reason,
         )
     )
+    t04_result = build_t04_attention_schema(
+        tick_id=tick_id,
+        t03_result=t03_result,
+        c04_execution_mode_claim=c04_execution_mode_claim,
+        c05_validity_action=c05_validity_action,
+        source_lineage=lineage,
+    )
+    t04_preverbal_view = derive_t04_preverbal_focus_consumer_view(t04_result)
+    t04_checkpoint_status = SubjectTickCheckpointStatus.ALLOWED
+    t04_checkpoint_reason = t04_result.gate.reason
+    if not context.disable_t04_enforcement:
+        if (
+            context.require_t04_focus_ownership_consumer
+            and not t04_preverbal_view.can_consume_focus_ownership
+            and halt_reason is None
+        ):
+            t04_checkpoint_status = SubjectTickCheckpointStatus.ENFORCED_DETOUR
+            repair_needed = True
+            t04_checkpoint_reason = (
+                "t04 focus-ownership consumer requested but lawful owner/control basis is not consumable"
+            )
+            if active_execution_mode not in {"halt_execution", "revalidate_scope"}:
+                active_execution_mode = "repair_runtime_path"
+        if (
+            context.require_t04_reportable_focus_consumer
+            and not t04_preverbal_view.can_consume_reportable_focus
+            and halt_reason is None
+        ):
+            t04_checkpoint_status = SubjectTickCheckpointStatus.ENFORCED_DETOUR
+            revalidation_needed = True
+            t04_checkpoint_reason = (
+                "t04 reportable-focus consumer requested but stability/reportability remains underconstrained"
+            )
+            if active_execution_mode != "halt_execution":
+                active_execution_mode = "revalidate_scope"
+        if (
+            context.require_t04_peripheral_preservation
+            and not t04_preverbal_view.peripheral_preservation_ready
+            and halt_reason is None
+        ):
+            t04_checkpoint_status = SubjectTickCheckpointStatus.ENFORCED_DETOUR
+            revalidation_needed = True
+            t04_checkpoint_reason = (
+                "t04 peripheral-preservation consumer requested but unresolved competitive targets were collapsed"
+            )
+            if active_execution_mode != "halt_execution":
+                active_execution_mode = "revalidate_scope"
+    else:
+        t04_checkpoint_status = SubjectTickCheckpointStatus.ENFORCED_DETOUR
+        t04_checkpoint_reason = "t04 attention schema enforcement disabled in ablation context"
+    checkpoints.append(
+        SubjectTickCheckpointResult(
+            checkpoint_id="rt01.t04_attention_schema_checkpoint",
+            source_contract="t04_attention_schema.focus_ownership_model",
+            status=t04_checkpoint_status,
+            required_action=(
+                "require_t04_focus_ownership_and_reportable_focus_and_peripheral_preservation"
+                if (
+                    context.require_t04_focus_ownership_consumer
+                    and context.require_t04_reportable_focus_consumer
+                    and context.require_t04_peripheral_preservation
+                )
+                else "require_t04_focus_ownership_and_reportable_focus_consumer"
+                if (
+                    context.require_t04_focus_ownership_consumer
+                    and context.require_t04_reportable_focus_consumer
+                )
+                else "require_t04_focus_ownership_consumer"
+                if context.require_t04_focus_ownership_consumer
+                else "require_t04_reportable_focus_consumer"
+                if context.require_t04_reportable_focus_consumer
+                else "require_t04_peripheral_preservation"
+                if context.require_t04_peripheral_preservation
+                else "t04_optional"
+            ),
+            applied_action=active_execution_mode,
+            reason=t04_checkpoint_reason,
+        )
+    )
 
     if halt_reason is not None:
         final_outcome = SubjectTickOutcome.HALT
@@ -1968,7 +2052,7 @@ def execute_subject_tick(
         attempted_paths=ATTEMPTED_SUBJECT_TICK_PATHS,
         downstream_gate=gate,
         causal_basis=(
-            "bounded runtime execution spine enforces roadmap authority roles for C04/C05, consumes world-entry, s-minimal, a-line, m-minimal, n-minimal, t01 semantic-field, t02 relation-binding, and t03 hypothesis-competition gates, and keeps D01 observability-only over fixed R->C order"
+            "bounded runtime execution spine enforces roadmap authority roles for C04/C05, consumes world-entry, s-minimal, a-line, m-minimal, n-minimal, t01 semantic-field, t02 relation-binding, t03 hypothesis-competition, and t04 attention-schema gates, and keeps D01 observability-only over fixed R->C order"
         ),
     )
     abstain = final_outcome in {SubjectTickOutcome.REPAIR, SubjectTickOutcome.REVALIDATE}
@@ -2003,6 +2087,7 @@ def execute_subject_tick(
         t01_result=t01_result,
         t02_result=t02_result,
         t03_result=t03_result,
+        t04_result=t04_result,
         abstain=abstain,
         abstain_reason=abstain_reason,
         no_planner_orchestrator_dependency=True,

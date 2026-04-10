@@ -9,6 +9,7 @@ def runtime_dispatch_snapshot(result: RuntimeDispatchResult) -> dict[str, object
     state = None if result.subject_tick_result is None else result.subject_tick_result.state
     t02_result = None if result.subject_tick_result is None else result.subject_tick_result.t02_result
     t03_result = None if result.subject_tick_result is None else result.subject_tick_result.t03_result
+    t04_result = None if result.subject_tick_result is None else result.subject_tick_result.t04_result
     return {
         "decision": {
             "accepted": result.decision.accepted,
@@ -403,6 +404,76 @@ def runtime_dispatch_snapshot(result: RuntimeDispatchResult) -> dict[str, object
                 "t03_require_frontier_consumer": state.t03_require_frontier_consumer,
                 "t03_require_nonconvergence_preservation": (
                     state.t03_require_nonconvergence_preservation
+                ),
+                "t04_schema_id": (
+                    None if t04_result is None else t04_result.state.schema_id
+                ),
+                "t04_focus_targets_count": (
+                    None if t04_result is None else len(t04_result.state.focus_targets)
+                ),
+                "t04_peripheral_targets_count": (
+                    None if t04_result is None else len(t04_result.state.peripheral_targets)
+                ),
+                "t04_attention_owner": (
+                    None if t04_result is None else t04_result.state.attention_owner.value
+                ),
+                "t04_focus_mode": (
+                    None if t04_result is None else t04_result.state.focus_mode.value
+                ),
+                "t04_control_estimate": (
+                    None if t04_result is None else t04_result.state.control_estimate
+                ),
+                "t04_stability_estimate": (
+                    None if t04_result is None else t04_result.state.stability_estimate
+                ),
+                "t04_redirect_cost": (
+                    None if t04_result is None else t04_result.state.redirect_cost
+                ),
+                "t04_reportability_status": (
+                    None
+                    if t04_result is None
+                    else t04_result.state.reportability_status.value
+                ),
+                "t04_focus_ownership_consumer_ready": (
+                    None if t04_result is None else t04_result.gate.focus_ownership_consumer_ready
+                ),
+                "t04_reportable_focus_consumer_ready": (
+                    None if t04_result is None else t04_result.gate.reportable_focus_consumer_ready
+                ),
+                "t04_peripheral_preservation_ready": (
+                    None if t04_result is None else t04_result.gate.peripheral_preservation_ready
+                ),
+                "t04_forbidden_shortcuts": (
+                    None if t04_result is None else t04_result.gate.forbidden_shortcuts
+                ),
+                "t04_restrictions": (
+                    None if t04_result is None else t04_result.gate.restrictions
+                ),
+                "t04_scope": (
+                    None if t04_result is None else t04_result.scope_marker.scope
+                ),
+                "t04_scope_rt01_contour_only": (
+                    None if t04_result is None else t04_result.scope_marker.rt01_contour_only
+                ),
+                "t04_scope_t04_first_slice_only": (
+                    None if t04_result is None else t04_result.scope_marker.t04_first_slice_only
+                ),
+                "t04_scope_o01_implemented": (
+                    None if t04_result is None else t04_result.scope_marker.o01_implemented
+                ),
+                "t04_scope_o02_implemented": (
+                    None if t04_result is None else t04_result.scope_marker.o02_implemented
+                ),
+                "t04_scope_o03_implemented": (
+                    None if t04_result is None else t04_result.scope_marker.o03_implemented
+                ),
+                "t04_scope_full_attention_line_implemented": (
+                    None
+                    if t04_result is None
+                    else t04_result.scope_marker.full_attention_line_implemented
+                ),
+                "t04_scope_repo_wide_adoption": (
+                    None if t04_result is None else t04_result.scope_marker.repo_wide_adoption
                 ),
             }
         ),

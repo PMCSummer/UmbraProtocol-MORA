@@ -371,6 +371,26 @@ def test_t03_metamorphic_delayed_support_can_reactivate_previous_candidate() -> 
     assert revived.state.reactivated_hypothesis_ids
 
 
+def test_t03_metamorphic_no_gain_does_not_reactivate_previous_candidate() -> None:
+    prior, _, _ = _t03_result(
+        "revival-no-gain-prior",
+        wording_ref="wording:t03-revival-no-gain",
+        include_observation=False,
+        request_action=False,
+        effect_action_id=None,
+        t03_mode=T03CompetitionMode.CONVENIENCE_BIAS_ABLATION,
+    )
+    no_gain, _, _ = _t03_result(
+        "revival-no-gain-next",
+        wording_ref="wording:t03-revival-no-gain",
+        include_observation=False,
+        request_action=False,
+        effect_action_id=None,
+        prior_state=prior.state,
+    )
+    assert no_gain.state.reactivated_hypothesis_ids == ()
+
+
 def test_t03_ablation_modes_emit_machine_readable_shortcuts() -> None:
     greedy, _, _ = _t03_result(
         "abl-greedy",

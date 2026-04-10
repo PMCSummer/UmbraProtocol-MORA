@@ -697,6 +697,16 @@ def _build_gate(
     forbidden_shortcuts: tuple[str, ...],
     preserve_plurality: bool,
 ) -> T03GateDecision:
+    frontier_shortcut_markers = {
+        ForbiddenT03Shortcut.GREEDY_WINNER_TAKE_ALL_ARGMAX.value,
+        ForbiddenT03Shortcut.HIDDEN_TEXT_RERANKING.value,
+        ForbiddenT03Shortcut.CONVENIENCE_BIASED_CANDIDATE_SELECTION.value,
+        ForbiddenT03Shortcut.FORCED_SINGLE_WINNER_UNDER_AMBIGUITY.value,
+        ForbiddenT03Shortcut.AUTHORITY_WEIGHT_DISABLED.value,
+    }
+    frontier_shortcut_detected = any(
+        marker in forbidden_shortcuts for marker in frontier_shortcut_markers
+    )
     convergence_consumer_ready = state.convergence_status in {
         T03ConvergenceStatus.PROVISIONAL_CONVERGENCE,
         T03ConvergenceStatus.STABLE_LOCAL_CONVERGENCE,
@@ -704,7 +714,7 @@ def _build_gate(
     frontier_consumer_ready = bool(
         state.publication_frontier.competitive_neighborhood
         and state.publication_frontier.authority_profile
-    )
+    ) and not frontier_shortcut_detected
     nonconvergence_preserved = bool(
         state.convergence_status is T03ConvergenceStatus.HONEST_NONCONVERGENCE
         and preserve_plurality
@@ -725,6 +735,8 @@ def _build_gate(
         restrictions.append("t03_convergence_consumer_not_ready")
     if not frontier_consumer_ready:
         restrictions.append("t03_frontier_consumer_not_ready")
+    if frontier_shortcut_detected:
+        restrictions.append("t03_frontier_shortcut_detected")
     if (
         state.convergence_status is T03ConvergenceStatus.HONEST_NONCONVERGENCE
         and not nonconvergence_preserved

@@ -58,6 +58,7 @@ def evaluate_subject_tick_downstream_gate(
         SubjectTickRestrictionCode.T02_RELATION_BINDING_CONTRACT_MUST_BE_READ,
         SubjectTickRestrictionCode.T02_FORBIDDEN_SHORTCUTS_MUST_BE_READ,
         SubjectTickRestrictionCode.T03_HYPOTHESIS_COMPETITION_CONTRACT_MUST_BE_READ,
+        SubjectTickRestrictionCode.T04_ATTENTION_SCHEMA_CONTRACT_MUST_BE_READ,
     ]
     usability = SubjectTickUsabilityClass.USABLE_BOUNDED
     accepted = True
@@ -374,6 +375,26 @@ def evaluate_subject_tick_downstream_gate(
             reason = (
                 "t03 nonconvergence preservation requested but frontier collapsed under ambiguity"
             )
+    t04_checkpoint = next(
+        (
+            checkpoint
+            for checkpoint in state.execution_checkpoints
+            if checkpoint.checkpoint_id == "rt01.t04_attention_schema_checkpoint"
+        ),
+        None,
+    )
+    if t04_checkpoint is not None and t04_checkpoint.status.value != "allowed":
+        if "focus_ownership" in t04_checkpoint.required_action:
+            restrictions.append(SubjectTickRestrictionCode.T04_FOCUS_OWNERSHIP_CONSUMER_REQUIRED)
+        if "reportable_focus" in t04_checkpoint.required_action:
+            restrictions.append(SubjectTickRestrictionCode.T04_REPORTABLE_FOCUS_CONSUMER_REQUIRED)
+        if "peripheral_preservation" in t04_checkpoint.required_action:
+            restrictions.append(SubjectTickRestrictionCode.T04_PERIPHERAL_PRESERVATION_REQUIRED)
+        restrictions.append(SubjectTickRestrictionCode.DOWNSTREAM_AUTHORITY_DEGRADED)
+        if state.final_execution_outcome == SubjectTickOutcome.CONTINUE:
+            accepted = False
+            usability = SubjectTickUsabilityClass.BLOCKED
+            reason = "t04 attention schema checkpoint requires detour before downstream continuation"
 
     return SubjectTickGateDecision(
         accepted=accepted,
