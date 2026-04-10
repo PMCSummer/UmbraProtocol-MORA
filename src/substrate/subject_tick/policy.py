@@ -61,6 +61,7 @@ def evaluate_subject_tick_downstream_gate(
         SubjectTickRestrictionCode.T04_ATTENTION_SCHEMA_CONTRACT_MUST_BE_READ,
         SubjectTickRestrictionCode.S01_EFFERENCE_COPY_CONTRACT_MUST_BE_READ,
         SubjectTickRestrictionCode.S02_PREDICTION_BOUNDARY_CONTRACT_MUST_BE_READ,
+        SubjectTickRestrictionCode.S03_OWNERSHIP_WEIGHTED_LEARNING_CONTRACT_MUST_BE_READ,
     ]
     usability = SubjectTickUsabilityClass.USABLE_BOUNDED
     accepted = True
@@ -491,6 +492,62 @@ def evaluate_subject_tick_downstream_gate(
             accepted = False
             usability = SubjectTickUsabilityClass.BLOCKED
             reason = "s02 prediction boundary checkpoint requires detour before downstream continuation"
+
+    s03_checkpoint = next(
+        (
+            checkpoint
+            for checkpoint in state.execution_checkpoints
+            if checkpoint.checkpoint_id == "rt01.s03_ownership_weighted_learning_checkpoint"
+        ),
+        None,
+    )
+    if (
+        state.s03_require_learning_packet_consumer
+        and not state.s03_learning_packet_consumer_ready
+    ):
+        restrictions.append(SubjectTickRestrictionCode.S03_LEARNING_PACKET_CONSUMER_REQUIRED)
+        restrictions.append(SubjectTickRestrictionCode.DOWNSTREAM_AUTHORITY_DEGRADED)
+        if state.final_execution_outcome == SubjectTickOutcome.CONTINUE:
+            accepted = False
+            usability = SubjectTickUsabilityClass.BLOCKED
+            reason = "s03 learning packet consumer requested but lawful ownership-weighted packet is unavailable"
+    if state.s03_require_mixed_update_consumer and not state.s03_mixed_update_consumer_ready:
+        restrictions.append(SubjectTickRestrictionCode.S03_MIXED_UPDATE_CONSUMER_REQUIRED)
+        restrictions.append(SubjectTickRestrictionCode.DOWNSTREAM_AUTHORITY_DEGRADED)
+        if state.final_execution_outcome == SubjectTickOutcome.CONTINUE:
+            accepted = False
+            usability = SubjectTickUsabilityClass.BLOCKED
+            reason = "s03 mixed update consumer requested but split ownership update packet is unavailable"
+    if (
+        state.s03_require_freeze_obedience_consumer
+        and not state.s03_freeze_obedience_consumer_ready
+    ):
+        restrictions.append(
+            SubjectTickRestrictionCode.S03_FREEZE_OBEDIENCE_CONSUMER_REQUIRED
+        )
+        restrictions.append(SubjectTickRestrictionCode.DOWNSTREAM_AUTHORITY_DEGRADED)
+        if state.final_execution_outcome == SubjectTickOutcome.CONTINUE:
+            accepted = False
+            usability = SubjectTickUsabilityClass.BLOCKED
+            reason = "s03 freeze-obedience consumer requested but freeze/defer route is not lawfully consumable"
+    if s03_checkpoint is not None and s03_checkpoint.status.value != "allowed":
+        if "learning_packet" in s03_checkpoint.required_action:
+            restrictions.append(
+                SubjectTickRestrictionCode.S03_LEARNING_PACKET_CONSUMER_REQUIRED
+            )
+        if "mixed_update" in s03_checkpoint.required_action:
+            restrictions.append(
+                SubjectTickRestrictionCode.S03_MIXED_UPDATE_CONSUMER_REQUIRED
+            )
+        if "freeze_obedience" in s03_checkpoint.required_action:
+            restrictions.append(
+                SubjectTickRestrictionCode.S03_FREEZE_OBEDIENCE_CONSUMER_REQUIRED
+            )
+        restrictions.append(SubjectTickRestrictionCode.DOWNSTREAM_AUTHORITY_DEGRADED)
+        if state.final_execution_outcome == SubjectTickOutcome.CONTINUE:
+            accepted = False
+            usability = SubjectTickUsabilityClass.BLOCKED
+            reason = "s03 ownership-weighted learning checkpoint requires detour before downstream continuation"
 
     return SubjectTickGateDecision(
         accepted=accepted,

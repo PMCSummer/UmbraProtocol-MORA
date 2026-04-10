@@ -6,6 +6,10 @@ from enum import Enum, StrEnum
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
+    from substrate.s03_ownership_weighted_learning import (
+        S03OwnershipWeightedLearningResult,
+        S03OwnershipWeightedLearningState,
+    )
     from substrate.s02_prediction_boundary import (
         S02PredictionBoundaryResult,
         S02PredictionBoundaryState,
@@ -136,6 +140,14 @@ class SubjectTickRestrictionCode(StrEnum):
     S02_BOUNDARY_CONSUMER_REQUIRED = "s02_boundary_consumer_required"
     S02_CONTROLLABILITY_CONSUMER_REQUIRED = "s02_controllability_consumer_required"
     S02_MIXED_SOURCE_CONSUMER_REQUIRED = "s02_mixed_source_consumer_required"
+    S03_OWNERSHIP_WEIGHTED_LEARNING_CONTRACT_MUST_BE_READ = (
+        "s03_ownership_weighted_learning_contract_must_be_read"
+    )
+    S03_LEARNING_PACKET_CONSUMER_REQUIRED = "s03_learning_packet_consumer_required"
+    S03_MIXED_UPDATE_CONSUMER_REQUIRED = "s03_mixed_update_consumer_required"
+    S03_FREEZE_OBEDIENCE_CONSUMER_REQUIRED = (
+        "s03_freeze_obedience_consumer_required"
+    )
     DOWNSTREAM_AUTHORITY_DEGRADED = "downstream_authority_degraded"
 
 
@@ -192,6 +204,7 @@ class SubjectTickContext:
     prior_temporal_validity_state: object | None = None
     prior_s01_state: S01EfferenceCopyState | None = None
     prior_s02_state: S02PredictionBoundaryState | None = None
+    prior_s03_state: S03OwnershipWeightedLearningState | None = None
     dependency_trigger_hits: tuple[str, ...] = ()
     context_shift_markers: tuple[str, ...] = ()
     contradicted_source_refs: tuple[str, ...] = ()
@@ -252,6 +265,10 @@ class SubjectTickContext:
     require_s02_controllability_consumer: bool = False
     require_s02_mixed_source_consumer: bool = False
     disable_s02_enforcement: bool = False
+    require_s03_learning_packet_consumer: bool = False
+    require_s03_mixed_update_consumer: bool = False
+    require_s03_freeze_obedience_consumer: bool = False
+    disable_s03_enforcement: bool = False
     source_lineage: tuple[str, ...] = ()
 
 
@@ -573,6 +590,31 @@ class SubjectTickState:
     s02_require_boundary_consumer: bool
     s02_require_controllability_consumer: bool
     s02_require_mixed_source_consumer: bool
+    s03_learning_id: str
+    s03_latest_packet_id: str
+    s03_latest_update_class: str
+    s03_latest_commit_class: str
+    s03_latest_ambiguity_class: str | None
+    s03_freeze_or_defer_state: str
+    s03_requested_revalidation: bool
+    s03_self_update_weight: float
+    s03_world_update_weight: float
+    s03_observation_update_weight: float
+    s03_anomaly_update_weight: float
+    s03_learning_packet_consumer_ready: bool
+    s03_mixed_update_consumer_ready: bool
+    s03_freeze_obedience_consumer_ready: bool
+    s03_scope: str
+    s03_scope_rt01_contour_only: bool
+    s03_scope_s03_first_slice_only: bool
+    s03_scope_s04_implemented: bool
+    s03_scope_s05_implemented: bool
+    s03_scope_repo_wide_adoption: bool
+    s03_scope_reason: str
+    s03_reason: str
+    s03_require_learning_packet_consumer: bool
+    s03_require_mixed_update_consumer: bool
+    s03_require_freeze_obedience_consumer: bool
     t02_require_constrained_scene_consumer: bool
     t02_require_raw_vs_propagated_distinction: bool
     t02_raw_vs_propagated_distinct: bool
@@ -965,6 +1007,7 @@ class SubjectTickResult:
     n_minimal_result: NMinimalResult
     s01_result: S01EfferenceCopyResult
     s02_result: S02PredictionBoundaryResult
+    s03_result: S03OwnershipWeightedLearningResult
     t01_result: T01ActiveFieldResult
     t02_result: T02ConstrainedSceneResult
     t03_result: T03CompetitionResult

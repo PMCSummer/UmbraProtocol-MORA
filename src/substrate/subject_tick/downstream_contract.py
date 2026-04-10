@@ -302,6 +302,31 @@ class SubjectTickContractView:
     s02_require_boundary_consumer: bool
     s02_require_controllability_consumer: bool
     s02_require_mixed_source_consumer: bool
+    s03_learning_id: str
+    s03_latest_packet_id: str
+    s03_latest_update_class: str
+    s03_latest_commit_class: str
+    s03_latest_ambiguity_class: str | None
+    s03_freeze_or_defer_state: str
+    s03_requested_revalidation: bool
+    s03_self_update_weight: float
+    s03_world_update_weight: float
+    s03_observation_update_weight: float
+    s03_anomaly_update_weight: float
+    s03_learning_packet_consumer_ready: bool
+    s03_mixed_update_consumer_ready: bool
+    s03_freeze_obedience_consumer_ready: bool
+    s03_scope: str
+    s03_scope_rt01_contour_only: bool
+    s03_scope_s03_first_slice_only: bool
+    s03_scope_s04_implemented: bool
+    s03_scope_s05_implemented: bool
+    s03_scope_repo_wide_adoption: bool
+    s03_scope_reason: str
+    s03_reason: str
+    s03_require_learning_packet_consumer: bool
+    s03_require_mixed_update_consumer: bool
+    s03_require_freeze_obedience_consumer: bool
     t02_constrained_scene_id: str | None
     t02_scene_status: str | None
     t02_preverbal_constraint_consumer_ready: bool | None
@@ -759,6 +784,31 @@ def derive_subject_tick_contract_view(
         s02_require_boundary_consumer=state.s02_require_boundary_consumer,
         s02_require_controllability_consumer=state.s02_require_controllability_consumer,
         s02_require_mixed_source_consumer=state.s02_require_mixed_source_consumer,
+        s03_learning_id=state.s03_learning_id,
+        s03_latest_packet_id=state.s03_latest_packet_id,
+        s03_latest_update_class=state.s03_latest_update_class,
+        s03_latest_commit_class=state.s03_latest_commit_class,
+        s03_latest_ambiguity_class=state.s03_latest_ambiguity_class,
+        s03_freeze_or_defer_state=state.s03_freeze_or_defer_state,
+        s03_requested_revalidation=state.s03_requested_revalidation,
+        s03_self_update_weight=state.s03_self_update_weight,
+        s03_world_update_weight=state.s03_world_update_weight,
+        s03_observation_update_weight=state.s03_observation_update_weight,
+        s03_anomaly_update_weight=state.s03_anomaly_update_weight,
+        s03_learning_packet_consumer_ready=state.s03_learning_packet_consumer_ready,
+        s03_mixed_update_consumer_ready=state.s03_mixed_update_consumer_ready,
+        s03_freeze_obedience_consumer_ready=state.s03_freeze_obedience_consumer_ready,
+        s03_scope=state.s03_scope,
+        s03_scope_rt01_contour_only=state.s03_scope_rt01_contour_only,
+        s03_scope_s03_first_slice_only=state.s03_scope_s03_first_slice_only,
+        s03_scope_s04_implemented=state.s03_scope_s04_implemented,
+        s03_scope_s05_implemented=state.s03_scope_s05_implemented,
+        s03_scope_repo_wide_adoption=state.s03_scope_repo_wide_adoption,
+        s03_scope_reason=state.s03_scope_reason,
+        s03_reason=state.s03_reason,
+        s03_require_learning_packet_consumer=state.s03_require_learning_packet_consumer,
+        s03_require_mixed_update_consumer=state.s03_require_mixed_update_consumer,
+        s03_require_freeze_obedience_consumer=state.s03_require_freeze_obedience_consumer,
         t02_constrained_scene_id=(
             None if t02_result is None else t02_result.state.constrained_scene_id
         ),

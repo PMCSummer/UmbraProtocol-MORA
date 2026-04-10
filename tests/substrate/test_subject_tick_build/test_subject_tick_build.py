@@ -1402,3 +1402,96 @@ def test_subject_tick_s02_mixed_source_consumer_positive_path_is_load_bearing_wi
     assert required_checkpoint.status.value == "allowed"
     assert baseline.state.final_execution_outcome == SubjectTickOutcome.CONTINUE
     assert required.state.final_execution_outcome == SubjectTickOutcome.CONTINUE
+
+
+def test_subject_tick_s03_learning_packet_consumer_requirement_is_path_affecting() -> None:
+    baseline = _result(
+        "rt-s03-learning-baseline",
+        unresolved=False,
+        context=SubjectTickContext(
+            context_shift_markers=("shift:s03-local",),
+            disable_c05_validity_enforcement=True,
+            disable_gate_application=True,
+            disable_downstream_obedience_enforcement=True,
+        ),
+    )
+    required = _result(
+        "rt-s03-learning-required",
+        unresolved=False,
+        context=SubjectTickContext(
+            context_shift_markers=("shift:s03-local",),
+            require_s03_learning_packet_consumer=True,
+            disable_c05_validity_enforcement=True,
+            disable_gate_application=True,
+            disable_downstream_obedience_enforcement=True,
+        ),
+    )
+    assert baseline.state.final_execution_outcome == SubjectTickOutcome.CONTINUE
+    assert required.state.final_execution_outcome == SubjectTickOutcome.REPAIR
+    assert any(
+        checkpoint.checkpoint_id == "rt01.s03_ownership_weighted_learning_checkpoint"
+        and checkpoint.status.value == "enforced_detour"
+        for checkpoint in required.state.execution_checkpoints
+    )
+
+
+def test_subject_tick_s03_mixed_update_consumer_requirement_is_path_affecting() -> None:
+    baseline = _result("rt-s03-mixed-baseline", unresolved=False)
+    required = _result(
+        "rt-s03-mixed-required",
+        unresolved=False,
+        context=SubjectTickContext(require_s03_mixed_update_consumer=True),
+    )
+    assert baseline.state.final_execution_outcome == SubjectTickOutcome.CONTINUE
+    assert required.state.final_execution_outcome == SubjectTickOutcome.REVALIDATE
+    assert any(
+        checkpoint.checkpoint_id == "rt01.s03_ownership_weighted_learning_checkpoint"
+        and checkpoint.status.value == "enforced_detour"
+        for checkpoint in required.state.execution_checkpoints
+    )
+
+
+def test_subject_tick_s03_freeze_obedience_consumer_requirement_is_path_affecting() -> None:
+    baseline = _result(
+        "rt-s03-freeze-baseline",
+        unresolved=False,
+        context=SubjectTickContext(
+            context_shift_markers=("shift:s03-freeze",),
+            disable_c05_validity_enforcement=True,
+            disable_gate_application=True,
+            disable_downstream_obedience_enforcement=True,
+        ),
+    )
+    required = _result(
+        "rt-s03-freeze-required",
+        unresolved=False,
+        context=SubjectTickContext(
+            context_shift_markers=("shift:s03-freeze",),
+            require_s03_freeze_obedience_consumer=True,
+            disable_c05_validity_enforcement=True,
+            disable_gate_application=True,
+            disable_downstream_obedience_enforcement=True,
+        ),
+    )
+    assert baseline.state.final_execution_outcome == SubjectTickOutcome.CONTINUE
+    assert required.state.final_execution_outcome == SubjectTickOutcome.REVALIDATE
+    assert any(
+        checkpoint.checkpoint_id == "rt01.s03_ownership_weighted_learning_checkpoint"
+        and checkpoint.status.value == "enforced_detour"
+        for checkpoint in required.state.execution_checkpoints
+    )
+
+
+def test_subject_tick_s03_positive_consumer_ready_path_has_no_detour() -> None:
+    result = _result(
+        "rt-s03-positive",
+        unresolved=False,
+        context=SubjectTickContext(require_s03_learning_packet_consumer=True),
+    )
+    checkpoint = next(
+        checkpoint
+        for checkpoint in result.state.execution_checkpoints
+        if checkpoint.checkpoint_id == "rt01.s03_ownership_weighted_learning_checkpoint"
+    )
+    assert result.state.final_execution_outcome == SubjectTickOutcome.CONTINUE
+    assert checkpoint.status.value == "allowed"

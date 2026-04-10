@@ -172,6 +172,29 @@ class RuntimeDispatchContractView:
     s02_require_boundary_consumer: bool | None
     s02_require_controllability_consumer: bool | None
     s02_require_mixed_source_consumer: bool | None
+    s03_learning_id: str | None
+    s03_latest_packet_id: str | None
+    s03_latest_update_class: str | None
+    s03_latest_commit_class: str | None
+    s03_latest_ambiguity_class: str | None
+    s03_freeze_or_defer_state: str | None
+    s03_requested_revalidation: bool | None
+    s03_self_update_weight: float | None
+    s03_world_update_weight: float | None
+    s03_observation_update_weight: float | None
+    s03_anomaly_update_weight: float | None
+    s03_learning_packet_consumer_ready: bool | None
+    s03_mixed_update_consumer_ready: bool | None
+    s03_freeze_obedience_consumer_ready: bool | None
+    s03_scope: str | None
+    s03_scope_rt01_contour_only: bool | None
+    s03_scope_s03_first_slice_only: bool | None
+    s03_scope_s04_implemented: bool | None
+    s03_scope_s05_implemented: bool | None
+    s03_scope_repo_wide_adoption: bool | None
+    s03_require_learning_packet_consumer: bool | None
+    s03_require_mixed_update_consumer: bool | None
+    s03_require_freeze_obedience_consumer: bool | None
     t02_constrained_scene_id: str | None
     t02_scene_status: str | None
     t02_preverbal_constraint_consumer_ready: bool | None
@@ -620,6 +643,73 @@ def derive_runtime_dispatch_contract_view(
         ),
         s02_require_mixed_source_consumer=(
             None if state is None else state.s02_require_mixed_source_consumer
+        ),
+        s03_learning_id=(
+            None if state is None else state.s03_learning_id
+        ),
+        s03_latest_packet_id=(
+            None if state is None else state.s03_latest_packet_id
+        ),
+        s03_latest_update_class=(
+            None if state is None else state.s03_latest_update_class
+        ),
+        s03_latest_commit_class=(
+            None if state is None else state.s03_latest_commit_class
+        ),
+        s03_latest_ambiguity_class=(
+            None if state is None else state.s03_latest_ambiguity_class
+        ),
+        s03_freeze_or_defer_state=(
+            None if state is None else state.s03_freeze_or_defer_state
+        ),
+        s03_requested_revalidation=(
+            None if state is None else state.s03_requested_revalidation
+        ),
+        s03_self_update_weight=(
+            None if state is None else state.s03_self_update_weight
+        ),
+        s03_world_update_weight=(
+            None if state is None else state.s03_world_update_weight
+        ),
+        s03_observation_update_weight=(
+            None if state is None else state.s03_observation_update_weight
+        ),
+        s03_anomaly_update_weight=(
+            None if state is None else state.s03_anomaly_update_weight
+        ),
+        s03_learning_packet_consumer_ready=(
+            None if state is None else state.s03_learning_packet_consumer_ready
+        ),
+        s03_mixed_update_consumer_ready=(
+            None if state is None else state.s03_mixed_update_consumer_ready
+        ),
+        s03_freeze_obedience_consumer_ready=(
+            None if state is None else state.s03_freeze_obedience_consumer_ready
+        ),
+        s03_scope=(None if state is None else state.s03_scope),
+        s03_scope_rt01_contour_only=(
+            None if state is None else state.s03_scope_rt01_contour_only
+        ),
+        s03_scope_s03_first_slice_only=(
+            None if state is None else state.s03_scope_s03_first_slice_only
+        ),
+        s03_scope_s04_implemented=(
+            None if state is None else state.s03_scope_s04_implemented
+        ),
+        s03_scope_s05_implemented=(
+            None if state is None else state.s03_scope_s05_implemented
+        ),
+        s03_scope_repo_wide_adoption=(
+            None if state is None else state.s03_scope_repo_wide_adoption
+        ),
+        s03_require_learning_packet_consumer=(
+            None if state is None else state.s03_require_learning_packet_consumer
+        ),
+        s03_require_mixed_update_consumer=(
+            None if state is None else state.s03_require_mixed_update_consumer
+        ),
+        s03_require_freeze_obedience_consumer=(
+            None if state is None else state.s03_require_freeze_obedience_consumer
         ),
         t02_constrained_scene_id=(
             None if t02_result is None else t02_result.state.constrained_scene_id

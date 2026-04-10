@@ -136,6 +136,10 @@ from substrate.s02_prediction_boundary import (
     build_s02_prediction_boundary,
     derive_s02_boundary_consumer_view,
 )
+from substrate.s03_ownership_weighted_learning import (
+    build_s03_ownership_weighted_learning,
+    derive_s03_update_packet_consumer_view,
+)
 from substrate.s01_efference_copy import (
     S01EfferenceCopyState,
     build_s01_efference_copy,
@@ -155,6 +159,7 @@ ATTEMPTED_SUBJECT_TICK_PATHS: tuple[str, ...] = (
     "subject_tick.evaluate_world_entry_contract",
     "subject_tick.evaluate_s01_efference_copy",
     "subject_tick.evaluate_s02_prediction_boundary",
+    "subject_tick.evaluate_s03_ownership_weighted_learning",
     "subject_tick.evaluate_s_minimal_contour",
     "subject_tick.evaluate_a_line_normalization",
     "subject_tick.evaluate_m_minimal_contour",
@@ -1148,6 +1153,104 @@ def execute_subject_tick(
             ),
             applied_action=active_execution_mode,
             reason=s02_checkpoint_reason,
+        )
+    )
+    s03_result = build_s03_ownership_weighted_learning(
+        tick_id=tick_id,
+        tick_index=tick_index,
+        s01_result=s01_result,
+        s02_result=s02_result,
+        c04_selected_mode=c04_execution_mode_claim,
+        c05_validity_action=c05_validity_action,
+        c05_revalidation_required=bool(
+            temporal_validity.state.revalidation_item_ids
+            or temporal_validity.state.selective_scope_targets
+            or temporal_validity.state.selective_scope_uncertain
+            or temporal_validity.state.insufficient_basis_for_revalidation
+        ),
+        c05_dependency_contaminated=bool(
+            temporal_validity.state.dependency_contaminated_item_ids
+            or temporal_validity.state.no_safe_reuse_item_ids
+        ),
+        c05_no_safe_reuse=bool(
+            temporal_validity.state.no_safe_reuse_item_ids
+        ),
+        context_shift_detected=bool(context.context_shift_markers),
+        prior_state=context.prior_s03_state,
+        source_lineage=lineage,
+    )
+    s03_view = derive_s03_update_packet_consumer_view(s03_result)
+    s03_checkpoint_status = SubjectTickCheckpointStatus.ALLOWED
+    s03_checkpoint_reason = s03_result.gate.reason
+    if not context.disable_s03_enforcement:
+        if (
+            context.require_s03_learning_packet_consumer
+            and not s03_view.can_consume_learning_packet
+            and halt_reason is None
+        ):
+            repair_needed = True
+            s03_checkpoint_status = SubjectTickCheckpointStatus.ENFORCED_DETOUR
+            s03_checkpoint_reason = (
+                "s03 learning packet consumer requested but ownership-weighted packet is deferred/frozen"
+            )
+            if active_execution_mode not in {"halt_execution", "revalidate_scope"}:
+                active_execution_mode = "repair_runtime_path"
+        if (
+            context.require_s03_mixed_update_consumer
+            and not s03_view.can_consume_mixed_update
+            and halt_reason is None
+        ):
+            revalidation_needed = True
+            s03_checkpoint_status = SubjectTickCheckpointStatus.ENFORCED_DETOUR
+            s03_checkpoint_reason = (
+                "s03 mixed-update consumer requested but bounded split update packet is unavailable"
+            )
+            if active_execution_mode != "halt_execution":
+                active_execution_mode = "revalidate_scope"
+        if (
+            context.require_s03_freeze_obedience_consumer
+            and not s03_view.can_obey_freeze
+            and halt_reason is None
+        ):
+            revalidation_needed = True
+            s03_checkpoint_status = SubjectTickCheckpointStatus.ENFORCED_DETOUR
+            s03_checkpoint_reason = (
+                "s03 freeze-obedience consumer requested but freeze/defer packet cannot be lawfully consumed"
+            )
+            if active_execution_mode != "halt_execution":
+                active_execution_mode = "revalidate_scope"
+    else:
+        s03_checkpoint_status = SubjectTickCheckpointStatus.ENFORCED_DETOUR
+        s03_checkpoint_reason = (
+            "s03 ownership-weighted learning enforcement disabled in ablation context"
+        )
+    checkpoints.append(
+        SubjectTickCheckpointResult(
+            checkpoint_id="rt01.s03_ownership_weighted_learning_checkpoint",
+            source_contract="s03_ownership_weighted_learning.update_routing",
+            status=s03_checkpoint_status,
+            required_action=(
+                "require_s03_learning_packet_and_mixed_update_and_freeze_obedience_consumer"
+                if (
+                    context.require_s03_learning_packet_consumer
+                    and context.require_s03_mixed_update_consumer
+                    and context.require_s03_freeze_obedience_consumer
+                )
+                else "require_s03_learning_packet_and_mixed_update_consumer"
+                if (
+                    context.require_s03_learning_packet_consumer
+                    and context.require_s03_mixed_update_consumer
+                )
+                else "require_s03_learning_packet_consumer"
+                if context.require_s03_learning_packet_consumer
+                else "require_s03_mixed_update_consumer"
+                if context.require_s03_mixed_update_consumer
+                else "require_s03_freeze_obedience_consumer"
+                if context.require_s03_freeze_obedience_consumer
+                else "s03_optional"
+            ),
+            applied_action=active_execution_mode,
+            reason=s03_checkpoint_reason,
         )
     )
     s_minimal_result = build_s_minimal_contour(
@@ -2255,6 +2358,41 @@ def execute_subject_tick(
             context.require_s02_controllability_consumer
         ),
         s02_require_mixed_source_consumer=context.require_s02_mixed_source_consumer,
+        s03_learning_id=s03_result.state.learning_id,
+        s03_latest_packet_id=s03_result.state.latest_packet_id,
+        s03_latest_update_class=s03_result.state.latest_update_class.value,
+        s03_latest_commit_class=s03_result.state.latest_commit_class.value,
+        s03_latest_ambiguity_class=(
+            None
+            if s03_result.state.latest_ambiguity_class is None
+            else s03_result.state.latest_ambiguity_class.value
+        ),
+        s03_freeze_or_defer_state=s03_result.state.freeze_or_defer_state.value,
+        s03_requested_revalidation=s03_result.state.requested_revalidation,
+        s03_self_update_weight=s03_result.state.packets[-1].self_update_weight,
+        s03_world_update_weight=s03_result.state.packets[-1].world_update_weight,
+        s03_observation_update_weight=s03_result.state.packets[-1].observation_update_weight,
+        s03_anomaly_update_weight=s03_result.state.packets[-1].anomaly_update_weight,
+        s03_learning_packet_consumer_ready=s03_result.gate.learning_packet_consumer_ready,
+        s03_mixed_update_consumer_ready=s03_result.gate.mixed_update_consumer_ready,
+        s03_freeze_obedience_consumer_ready=s03_result.gate.freeze_obedience_consumer_ready,
+        s03_scope=s03_result.scope_marker.scope,
+        s03_scope_rt01_contour_only=s03_result.scope_marker.rt01_contour_only,
+        s03_scope_s03_first_slice_only=s03_result.scope_marker.s03_first_slice_only,
+        s03_scope_s04_implemented=s03_result.scope_marker.s04_implemented,
+        s03_scope_s05_implemented=s03_result.scope_marker.s05_implemented,
+        s03_scope_repo_wide_adoption=s03_result.scope_marker.repo_wide_adoption,
+        s03_scope_reason=s03_result.scope_marker.reason,
+        s03_reason=s03_result.reason,
+        s03_require_learning_packet_consumer=(
+            context.require_s03_learning_packet_consumer
+        ),
+        s03_require_mixed_update_consumer=(
+            context.require_s03_mixed_update_consumer
+        ),
+        s03_require_freeze_obedience_consumer=(
+            context.require_s03_freeze_obedience_consumer
+        ),
         t02_require_constrained_scene_consumer=(
             context.require_t02_constrained_scene_consumer
         ),
@@ -2348,7 +2486,7 @@ def execute_subject_tick(
         attempted_paths=ATTEMPTED_SUBJECT_TICK_PATHS,
         downstream_gate=gate,
         causal_basis=(
-            "bounded runtime execution spine enforces roadmap authority roles for C04/C05, consumes world-entry, s01 efference-copy, s02 prediction-boundary seam, s-minimal, a-line, m-minimal, n-minimal, t01 semantic-field, t02 relation-binding, t03 hypothesis-competition, and t04 attention-schema gates, and keeps D01 observability-only over fixed R->C order"
+            "bounded runtime execution spine enforces roadmap authority roles for C04/C05, consumes world-entry, s01 efference-copy, s02 prediction-boundary seam, s03 ownership-weighted learning, s-minimal, a-line, m-minimal, n-minimal, t01 semantic-field, t02 relation-binding, t03 hypothesis-competition, and t04 attention-schema gates, and keeps D01 observability-only over fixed R->C order"
         ),
     )
     abstain = final_outcome in {SubjectTickOutcome.REPAIR, SubjectTickOutcome.REVALIDATE}
@@ -2382,6 +2520,7 @@ def execute_subject_tick(
         n_minimal_result=n_minimal_result,
         s01_result=s01_result,
         s02_result=s02_result,
+        s03_result=s03_result,
         t01_result=t01_result,
         t02_result=t02_result,
         t03_result=t03_result,

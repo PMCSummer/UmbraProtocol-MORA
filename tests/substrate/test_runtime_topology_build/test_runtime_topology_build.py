@@ -109,6 +109,7 @@ def test_runtime_topology_bundle_and_graph_are_materialized() -> None:
         "C05",
         "S01",
         "S02",
+        "S03",
         "T01",
         "T02",
         "T03",
@@ -124,6 +125,7 @@ def test_runtime_topology_bundle_and_graph_are_materialized() -> None:
     assert "rt01.n_minimal_contour_checkpoint" in graph.mandatory_checkpoint_ids
     assert "rt01.s01_efference_copy_checkpoint" in graph.mandatory_checkpoint_ids
     assert "rt01.s02_prediction_boundary_checkpoint" in graph.mandatory_checkpoint_ids
+    assert "rt01.s03_ownership_weighted_learning_checkpoint" in graph.mandatory_checkpoint_ids
     assert "rt01.t01_semantic_field_checkpoint" in graph.mandatory_checkpoint_ids
     assert "rt01.t02_relation_binding_checkpoint" in graph.mandatory_checkpoint_ids
     assert "rt01.t02_raw_vs_propagated_integrity_checkpoint" in graph.mandatory_checkpoint_ids
@@ -139,6 +141,18 @@ def test_runtime_topology_bundle_and_graph_are_materialized() -> None:
     assert "s02_prediction_boundary.seam_ledger" in graph.source_of_truth_surfaces
     assert (
         "s02_prediction_boundary.controllability_vs_predictability"
+        in graph.source_of_truth_surfaces
+    )
+    assert (
+        "s03_ownership_weighted_learning.learning_attribution_ledger"
+        in graph.source_of_truth_surfaces
+    )
+    assert (
+        "s03_ownership_weighted_learning.target_update_routes"
+        in graph.source_of_truth_surfaces
+    )
+    assert (
+        "s03_ownership_weighted_learning.freeze_or_defer_state"
         in graph.source_of_truth_surfaces
     )
     assert "t01_semantic_field.active_scene" in graph.source_of_truth_surfaces
@@ -1557,3 +1571,135 @@ def test_dispatch_contract_view_exposes_s02_prediction_boundary_surface() -> Non
     assert view.s02_require_boundary_consumer is True
     assert view.s02_require_controllability_consumer is True
     assert view.s02_require_mixed_source_consumer is True
+
+
+def test_dispatch_s03_learning_packet_consumer_requirement_is_load_bearing() -> None:
+    baseline = dispatch_runtime_tick(
+        RuntimeDispatchRequest(
+            tick_input=_tick_input("runtime-topology-s03-learning-baseline"),
+            context=SubjectTickContext(context_shift_markers=("shift:s03-local",)),
+            route_class=RuntimeRouteClass.PRODUCTION_CONTOUR,
+        )
+    )
+    required = dispatch_runtime_tick(
+        RuntimeDispatchRequest(
+            tick_input=_tick_input("runtime-topology-s03-learning-required"),
+            context=SubjectTickContext(
+                context_shift_markers=("shift:s03-local",),
+                require_s03_learning_packet_consumer=True,
+            ),
+            route_class=RuntimeRouteClass.PRODUCTION_CONTOUR,
+        )
+    )
+    assert baseline.subject_tick_result is not None
+    assert required.subject_tick_result is not None
+    assert baseline.subject_tick_result.state.final_execution_outcome == SubjectTickOutcome.CONTINUE
+    assert required.subject_tick_result.state.final_execution_outcome == SubjectTickOutcome.REPAIR
+    assert any(
+        checkpoint.checkpoint_id == "rt01.s03_ownership_weighted_learning_checkpoint"
+        and checkpoint.status.value == "enforced_detour"
+        for checkpoint in required.subject_tick_result.state.execution_checkpoints
+    )
+
+
+def test_dispatch_s03_mixed_update_consumer_requirement_is_load_bearing() -> None:
+    baseline = dispatch_runtime_tick(
+        RuntimeDispatchRequest(
+            tick_input=_tick_input("runtime-topology-s03-mixed-baseline"),
+            route_class=RuntimeRouteClass.PRODUCTION_CONTOUR,
+        )
+    )
+    required = dispatch_runtime_tick(
+        RuntimeDispatchRequest(
+            tick_input=_tick_input("runtime-topology-s03-mixed-required"),
+            context=SubjectTickContext(require_s03_mixed_update_consumer=True),
+            route_class=RuntimeRouteClass.PRODUCTION_CONTOUR,
+        )
+    )
+    assert baseline.subject_tick_result is not None
+    assert required.subject_tick_result is not None
+    assert baseline.subject_tick_result.state.final_execution_outcome == SubjectTickOutcome.CONTINUE
+    assert required.subject_tick_result.state.final_execution_outcome == SubjectTickOutcome.REVALIDATE
+    assert any(
+        checkpoint.checkpoint_id == "rt01.s03_ownership_weighted_learning_checkpoint"
+        and checkpoint.status.value == "enforced_detour"
+        for checkpoint in required.subject_tick_result.state.execution_checkpoints
+    )
+
+
+def test_dispatch_s03_freeze_obedience_consumer_requirement_is_load_bearing() -> None:
+    baseline = dispatch_runtime_tick(
+        RuntimeDispatchRequest(
+            tick_input=_tick_input("runtime-topology-s03-freeze-baseline"),
+            context=SubjectTickContext(context_shift_markers=("shift:s03-freeze",)),
+            route_class=RuntimeRouteClass.PRODUCTION_CONTOUR,
+        )
+    )
+    required = dispatch_runtime_tick(
+        RuntimeDispatchRequest(
+            tick_input=_tick_input("runtime-topology-s03-freeze-required"),
+            context=SubjectTickContext(
+                context_shift_markers=("shift:s03-freeze",),
+                require_s03_freeze_obedience_consumer=True,
+            ),
+            route_class=RuntimeRouteClass.PRODUCTION_CONTOUR,
+        )
+    )
+    assert baseline.subject_tick_result is not None
+    assert required.subject_tick_result is not None
+    assert baseline.subject_tick_result.state.final_execution_outcome == SubjectTickOutcome.CONTINUE
+    assert required.subject_tick_result.state.final_execution_outcome == SubjectTickOutcome.REVALIDATE
+    assert any(
+        checkpoint.checkpoint_id == "rt01.s03_ownership_weighted_learning_checkpoint"
+        and checkpoint.status.value == "enforced_detour"
+        for checkpoint in required.subject_tick_result.state.execution_checkpoints
+    )
+
+
+def test_dispatch_s03_positive_consumer_ready_path_has_no_detour() -> None:
+    result = dispatch_runtime_tick(
+        RuntimeDispatchRequest(
+            tick_input=_tick_input("runtime-topology-s03-positive"),
+            context=SubjectTickContext(require_s03_learning_packet_consumer=True),
+            route_class=RuntimeRouteClass.PRODUCTION_CONTOUR,
+        )
+    )
+    assert result.subject_tick_result is not None
+    checkpoint = next(
+        checkpoint
+        for checkpoint in result.subject_tick_result.state.execution_checkpoints
+        if checkpoint.checkpoint_id == "rt01.s03_ownership_weighted_learning_checkpoint"
+    )
+    assert result.subject_tick_result.state.final_execution_outcome == SubjectTickOutcome.CONTINUE
+    assert checkpoint.status.value == "allowed"
+
+
+def test_dispatch_contract_view_exposes_s03_ownership_weighted_learning_surface() -> None:
+    result = dispatch_runtime_tick(
+        RuntimeDispatchRequest(
+            tick_input=_tick_input("runtime-topology-s03-contract-view"),
+            context=SubjectTickContext(
+                require_s03_learning_packet_consumer=True,
+                require_s03_mixed_update_consumer=True,
+                require_s03_freeze_obedience_consumer=True,
+            ),
+            route_class=RuntimeRouteClass.PRODUCTION_CONTOUR,
+        )
+    )
+    view = derive_runtime_dispatch_contract_view(result)
+    assert view.s03_learning_id is not None
+    assert view.s03_latest_packet_id is not None
+    assert view.s03_latest_update_class is not None
+    assert view.s03_latest_commit_class is not None
+    assert view.s03_learning_packet_consumer_ready in {True, False}
+    assert view.s03_mixed_update_consumer_ready in {True, False}
+    assert view.s03_freeze_obedience_consumer_ready in {True, False}
+    assert view.s03_scope == "rt01_contour_only"
+    assert view.s03_scope_rt01_contour_only is True
+    assert view.s03_scope_s03_first_slice_only is True
+    assert view.s03_scope_s04_implemented is False
+    assert view.s03_scope_s05_implemented is False
+    assert view.s03_scope_repo_wide_adoption is False
+    assert view.s03_require_learning_packet_consumer is True
+    assert view.s03_require_mixed_update_consumer is True
+    assert view.s03_require_freeze_obedience_consumer is True
