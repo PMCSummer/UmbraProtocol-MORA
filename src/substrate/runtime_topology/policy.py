@@ -19,6 +19,7 @@ def build_minimal_runtime_tick_graph() -> RuntimeTickGraph:
         graph_id="rt01.minimal_runtime_tick_graph.v1",
         contour_id="rt01_subject_tick_contour",
         runtime_order=(
+            "EPISTEMICS",
             "R",
             "C01",
             "C02",
@@ -35,6 +36,17 @@ def build_minimal_runtime_tick_graph() -> RuntimeTickGraph:
             "RT01",
         ),
         nodes=(
+            RuntimeContourNode(
+                node_id="node.epistemics",
+                phase_id="EPISTEMICS",
+                authority_role="gating",
+                computational_role="grounded_classifier",
+                surfaces=(
+                    "epistemics.grounded_unit",
+                    "epistemics.downstream_allowance",
+                ),
+                checkpoint_ids=("rt01.epistemic_admission_checkpoint",),
+            ),
             RuntimeContourNode(
                 node_id="node.r04",
                 phase_id="R04",
@@ -217,6 +229,7 @@ def build_minimal_runtime_tick_graph() -> RuntimeTickGraph:
                 authority_role="gating",
                 computational_role="execution_spine",
                 surfaces=(
+                    "rt01.epistemic_admission_checkpoint",
                     "rt01.downstream_obedience_checkpoint",
                     "rt01.world_seam_checkpoint",
                     "rt01.world_entry_checkpoint",
@@ -233,6 +246,7 @@ def build_minimal_runtime_tick_graph() -> RuntimeTickGraph:
                     "rt01.outcome_resolution_checkpoint",
                 ),
                 checkpoint_ids=(
+                    "rt01.epistemic_admission_checkpoint",
                     "rt01.downstream_obedience_checkpoint",
                     "rt01.world_seam_checkpoint",
                     "rt01.world_entry_checkpoint",
@@ -259,6 +273,7 @@ def build_minimal_runtime_tick_graph() -> RuntimeTickGraph:
             ),
         ),
         edges=(
+            RuntimeContourEdge(source_phase="EPISTEMICS", target_phase="R04", relation="gates"),
             RuntimeContourEdge(source_phase="R04", target_phase="C04", relation="overrides_survival"),
             RuntimeContourEdge(source_phase="R04", target_phase="RT01", relation="modulates"),
             RuntimeContourEdge(source_phase="C04", target_phase="RT01", relation="arbitrates"),
@@ -299,6 +314,7 @@ def build_minimal_runtime_tick_graph() -> RuntimeTickGraph:
             RuntimeContourEdge(source_phase="RT01", target_phase="F01", relation="persists_via_f01"),
         ),
         mandatory_checkpoint_ids=(
+            "rt01.epistemic_admission_checkpoint",
             "rt01.c04_mode_binding",
             "rt01.c05_legality_checkpoint",
             "rt01.downstream_obedience_checkpoint",
@@ -319,6 +335,8 @@ def build_minimal_runtime_tick_graph() -> RuntimeTickGraph:
             "rt01.outcome_resolution_checkpoint",
         ),
         source_of_truth_surfaces=(
+            "epistemics.grounded_unit",
+            "epistemics.downstream_allowance",
             "runtime_state.domains",
             "rt01.downstream_obedience_checkpoint",
             "world_adapter.state",

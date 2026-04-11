@@ -4,6 +4,18 @@ from dataclasses import replace
 from typing import Iterable
 
 from substrate.a_line_normalization import build_a_line_normalization
+from substrate.epistemics import (
+    ClaimPolarity,
+    ConfidenceLevel,
+    EpistemicUnit,
+    GroundingContext,
+    InputMaterial,
+    ModalityClass,
+    SourceClass,
+    SourceMetadata,
+    evaluate_downstream_allowance,
+    ground_epistemic_input,
+)
 from substrate.m_minimal import build_m_minimal
 from substrate.n_minimal import build_n_minimal
 from substrate.t01_semantic_field import (
@@ -148,6 +160,7 @@ from substrate.world_entry_contract import build_world_entry_contract
 
 
 ATTEMPTED_SUBJECT_TICK_PATHS: tuple[str, ...] = (
+    "subject_tick.evaluate_epistemic_admission",
     "subject_tick.run_regulation_stack",
     "subject_tick.run_c01_stream_kernel",
     "subject_tick.run_c02_tension_scheduler",
@@ -230,6 +243,39 @@ def execute_subject_tick(
     c05_computational_role = computational_roles["C05"].value
     d01_computational_role = computational_roles["D01"].value
     rt01_computational_role = computational_roles["RT01"].value
+
+    epistemic = ground_epistemic_input(
+        InputMaterial(
+            material_id=f"{tick_id}-epistemic-material",
+            content=tick_input.epistemic_content or f"runtime_tick:{tick_input.case_id}",
+        ),
+        SourceMetadata(
+            source_id=tick_input.epistemic_source_id or f"subject_tick:{tick_input.case_id}",
+            source_class=_resolve_epistemic_source_class(tick_input.epistemic_source_class),
+            modality=_resolve_epistemic_modality_class(tick_input.epistemic_modality),
+            confidence_hint=_resolve_epistemic_confidence_level(
+                tick_input.epistemic_confidence_hint
+            ),
+            support_note=tick_input.epistemic_support_note,
+            contestation_note=tick_input.epistemic_contestation_note,
+            claim_key=tick_input.epistemic_claim_key,
+            claim_polarity=_resolve_epistemic_claim_polarity(
+                tick_input.epistemic_claim_polarity
+            ),
+        ),
+        context=GroundingContext(
+            existing_units=_coerce_epistemic_units(context.prior_epistemic_units),
+            require_observation=context.require_epistemic_observation,
+        ),
+    )
+    epistemic_allowance = evaluate_downstream_allowance(
+        epistemic.unit,
+        require_observation=context.require_epistemic_observation,
+    )
+    epistemic_admission_allowed = (
+        context.disable_epistemic_admission_enforcement
+        or not epistemic_allowance.should_abstain
+    )
 
     regulation = update_regulation_state(
         (
@@ -324,7 +370,8 @@ def execute_subject_tick(
     preference_gate = evaluate_preference_downstream_gate(preferences)
     viability_gate = evaluate_viability_downstream_gate(viability)
     r_gate_accepted = (
-        regulation_gate.allowed
+        epistemic_admission_allowed
+        and regulation_gate.allowed
         and bool(affordance_gate.accepted_candidate_ids)
         and preference_gate.accepted
     )
@@ -555,6 +602,34 @@ def execute_subject_tick(
         )
 
     revalidation_modes = {"revalidate_mode_hold", "revalidate_revisit_basis", "revalidate_scope"}
+    epistemic_checkpoint_status = SubjectTickCheckpointStatus.ALLOWED
+    epistemic_checkpoint_reason = epistemic_allowance.reason
+    if not context.disable_epistemic_admission_enforcement:
+        if epistemic_allowance.should_abstain:
+            epistemic_checkpoint_status = SubjectTickCheckpointStatus.ENFORCED_DETOUR
+            revalidation_needed = True
+            if halt_reason is None and active_execution_mode != "halt_execution":
+                active_execution_mode = "revalidate_scope"
+            epistemic_checkpoint_reason = (
+                "epistemic admission marked abstain/unknown/conflict; revalidation detour enforced"
+            )
+    else:
+        epistemic_checkpoint_status = SubjectTickCheckpointStatus.ENFORCED_DETOUR
+        epistemic_checkpoint_reason = (
+            "epistemic admission enforcement disabled in ablation context"
+        )
+    checkpoints.append(
+        SubjectTickCheckpointResult(
+            checkpoint_id="rt01.epistemic_admission_checkpoint",
+            source_contract="epistemics.downstream_allowance",
+            status=epistemic_checkpoint_status,
+            required_action=(
+                "consume_epistemic_allowance_and_preserve_abstain_unknown_conflict_markers"
+            ),
+            applied_action=f"{epistemic_allowance.claim_strength}:{active_execution_mode}",
+            reason=epistemic_checkpoint_reason,
+        )
+    )
     if d01_authority_role != SubjectTickAuthorityRole.OBSERVABILITY_ONLY.value:
         repair_needed = True
         if halt_reason is None and active_execution_mode not in revalidation_modes:
@@ -750,6 +825,8 @@ def execute_subject_tick(
 
     if not context.disable_gate_application:
         gate_reasons: list[str] = []
+        if not epistemic_admission_allowed:
+            gate_reasons.append("epistemic_admission_blocked")
         if c05_enforcement_authority and c05_validity_action == "halt_reuse_and_rebuild_scope" and halt_reason is None:
             halt_reason = "c05_halt_reuse_and_rebuild_scope"
             gate_reasons.append("c05_halt_reuse_action")
@@ -1904,6 +1981,10 @@ def execute_subject_tick(
     r_restrictions = tuple(
         dict.fromkeys(
             (
+                *epistemic_allowance.restrictions,
+                "epistemic_should_abstain"
+                if epistemic_allowance.should_abstain
+                else "epistemic_admission_allowed",
                 *regulation_gate.applied_restrictions,
                 *affordance_gate.restrictions,
                 *preference_gate.restrictions,
@@ -1920,9 +2001,9 @@ def execute_subject_tick(
             execution_mode="r_update_ready",
             restrictions=r_restrictions,
             reason=(
-                "regulation/affordance/preference/viability stack produced typed upstream basis"
+                "epistemic admission and regulation/affordance/preference/viability stack produced typed upstream basis"
                 if r_gate_accepted
-                else "r-stack gate degraded; downstream continuation must be repaired"
+                else "epistemic and/or r-stack gate degraded; downstream continuation must be repaired"
             ),
         ),
         _phase_step(
@@ -1990,8 +2071,34 @@ def execute_subject_tick(
         role_map_ready=role_map_ready,
         role_frontier_typed=role_frontier_typed,
         active_execution_mode=active_execution_mode,
+        epistemic_unit_id=epistemic.unit.unit_id,
+        epistemic_status=epistemic.unit.status.value,
+        epistemic_confidence=epistemic.unit.confidence.value,
+        epistemic_source_class=epistemic.unit.source_class.value,
+        epistemic_modality=epistemic.unit.modality.value,
+        epistemic_classification_basis=epistemic.unit.classification_basis,
+        epistemic_can_treat_as_observation=epistemic_allowance.can_treat_as_observation,
+        epistemic_should_abstain=epistemic_allowance.should_abstain,
+        epistemic_claim_strength=epistemic_allowance.claim_strength,
+        epistemic_allowance_restrictions=epistemic_allowance.restrictions,
+        epistemic_allowance_reason=epistemic_allowance.reason,
+        epistemic_unknown_reason=(
+            None if epistemic.unit.unknown is None else epistemic.unit.unknown.reason
+        ),
+        epistemic_conflict_reason=(
+            None if epistemic.unit.conflict is None else epistemic.unit.conflict.reason
+        ),
+        epistemic_abstain_reason=(
+            None if epistemic.unit.abstention is None else epistemic.unit.abstention.reason
+        ),
         c04_selected_mode=mode_arbitration.state.active_mode.value,
         c05_validity_action=c05_validity_action,
+        regulation_pressure_level=viability.state.pressure_level,
+        regulation_escalation_stage=viability.state.escalation_stage.value,
+        regulation_override_scope=viability.state.override_scope.value,
+        regulation_no_strong_override_claim=viability.state.no_strong_override_claim,
+        regulation_gate_accepted=viability.downstream_gate.accepted,
+        regulation_source_state_ref=viability.state.input_regulation_snapshot_ref,
         downstream_obedience_status=obedience_decision.status.value,
         downstream_obedience_fallback=obedience_decision.fallback.value,
         downstream_obedience_source_of_truth_surface=obedience_decision.source_of_truth_surface,
@@ -2503,6 +2610,7 @@ def execute_subject_tick(
         state=state,
         downstream_gate=gate,
         telemetry=telemetry,
+        epistemic_result=epistemic,
         regulation_result=regulation,
         affordance_result=affordances,
         preference_result=preferences,
@@ -2830,6 +2938,50 @@ def _phase_step(
         restrictions=restrictions,
         reason=reason,
     )
+
+
+def _resolve_epistemic_source_class(token: str | None) -> SourceClass:
+    normalized = str(token or "").strip()
+    if not normalized:
+        return SourceClass.REPORTER
+    try:
+        return SourceClass(normalized)
+    except ValueError:
+        return SourceClass.UNKNOWN
+
+
+def _resolve_epistemic_modality_class(token: str | None) -> ModalityClass:
+    normalized = str(token or "").strip()
+    if not normalized:
+        return ModalityClass.USER_TEXT
+    try:
+        return ModalityClass(normalized)
+    except ValueError:
+        return ModalityClass.UNSPECIFIED
+
+
+def _resolve_epistemic_confidence_level(token: str | None) -> ConfidenceLevel | None:
+    normalized = str(token or "").strip()
+    if not normalized:
+        return None
+    try:
+        return ConfidenceLevel(normalized)
+    except ValueError:
+        return None
+
+
+def _resolve_epistemic_claim_polarity(token: str | None) -> ClaimPolarity:
+    normalized = str(token or "").strip()
+    if not normalized:
+        return ClaimPolarity.UNSPECIFIED
+    try:
+        return ClaimPolarity(normalized)
+    except ValueError:
+        return ClaimPolarity.UNSPECIFIED
+
+
+def _coerce_epistemic_units(units: tuple[EpistemicUnit, ...]) -> tuple[EpistemicUnit, ...]:
+    return tuple(unit for unit in units if isinstance(unit, EpistemicUnit))
 
 
 def _union_unique(*chunks: Iterable[str]) -> tuple[str, ...]:

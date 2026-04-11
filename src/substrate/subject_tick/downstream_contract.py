@@ -29,8 +29,28 @@ class SubjectTickContractView:
     role_map_ready: bool
     role_frontier_typed: bool
     active_execution_mode: str
+    epistemic_unit_id: str
+    epistemic_status: str
+    epistemic_confidence: str
+    epistemic_source_class: str
+    epistemic_modality: str
+    epistemic_classification_basis: str
+    epistemic_can_treat_as_observation: bool
+    epistemic_should_abstain: bool
+    epistemic_claim_strength: str
+    epistemic_allowance_restrictions: tuple[str, ...]
+    epistemic_allowance_reason: str
+    epistemic_unknown_reason: str | None
+    epistemic_conflict_reason: str | None
+    epistemic_abstain_reason: str | None
     c04_selected_mode: str
     c05_validity_action: str
+    regulation_pressure_level: float
+    regulation_escalation_stage: str
+    regulation_override_scope: str
+    regulation_no_strong_override_claim: bool
+    regulation_gate_accepted: bool
+    regulation_source_state_ref: str
     downstream_obedience_status: str
     downstream_obedience_fallback: str
     downstream_obedience_source_of_truth_surface: str
@@ -422,7 +442,11 @@ class SubjectTickContractView:
 @dataclass(frozen=True, slots=True)
 class SubjectTickRuntimeDomainContractView:
     regulation_pressure_level: float | None
+    regulation_escalation_stage: str | None
     regulation_override_scope: str | None
+    regulation_no_strong_override_claim: bool
+    regulation_gate_accepted: bool
+    regulation_source_state_ref: str | None
     continuity_mode_claim: str | None
     continuity_mode_legitimacy: bool
     validity_action_claim: str | None
@@ -469,8 +493,28 @@ def derive_subject_tick_contract_view(
         role_map_ready=state.role_map_ready,
         role_frontier_typed=state.role_frontier_typed,
         active_execution_mode=state.active_execution_mode,
+        epistemic_unit_id=state.epistemic_unit_id,
+        epistemic_status=state.epistemic_status,
+        epistemic_confidence=state.epistemic_confidence,
+        epistemic_source_class=state.epistemic_source_class,
+        epistemic_modality=state.epistemic_modality,
+        epistemic_classification_basis=state.epistemic_classification_basis,
+        epistemic_can_treat_as_observation=state.epistemic_can_treat_as_observation,
+        epistemic_should_abstain=state.epistemic_should_abstain,
+        epistemic_claim_strength=state.epistemic_claim_strength,
+        epistemic_allowance_restrictions=state.epistemic_allowance_restrictions,
+        epistemic_allowance_reason=state.epistemic_allowance_reason,
+        epistemic_unknown_reason=state.epistemic_unknown_reason,
+        epistemic_conflict_reason=state.epistemic_conflict_reason,
+        epistemic_abstain_reason=state.epistemic_abstain_reason,
         c04_selected_mode=state.c04_selected_mode,
         c05_validity_action=state.c05_validity_action,
+        regulation_pressure_level=state.regulation_pressure_level,
+        regulation_escalation_stage=state.regulation_escalation_stage,
+        regulation_override_scope=state.regulation_override_scope,
+        regulation_no_strong_override_claim=state.regulation_no_strong_override_claim,
+        regulation_gate_accepted=state.regulation_gate_accepted,
+        regulation_source_state_ref=state.regulation_source_state_ref,
         downstream_obedience_status=state.downstream_obedience_status,
         downstream_obedience_fallback=state.downstream_obedience_fallback,
         downstream_obedience_source_of_truth_surface=state.downstream_obedience_source_of_truth_surface,
@@ -1125,7 +1169,11 @@ def derive_subject_tick_runtime_domain_contract_view(
 
     return SubjectTickRuntimeDomainContractView(
         regulation_pressure_level=regulation.pressure_level,
+        regulation_escalation_stage=regulation.escalation_stage,
         regulation_override_scope=regulation.override_scope,
+        regulation_no_strong_override_claim=regulation.no_strong_override_claim,
+        regulation_gate_accepted=regulation.gate_accepted,
+        regulation_source_state_ref=regulation.source_state_ref,
         continuity_mode_claim=continuity.c04_mode_claim,
         continuity_mode_legitimacy=continuity.mode_legitimacy,
         validity_action_claim=validity.c05_action_claim,

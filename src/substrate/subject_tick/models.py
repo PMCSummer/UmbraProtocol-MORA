@@ -6,6 +6,7 @@ from enum import Enum, StrEnum
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
+    from substrate.epistemics import EpistemicResult, EpistemicUnit
     from substrate.s03_ownership_weighted_learning import (
         S03OwnershipWeightedLearningResult,
         S03OwnershipWeightedLearningState,
@@ -189,6 +190,15 @@ class SubjectTickInput:
     cognitive: float
     safety: float
     unresolved_preference: bool = False
+    epistemic_content: str | None = None
+    epistemic_source_id: str | None = None
+    epistemic_source_class: str | None = None
+    epistemic_modality: str | None = None
+    epistemic_confidence_hint: str | None = None
+    epistemic_support_note: str | None = None
+    epistemic_contestation_note: str | None = None
+    epistemic_claim_key: str | None = None
+    epistemic_claim_polarity: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -220,6 +230,9 @@ class SubjectTickContext:
     disable_c04_mode_execution_binding: bool = False
     disable_c05_validity_enforcement: bool = False
     disable_downstream_obedience_enforcement: bool = False
+    prior_epistemic_units: tuple[EpistemicUnit, ...] = ()
+    require_epistemic_observation: bool = False
+    disable_epistemic_admission_enforcement: bool = False
     phase_authority_roles: dict[str, str] = field(default_factory=dict)
     phase_computational_roles: dict[str, str] = field(default_factory=dict)
     role_map_source: SubjectTickRoleMapSource | None = None
@@ -317,8 +330,28 @@ class SubjectTickState:
     role_map_ready: bool
     role_frontier_typed: bool
     active_execution_mode: str
+    epistemic_unit_id: str
+    epistemic_status: str
+    epistemic_confidence: str
+    epistemic_source_class: str
+    epistemic_modality: str
+    epistemic_classification_basis: str
+    epistemic_can_treat_as_observation: bool
+    epistemic_should_abstain: bool
+    epistemic_claim_strength: str
+    epistemic_allowance_restrictions: tuple[str, ...]
+    epistemic_allowance_reason: str
+    epistemic_unknown_reason: str | None
+    epistemic_conflict_reason: str | None
+    epistemic_abstain_reason: str | None
     c04_selected_mode: str
     c05_validity_action: str
+    regulation_pressure_level: float
+    regulation_escalation_stage: str
+    regulation_override_scope: str
+    regulation_no_strong_override_claim: bool
+    regulation_gate_accepted: bool
+    regulation_source_state_ref: str
     downstream_obedience_status: str
     downstream_obedience_fallback: str
     downstream_obedience_source_of_truth_surface: str
@@ -990,6 +1023,7 @@ class SubjectTickResult:
     state: SubjectTickState
     downstream_gate: SubjectTickGateDecision
     telemetry: SubjectTickTelemetry
+    epistemic_result: EpistemicResult
     regulation_result: object
     affordance_result: object
     preference_result: object

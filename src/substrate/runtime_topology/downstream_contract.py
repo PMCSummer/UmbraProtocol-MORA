@@ -17,6 +17,23 @@ class RuntimeDispatchContractView:
     source_of_truth_surfaces: tuple[str, ...]
     mandatory_checkpoints: tuple[str, ...]
     restrictions: tuple[str, ...]
+    epistemic_status: str | None
+    epistemic_confidence: str | None
+    epistemic_source_class: str | None
+    epistemic_modality: str | None
+    epistemic_should_abstain: bool | None
+    epistemic_claim_strength: str | None
+    epistemic_allowance_restrictions: tuple[str, ...] | None
+    epistemic_allowance_reason: str | None
+    epistemic_unknown_reason: str | None
+    epistemic_conflict_reason: str | None
+    epistemic_abstain_reason: str | None
+    regulation_pressure_level: float | None
+    regulation_escalation_stage: str | None
+    regulation_override_scope: str | None
+    regulation_no_strong_override_claim: bool | None
+    regulation_gate_accepted: bool | None
+    regulation_source_state_ref: str | None
     final_execution_outcome: str | None
     downstream_obedience_status: str | None
     world_link_status: str | None
@@ -299,6 +316,35 @@ def derive_runtime_dispatch_contract_view(
         source_of_truth_surfaces=result.tick_graph.source_of_truth_surfaces,
         mandatory_checkpoints=result.tick_graph.mandatory_checkpoint_ids,
         restrictions=tuple(item.value for item in result.decision.restrictions),
+        epistemic_status=(None if state is None else state.epistemic_status),
+        epistemic_confidence=(None if state is None else state.epistemic_confidence),
+        epistemic_source_class=(None if state is None else state.epistemic_source_class),
+        epistemic_modality=(None if state is None else state.epistemic_modality),
+        epistemic_should_abstain=(None if state is None else state.epistemic_should_abstain),
+        epistemic_claim_strength=(None if state is None else state.epistemic_claim_strength),
+        epistemic_allowance_restrictions=(
+            None if state is None else state.epistemic_allowance_restrictions
+        ),
+        epistemic_allowance_reason=(
+            None if state is None else state.epistemic_allowance_reason
+        ),
+        epistemic_unknown_reason=(None if state is None else state.epistemic_unknown_reason),
+        epistemic_conflict_reason=(
+            None if state is None else state.epistemic_conflict_reason
+        ),
+        epistemic_abstain_reason=(None if state is None else state.epistemic_abstain_reason),
+        regulation_pressure_level=(None if state is None else state.regulation_pressure_level),
+        regulation_escalation_stage=(
+            None if state is None else state.regulation_escalation_stage
+        ),
+        regulation_override_scope=(None if state is None else state.regulation_override_scope),
+        regulation_no_strong_override_claim=(
+            None if state is None else state.regulation_no_strong_override_claim
+        ),
+        regulation_gate_accepted=(None if state is None else state.regulation_gate_accepted),
+        regulation_source_state_ref=(
+            None if state is None else state.regulation_source_state_ref
+        ),
         final_execution_outcome=(
             None if state is None else state.final_execution_outcome.value
         ),

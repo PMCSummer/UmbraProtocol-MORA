@@ -101,6 +101,7 @@ def test_runtime_topology_bundle_and_graph_are_materialized() -> None:
         "domains.validity",
     )
     assert graph.runtime_order == (
+        "EPISTEMICS",
         "R",
         "C01",
         "C02",
@@ -116,6 +117,7 @@ def test_runtime_topology_bundle_and_graph_are_materialized() -> None:
         "T04",
         "RT01",
     )
+    assert "rt01.epistemic_admission_checkpoint" in graph.mandatory_checkpoint_ids
     assert "rt01.downstream_obedience_checkpoint" in graph.mandatory_checkpoint_ids
     assert "rt01.world_seam_checkpoint" in graph.mandatory_checkpoint_ids
     assert "rt01.world_entry_checkpoint" in graph.mandatory_checkpoint_ids
@@ -131,6 +133,8 @@ def test_runtime_topology_bundle_and_graph_are_materialized() -> None:
     assert "rt01.t02_raw_vs_propagated_integrity_checkpoint" in graph.mandatory_checkpoint_ids
     assert "rt01.t03_hypothesis_competition_checkpoint" in graph.mandatory_checkpoint_ids
     assert "rt01.t04_attention_schema_checkpoint" in graph.mandatory_checkpoint_ids
+    assert "epistemics.grounded_unit" in graph.source_of_truth_surfaces
+    assert "epistemics.downstream_allowance" in graph.source_of_truth_surfaces
     assert "world_adapter.state" in graph.source_of_truth_surfaces
     assert "world_entry_contract.episode" in graph.source_of_truth_surfaces
     assert "s_minimal_contour.boundary_state" in graph.source_of_truth_surfaces
