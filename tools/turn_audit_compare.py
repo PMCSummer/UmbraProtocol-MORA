@@ -256,6 +256,10 @@ def _compare_phase_map(
     return out
 
 
+def _changed_rows(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    return [row for row in rows if isinstance(row, dict) and row.get("changed") is True]
+
+
 def _artifact_is_structurally_incomplete(artifact: dict[str, Any] | None) -> bool:
     if artifact is None:
         return True
@@ -417,7 +421,7 @@ def build_comparison_artifact(
         ],
     }
 
-    regulation_differences = {
+    regulation_signal_differences = {
         "changed_fields": [
             _changed("phase_surfaces.regulation.regulation_override_scope", baseline, perturbation),
             _changed(
@@ -428,6 +432,78 @@ def build_comparison_artifact(
             _changed("phase_surfaces.regulation.regulation_gate_accepted", baseline, perturbation),
             _changed("phase_surfaces.regulation.regulation_pressure_level", baseline, perturbation),
             _changed("phase_surfaces.regulation.regulation_escalation_stage", baseline, perturbation),
+        ],
+    }
+    regulation_observability_differences = {
+        "changed_fields": [
+            _changed(
+                "phase_surfaces.regulation.effective_regulation_shared_domain_source_surface",
+                baseline,
+                perturbation,
+            ),
+            _changed(
+                "phase_surfaces.regulation.effective_shared_runtime_domain_checkpoint_status",
+                baseline,
+                perturbation,
+            ),
+            _changed(
+                "phase_surfaces.regulation.effective_shared_runtime_domain_checkpoint_applied_action",
+                baseline,
+                perturbation,
+            ),
+            _changed(
+                "phase_surfaces.regulation.effective_regulation_path_consequence",
+                baseline,
+                perturbation,
+            ),
+            _changed(
+                "phase_surfaces.regulation.effective_regulation_causal_reason",
+                baseline,
+                perturbation,
+            ),
+            _changed(
+                "phase_surfaces.regulation.effective_regulation_influence_source",
+                baseline,
+                perturbation,
+            ),
+            _changed(
+                "phase_surfaces.regulation.effective_regulation_restriction_source",
+                baseline,
+                perturbation,
+            ),
+        ],
+    }
+    regulation_load_bearing_consequences = {
+        "changed_fields": [
+            _changed(
+                "checkpoints.shared_runtime_domain_checkpoint.status",
+                baseline,
+                perturbation,
+            ),
+            _changed(
+                "checkpoints.shared_runtime_domain_checkpoint.applied_action",
+                baseline,
+                perturbation,
+            ),
+            _changed(
+                "phase_surfaces.regulation.effective_regulation_path_consequence",
+                baseline,
+                perturbation,
+            ),
+            _list_changed(
+                "restrictions_and_forbidden_shortcuts.regulation_gate_restrictions",
+                baseline,
+                perturbation,
+            ),
+            _changed("final_outcome.active_execution_mode", baseline, perturbation),
+            _changed("final_outcome.final_execution_outcome", baseline, perturbation),
+            _changed("final_outcome.execution_stance", baseline, perturbation),
+        ],
+    }
+    regulation_differences = {
+        "changed_fields": [
+            *regulation_signal_differences["changed_fields"],
+            *regulation_observability_differences["changed_fields"],
             _changed(
                 "checkpoints.shared_runtime_domain_checkpoint.status",
                 baseline,
@@ -538,21 +614,32 @@ def build_comparison_artifact(
             perturbation,
         )["changed"]
     )
-    signal_regulation_override_scope_changed = _changed(
-        "phase_surfaces.regulation.regulation_override_scope", baseline, perturbation
-    )["changed"]
-    signal_regulation_no_strong_override_changed = _changed(
-        "phase_surfaces.regulation.regulation_no_strong_override_claim", baseline, perturbation
-    )["changed"]
-    signal_regulation_gate_changed = _changed(
-        "phase_surfaces.regulation.regulation_gate_accepted", baseline, perturbation
-    )["changed"]
-    signal_regulation_pressure_changed = _changed(
-        "phase_surfaces.regulation.regulation_pressure_level", baseline, perturbation
-    )["changed"]
-    signal_regulation_escalation_changed = _changed(
-        "phase_surfaces.regulation.regulation_escalation_stage", baseline, perturbation
-    )["changed"]
+    signal_regulation_override_scope_changed = regulation_signal_differences["changed_fields"][0]["changed"]
+    signal_regulation_no_strong_override_changed = regulation_signal_differences["changed_fields"][1]["changed"]
+    signal_regulation_gate_changed = regulation_signal_differences["changed_fields"][2]["changed"]
+    signal_regulation_pressure_changed = regulation_signal_differences["changed_fields"][3]["changed"]
+    signal_regulation_escalation_changed = regulation_signal_differences["changed_fields"][4]["changed"]
+    signal_effective_regulation_shared_source_changed = (
+        regulation_observability_differences["changed_fields"][0]["changed"]
+    )
+    signal_effective_shared_checkpoint_status_changed = (
+        regulation_observability_differences["changed_fields"][1]["changed"]
+    )
+    signal_effective_shared_checkpoint_action_changed = (
+        regulation_observability_differences["changed_fields"][2]["changed"]
+    )
+    signal_effective_regulation_path_consequence_changed = (
+        regulation_observability_differences["changed_fields"][3]["changed"]
+    )
+    signal_effective_regulation_causal_reason_changed = (
+        regulation_observability_differences["changed_fields"][4]["changed"]
+    )
+    signal_effective_regulation_influence_source_changed = (
+        regulation_observability_differences["changed_fields"][5]["changed"]
+    )
+    signal_effective_regulation_restriction_source_changed = (
+        regulation_observability_differences["changed_fields"][6]["changed"]
+    )
     signal_shared_runtime_checkpoint_changed = (
         _changed("checkpoints.shared_runtime_domain_checkpoint.status", baseline, perturbation)["changed"]
         or _changed(
@@ -561,11 +648,7 @@ def build_comparison_artifact(
             perturbation,
         )["changed"]
     )
-    signal_regulation_gate_restrictions_changed = _list_changed(
-        "restrictions_and_forbidden_shortcuts.regulation_gate_restrictions",
-        baseline,
-        perturbation,
-    )["changed"]
+    signal_regulation_gate_restrictions_changed = regulation_load_bearing_consequences["changed_fields"][3]["changed"]
     signal_checkpoint_consequence_changed = (
         _list_changed("checkpoints.blocked_checkpoint_ids", baseline, perturbation)["changed"]
         or _list_changed("checkpoints.enforced_detour_checkpoint_ids", baseline, perturbation)["changed"]
@@ -599,6 +682,17 @@ def build_comparison_artifact(
             signal_regulation_escalation_changed,
         )
     )
+    regulation_observability_changed = any(
+        (
+            signal_effective_regulation_shared_source_changed,
+            signal_effective_shared_checkpoint_status_changed,
+            signal_effective_shared_checkpoint_action_changed,
+            signal_effective_regulation_path_consequence_changed,
+            signal_effective_regulation_causal_reason_changed,
+            signal_effective_regulation_influence_source_changed,
+            signal_effective_regulation_restriction_source_changed,
+        )
+    )
     regulation_signal_changed = any(
         (
             regulation_surface_signal_changed,
@@ -606,7 +700,8 @@ def build_comparison_artifact(
             signal_regulation_gate_restrictions_changed,
         )
     )
-    epistemic_or_regulation_changed = epistemic_signal_changed or regulation_signal_changed
+    regulation_causal_surface_changed = regulation_signal_changed or regulation_observability_changed
+    epistemic_or_regulation_changed = epistemic_signal_changed or regulation_causal_surface_changed
 
     epistemic_load_bearing_consequence_changed = any(
         (
@@ -618,10 +713,16 @@ def build_comparison_artifact(
             signal_stance_changed,
         )
     )
-    regulation_load_bearing_consequence_changed = any(
+    regulation_direct_consequence_changed = any(
         (
             signal_shared_runtime_checkpoint_changed,
+            signal_effective_regulation_path_consequence_changed,
             signal_regulation_gate_restrictions_changed,
+        )
+    )
+    regulation_load_bearing_consequence_changed = any(
+        (
+            regulation_direct_consequence_changed,
             signal_checkpoint_consequence_changed,
             signal_restriction_envelope_changed,
             signal_mode_changed,
@@ -633,8 +734,36 @@ def build_comparison_artifact(
         epistemic_signal_changed and epistemic_load_bearing_consequence_changed
     )
     regulation_path_affecting_confirmed = (
-        regulation_signal_changed and regulation_load_bearing_consequence_changed
+        regulation_causal_surface_changed
+        and regulation_load_bearing_consequence_changed
+        and (regulation_direct_consequence_changed or regulation_signal_changed)
     )
+
+    regulation_signal_changed_rows = _changed_rows(regulation_signal_differences["changed_fields"])
+    regulation_observability_changed_rows = _changed_rows(
+        regulation_observability_differences["changed_fields"]
+    )
+    regulation_load_bearing_changed_rows = _changed_rows(
+        regulation_load_bearing_consequences["changed_fields"]
+    )
+
+    regulation_path_affecting_support = {
+        "regulation_signal_changed": regulation_signal_changed,
+        "regulation_observability_changed": regulation_observability_changed,
+        "regulation_causal_surface_changed": regulation_causal_surface_changed,
+        "regulation_direct_consequence_changed": regulation_direct_consequence_changed,
+        "regulation_load_bearing_consequence_changed": regulation_load_bearing_consequence_changed,
+        "regulation_path_affecting_confirmed": regulation_path_affecting_confirmed,
+        "regulation_signal_changed_field_paths": [
+            row["field_path"] for row in regulation_signal_changed_rows
+        ],
+        "regulation_observability_changed_field_paths": [
+            row["field_path"] for row in regulation_observability_changed_rows
+        ],
+        "regulation_load_bearing_consequence_field_paths": [
+            row["field_path"] for row in regulation_load_bearing_changed_rows
+        ],
+    }
 
     primary_causal_signals: list[str] = []
     if signal_epistemic_checkpoint_changed:
@@ -660,8 +789,71 @@ def build_comparison_artifact(
     non_load_bearing_differences: list[str] = []
     if epistemic_signal_changed and not epistemic_load_bearing_consequence_changed:
         non_load_bearing_differences.append("epistemic_surface_only")
-    if regulation_signal_changed and not regulation_load_bearing_consequence_changed:
-        non_load_bearing_differences.append("regulation_surface_only")
+    if regulation_causal_surface_changed and not regulation_load_bearing_consequence_changed:
+        if regulation_observability_changed and not regulation_signal_changed:
+            non_load_bearing_differences.append("regulation_observability_only")
+        elif regulation_signal_changed and not regulation_observability_changed:
+            non_load_bearing_differences.append("regulation_signal_only")
+        else:
+            non_load_bearing_differences.append("regulation_signal_and_observability_without_consequence")
+
+    observability_paths = (
+        "phase_surfaces.regulation.effective_regulation_shared_domain_source_surface",
+        "phase_surfaces.regulation.effective_shared_runtime_domain_checkpoint_status",
+        "phase_surfaces.regulation.effective_shared_runtime_domain_checkpoint_applied_action",
+        "phase_surfaces.regulation.effective_regulation_path_consequence",
+        "phase_surfaces.regulation.effective_regulation_causal_reason",
+        "phase_surfaces.regulation.effective_regulation_influence_source",
+        "phase_surfaces.regulation.effective_regulation_restriction_source",
+    )
+    missing_observability_fields: list[str] = []
+    for path in observability_paths:
+        if _get(baseline, path) == UNRESOLVED_TOKEN or _get(perturbation, path) == UNRESOLVED_TOKEN:
+            missing_observability_fields.append(path)
+    if missing_observability_fields:
+        unresolved.append(
+            _unresolved_entry(
+                code="REGULATION_OBSERVABILITY_FIELDS_PARTIALLY_EXPOSED",
+                message=(
+                    "one or more regulation observability fields are missing in baseline or perturbation artifact: "
+                    + ", ".join(missing_observability_fields)
+                ),
+                blocking_surface="phase_surfaces.regulation.effective_*",
+                severity="low",
+                impacted_sections=[
+                    "regulation_observability_differences",
+                    "regulation_path_affecting_support",
+                    "path_affecting_assessment",
+                ],
+                requires_non_v1_extension=False,
+            )
+        )
+    baseline_regulation_gate_restrictions = _get(
+        baseline,
+        "restrictions_and_forbidden_shortcuts.regulation_gate_restrictions",
+    )
+    perturbation_regulation_gate_restrictions = _get(
+        perturbation,
+        "restrictions_and_forbidden_shortcuts.regulation_gate_restrictions",
+    )
+    if (
+        baseline_regulation_gate_restrictions == UNRESOLVED_TOKEN
+        or perturbation_regulation_gate_restrictions == UNRESOLVED_TOKEN
+    ):
+        unresolved.append(
+            _unresolved_entry(
+                code="REGULATION_GATE_RESTRICTIONS_UNRESOLVED_IN_COMPARISON_INPUT",
+                message="regulation_gate_restrictions is unresolved in baseline or perturbation artifact",
+                blocking_surface="restrictions_and_forbidden_shortcuts.regulation_gate_restrictions",
+                severity="low",
+                impacted_sections=[
+                    "restriction_differences",
+                    "regulation_load_bearing_consequences",
+                    "regulation_path_affecting_support",
+                ],
+                requires_non_v1_extension=False,
+            )
+        )
 
     if not signal_mode_available:
         unresolved.append(
@@ -720,9 +912,19 @@ def build_comparison_artifact(
         "regulation_gate_accepted_changed": signal_regulation_gate_changed,
         "regulation_pressure_level_changed": signal_regulation_pressure_changed,
         "regulation_escalation_stage_changed": signal_regulation_escalation_changed,
+        "regulation_observability_changed": regulation_observability_changed,
+        "regulation_causal_surface_changed": regulation_causal_surface_changed,
+        "effective_regulation_shared_source_changed": signal_effective_regulation_shared_source_changed,
+        "effective_shared_runtime_domain_checkpoint_status_changed": signal_effective_shared_checkpoint_status_changed,
+        "effective_shared_runtime_domain_checkpoint_applied_action_changed": signal_effective_shared_checkpoint_action_changed,
+        "effective_regulation_path_consequence_changed": signal_effective_regulation_path_consequence_changed,
+        "effective_regulation_causal_reason_changed": signal_effective_regulation_causal_reason_changed,
+        "effective_regulation_influence_source_changed": signal_effective_regulation_influence_source_changed,
+        "effective_regulation_restriction_source_changed": signal_effective_regulation_restriction_source_changed,
         "shared_runtime_domain_checkpoint_changed": signal_shared_runtime_checkpoint_changed,
         "regulation_gate_restrictions_changed": signal_regulation_gate_restrictions_changed,
         "regulation_signal_changed": regulation_signal_changed,
+        "regulation_direct_consequence_changed": regulation_direct_consequence_changed,
         "regulation_load_bearing_consequence_changed": regulation_load_bearing_consequence_changed,
         "regulation_path_affecting_confirmed": regulation_path_affecting_confirmed,
     }
@@ -733,14 +935,28 @@ def build_comparison_artifact(
         ]
     elif epistemic_path_affecting_confirmed or regulation_path_affecting_confirmed:
         status = "CONFIRMED"
-        reasons = [
-            "epistemic/regulation signals changed with explicit checkpoint/restriction/mode/outcome consequence",
-        ]
+        if regulation_path_affecting_confirmed and not epistemic_path_affecting_confirmed:
+            reasons = [
+                "regulation signal/observability differences are paired with explicit load-bearing checkpoint/restriction/mode/outcome consequence",
+            ]
+        elif epistemic_path_affecting_confirmed and not regulation_path_affecting_confirmed:
+            reasons = [
+                "epistemic signal differences are paired with explicit load-bearing checkpoint/restriction/mode/outcome consequence",
+            ]
+        else:
+            reasons = [
+                "epistemic and/or regulation signals changed with explicit load-bearing checkpoint/restriction/mode/outcome consequence",
+            ]
     elif epistemic_or_regulation_changed:
         status = "NOT_CONFIRMED"
-        reasons = [
-            "epistemic/regulation surface differences are present but no load-bearing contour consequence is evidenced",
-        ]
+        if regulation_observability_changed and not regulation_load_bearing_consequence_changed:
+            reasons = [
+                "regulation observability differs but no load-bearing checkpoint/restriction/mode/outcome consequence is evidenced",
+            ]
+        else:
+            reasons = [
+                "epistemic/regulation surface differences are present but no load-bearing contour consequence is evidenced",
+            ]
     else:
         status = "NOT_CONFIRMED"
         reasons = [
@@ -762,6 +978,10 @@ def build_comparison_artifact(
         "checkpoint_differences": checkpoint_differences,
         "epistemic_differences": epistemic_differences,
         "regulation_differences": regulation_differences,
+        "regulation_signal_differences": regulation_signal_differences,
+        "regulation_observability_differences": regulation_observability_differences,
+        "regulation_load_bearing_consequences": regulation_load_bearing_consequences,
+        "regulation_path_affecting_support": regulation_path_affecting_support,
         "restriction_differences": restriction_differences,
         "uncertainty_differences": uncertainty_differences,
         "outcome_differences": outcome_differences,
@@ -826,6 +1046,9 @@ def render_comparison_markdown(comparison: dict[str, Any]) -> str:
         ("## Route / legality / scope differences", "route_and_scope_differences.changed_fields"),
         ("## Critical checkpoint differences", "checkpoint_differences.changed_fields"),
         ("## Epistemic differences", "epistemic_differences.changed_fields"),
+        ("## Regulation signal differences", "regulation_signal_differences.changed_fields"),
+        ("## Regulation observability differences", "regulation_observability_differences.changed_fields"),
+        ("## Regulation load-bearing consequences", "regulation_load_bearing_consequences.changed_fields"),
         ("## Regulation differences", "regulation_differences.changed_fields"),
         ("## Restrictions / forbidden shortcut differences", "restriction_differences.changed_fields"),
         ("## Uncertainty / degraded / unresolved differences", "uncertainty_differences.changed_fields"),
@@ -948,6 +1171,26 @@ def render_comparison_markdown(comparison: dict[str, Any]) -> str:
         "- non-load-bearing differences: "
         f"{_fmt_list(_get(comparison, 'path_affecting_assessment.non_load_bearing_differences', []))} "
         "(field: path_affecting_assessment.non_load_bearing_differences)"
+    )
+    lines.append(
+        "- regulation signal changed field paths: "
+        f"{_fmt_list(_get(comparison, 'regulation_path_affecting_support.regulation_signal_changed_field_paths', []))} "
+        "(field: regulation_path_affecting_support.regulation_signal_changed_field_paths)"
+    )
+    lines.append(
+        "- regulation observability changed field paths: "
+        f"{_fmt_list(_get(comparison, 'regulation_path_affecting_support.regulation_observability_changed_field_paths', []))} "
+        "(field: regulation_path_affecting_support.regulation_observability_changed_field_paths)"
+    )
+    lines.append(
+        "- regulation load-bearing consequence field paths: "
+        f"{_fmt_list(_get(comparison, 'regulation_path_affecting_support.regulation_load_bearing_consequence_field_paths', []))} "
+        "(field: regulation_path_affecting_support.regulation_load_bearing_consequence_field_paths)"
+    )
+    lines.append(
+        "- regulation path-affecting confirmed: "
+        f"`{_fmt_scalar(_get(comparison, 'regulation_path_affecting_support.regulation_path_affecting_confirmed'))}` "
+        "(field: regulation_path_affecting_support.regulation_path_affecting_confirmed)"
     )
     signals = _get(comparison, "path_affecting_assessment.signals", {})
     lines.append("Load-bearing signals:")
