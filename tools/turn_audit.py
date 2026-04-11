@@ -19,6 +19,10 @@ from substrate.runtime_topology import (
     dispatch_rt01_production_tick,
     dispatch_runtime_tick,
 )
+from substrate.runtime_topology.models import (
+    RuntimeEpistemicCaseInput,
+    RuntimeRegulationSharedDomainInput,
+)
 from substrate.subject_tick import (
     SubjectTickContext,
     SubjectTickInput,
@@ -73,6 +77,18 @@ CONTEXT_VALUE_FLAGS: tuple[str, ...] = (
     "t02_assembly_mode",
     "t03_competition_mode",
 )
+
+CAUSE_FAMILY_SUBJECT_INTERNAL = "subject_internal"
+CAUSE_FAMILY_EPISTEMIC_CONSTRAINT = "epistemic_constraint"
+CAUSE_FAMILY_SHARED_RUNTIME_REGULATION = "shared_runtime_regulation"
+CAUSE_FAMILY_LOCAL_REGULATION_CONSTRAINT = "local_regulation_constraint"
+CAUSE_FAMILY_OBSERVABILITY_ONLY = "observability_only_difference"
+CAUSE_FAMILY_HARNESS_INFERENCE_ONLY = "harness_inference_only"
+CAUSE_FAMILY_MIXED = "mixed"
+CAUSE_FAMILY_UNRESOLVED = "unresolved"
+
+PATH_AFFECTING_CHECKPOINT_STATUSES = {"blocked", "enforced_detour"}
+PATH_AFFECTING_OUTCOMES = {"repair", "revalidate", "halt"}
 
 
 def _enum_value(value: Any) -> Any:
@@ -852,6 +868,546 @@ def _contains_risk_markers(uncertainty: dict[str, object]) -> bool:
     return False
 
 
+def _is_unresolved_like(value: Any) -> bool:
+    return value in {None, "", UNRESOLVED_TOKEN}
+
+
+def _nonempty_list(value: Any) -> list[Any]:
+    if isinstance(value, list):
+        return value
+    if isinstance(value, tuple):
+        return list(value)
+    return []
+
+
+def _summarize_epistemic_case_input(raw: Any) -> dict[str, object] | None:
+    if raw is None:
+        return None
+    prior_units = getattr(raw, "prior_units", None)
+    prior_units_count: object = UNRESOLVED_TOKEN
+    if isinstance(prior_units, tuple):
+        prior_units_count = len(prior_units)
+    return {
+        "content": getattr(raw, "content", None),
+        "source_id": getattr(raw, "source_id", None),
+        "source_class": getattr(raw, "source_class", None),
+        "modality": getattr(raw, "modality", None),
+        "confidence_hint": getattr(raw, "confidence_hint", None),
+        "support_note": getattr(raw, "support_note", None),
+        "contestation_note": getattr(raw, "contestation_note", None),
+        "claim_key": getattr(raw, "claim_key", None),
+        "claim_polarity": getattr(raw, "claim_polarity", None),
+        "require_observation": getattr(raw, "require_observation", None),
+        "prior_units_count": prior_units_count,
+    }
+
+
+def _summarize_regulation_shared_domain_input(raw: Any) -> dict[str, object] | None:
+    if raw is None:
+        return None
+    return {
+        "pressure_level": getattr(raw, "pressure_level", None),
+        "escalation_stage": getattr(raw, "escalation_stage", None),
+        "override_scope": getattr(raw, "override_scope", None),
+        "no_strong_override_claim": getattr(raw, "no_strong_override_claim", None),
+        "gate_accepted": getattr(raw, "gate_accepted", None),
+        "source_state_ref": getattr(raw, "source_state_ref", None),
+    }
+
+
+def _build_trigger_inventory(
+    *,
+    input_summary: dict[str, object],
+    checkpoints: dict[str, object],
+) -> list[dict[str, object]]:
+    trigger_rows: list[dict[str, object]] = []
+    context = input_summary.get("context_flags", {})
+    if isinstance(context, dict):
+        for key, value in sorted(context.items()):
+            active = (
+                (key.startswith("require_") and value is True)
+                or (key.startswith("disable_") and value is True)
+                or (key in {"t02_assembly_mode", "t03_competition_mode"} and not _is_unresolved_like(value))
+            )
+            if active:
+                trigger_rows.append(
+                    {
+                        "trigger_source": f"input_summary.context_flags.{key}",
+                        "trigger_class": "context_flag",
+                        "active": True,
+                        "value": value,
+                    }
+                )
+
+    epistemic_input = input_summary.get("epistemic_case_input")
+    if isinstance(epistemic_input, dict):
+        require_observation = epistemic_input.get("require_observation", UNRESOLVED_TOKEN)
+        if require_observation is True:
+            trigger_rows.append(
+                {
+                    "trigger_source": "input_summary.epistemic_case_input.require_observation",
+                    "trigger_class": "epistemic_input_pressure",
+                    "active": True,
+                    "value": True,
+                }
+            )
+        prior_units_count = epistemic_input.get("prior_units_count", UNRESOLVED_TOKEN)
+        if isinstance(prior_units_count, int) and prior_units_count > 0:
+            trigger_rows.append(
+                {
+                    "trigger_source": "input_summary.epistemic_case_input.prior_units_count",
+                    "trigger_class": "epistemic_input_pressure",
+                    "active": True,
+                    "value": prior_units_count,
+                }
+            )
+
+    regulation_input = input_summary.get("regulation_shared_domain_input")
+    if isinstance(regulation_input, dict):
+        for field_name in (
+            "pressure_level",
+            "escalation_stage",
+            "override_scope",
+            "no_strong_override_claim",
+            "gate_accepted",
+        ):
+            value = regulation_input.get(field_name, UNRESOLVED_TOKEN)
+            active = not _is_unresolved_like(value)
+            if active:
+                trigger_rows.append(
+                    {
+                        "trigger_source": f"input_summary.regulation_shared_domain_input.{field_name}",
+                        "trigger_class": "regulation_input_pressure",
+                        "active": True,
+                        "value": value,
+                    }
+                )
+
+    checkpoint_rows = checkpoints.get("observed_checkpoint_results", [])
+    if isinstance(checkpoint_rows, list):
+        for row in checkpoint_rows:
+            if not isinstance(row, dict):
+                continue
+            status = row.get("status", UNRESOLVED_TOKEN)
+            checkpoint_id = row.get("checkpoint_id", UNRESOLVED_TOKEN)
+            if status in PATH_AFFECTING_CHECKPOINT_STATUSES:
+                trigger_rows.append(
+                    {
+                        "trigger_source": f"checkpoints.{checkpoint_id}",
+                        "trigger_class": "causal_checkpoint",
+                        "active": True,
+                        "value": status,
+                    }
+                )
+    return trigger_rows
+
+
+def _append_causal_entry(
+    *,
+    entries: list[dict[str, object]],
+    event_type: str,
+    event_ref: str,
+    cause_family: str,
+    cause_source: str,
+    load_bearing: bool,
+    confidence: float,
+    evidence_field_paths: list[str],
+    competing_causes: list[str] | None = None,
+    observability_gap_candidate: bool = False,
+) -> None:
+    entries.append(
+        {
+            "event_type": event_type,
+            "event_ref": event_ref,
+            "cause_family": cause_family,
+            "cause_source": cause_source,
+            "load_bearing": load_bearing,
+            "confidence": confidence,
+            "evidence_field_paths": evidence_field_paths,
+            "competing_causes": [] if competing_causes is None else competing_causes,
+            "observability_gap_candidate": observability_gap_candidate,
+        }
+    )
+
+
+def _regulation_observability_gap_candidate(
+    *,
+    regulation_surface: dict[str, object],
+    restrictions: dict[str, object],
+    consequence_is_path_affecting: bool,
+) -> bool:
+    if not consequence_is_path_affecting:
+        return False
+    influence = regulation_surface.get("effective_regulation_influence_source", UNRESOLVED_TOKEN)
+    consequence = regulation_surface.get("effective_regulation_path_consequence", UNRESOLVED_TOKEN)
+    reason = regulation_surface.get("effective_regulation_causal_reason", UNRESOLVED_TOKEN)
+    regulation_gate_restrictions = restrictions.get("regulation_gate_restrictions", UNRESOLVED_TOKEN)
+    if influence == UNRESOLVED_TOKEN:
+        return True
+    if consequence == UNRESOLVED_TOKEN:
+        return True
+    if reason == UNRESOLVED_TOKEN and regulation_gate_restrictions == UNRESOLVED_TOKEN:
+        return True
+    return False
+
+
+def _cause_source_covered_by_evidence(cause_source: str, evidence_field_paths: list[str]) -> bool:
+    if not evidence_field_paths:
+        return False
+    if cause_source == "uncertainty_and_fallbacks + phase_surfaces.regulation":
+        return (
+            any(path.startswith("uncertainty_and_fallbacks.") for path in evidence_field_paths)
+            and any(path.startswith("phase_surfaces.regulation.") for path in evidence_field_paths)
+        )
+    if cause_source == "phase_surfaces.regulation.regulation_*":
+        return any(path.startswith("phase_surfaces.regulation.regulation_") for path in evidence_field_paths)
+    if cause_source.endswith(".*"):
+        prefix = cause_source[:-1]
+        return any(path.startswith(prefix) for path in evidence_field_paths)
+    if cause_source.endswith("*"):
+        prefix = cause_source[:-1]
+        return any(path.startswith(prefix) for path in evidence_field_paths)
+    if "/" in cause_source:
+        parts = [part for part in cause_source.split("/") if part]
+        return all(
+            any(path.startswith(part) for path in evidence_field_paths)
+            for part in parts
+        )
+    if cause_source in evidence_field_paths:
+        return True
+    return any(path.startswith(cause_source + ".") for path in evidence_field_paths)
+
+
+def _classify_shared_regulation_cause(
+    *,
+    regulation_surface: dict[str, object],
+    restrictions: dict[str, object],
+) -> tuple[str, str, list[str], bool]:
+    influence_source = regulation_surface.get("effective_regulation_influence_source", UNRESOLVED_TOKEN)
+    local_fields = (
+        "regulation_pressure_level",
+        "regulation_escalation_stage",
+        "regulation_override_scope",
+        "regulation_no_strong_override_claim",
+        "regulation_gate_accepted",
+        "regulation_source_state_ref",
+    )
+    local_surface_observed = any(
+        regulation_surface.get(field_name, UNRESOLVED_TOKEN) not in {UNRESOLVED_TOKEN, None}
+        for field_name in local_fields
+    )
+    regulation_gate_restrictions = restrictions.get("regulation_gate_restrictions", UNRESOLVED_TOKEN)
+    regulation_restrictions_missing = regulation_gate_restrictions == UNRESOLVED_TOKEN
+
+    if influence_source == "both":
+        return (
+            CAUSE_FAMILY_MIXED,
+            "phase_surfaces.regulation.effective_regulation_influence_source",
+            [CAUSE_FAMILY_LOCAL_REGULATION_CONSTRAINT, CAUSE_FAMILY_SHARED_RUNTIME_REGULATION],
+            regulation_restrictions_missing,
+        )
+    if influence_source == "shared_runtime_domain_precedence":
+        return (
+            CAUSE_FAMILY_SHARED_RUNTIME_REGULATION,
+            "phase_surfaces.regulation.effective_regulation_influence_source",
+            [],
+            regulation_restrictions_missing and not local_surface_observed,
+        )
+    if influence_source == "local_regulation_surface":
+        return (
+            CAUSE_FAMILY_LOCAL_REGULATION_CONSTRAINT,
+            "phase_surfaces.regulation.effective_regulation_influence_source",
+            [],
+            regulation_restrictions_missing,
+        )
+    if local_surface_observed:
+        return (
+            CAUSE_FAMILY_LOCAL_REGULATION_CONSTRAINT,
+            "phase_surfaces.regulation.regulation_*",
+            [CAUSE_FAMILY_SHARED_RUNTIME_REGULATION],
+            regulation_restrictions_missing,
+        )
+    return (
+        CAUSE_FAMILY_UNRESOLVED,
+        "phase_surfaces.regulation.effective_regulation_influence_source",
+        [CAUSE_FAMILY_SHARED_RUNTIME_REGULATION],
+        True,
+    )
+
+
+def _collect_causal_trace(
+    *,
+    route_and_scope: dict[str, object],
+    phase_surfaces: dict[str, object],
+    checkpoints: dict[str, object],
+    restrictions: dict[str, object],
+    uncertainty: dict[str, object],
+    final_outcome: dict[str, object],
+    input_summary: dict[str, object],
+) -> dict[str, object]:
+    entries: list[dict[str, object]] = []
+    trigger_inventory = _build_trigger_inventory(input_summary=input_summary, checkpoints=checkpoints)
+    regulation_surface = phase_surfaces.get("regulation", {})
+    if not isinstance(regulation_surface, dict):
+        regulation_surface = {}
+    epistemics = phase_surfaces.get("epistemics", {})
+    if not isinstance(epistemics, dict):
+        epistemics = {}
+
+    if route_and_scope.get("accepted") is False:
+        _append_causal_entry(
+            entries=entries,
+            event_type="dispatch_rejection",
+            event_ref="route_and_scope.accepted",
+            cause_family=CAUSE_FAMILY_UNRESOLVED,
+            cause_source="route_and_scope.accepted",
+            load_bearing=False,
+            confidence=0.99,
+            evidence_field_paths=[
+                "route_and_scope.accepted",
+                "route_and_scope.route_binding_consequence",
+                "route_and_scope.decision_restrictions",
+            ],
+            competing_causes=[],
+            observability_gap_candidate=True,
+        )
+
+    checkpoint_rows = checkpoints.get("observed_checkpoint_results", [])
+    if isinstance(checkpoint_rows, list):
+        for row in checkpoint_rows:
+            if not isinstance(row, dict):
+                continue
+            status = row.get("status", UNRESOLVED_TOKEN)
+            if status not in PATH_AFFECTING_CHECKPOINT_STATUSES:
+                continue
+            checkpoint_id = str(row.get("checkpoint_id", UNRESOLVED_TOKEN))
+            cause_family = CAUSE_FAMILY_UNRESOLVED
+            cause_source = f"checkpoints.{checkpoint_id}.status"
+            competing_causes: list[str] = []
+            observability_gap = False
+            confidence = 0.55
+            if checkpoint_id == "rt01.epistemic_admission_checkpoint":
+                cause_family = CAUSE_FAMILY_EPISTEMIC_CONSTRAINT
+                cause_source = "checkpoints.epistemic_admission_checkpoint.status"
+                competing_causes = [CAUSE_FAMILY_UNRESOLVED]
+                confidence = 0.97
+            elif checkpoint_id == "rt01.shared_runtime_domain_checkpoint":
+                (
+                    cause_family,
+                    cause_source,
+                    competing_causes,
+                    observability_gap,
+                ) = _classify_shared_regulation_cause(
+                    regulation_surface=regulation_surface,
+                    restrictions=restrictions,
+                )
+                confidence = 0.88 if cause_family != CAUSE_FAMILY_UNRESOLVED else 0.55
+                observability_gap = _regulation_observability_gap_candidate(
+                    regulation_surface=regulation_surface,
+                    restrictions=restrictions,
+                    consequence_is_path_affecting=True,
+                )
+            else:
+                competing_causes = [
+                    CAUSE_FAMILY_EPISTEMIC_CONSTRAINT,
+                    CAUSE_FAMILY_LOCAL_REGULATION_CONSTRAINT,
+                    CAUSE_FAMILY_SHARED_RUNTIME_REGULATION,
+                ]
+            evidence_paths = [
+                f"checkpoints.{checkpoint_id}.status",
+                f"checkpoints.{checkpoint_id}.applied_action",
+                f"checkpoints.{checkpoint_id}.reason",
+                "final_outcome.active_execution_mode",
+                "final_outcome.final_execution_outcome",
+            ]
+            if checkpoint_id == "rt01.epistemic_admission_checkpoint":
+                evidence_paths.extend(
+                    [
+                        "uncertainty_and_fallbacks.epistemic_should_abstain",
+                        "uncertainty_and_fallbacks.epistemic_unknown_reason",
+                        "uncertainty_and_fallbacks.epistemic_conflict_reason",
+                        "phase_surfaces.epistemics.epistemic_should_abstain",
+                        "phase_surfaces.epistemics.epistemic_claim_strength",
+                    ]
+                )
+            if checkpoint_id == "rt01.shared_runtime_domain_checkpoint":
+                evidence_paths.extend(
+                    [
+                        "phase_surfaces.regulation.effective_regulation_influence_source",
+                        "phase_surfaces.regulation.effective_regulation_path_consequence",
+                        "phase_surfaces.regulation.effective_regulation_causal_reason",
+                        "phase_surfaces.regulation.regulation_override_scope",
+                        "phase_surfaces.regulation.regulation_no_strong_override_claim",
+                        "restrictions_and_forbidden_shortcuts.regulation_gate_restrictions",
+                    ]
+                )
+            _append_causal_entry(
+                entries=entries,
+                event_type="checkpoint_consequence",
+                event_ref=checkpoint_id,
+                cause_family=cause_family,
+                cause_source=cause_source,
+                load_bearing=True,
+                confidence=confidence,
+                evidence_field_paths=evidence_paths,
+                competing_causes=competing_causes,
+                observability_gap_candidate=observability_gap,
+            )
+
+    outcome = final_outcome.get("final_execution_outcome", UNRESOLVED_TOKEN)
+    repair_needed = final_outcome.get("repair_needed")
+    revalidation_needed = final_outcome.get("revalidation_needed")
+    path_affecting_outcome = (
+        (isinstance(outcome, str) and outcome in PATH_AFFECTING_OUTCOMES)
+        or repair_needed is True
+        or revalidation_needed is True
+    )
+    if path_affecting_outcome:
+        epistemic_marked = (
+            uncertainty.get("epistemic_should_abstain") is True
+            or not _is_unresolved_like(uncertainty.get("epistemic_unknown_reason"))
+            or not _is_unresolved_like(uncertainty.get("epistemic_conflict_reason"))
+            or not _is_unresolved_like(epistemics.get("epistemic_abstain_reason", UNRESOLVED_TOKEN))
+        )
+        shared_checkpoint_status = regulation_surface.get(
+            "effective_shared_runtime_domain_checkpoint_status",
+            UNRESOLVED_TOKEN,
+        )
+        shared_reg_marked = shared_checkpoint_status in PATH_AFFECTING_CHECKPOINT_STATUSES
+        competing: list[str] = []
+        observability_gap_candidate = False
+        if epistemic_marked and shared_reg_marked:
+            cause_family = CAUSE_FAMILY_MIXED
+            cause_source = "uncertainty_and_fallbacks + phase_surfaces.regulation"
+            competing = [CAUSE_FAMILY_EPISTEMIC_CONSTRAINT, CAUSE_FAMILY_SHARED_RUNTIME_REGULATION]
+            confidence = 0.7
+            observability_gap_candidate = _regulation_observability_gap_candidate(
+                regulation_surface=regulation_surface,
+                restrictions=restrictions,
+                consequence_is_path_affecting=True,
+            )
+        elif epistemic_marked:
+            cause_family = CAUSE_FAMILY_EPISTEMIC_CONSTRAINT
+            cause_source = "uncertainty_and_fallbacks.epistemic_*"
+            confidence = 0.9
+        elif shared_reg_marked:
+            cause_family, cause_source, competing, observability_gap_candidate = _classify_shared_regulation_cause(
+                regulation_surface=regulation_surface,
+                restrictions=restrictions,
+            )
+            confidence = 0.85 if cause_family != CAUSE_FAMILY_UNRESOLVED else 0.5
+        elif not _is_unresolved_like(final_outcome.get("halt_reason")):
+            cause_family = CAUSE_FAMILY_HARNESS_INFERENCE_ONLY
+            cause_source = "final_outcome.halt_reason"
+            confidence = 0.45
+        else:
+            cause_family = CAUSE_FAMILY_UNRESOLVED
+            cause_source = "final_outcome.final_execution_outcome"
+            confidence = 0.35
+            observability_gap_candidate = True
+        outcome_load_bearing = cause_family not in {
+            CAUSE_FAMILY_HARNESS_INFERENCE_ONLY,
+            CAUSE_FAMILY_UNRESOLVED,
+        }
+        _append_causal_entry(
+            entries=entries,
+            event_type="outcome_consequence",
+            event_ref="final_outcome.final_execution_outcome",
+            cause_family=cause_family,
+            cause_source=cause_source,
+            load_bearing=outcome_load_bearing,
+            confidence=confidence,
+            evidence_field_paths=[
+                "final_outcome.final_execution_outcome",
+                "final_outcome.active_execution_mode",
+                "final_outcome.repair_needed",
+                "final_outcome.revalidation_needed",
+                "uncertainty_and_fallbacks.epistemic_should_abstain",
+                "uncertainty_and_fallbacks.epistemic_unknown_reason",
+                "uncertainty_and_fallbacks.epistemic_conflict_reason",
+                "phase_surfaces.regulation.effective_shared_runtime_domain_checkpoint_status",
+                "phase_surfaces.regulation.effective_regulation_influence_source",
+            ],
+            competing_causes=competing,
+            observability_gap_candidate=observability_gap_candidate,
+        )
+
+    shared_checkpoint_status = regulation_surface.get("effective_shared_runtime_domain_checkpoint_status", UNRESOLVED_TOKEN)
+    regulation_observability_noted = any(
+        not _is_unresolved_like(regulation_surface.get(field_name, UNRESOLVED_TOKEN))
+        for field_name in (
+            "effective_regulation_shared_domain_source_surface",
+            "effective_regulation_causal_reason",
+            "effective_regulation_influence_source",
+        )
+    )
+    if (
+        regulation_observability_noted
+        and shared_checkpoint_status not in PATH_AFFECTING_CHECKPOINT_STATUSES
+        and not path_affecting_outcome
+    ):
+        _append_causal_entry(
+            entries=entries,
+            event_type="regulation_observability_note",
+            event_ref="phase_surfaces.regulation.effective_*",
+            cause_family=CAUSE_FAMILY_OBSERVABILITY_ONLY,
+            cause_source="phase_surfaces.regulation.effective_*",
+            load_bearing=False,
+            confidence=0.9,
+            evidence_field_paths=[
+                "phase_surfaces.regulation.effective_regulation_shared_domain_source_surface",
+                "phase_surfaces.regulation.effective_regulation_causal_reason",
+                "phase_surfaces.regulation.effective_regulation_influence_source",
+                "phase_surfaces.regulation.effective_shared_runtime_domain_checkpoint_status",
+                "final_outcome.final_execution_outcome",
+            ],
+            competing_causes=[],
+            observability_gap_candidate=False,
+        )
+
+    if not entries and trigger_inventory:
+        _append_causal_entry(
+            entries=entries,
+            event_type="trigger_without_consequence",
+            event_ref="input_summary",
+            cause_family=CAUSE_FAMILY_HARNESS_INFERENCE_ONLY,
+            cause_source="input_summary.context_flags/epistemic_case_input/regulation_shared_domain_input",
+            load_bearing=False,
+            confidence=0.6,
+            evidence_field_paths=[row["trigger_source"] for row in trigger_inventory if isinstance(row, dict)],
+            competing_causes=[CAUSE_FAMILY_UNRESOLVED],
+            observability_gap_candidate=False,
+        )
+
+    for entry in entries:
+        if not isinstance(entry, dict):
+            continue
+        entry["evidence_coverage_complete"] = True
+        if entry.get("load_bearing") is not True:
+            continue
+        cause_source = str(entry.get("cause_source", UNRESOLVED_TOKEN))
+        evidence_field_paths = _nonempty_list(entry.get("evidence_field_paths"))
+        if not _cause_source_covered_by_evidence(cause_source, [str(path) for path in evidence_field_paths]):
+            entry["load_bearing"] = False
+            entry["cause_family"] = CAUSE_FAMILY_UNRESOLVED
+            entry["competing_causes"] = list(_nonempty_list(entry.get("competing_causes"))) + [CAUSE_FAMILY_UNRESOLVED]
+            entry["observability_gap_candidate"] = True
+            entry["evidence_coverage_complete"] = False
+
+    ownership_status = "resolved"
+    if any(entry.get("cause_family") == CAUSE_FAMILY_UNRESOLVED for entry in entries):
+        ownership_status = "unresolved"
+    elif any(entry.get("cause_family") == CAUSE_FAMILY_MIXED for entry in entries):
+        ownership_status = "mixed"
+
+    return {
+        "entries": entries,
+        "trigger_inventory": trigger_inventory,
+        "has_load_bearing_entries": any(entry.get("load_bearing") is True for entry in entries),
+        "ownership_status": ownership_status,
+    }
+
+
 def _compute_verdicts(
     *,
     route_and_scope: dict[str, object],
@@ -859,6 +1415,7 @@ def _compute_verdicts(
     uncertainty: dict[str, object],
     final_outcome: dict[str, object],
     input_summary: dict[str, object],
+    causal_trace: dict[str, object],
 ) -> dict[str, object]:
     verdicts: dict[str, object] = {}
 
@@ -928,43 +1485,83 @@ def _compute_verdicts(
         ],
     }
 
+    trace_entries = _nonempty_list(causal_trace.get("entries"))
+    trigger_inventory = _nonempty_list(causal_trace.get("trigger_inventory"))
+    trigger_paths = [
+        row.get("trigger_source", UNRESOLVED_TOKEN)
+        for row in trigger_inventory
+        if isinstance(row, dict)
+    ]
+    sensitivity_trigger_inventory = [
+        row
+        for row in trigger_inventory
+        if isinstance(row, dict)
+        and row.get("trigger_class")
+        in {"context_flag", "epistemic_input_pressure", "regulation_input_pressure"}
+    ]
+    load_bearing_trace_entries = [
+        row
+        for row in trace_entries
+        if isinstance(row, dict) and row.get("load_bearing") is True
+    ]
+    unresolved_or_mixed_ownership = causal_trace.get("ownership_status") in {"mixed", "unresolved"}
+
     path_status = "PASS"
     path_reasons: list[str] = []
     if route_and_scope["accepted"] is False:
         path_status = "UNRESOLVED"
         path_reasons.append("dispatch rejected pre-execution; no path-affecting execution evidence")
     else:
-        context = input_summary.get("context_flags", {})
-        trigger_keys = [
-            key
-            for key, value in context.items()
-            if (
-                (key.startswith("require_") and value is True)
-                or (key.startswith("disable_") and value is True)
-                or (key in {"t02_assembly_mode", "t03_competition_mode"} and bool(value))
-            )
-        ]
-        has_path_evidence = bool(checkpoints["enforced_detour_checkpoint_ids"]) or bool(
-            checkpoints["blocked_checkpoint_ids"]
-        )
-        if trigger_keys:
-            if has_path_evidence:
-                path_reasons.append("triggered requirement/ablation flags produced explicit detour/block checkpoints")
+        if sensitivity_trigger_inventory:
+            if load_bearing_trace_entries:
+                path_reasons.append(
+                    "sensitivity-bearing triggers are paired with load-bearing checkpoint/restriction/outcome causal entries"
+                )
             else:
                 path_status = "FAIL"
-                path_reasons.append("triggered requirement/ablation flags did not produce path-affecting evidence")
+                path_reasons.append(
+                    "sensitivity-bearing triggers are present but no load-bearing causal entry is materialized"
+                )
+        elif load_bearing_trace_entries:
+            path_status = "PARTIAL"
+            path_reasons.append(
+                "load-bearing baseline path evidence exists without perturbation-bearing trigger input; sensitivity is bounded"
+            )
         else:
             path_status = "PARTIAL"
-            path_reasons.append("single-turn artifact has no explicit trigger; sensitivity cannot be fully proven")
+            path_reasons.append("single-turn artifact has no sensitivity-bearing trigger inventory; sensitivity cannot be fully proven")
+
+        if unresolved_or_mixed_ownership and path_status == "PASS":
+            path_status = "PARTIAL"
+            path_reasons.append("causal ownership is mixed/unresolved; compact success-style sensitivity claim is bounded")
+
+        if path_status in {"FAIL", "PARTIAL"} and not trace_entries:
+            path_status = "UNRESOLVED"
+            path_reasons.append("causal trace entry is required for contradiction-grade path verdict but is missing")
+
     verdicts["path_affecting_sensitivity"] = {
         "status": path_status,
         "reasons": path_reasons,
         "evidence_field_paths": [
-            "input_summary.context_flags",
+            "causal_trace.trigger_inventory",
+            "causal_trace.has_load_bearing_entries",
+            *trigger_paths,
+            "causal_trace.entries",
             "checkpoints.enforced_detour_checkpoint_ids",
             "checkpoints.blocked_checkpoint_ids",
         ],
     }
+
+    for key in ("mechanistic_integrity", "claim_honesty"):
+        status = verdicts[key]["status"]
+        if status in {"FAIL", "PARTIAL"} and not trace_entries:
+            verdicts[key]["status"] = "UNRESOLVED"
+            verdicts[key]["reasons"] = list(verdicts[key]["reasons"]) + [
+                "causal ownership is unresolved because no causal trace entry is materialized"
+            ]
+            verdicts[key]["evidence_field_paths"] = list(verdicts[key]["evidence_field_paths"]) + [
+                "causal_trace.entries"
+            ]
 
     statuses = [
         verdicts["mechanistic_integrity"]["status"],
@@ -1073,6 +1670,12 @@ def build_turn_audit_artifact(
         "allow_non_production_consumer_opt_in": request.allow_non_production_consumer_opt_in,
         "persist_via_f01_requested": request.persist_via_f01,
         "context_flags": context_flags,
+        "epistemic_case_input": _summarize_epistemic_case_input(
+            getattr(request, "epistemic_case_input", None)
+        ),
+        "regulation_shared_domain_input": _summarize_regulation_shared_domain_input(
+            getattr(request, "regulation_shared_domain_input", None)
+        ),
     }
 
     route_and_scope = {
@@ -1227,13 +1830,75 @@ def build_turn_audit_artifact(
             )
         )
 
+    causal_trace = _collect_causal_trace(
+        route_and_scope=route_and_scope,
+        phase_surfaces=phase_surfaces,
+        checkpoints=checkpoints,
+        restrictions=restrictions_and_forbidden_shortcuts,
+        uncertainty=uncertainty_and_fallbacks,
+        final_outcome=final_outcome,
+        input_summary=input_summary,
+    )
+    causal_entries = _nonempty_list(causal_trace.get("entries"))
+    evidence_incomplete_entries = [
+        entry
+        for entry in causal_entries
+        if isinstance(entry, dict) and entry.get("evidence_coverage_complete") is False
+    ]
+    if evidence_incomplete_entries:
+        unresolved.append(
+            _unresolved_entry(
+                code="CAUSAL_TRACE_EVIDENCE_COVERAGE_INCOMPLETE",
+                message="one or more causal trace entries were downgraded because evidence paths do not cover classification basis",
+                blocking_surface="causal_trace.entries[].evidence_field_paths",
+                severity="medium",
+                impacted_sections=["causal_trace", "verdicts"],
+                requires_non_v1_extension=False,
+            )
+        )
+    if any(
+        isinstance(entry, dict)
+        and entry.get("event_type") in {"checkpoint_consequence", "outcome_consequence"}
+        and entry.get("cause_family") == CAUSE_FAMILY_UNRESOLVED
+    for entry in causal_entries):
+        unresolved.append(
+            _unresolved_entry(
+                code="CAUSAL_OWNERSHIP_UNRESOLVED_FOR_PATH_CONSEQUENCE",
+                message="path-affecting consequence is observed but causal ownership remains unresolved from available surfaces",
+                blocking_surface="causal_trace.entries[].cause_family",
+                severity="medium",
+                impacted_sections=["causal_trace", "verdicts", "final_outcome"],
+                requires_non_v1_extension=False,
+            )
+        )
+
     verdicts = _compute_verdicts(
         route_and_scope=route_and_scope,
         checkpoints=checkpoints,
         uncertainty=uncertainty_and_fallbacks,
         final_outcome=final_outcome,
         input_summary=input_summary,
+        causal_trace=causal_trace,
     )
+
+    contradiction_statuses = (
+        verdicts["mechanistic_integrity"]["status"],
+        verdicts["claim_honesty"]["status"],
+        verdicts["path_affecting_sensitivity"]["status"],
+    )
+    if any(status in {"FAIL", "PARTIAL"} for status in contradiction_statuses):
+        entries = _nonempty_list(causal_trace.get("entries"))
+        if not entries:
+            unresolved.append(
+                _unresolved_entry(
+                    code="CAUSAL_TRACE_MISSING_FOR_CONTRADICTION_VERDICT",
+                    message="at least one causal trace entry is required when contradiction-grade verdict status is FAIL/PARTIAL",
+                    blocking_surface="causal_trace.entries",
+                    severity="high",
+                    impacted_sections=["causal_trace", "verdicts"],
+                    requires_non_v1_extension=False,
+                )
+            )
 
     artifact = {
         "artifact_metadata": artifact_metadata,
@@ -1244,6 +1909,7 @@ def build_turn_audit_artifact(
         "restrictions_and_forbidden_shortcuts": restrictions_and_forbidden_shortcuts,
         "uncertainty_and_fallbacks": uncertainty_and_fallbacks,
         "final_outcome": final_outcome,
+        "causal_trace": causal_trace,
         "verdicts": verdicts,
         "unresolved": unresolved,
     }
@@ -1280,6 +1946,73 @@ def _build_context_from_flags(context_flags: dict[str, object] | None) -> Subjec
     return SubjectTickContext(**kwargs)
 
 
+def _coerce_epistemic_case_input(
+    payload: RuntimeEpistemicCaseInput | dict[str, object] | None,
+) -> RuntimeEpistemicCaseInput | None:
+    if payload is None:
+        return None
+    if isinstance(payload, RuntimeEpistemicCaseInput):
+        return payload
+    if not isinstance(payload, dict):
+        raise TypeError("epistemic_case_input must be RuntimeEpistemicCaseInput, dict, or None")
+    return RuntimeEpistemicCaseInput(
+        content=str(payload.get("content")) if payload.get("content") is not None else None,
+        source_id=str(payload.get("source_id")) if payload.get("source_id") is not None else None,
+        source_class=str(payload.get("source_class")) if payload.get("source_class") is not None else None,
+        modality=str(payload.get("modality")) if payload.get("modality") is not None else None,
+        confidence_hint=(
+            str(payload.get("confidence_hint")) if payload.get("confidence_hint") is not None else None
+        ),
+        support_note=str(payload.get("support_note")) if payload.get("support_note") is not None else None,
+        contestation_note=(
+            str(payload.get("contestation_note")) if payload.get("contestation_note") is not None else None
+        ),
+        claim_key=str(payload.get("claim_key")) if payload.get("claim_key") is not None else None,
+        claim_polarity=(
+            str(payload.get("claim_polarity")) if payload.get("claim_polarity") is not None else None
+        ),
+        require_observation=(
+            bool(payload.get("require_observation"))
+            if payload.get("require_observation") is not None
+            else None
+        ),
+    )
+
+
+def _coerce_regulation_shared_domain_input(
+    payload: RuntimeRegulationSharedDomainInput | dict[str, object] | None,
+) -> RuntimeRegulationSharedDomainInput | None:
+    if payload is None:
+        return None
+    if isinstance(payload, RuntimeRegulationSharedDomainInput):
+        return payload
+    if not isinstance(payload, dict):
+        raise TypeError(
+            "regulation_shared_domain_input must be RuntimeRegulationSharedDomainInput, dict, or None"
+        )
+    pressure_raw = payload.get("pressure_level")
+    return RuntimeRegulationSharedDomainInput(
+        pressure_level=float(pressure_raw) if pressure_raw is not None else None,
+        escalation_stage=(
+            str(payload.get("escalation_stage")) if payload.get("escalation_stage") is not None else None
+        ),
+        override_scope=str(payload.get("override_scope")) if payload.get("override_scope") is not None else None,
+        no_strong_override_claim=(
+            bool(payload.get("no_strong_override_claim"))
+            if payload.get("no_strong_override_claim") is not None
+            else None
+        ),
+        gate_accepted=(
+            bool(payload.get("gate_accepted"))
+            if payload.get("gate_accepted") is not None
+            else None
+        ),
+        source_state_ref=(
+            str(payload.get("source_state_ref")) if payload.get("source_state_ref") is not None else None
+        ),
+    )
+
+
 def collect_turn_audit_artifact(
     *,
     case_id: str,
@@ -1288,6 +2021,8 @@ def collect_turn_audit_artifact(
     safety: float,
     unresolved_preference: bool,
     context_flags: dict[str, object] | None = None,
+    epistemic_case_input: RuntimeEpistemicCaseInput | dict[str, object] | None = None,
+    regulation_shared_domain_input: RuntimeRegulationSharedDomainInput | dict[str, object] | None = None,
     route_class: RuntimeRouteClass | str = RuntimeRouteClass.PRODUCTION_CONTOUR,
     allow_helper_route: bool = False,
     allow_test_only_route: bool = False,
@@ -1307,12 +2042,18 @@ def collect_turn_audit_artifact(
         unresolved_preference=unresolved_preference,
     )
     context = _build_context_from_flags(context_flags)
+    epistemic_case_input_typed = _coerce_epistemic_case_input(epistemic_case_input)
+    regulation_shared_domain_input_typed = _coerce_regulation_shared_domain_input(
+        regulation_shared_domain_input
+    )
     route = _coerce_route_class(route_class)
     if (
         route == RuntimeRouteClass.PRODUCTION_CONTOUR
         and not allow_helper_route
         and not allow_test_only_route
         and not allow_non_production_consumer_opt_in
+        and epistemic_case_input_typed is None
+        and regulation_shared_domain_input_typed is None
     ):
         result = dispatch_rt01_production_tick(
             tick_input=tick_input,
@@ -1328,6 +2069,8 @@ def collect_turn_audit_artifact(
             RuntimeDispatchRequest(
                 tick_input=tick_input,
                 context=context,
+                epistemic_case_input=epistemic_case_input_typed,
+                regulation_shared_domain_input=regulation_shared_domain_input_typed,
                 route_class=route,
                 allow_helper_route=allow_helper_route,
                 allow_test_only_route=allow_test_only_route,
@@ -1367,6 +2110,8 @@ def collect_turn_audit_artifact_to_disk(
     safety: float,
     unresolved_preference: bool,
     context_flags: dict[str, object] | None = None,
+    epistemic_case_input: RuntimeEpistemicCaseInput | dict[str, object] | None = None,
+    regulation_shared_domain_input: RuntimeRegulationSharedDomainInput | dict[str, object] | None = None,
     output_path: str | Path | None = None,
     route_class: RuntimeRouteClass | str = RuntimeRouteClass.PRODUCTION_CONTOUR,
     allow_helper_route: bool = False,
@@ -1382,6 +2127,8 @@ def collect_turn_audit_artifact_to_disk(
         safety=safety,
         unresolved_preference=unresolved_preference,
         context_flags=context_flags,
+        epistemic_case_input=epistemic_case_input,
+        regulation_shared_domain_input=regulation_shared_domain_input,
         route_class=route_class,
         allow_helper_route=allow_helper_route,
         allow_test_only_route=allow_test_only_route,
@@ -1437,6 +2184,14 @@ def _build_arg_parser() -> argparse.ArgumentParser:
         default=[],
         help="context value in KEY=VALUE form (supported keys: t02_assembly_mode, t03_competition_mode)",
     )
+    parser.add_argument(
+        "--epistemic-case-input-json",
+        help="JSON object for RuntimeEpistemicCaseInput-compatible fields",
+    )
+    parser.add_argument(
+        "--regulation-shared-domain-input-json",
+        help="JSON object for RuntimeRegulationSharedDomainInput-compatible fields",
+    )
     parser.add_argument("--output", dest="output_path")
     parser.add_argument("--seam-contract-path", default=DEFAULT_SEAM_CONTRACT_PATH)
     return parser
@@ -1451,6 +2206,18 @@ def main(argv: list[str] | None = None) -> int:
         context_flags[key] = True
     context_flags.update(_parse_context_values(args.context_value))
     context_flags_or_none = context_flags if context_flags else None
+    epistemic_case_input: dict[str, object] | None = None
+    regulation_shared_domain_input: dict[str, object] | None = None
+    if args.epistemic_case_input_json:
+        loaded = json.loads(args.epistemic_case_input_json)
+        if not isinstance(loaded, dict):
+            raise ValueError("--epistemic-case-input-json must decode to a JSON object")
+        epistemic_case_input = loaded
+    if args.regulation_shared_domain_input_json:
+        loaded = json.loads(args.regulation_shared_domain_input_json)
+        if not isinstance(loaded, dict):
+            raise ValueError("--regulation-shared-domain-input-json must decode to a JSON object")
+        regulation_shared_domain_input = loaded
 
     artifact_path, artifact = collect_turn_audit_artifact_to_disk(
         case_id=args.case_id,
@@ -1459,6 +2226,8 @@ def main(argv: list[str] | None = None) -> int:
         safety=args.safety,
         unresolved_preference=_parse_bool_token(args.unresolved_preference),
         context_flags=context_flags_or_none,
+        epistemic_case_input=epistemic_case_input,
+        regulation_shared_domain_input=regulation_shared_domain_input,
         output_path=args.output_path,
         route_class=args.route_class,
         allow_helper_route=args.allow_helper_route,

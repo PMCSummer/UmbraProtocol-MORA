@@ -369,3 +369,48 @@ def test_compare_markdown_includes_regulation_and_epistemic_sections(tmp_path) -
     assert "regulation signal changed field paths" in markdown
     assert "regulation observability changed field paths" in markdown
     assert "regulation load-bearing consequence field paths" in markdown
+
+
+def test_single_turn_causal_trace_aligns_with_compare_regulation_confirmation(tmp_path) -> None:
+    battery = run_turn_audit_battery(
+        output_dir=tmp_path / "battery-regulation-cross-check",
+        case_filter=[
+            "regulation_no_strong_override_claim_guard",
+            "regulation_high_override_scope_detour",
+        ],
+    )
+    index = _load(Path(battery["index_json_path"]))
+    baseline_path = _artifact_path_from_battery(index, "regulation_no_strong_override_claim_guard")
+    perturb_path = _artifact_path_from_battery(index, "regulation_high_override_scope_detour")
+    baseline_artifact = _load(baseline_path)
+    perturb_artifact = _load(perturb_path)
+
+    result = compare_artifacts(
+        baseline_path=baseline_path,
+        perturbation_path=perturb_path,
+        output_dir=tmp_path / "cmp-cross-check",
+    )
+    comparison = _load(Path(result["comparison_json_path"]))
+    assert comparison["path_affecting_assessment"]["signals"]["regulation_path_affecting_confirmed"] is True
+    assert comparison["path_affecting_assessment"]["status"] == "CONFIRMED"
+
+    def _has_regulation_load_bearing_entry(artifact: dict) -> bool:
+        entries = artifact.get("causal_trace", {}).get("entries", [])
+        return any(
+            isinstance(entry, dict)
+            and entry.get("event_ref") in {
+                "rt01.shared_runtime_domain_checkpoint",
+                "final_outcome.final_execution_outcome",
+            }
+            and entry.get("load_bearing") is True
+            and entry.get("cause_family") in {
+                "shared_runtime_regulation",
+                "local_regulation_constraint",
+                "mixed",
+            }
+            for entry in entries
+        )
+
+    assert _has_regulation_load_bearing_entry(baseline_artifact) or _has_regulation_load_bearing_entry(
+        perturb_artifact
+    )

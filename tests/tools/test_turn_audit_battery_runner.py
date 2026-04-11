@@ -123,3 +123,44 @@ def test_battery_continues_when_one_case_fails_generation(tmp_path, monkeypatch)
     successful = [item for item in index["cases"] if item["case_id"] != broken.case_id]
     assert successful
     assert all(item["failed_generation"] is False for item in successful)
+
+
+def test_battery_regression_causal_trace_honesty_for_core_cases(tmp_path) -> None:
+    run = run_turn_audit_battery(
+        output_dir=tmp_path / "battery-causal-regression",
+        case_filter=[
+            "bounded_clean_production_turn",
+            "epistemic_unknown_abstain_detour",
+            "regulation_high_override_scope_detour",
+        ],
+    )
+    index = _load_json(Path(run["index_json_path"]))
+    by_case = {item["case_id"]: item for item in index["cases"]}
+
+    for case_id in (
+        "bounded_clean_production_turn",
+        "epistemic_unknown_abstain_detour",
+        "regulation_high_override_scope_detour",
+    ):
+        artifact = _load_json(Path(by_case[case_id]["artifact_path"]))
+        causal_trace = artifact.get("causal_trace", {})
+        assert isinstance(causal_trace.get("entries"), list)
+        assert isinstance(causal_trace.get("trigger_inventory"), list)
+        assert causal_trace.get("ownership_status") in {"resolved", "mixed", "unresolved"}
+
+    epistemic = _load_json(Path(by_case["epistemic_unknown_abstain_detour"]["artifact_path"]))
+    assert any(
+        isinstance(row, dict)
+        and row.get("cause_family") in {"epistemic_constraint", "mixed"}
+        and row.get("load_bearing") is True
+        for row in epistemic["causal_trace"]["entries"]
+    )
+
+    regulation = _load_json(Path(by_case["regulation_high_override_scope_detour"]["artifact_path"]))
+    assert any(
+        isinstance(row, dict)
+        and row.get("event_ref") == "rt01.shared_runtime_domain_checkpoint"
+        and row.get("cause_family") in {"shared_runtime_regulation", "mixed"}
+        and row.get("load_bearing") is True
+        for row in regulation["causal_trace"]["entries"]
+    )
