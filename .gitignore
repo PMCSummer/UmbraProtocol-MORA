@@ -1,5 +1,5 @@
 __pycache__/
 .pytest_cache
 .git
-tools
+tools/ripgrep
 artifacts
