@@ -2,9 +2,13 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from enum import Enum, StrEnum
+from typing import TYPE_CHECKING
 
 from substrate.contracts import RuntimeState, TransitionResult
 from substrate.subject_tick import SubjectTickContext, SubjectTickInput, SubjectTickResult
+
+if TYPE_CHECKING:
+    from substrate.epistemics import EpistemicUnit
 
 
 class RuntimeRouteClass(str, Enum):
@@ -78,9 +82,36 @@ class RuntimeTopologyBundle:
 
 
 @dataclass(frozen=True, slots=True)
+class RuntimeEpistemicCaseInput:
+    content: str | None = None
+    source_id: str | None = None
+    source_class: str | None = None
+    modality: str | None = None
+    confidence_hint: str | None = None
+    support_note: str | None = None
+    contestation_note: str | None = None
+    claim_key: str | None = None
+    claim_polarity: str | None = None
+    require_observation: bool | None = None
+    prior_units: tuple[EpistemicUnit, ...] | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class RuntimeRegulationSharedDomainInput:
+    pressure_level: float | None = None
+    escalation_stage: str | None = None
+    override_scope: str | None = None
+    no_strong_override_claim: bool | None = None
+    gate_accepted: bool | None = None
+    source_state_ref: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
 class RuntimeDispatchRequest:
     tick_input: SubjectTickInput
     context: SubjectTickContext | None = None
+    epistemic_case_input: RuntimeEpistemicCaseInput | None = None
+    regulation_shared_domain_input: RuntimeRegulationSharedDomainInput | None = None
     route_class: RuntimeRouteClass = RuntimeRouteClass.PRODUCTION_CONTOUR
     allow_helper_route: bool = False
     allow_test_only_route: bool = False
