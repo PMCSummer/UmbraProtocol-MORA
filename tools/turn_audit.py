@@ -576,22 +576,61 @@ def _collect_checkpoints(result: Any) -> dict[str, object]:
 
 def _collect_restrictions_and_shortcuts(view: Any, result: Any) -> dict[str, object]:
     state = None if result.subject_tick_result is None else result.subject_tick_result.state
+
+    def _to_text_list(value: object) -> list[str] | object:
+        if value is None:
+            return UNRESOLVED_TOKEN
+        if value == UNRESOLVED_TOKEN:
+            return UNRESOLVED_TOKEN
+        if isinstance(value, tuple):
+            value = list(value)
+        if isinstance(value, list):
+            out: list[str] = []
+            for item in value:
+                if hasattr(item, "value"):
+                    out.append(str(item.value))
+                else:
+                    out.append(str(item))
+            return out
+        return [str(value)]
+
     if state is None:
         gate_restrictions: list[str] = []
         epistemic_allowance_restrictions: object = UNRESOLVED_TOKEN
         regulation_gate_restrictions: object = UNRESOLVED_TOKEN
+        t02_restrictions: object = UNRESOLVED_TOKEN
     else:
         gate_restrictions = [code.value for code in result.subject_tick_result.downstream_gate.restrictions]
         epistemic_allowance_restrictions = list(
             getattr(state, "epistemic_allowance_restrictions", ())
         )
-        # No dedicated typed regulation restriction field is currently exposed in the RT01 contracts.
-        regulation_gate_restrictions = UNRESOLVED_TOKEN
+        regulation_gate_restrictions = _to_text_list(
+            getattr(view, "regulation_gate_restrictions", None)
+        )
+        if regulation_gate_restrictions == UNRESOLVED_TOKEN:
+            regulation_gate_restrictions = _to_text_list(
+                getattr(
+                    getattr(
+                        getattr(result.subject_tick_result, "viability_result", None),
+                        "downstream_gate",
+                        None,
+                    ),
+                    "restrictions",
+                    None,
+                )
+            )
+        t02_restrictions = _to_text_list(getattr(view, "t02_restrictions", None))
+        if t02_restrictions == UNRESOLVED_TOKEN:
+            t02_result = getattr(result.subject_tick_result, "t02_result", None)
+            t02_restrictions = _to_text_list(
+                None if t02_result is None else getattr(t02_result.gate, "restrictions", None)
+            )
     return {
         "dispatch_restrictions": list(view.restrictions),
         "downstream_gate_restrictions": gate_restrictions,
         "epistemic_allowance_restrictions": epistemic_allowance_restrictions,
         "regulation_gate_restrictions": regulation_gate_restrictions,
+        "t02_restrictions": t02_restrictions,
         "phase_restrictions": {
             "world_entry_w01": list(() if state is None else state.world_entry_w01_admission_restrictions),
             "s": list(() if state is None else state.s_restrictions),
@@ -600,7 +639,7 @@ def _collect_restrictions_and_shortcuts(view: Any, result: Any) -> dict[str, obj
             "n": list(() if state is None else state.n_restrictions),
             "t01": list(() if state is None else state.t01_restrictions),
             "s02": list(() if state is None else state.s02_restrictions),
-            "t02": UNRESOLVED_TOKEN,
+            "t02": t02_restrictions,
             "t03": list(() if state is None else state.t03_restrictions),
             "t04": list(view.t04_restrictions or ()),
         },
@@ -979,27 +1018,6 @@ def build_turn_audit_artifact(
             )
         )
 
-    unresolved.append(
-        _unresolved_entry(
-            code="T02_RESTRICTIONS_NOT_EXPOSED_AS_CANONICAL_FIELD",
-            message="t02 restrictions are not exposed as a stable dedicated field in current contract projection",
-            blocking_surface="runtime_topology.downstream_contract.RuntimeDispatchContractView",
-            severity="medium",
-            impacted_sections=["restrictions_and_forbidden_shortcuts", "phase_surfaces"],
-            requires_non_v1_extension=False,
-        )
-    )
-    unresolved.append(
-        _unresolved_entry(
-            code="REGULATION_GATE_RESTRICTIONS_NOT_EXPOSED_AS_CANONICAL_FIELD",
-            message="regulation gate restrictions are not exposed as a dedicated typed field in current RT01 contract projection",
-            blocking_surface="runtime_topology.downstream_contract.RuntimeDispatchContractView",
-            severity="medium",
-            impacted_sections=["restrictions_and_forbidden_shortcuts", "phase_surfaces", "uncertainty_and_fallbacks"],
-            requires_non_v1_extension=False,
-        )
-    )
-
     runtime_domain_view = None
     if result.persist_transition is not None and result.persist_transition.accepted:
         runtime_domain_view = derive_subject_tick_runtime_domain_contract_view(
@@ -1073,6 +1091,32 @@ def build_turn_audit_artifact(
     checkpoints = _collect_checkpoints(result)
     restrictions_and_forbidden_shortcuts = _collect_restrictions_and_shortcuts(view, result)
     uncertainty_and_fallbacks = _collect_uncertainty(view, result, runtime_domain_view)
+
+    if restrictions_and_forbidden_shortcuts.get("t02_restrictions", UNRESOLVED_TOKEN) == UNRESOLVED_TOKEN:
+        unresolved.append(
+            _unresolved_entry(
+                code="T02_RESTRICTIONS_NOT_EXPOSED_AS_CANONICAL_FIELD",
+                message="t02 restrictions are not exposed as a stable dedicated field in current contract projection",
+                blocking_surface="runtime_topology.downstream_contract.RuntimeDispatchContractView",
+                severity="medium",
+                impacted_sections=["restrictions_and_forbidden_shortcuts", "phase_surfaces"],
+                requires_non_v1_extension=False,
+            )
+        )
+    if (
+        restrictions_and_forbidden_shortcuts.get("regulation_gate_restrictions", UNRESOLVED_TOKEN)
+        == UNRESOLVED_TOKEN
+    ):
+        unresolved.append(
+            _unresolved_entry(
+                code="REGULATION_GATE_RESTRICTIONS_NOT_EXPOSED_AS_CANONICAL_FIELD",
+                message="regulation gate restrictions are not exposed as a dedicated typed field in current RT01 contract projection",
+                blocking_surface="runtime_topology.downstream_contract.RuntimeDispatchContractView",
+                severity="medium",
+                impacted_sections=["restrictions_and_forbidden_shortcuts", "phase_surfaces", "uncertainty_and_fallbacks"],
+                requires_non_v1_extension=False,
+            )
+        )
 
     if route_and_scope["accepted"] and checkpoints["missing_mandatory_checkpoint_ids"]:
         unresolved.append(

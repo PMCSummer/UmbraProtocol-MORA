@@ -108,7 +108,14 @@ def test_compare_confirms_regulation_load_bearing_difference(tmp_path) -> None:
     assert "## Regulation observability differences" in markdown
     assert "## Regulation load-bearing consequences" in markdown
     unresolved_codes = {entry["code"] for entry in comparison["unresolved"] if isinstance(entry, dict)}
-    assert "REGULATION_GATE_RESTRICTIONS_UNRESOLVED_IN_COMPARISON_INPUT" in unresolved_codes
+    baseline_artifact = _load(baseline_path)
+    perturb_artifact = _load(perturb_path)
+    baseline_reg_restrictions = baseline_artifact["restrictions_and_forbidden_shortcuts"]["regulation_gate_restrictions"]
+    perturb_reg_restrictions = perturb_artifact["restrictions_and_forbidden_shortcuts"]["regulation_gate_restrictions"]
+    if baseline_reg_restrictions == "UNRESOLVED_FOR_V1" or perturb_reg_restrictions == "UNRESOLVED_FOR_V1":
+        assert "REGULATION_GATE_RESTRICTIONS_UNRESOLVED_IN_COMPARISON_INPUT" in unresolved_codes
+    else:
+        assert "REGULATION_GATE_RESTRICTIONS_UNRESOLVED_IN_COMPARISON_INPUT" not in unresolved_codes
     assert any(
         marker in comparison["path_affecting_assessment"]["primary_causal_signals"]
         for marker in (
@@ -273,6 +280,53 @@ def test_compare_backward_compat_without_regulation_observability_fields(tmp_pat
     assert "REGULATION_OBSERVABILITY_FIELDS_PARTIALLY_EXPOSED" in markdown
 
 
+def test_compare_t02_restrictions_canonical_exposure_or_explicit_unresolved(tmp_path) -> None:
+    baseline_path = tmp_path / "baseline-t02.json"
+    perturb_path = tmp_path / "perturb-t02.json"
+    out = tmp_path / "cmp-t02"
+    _gen_artifact(
+        baseline_path,
+        case_id="compare-t02-restrictions-baseline",
+        energy=66.0,
+        cognitive=44.0,
+        safety=74.0,
+        unresolved_preference=False,
+    )
+    _gen_artifact(
+        perturb_path,
+        case_id="compare-t02-restrictions-perturb",
+        energy=66.0,
+        cognitive=44.0,
+        safety=74.0,
+        unresolved_preference=False,
+        context_flags={"require_t02_constrained_scene_consumer": True},
+    )
+    result = compare_artifacts(
+        baseline_path=baseline_path,
+        perturbation_path=perturb_path,
+        output_dir=out,
+    )
+    comparison = _load(Path(result["comparison_json_path"]))
+    markdown = Path(result["comparison_markdown_path"]).read_text(encoding="utf-8")
+
+    restriction_rows = comparison["restriction_differences"]["changed_fields"]
+    row = [item for item in restriction_rows if item.get("field_path") == "restrictions_and_forbidden_shortcuts.t02_restrictions"]
+    assert len(row) == 1
+
+    baseline_artifact = _load(baseline_path)
+    perturb_artifact = _load(perturb_path)
+    baseline_t02 = baseline_artifact["restrictions_and_forbidden_shortcuts"]["t02_restrictions"]
+    perturb_t02 = perturb_artifact["restrictions_and_forbidden_shortcuts"]["t02_restrictions"]
+    unresolved_codes = {entry["code"] for entry in comparison["unresolved"] if isinstance(entry, dict)}
+    if baseline_t02 == "UNRESOLVED_FOR_V1" or perturb_t02 == "UNRESOLVED_FOR_V1":
+        assert "T02_RESTRICTIONS_UNRESOLVED_IN_COMPARISON_INPUT" in unresolved_codes
+    else:
+        assert "T02_RESTRICTIONS_UNRESOLVED_IN_COMPARISON_INPUT" not in unresolved_codes
+        assert isinstance(baseline_t02, list)
+        assert isinstance(perturb_t02, list)
+    assert "restrictions_and_forbidden_shortcuts.t02_restrictions" in markdown
+
+
 def test_compare_markdown_includes_regulation_and_epistemic_sections(tmp_path) -> None:
     baseline = tmp_path / "baseline.json"
     perturb = tmp_path / "perturb.json"
@@ -309,6 +363,7 @@ def test_compare_markdown_includes_regulation_and_epistemic_sections(tmp_path) -
     assert "## Regulation differences" in markdown
     assert "rt01.shared_runtime_domain_checkpoint" in markdown
     assert "restrictions_and_forbidden_shortcuts.regulation_gate_restrictions" in markdown
+    assert "restrictions_and_forbidden_shortcuts.t02_restrictions" in markdown
     assert "primary causal signals" in markdown
     assert "non-load-bearing differences" in markdown
     assert "regulation signal changed field paths" in markdown

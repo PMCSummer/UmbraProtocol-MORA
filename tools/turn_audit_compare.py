@@ -385,6 +385,11 @@ def build_comparison_artifact(
                 baseline,
                 perturbation,
             ),
+            _list_changed(
+                "restrictions_and_forbidden_shortcuts.t02_restrictions",
+                baseline,
+                perturbation,
+            ),
         ],
         "phase_restriction_differences": _compare_phase_map(
             "restrictions_and_forbidden_shortcuts.phase_restrictions",
@@ -649,6 +654,7 @@ def build_comparison_artifact(
         )["changed"]
     )
     signal_regulation_gate_restrictions_changed = regulation_load_bearing_consequences["changed_fields"][3]["changed"]
+    signal_t02_restrictions_changed = restriction_differences["changed_fields"][3]["changed"]
     signal_checkpoint_consequence_changed = (
         _list_changed("checkpoints.blocked_checkpoint_ids", baseline, perturbation)["changed"]
         or _list_changed("checkpoints.enforced_detour_checkpoint_ids", baseline, perturbation)["changed"]
@@ -660,6 +666,7 @@ def build_comparison_artifact(
         restriction_differences["changed_fields"][0]["changed"]
         or restriction_differences["changed_fields"][1]["changed"]
         or restriction_differences["changed_fields"][2]["changed"]
+        or restriction_differences["changed_fields"][3]["changed"]
         or bool(restriction_differences["phase_restriction_differences"])
         or signal_epistemic_allowance_restrictions_changed
         or signal_regulation_gate_restrictions_changed
@@ -854,6 +861,28 @@ def build_comparison_artifact(
                 requires_non_v1_extension=False,
             )
         )
+    baseline_t02_restrictions = _get(
+        baseline,
+        "restrictions_and_forbidden_shortcuts.t02_restrictions",
+    )
+    perturbation_t02_restrictions = _get(
+        perturbation,
+        "restrictions_and_forbidden_shortcuts.t02_restrictions",
+    )
+    if baseline_t02_restrictions == UNRESOLVED_TOKEN or perturbation_t02_restrictions == UNRESOLVED_TOKEN:
+        unresolved.append(
+            _unresolved_entry(
+                code="T02_RESTRICTIONS_UNRESOLVED_IN_COMPARISON_INPUT",
+                message="t02_restrictions is unresolved in baseline or perturbation artifact",
+                blocking_surface="restrictions_and_forbidden_shortcuts.t02_restrictions",
+                severity="low",
+                impacted_sections=[
+                    "restriction_differences",
+                    "path_affecting_assessment",
+                ],
+                requires_non_v1_extension=False,
+            )
+        )
 
     if not signal_mode_available:
         unresolved.append(
@@ -923,6 +952,7 @@ def build_comparison_artifact(
         "effective_regulation_restriction_source_changed": signal_effective_regulation_restriction_source_changed,
         "shared_runtime_domain_checkpoint_changed": signal_shared_runtime_checkpoint_changed,
         "regulation_gate_restrictions_changed": signal_regulation_gate_restrictions_changed,
+        "t02_restrictions_changed": signal_t02_restrictions_changed,
         "regulation_signal_changed": regulation_signal_changed,
         "regulation_direct_consequence_changed": regulation_direct_consequence_changed,
         "regulation_load_bearing_consequence_changed": regulation_load_bearing_consequence_changed,

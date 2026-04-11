@@ -51,6 +51,7 @@ class SubjectTickContractView:
     regulation_no_strong_override_claim: bool
     regulation_gate_accepted: bool
     regulation_source_state_ref: str
+    regulation_gate_restrictions: tuple[str, ...]
     downstream_obedience_status: str
     downstream_obedience_fallback: str
     downstream_obedience_source_of_truth_surface: str
@@ -358,6 +359,7 @@ class SubjectTickContractView:
     t02_propagated_consequences_count: int | None
     t02_blocked_or_conflicted_consequences_count: int | None
     t02_forbidden_shortcuts: tuple[str, ...] | None
+    t02_restrictions: tuple[str, ...] | None
     t02_scope: str | None
     t02_scope_rt01_contour_only: bool | None
     t02_scope_t02_first_slice_only: bool | None
@@ -515,6 +517,11 @@ def derive_subject_tick_contract_view(
         regulation_no_strong_override_claim=state.regulation_no_strong_override_claim,
         regulation_gate_accepted=state.regulation_gate_accepted,
         regulation_source_state_ref=state.regulation_source_state_ref,
+        regulation_gate_restrictions=(
+            tuple(str(item) for item in subject_tick_state_or_result.viability_result.downstream_gate.restrictions)
+            if isinstance(subject_tick_state_or_result, SubjectTickResult)
+            else ()
+        ),
         downstream_obedience_status=state.downstream_obedience_status,
         downstream_obedience_fallback=state.downstream_obedience_fallback,
         downstream_obedience_source_of_truth_surface=state.downstream_obedience_source_of_truth_surface,
@@ -921,6 +928,9 @@ def derive_subject_tick_contract_view(
         ),
         t02_forbidden_shortcuts=(
             None if t02_result is None else t02_result.gate.forbidden_shortcuts
+        ),
+        t02_restrictions=(
+            None if t02_result is None else t02_result.gate.restrictions
         ),
         t02_scope=(None if t02_result is None else t02_result.scope_marker.scope),
         t02_scope_rt01_contour_only=(

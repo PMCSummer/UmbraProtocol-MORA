@@ -122,6 +122,21 @@ def test_collector_materializes_regulation_surfaces_v2() -> None:
         UNRESOLVED_TOKEN,
     }
     assert "regulation_gate_restrictions" in artifact["restrictions_and_forbidden_shortcuts"]
+    assert "t02_restrictions" in artifact["restrictions_and_forbidden_shortcuts"]
+
+    unresolved_codes = {entry["code"] for entry in artifact["unresolved"]}
+    regulation_gate_restrictions = artifact["restrictions_and_forbidden_shortcuts"]["regulation_gate_restrictions"]
+    t02_restrictions = artifact["restrictions_and_forbidden_shortcuts"]["t02_restrictions"]
+    if regulation_gate_restrictions == UNRESOLVED_TOKEN:
+        assert "REGULATION_GATE_RESTRICTIONS_NOT_EXPOSED_AS_CANONICAL_FIELD" in unresolved_codes
+    else:
+        assert isinstance(regulation_gate_restrictions, list)
+        assert "REGULATION_GATE_RESTRICTIONS_NOT_EXPOSED_AS_CANONICAL_FIELD" not in unresolved_codes
+    if t02_restrictions == UNRESOLVED_TOKEN:
+        assert "T02_RESTRICTIONS_NOT_EXPOSED_AS_CANONICAL_FIELD" in unresolved_codes
+    else:
+        assert isinstance(t02_restrictions, list)
+        assert "T02_RESTRICTIONS_NOT_EXPOSED_AS_CANONICAL_FIELD" not in unresolved_codes
 
 
 def _collect_regulation_case_artifact(
@@ -222,10 +237,12 @@ def test_collector_emits_unresolved_for_pre_execution_rejection() -> None:
     assert artifact["checkpoints"]["downstream_obedience_checkpoint"] == UNRESOLVED_TOKEN
     assert artifact["checkpoints"]["epistemic_admission_checkpoint"] == UNRESOLVED_TOKEN
     assert artifact["restrictions_and_forbidden_shortcuts"]["regulation_gate_restrictions"] == UNRESOLVED_TOKEN
+    assert artifact["restrictions_and_forbidden_shortcuts"]["t02_restrictions"] == UNRESOLVED_TOKEN
 
     unresolved_codes = {entry["code"] for entry in artifact["unresolved"]}
     assert "PRE_EXECUTION_DISPATCH_REJECTION" in unresolved_codes
     assert "REGULATION_GATE_RESTRICTIONS_NOT_EXPOSED_AS_CANONICAL_FIELD" in unresolved_codes
+    assert "T02_RESTRICTIONS_NOT_EXPOSED_AS_CANONICAL_FIELD" in unresolved_codes
 
     for entry in artifact["unresolved"]:
         assert set(entry) == {

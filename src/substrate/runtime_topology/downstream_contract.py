@@ -34,6 +34,7 @@ class RuntimeDispatchContractView:
     regulation_no_strong_override_claim: bool | None
     regulation_gate_accepted: bool | None
     regulation_source_state_ref: str | None
+    regulation_gate_restrictions: tuple[str, ...] | None
     final_execution_outcome: str | None
     downstream_obedience_status: str | None
     world_link_status: str | None
@@ -223,6 +224,7 @@ class RuntimeDispatchContractView:
     t02_propagated_consequences_count: int | None
     t02_blocked_or_conflicted_consequences_count: int | None
     t02_forbidden_shortcuts: tuple[str, ...] | None
+    t02_restrictions: tuple[str, ...] | None
     t02_scope: str | None
     t02_scope_rt01_contour_only: bool | None
     t02_scope_t02_first_slice_only: bool | None
@@ -344,6 +346,11 @@ def derive_runtime_dispatch_contract_view(
         regulation_gate_accepted=(None if state is None else state.regulation_gate_accepted),
         regulation_source_state_ref=(
             None if state is None else state.regulation_source_state_ref
+        ),
+        regulation_gate_restrictions=(
+            None
+            if result.subject_tick_result is None
+            else tuple(str(item) for item in result.subject_tick_result.viability_result.downstream_gate.restrictions)
         ),
         final_execution_outcome=(
             None if state is None else state.final_execution_outcome.value
@@ -827,6 +834,9 @@ def derive_runtime_dispatch_contract_view(
         ),
         t02_forbidden_shortcuts=(
             None if t02_result is None else t02_result.gate.forbidden_shortcuts
+        ),
+        t02_restrictions=(
+            None if t02_result is None else t02_result.gate.restrictions
         ),
         t02_scope=(None if t02_result is None else t02_result.scope_marker.scope),
         t02_scope_rt01_contour_only=(

@@ -75,6 +75,8 @@ def test_markdown_renderer_keeps_unresolved_visible(tmp_path) -> None:
         in markdown
     )
     assert "regulation gate restrictions canonical field: `UNRESOLVED_FOR_V1`" in markdown
+    assert "T02_RESTRICTIONS_NOT_EXPOSED_AS_CANONICAL_FIELD" in markdown
+    assert "t02 restrictions canonical field: `UNRESOLVED_FOR_V1`" in markdown
     assert "Unresolved entries from artifact" in markdown
     assert "Non-v1 / unresolved boundaries" in markdown
 
@@ -92,6 +94,7 @@ def test_markdown_renderer_keeps_explicit_empty_restrictions(tmp_path) -> None:
     restrictions["downstream_gate_restrictions"] = []
     restrictions["epistemic_allowance_restrictions"] = []
     restrictions["regulation_gate_restrictions"] = []
+    restrictions["t02_restrictions"] = []
     restrictions["phase_restrictions"] = {
         "s": [],
         "t01": [],
@@ -112,6 +115,7 @@ def test_markdown_renderer_keeps_explicit_empty_restrictions(tmp_path) -> None:
     assert "downstream gate restrictions: [] (explicit empty list)" in markdown
     assert "epistemic allowance restrictions: [] (explicit empty list)" in markdown
     assert "regulation gate restrictions: [] (explicit empty list)" in markdown
+    assert "t02 restrictions: [] (explicit empty list)" in markdown
     assert "`s`: [] (explicit empty list)" in markdown
     assert "`t01`: [] (explicit empty list)" in markdown
 
@@ -130,6 +134,7 @@ def test_markdown_renderer_handles_older_artifact_without_v2_fields(tmp_path) ->
     artifact["checkpoints"].pop("shared_runtime_domain_checkpoint", None)
     artifact["restrictions_and_forbidden_shortcuts"].pop("epistemic_allowance_restrictions", None)
     artifact["restrictions_and_forbidden_shortcuts"].pop("regulation_gate_restrictions", None)
+    artifact["restrictions_and_forbidden_shortcuts"].pop("t02_restrictions", None)
     artifact["uncertainty_and_fallbacks"].pop("epistemic_should_abstain", None)
     artifact["uncertainty_and_fallbacks"].pop("epistemic_unknown_reason", None)
     artifact["uncertainty_and_fallbacks"].pop("epistemic_conflict_reason", None)
@@ -145,5 +150,6 @@ def test_markdown_renderer_handles_older_artifact_without_v2_fields(tmp_path) ->
     assert "regulation pressure level: `UNRESOLVED_FOR_V1`" in markdown
     assert "regulation effective influence source: `UNRESOLVED_FOR_V1`" in markdown
     assert "regulation effective path consequence: `UNRESOLVED_FOR_V1`" in markdown
+    assert "t02 restrictions: UNRESOLVED_FOR_V1" in markdown
     assert "rt01.epistemic_admission_checkpoint" in markdown
     assert "active execution mode: `UNRESOLVED_FOR_V1`" in markdown

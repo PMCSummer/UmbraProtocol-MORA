@@ -336,6 +336,11 @@ def _render_restrictions(lines: list[str], artifact: dict[str, Any]) -> None:
         "(field: restrictions_and_forbidden_shortcuts.regulation_gate_restrictions)"
     )
     lines.append(
+        "- t02 restrictions: "
+        f"{_fmt_list(_get_path(artifact, 'restrictions_and_forbidden_shortcuts.t02_restrictions'))} "
+        "(field: restrictions_and_forbidden_shortcuts.t02_restrictions)"
+    )
+    lines.append(
         "- regulation effective restriction source: "
         f"`{_fmt_scalar(_get_path(artifact, 'phase_surfaces.regulation.effective_regulation_restriction_source'))}` "
         "(field: phase_surfaces.regulation.effective_regulation_restriction_source)"
@@ -349,6 +354,16 @@ def _render_restrictions(lines: list[str], artifact: dict[str, Any]) -> None:
             "- regulation gate restrictions canonical field: "
             "`UNRESOLVED_FOR_V1` "
             "(evidence: unresolved[].code=REGULATION_GATE_RESTRICTIONS_NOT_EXPOSED_AS_CANONICAL_FIELD)"
+        )
+    t02_restrictions = _get_path(
+        artifact,
+        "restrictions_and_forbidden_shortcuts.t02_restrictions",
+    )
+    if t02_restrictions == UNRESOLVED_TOKEN:
+        lines.append(
+            "- t02 restrictions canonical field: "
+            "`UNRESOLVED_FOR_V1` "
+            "(evidence: unresolved[].code=T02_RESTRICTIONS_NOT_EXPOSED_AS_CANONICAL_FIELD)"
         )
 
     lines.append("")
