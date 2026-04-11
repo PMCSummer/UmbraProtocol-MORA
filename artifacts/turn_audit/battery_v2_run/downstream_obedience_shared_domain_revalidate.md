@@ -1,20 +1,30 @@
 # Turn summary
-- artifact path: `artifacts\turn_audit\battery_run\bounded_clean_production_turn.json` (field: input artifact file)
+- artifact path: `artifacts\turn_audit\battery_v2_run\downstream_obedience_shared_domain_revalidate.json` (field: input artifact file)
 - artifact version: `turn_audit_artifact_v1` (field: artifact_metadata.artifact_version)
 - route class: `production_contour` (field: route_and_scope.route_class)
 - route binding consequence: `lawful_production_contour` (field: route_and_scope.route_binding_consequence)
-- final execution outcome: `continue` (field: final_outcome.final_execution_outcome)
-- overall verdict: `PARTIAL` (field: verdicts.overall.status)
+- final execution outcome: `revalidate` (field: final_outcome.final_execution_outcome)
+- overall verdict: `PASS` (field: verdicts.overall.status)
 - mechanistic_integrity: `PASS` (field: verdicts.mechanistic_integrity.status)
 - claim_honesty: `PASS` (field: verdicts.claim_honesty.status)
-- path_affecting_sensitivity: `PARTIAL` (field: verdicts.path_affecting_sensitivity.status)
+- path_affecting_sensitivity: `PASS` (field: verdicts.path_affecting_sensitivity.status)
 
 ## Route / legality / scope
 - dispatch accepted: `true` (field: route_and_scope.accepted)
 - lawful production route: `true` (field: route_and_scope.lawful_production_route)
 - decision restrictions: dispatch_contract_must_be_read, topology_bound_to_rt01_contour (field: route_and_scope.decision_restrictions)
-- runtime order: R, C01, C02, C03, C04, C05, S01, S02, S03, T01, T02, T03, T04, RT01 (field: route_and_scope.runtime_order)
-- mandatory checkpoint count: `18` (field: checkpoints.mandatory_checkpoint_ids)
+- runtime order: EPISTEMICS, R, C01, C02, C03, C04, C05, S01, S02, S03, T01, T02, T03, T04, RT01 (field: route_and_scope.runtime_order)
+- mandatory checkpoint count: `19` (field: checkpoints.mandatory_checkpoint_ids)
+- epistemic status: `report` (field: phase_surfaces.epistemics.epistemic_status)
+- epistemic confidence: `medium` (field: phase_surfaces.epistemics.epistemic_confidence)
+- epistemic source_class: `reporter` (field: phase_surfaces.epistemics.epistemic_source_class)
+- epistemic modality: `user_text` (field: phase_surfaces.epistemics.epistemic_modality)
+- regulation pressure level: `0.135` (field: phase_surfaces.regulation.regulation_pressure_level)
+- regulation escalation stage: `baseline` (field: phase_surfaces.regulation.regulation_escalation_stage)
+- regulation override scope: `none` (field: phase_surfaces.regulation.regulation_override_scope)
+- regulation no_strong_override_claim: `true` (field: phase_surfaces.regulation.regulation_no_strong_override_claim)
+- regulation gate_accepted: `false` (field: phase_surfaces.regulation.regulation_gate_accepted)
+- regulation source_state_ref: `regulation-step-1` (field: phase_surfaces.regulation.regulation_source_state_ref)
 
 Scope table:
 | Surface | Scope | rt01_contour_only |
@@ -35,17 +45,21 @@ Scope table:
 - checkpoint coverage complete: `true` (field: checkpoints.checkpoint_coverage_complete)
 - missing mandatory checkpoint ids: [] (explicit empty list) (field: checkpoints.missing_mandatory_checkpoint_ids)
 - blocked checkpoint ids: [] (explicit empty list) (field: checkpoints.blocked_checkpoint_ids)
-- enforced detour checkpoint ids: rt01.world_entry_checkpoint (field: checkpoints.enforced_detour_checkpoint_ids)
+- enforced detour checkpoint ids: rt01.world_entry_checkpoint, rt01.s02_prediction_boundary_checkpoint, rt01.outcome_resolution_checkpoint (field: checkpoints.enforced_detour_checkpoint_ids)
 
 Explicit checkpoint rows:
 | Checkpoint | Status | Required action | Applied action | Reason |
 | --- | --- | --- | --- | --- |
+| `rt01.epistemic_admission_checkpoint` | `allowed` | `consume_epistemic_allowance_and_preserve_abstain_unknown_conflict_markers` | `reported_claim:idle` | `report cannot be promoted to observation` |
+| `rt01.shared_runtime_domain_checkpoint` | `allowed` | `consume_shared_regulation_continuity_validity_domains` | `idle` | `no prior shared runtime state supplied; contour followed phase-local contracts` |
 | `rt01.downstream_obedience_checkpoint` | `allowed` | `allow_continue` | `idle` | `downstream obedience allows bounded continuation` |
-| `rt01.outcome_resolution_checkpoint` | `allowed` | `bounded_outcome_must_be_resolved` | `continue_path:idle` | `runtime contour resolved bounded outcome from enforced contracts` |
+| `rt01.outcome_resolution_checkpoint` | `enforced_detour` | `bounded_outcome_must_be_resolved` | `revalidate_path:revalidate_scope` | `runtime contour resolved bounded outcome from enforced contracts` |
 
 ## Restrictions and forbidden shortcuts
 - dispatch restrictions: dispatch_contract_must_be_read, topology_bound_to_rt01_contour (field: restrictions_and_forbidden_shortcuts.dispatch_restrictions)
-- downstream gate restrictions: fixed_order_must_be_read, r_gate_must_be_read, c01_gate_must_be_read, c02_gate_must_be_read, c03_gate_must_be_read, c04_gate_must_be_read, c05_gate_must_be_read, c04_mode_selection_must_be_enforced, c05_validity_action_must_be_enforced, c05_restrictions_must_not_be_ignored, outcome_must_be_bounded, execution_stance_must_be_read, checkpoint_decisions_must_be_read, c04_mode_claim_must_be_read, c05_action_claim_must_be_read, authority_roles_must_be_read, downstream_obedience_contract_must_be_read, downstream_obedience_restrictions_must_be_enforced, world_seam_contract_must_be_read, w_entry_contract_must_be_read, w_entry_forbidden_claims_must_be_read, w_entry_admission_criteria_must_be_read, s_minimal_contour_contract_must_be_read, s_forbidden_shortcuts_must_be_read, a_line_normalization_contract_must_be_read, a_forbidden_shortcuts_must_be_read, m_minimal_contour_contract_must_be_read, m_forbidden_shortcuts_must_be_read, n_minimal_contour_contract_must_be_read, n_forbidden_shortcuts_must_be_read, t01_semantic_field_contract_must_be_read, t01_forbidden_shortcuts_must_be_read, t02_relation_binding_contract_must_be_read, t02_forbidden_shortcuts_must_be_read, t03_hypothesis_competition_contract_must_be_read, t04_attention_schema_contract_must_be_read, s01_efference_copy_contract_must_be_read, s02_prediction_boundary_contract_must_be_read, s03_ownership_weighted_learning_contract_must_be_read (field: restrictions_and_forbidden_shortcuts.downstream_gate_restrictions)
+- downstream gate restrictions: fixed_order_must_be_read, r_gate_must_be_read, c01_gate_must_be_read, c02_gate_must_be_read, c03_gate_must_be_read, c04_gate_must_be_read, c05_gate_must_be_read, c04_mode_selection_must_be_enforced, c05_validity_action_must_be_enforced, c05_restrictions_must_not_be_ignored, outcome_must_be_bounded, execution_stance_must_be_read, checkpoint_decisions_must_be_read, c04_mode_claim_must_be_read, c05_action_claim_must_be_read, authority_roles_must_be_read, downstream_obedience_contract_must_be_read, downstream_obedience_restrictions_must_be_enforced, world_seam_contract_must_be_read, w_entry_contract_must_be_read, w_entry_forbidden_claims_must_be_read, w_entry_admission_criteria_must_be_read, s_minimal_contour_contract_must_be_read, s_forbidden_shortcuts_must_be_read, a_line_normalization_contract_must_be_read, a_forbidden_shortcuts_must_be_read, m_minimal_contour_contract_must_be_read, m_forbidden_shortcuts_must_be_read, n_minimal_contour_contract_must_be_read, n_forbidden_shortcuts_must_be_read, t01_semantic_field_contract_must_be_read, t01_forbidden_shortcuts_must_be_read, t02_relation_binding_contract_must_be_read, t02_forbidden_shortcuts_must_be_read, t03_hypothesis_competition_contract_must_be_read, t04_attention_schema_contract_must_be_read, s01_efference_copy_contract_must_be_read, s02_prediction_boundary_contract_must_be_read, s03_ownership_weighted_learning_contract_must_be_read, downstream_authority_degraded, s02_boundary_consumer_required (field: restrictions_and_forbidden_shortcuts.downstream_gate_restrictions)
+- epistemic allowance restrictions: reported_not_observed (field: restrictions_and_forbidden_shortcuts.epistemic_allowance_restrictions)
+- regulation gate restrictions: UNRESOLVED_FOR_V1 (field: restrictions_and_forbidden_shortcuts.regulation_gate_restrictions)
 
 Per-phase restrictions:
 - `a`: a_line_normalization_contract_must_be_read, sprint8c_not_a04_or_a05_build, capability_shortcuts_must_be_machine_readable, a_capability_claim_requires_world_or_self_basis, a_unavailable_capability_must_not_be_treated_as_available, a_no_safe_capability_claim_requires_repair_or_abstain (field: restrictions_and_forbidden_shortcuts.phase_restrictions.a)
@@ -71,8 +85,16 @@ Per-phase forbidden shortcuts:
 - `t04`: [] (explicit empty list) (field: restrictions_and_forbidden_shortcuts.phase_forbidden_shortcuts.t04)
 
 ## Uncertainty / degraded / abstain / mixed / unresolved
-- abstain: `false` (field: uncertainty_and_fallbacks.abstain)
-- abstain_reason: `null` (field: uncertainty_and_fallbacks.abstain_reason)
+- abstain: `true` (field: uncertainty_and_fallbacks.abstain)
+- abstain_reason: `revalidation_required` (field: uncertainty_and_fallbacks.abstain_reason)
+- epistemic_should_abstain: `false` (field: uncertainty_and_fallbacks.epistemic_should_abstain)
+- epistemic_claim_strength: `reported_claim` (field: uncertainty_and_fallbacks.epistemic_claim_strength)
+- epistemic_allowance_reason: `report cannot be promoted to observation` (field: uncertainty_and_fallbacks.epistemic_allowance_reason)
+- epistemic_unknown_reason: `null` (field: uncertainty_and_fallbacks.epistemic_unknown_reason)
+- epistemic_conflict_reason: `null` (field: uncertainty_and_fallbacks.epistemic_conflict_reason)
+- epistemic_abstain_reason: `null` (field: uncertainty_and_fallbacks.epistemic_abstain_reason)
+- regulation_no_strong_override_claim: `true` (field: uncertainty_and_fallbacks.regulation_no_strong_override_claim)
+- regulation_gate_accepted: `false` (field: uncertainty_and_fallbacks.regulation_gate_accepted)
 
 Active uncertainty/no_safe/degraded markers:
 - `uncertainty_markers.s_underconstrained`: `true` (field: uncertainty_and_fallbacks.uncertainty_markers.s_underconstrained)
@@ -95,16 +117,18 @@ Active uncertainty/no_safe/degraded markers:
 - `degraded_markers.a_degraded`: `true` (field: uncertainty_and_fallbacks.degraded_markers.a_degraded)
 - `degraded_markers.m_degraded`: `true` (field: uncertainty_and_fallbacks.degraded_markers.m_degraded)
 - `degraded_markers.n_degraded`: `true` (field: uncertainty_and_fallbacks.degraded_markers.n_degraded)
+- `degraded_markers.downstream_authority_degraded_restriction`: `true` (field: uncertainty_and_fallbacks.degraded_markers.downstream_authority_degraded_restriction)
 
 Unresolved entries from artifact:
 - `T02_RESTRICTIONS_NOT_EXPOSED_AS_CANONICAL_FIELD`: t02 restrictions are not exposed as a stable dedicated field in current contract projection (field: unresolved[])
+- `REGULATION_GATE_RESTRICTIONS_NOT_EXPOSED_AS_CANONICAL_FIELD`: regulation gate restrictions are not exposed as a dedicated typed field in current RT01 contract projection (field: unresolved[])
 - `RUNTIME_DOMAIN_VIEW_NOT_MATERIALIZED_IN_ARTIFACT_RUN`: runtime domain contract view is unavailable without accepted persistence transition in the same run (field: unresolved[])
 
 ## Final execution outcome
-- execution stance: `continue_path` (field: final_outcome.execution_stance)
-- active execution mode: `UNRESOLVED_FOR_V1` (field: final_outcome.active_execution_mode)
+- execution stance: `revalidate_path` (field: final_outcome.execution_stance)
+- active execution mode: `revalidate_scope` (field: final_outcome.active_execution_mode)
 - repair_needed: `false` (field: final_outcome.repair_needed)
-- revalidation_needed: `false` (field: final_outcome.revalidation_needed)
+- revalidation_needed: `true` (field: final_outcome.revalidation_needed)
 - halt_reason: `null` (field: final_outcome.halt_reason)
 - persist_transition_accepted: `null` (field: final_outcome.persist_transition_accepted)
 
@@ -113,26 +137,27 @@ Unresolved entries from artifact:
 ### mechanistic_integrity
 - status: `PASS` (field: verdicts.mechanistic_integrity.status)
 - reasons: route legality and checkpoint coherence are bounded (field: verdicts.mechanistic_integrity.reasons)
-- evidence_field_paths: route_and_scope.accepted, route_and_scope.lawful_production_route, checkpoints.missing_mandatory_checkpoint_ids, final_outcome.final_execution_outcome (field: verdicts.mechanistic_integrity.evidence_field_paths)
+- evidence_field_paths: route_and_scope.accepted, route_and_scope.lawful_production_route, checkpoints.missing_mandatory_checkpoint_ids, checkpoints.epistemic_admission_checkpoint, final_outcome.final_execution_outcome (field: verdicts.mechanistic_integrity.evidence_field_paths)
 
 ### claim_honesty
 - status: `PASS` (field: verdicts.claim_honesty.status)
 - reasons: uncertainty/no-safe markers are preserved with bounded detour/halt outcome (field: verdicts.claim_honesty.reasons)
-- evidence_field_paths: uncertainty_and_fallbacks.abstain, uncertainty_and_fallbacks.uncertainty_markers, uncertainty_and_fallbacks.no_safe_markers, final_outcome.final_execution_outcome (field: verdicts.claim_honesty.evidence_field_paths)
+- evidence_field_paths: uncertainty_and_fallbacks.abstain, uncertainty_and_fallbacks.epistemic_should_abstain, uncertainty_and_fallbacks.epistemic_unknown_reason, uncertainty_and_fallbacks.epistemic_conflict_reason, uncertainty_and_fallbacks.uncertainty_markers, uncertainty_and_fallbacks.no_safe_markers, final_outcome.final_execution_outcome (field: verdicts.claim_honesty.evidence_field_paths)
 
 ### path_affecting_sensitivity
-- status: `PARTIAL` (field: verdicts.path_affecting_sensitivity.status)
-- reasons: single-turn artifact has no explicit trigger; sensitivity cannot be fully proven (field: verdicts.path_affecting_sensitivity.reasons)
+- status: `PASS` (field: verdicts.path_affecting_sensitivity.status)
+- reasons: triggered requirement/ablation flags produced explicit detour/block checkpoints (field: verdicts.path_affecting_sensitivity.reasons)
 - evidence_field_paths: input_summary.context_flags, checkpoints.enforced_detour_checkpoint_ids, checkpoints.blocked_checkpoint_ids (field: verdicts.path_affecting_sensitivity.evidence_field_paths)
 
 ### overall
-- status: `PARTIAL` (field: verdicts.overall.status)
+- status: `PASS` (field: verdicts.overall.status)
 - reasons: aggregated from load-bearing verdict statuses without laundering (field: verdicts.overall.reasons)
 - evidence_field_paths: verdicts.mechanistic_integrity.status, verdicts.claim_honesty.status, verdicts.path_affecting_sensitivity.status (field: verdicts.overall.evidence_field_paths)
 
 ## Non-v1 / unresolved boundaries
 Unresolved entries:
 - `T02_RESTRICTIONS_NOT_EXPOSED_AS_CANONICAL_FIELD` | severity=`medium` | blocking_surface=`runtime_topology.downstream_contract.RuntimeDispatchContractView` | impacted=restrictions_and_forbidden_shortcuts, phase_surfaces | requires_non_v1_extension=`false`
+- `REGULATION_GATE_RESTRICTIONS_NOT_EXPOSED_AS_CANONICAL_FIELD` | severity=`medium` | blocking_surface=`runtime_topology.downstream_contract.RuntimeDispatchContractView` | impacted=restrictions_and_forbidden_shortcuts, phase_surfaces, uncertainty_and_fallbacks | requires_non_v1_extension=`false`
 - `RUNTIME_DOMAIN_VIEW_NOT_MATERIALIZED_IN_ARTIFACT_RUN` | severity=`low` | blocking_surface=`subject_tick.persist_subject_tick_result_via_f01` | impacted=final_outcome, uncertainty_and_fallbacks | requires_non_v1_extension=`false`
 - non-v1 exclusions: UNRESOLVED_FOR_V1 (field not present in artifact)
 - boundary note: report is rendered strictly from artifact JSON and does not extend beyond artifact scope

@@ -1,19 +1,19 @@
 {
   "comparison_metadata": {
-    "comparison_version": "turn_audit_paired_contrast_v1",
-    "generated_at": "2026-04-11T02:41:18.509100+00:00",
-    "comparison_mode": "paired_contrast_v1"
+    "comparison_version": "turn_audit_paired_contrast_v2",
+    "generated_at": "2026-04-11T15:53:21.783031+00:00",
+    "comparison_mode": "paired_contrast_v2"
   },
   "baseline_ref": {
-    "artifact_path": "artifacts\\turn_audit\\battery_run\\bounded_clean_production_turn.json",
+    "artifact_path": "artifacts\\turn_audit\\battery_v2_run\\bounded_clean_production_turn.json",
     "artifact_version": "turn_audit_artifact_v1",
     "case_id": "battery-bounded-clean",
     "load_status": "loaded"
   },
   "perturbation_ref": {
-    "artifact_path": "artifacts\\turn_audit\\battery_run\\t02_raw_vs_propagated_integrity_pressure.json",
+    "artifact_path": "artifacts\\turn_audit\\battery_v2_run\\epistemic_unknown_abstain_detour.json",
     "artifact_version": "turn_audit_artifact_v1",
-    "case_id": "battery-t02-raw-vs-propagated",
+    "case_id": "battery-epi-unknown-nearest",
     "load_status": "loaded"
   },
   "input_differences": {
@@ -21,7 +21,7 @@
       {
         "field_path": "input_summary.tick_input.case_id",
         "baseline": "battery-bounded-clean",
-        "perturbation": "battery-t02-raw-vs-propagated",
+        "perturbation": "battery-epi-unknown-nearest",
         "changed": true
       },
       {
@@ -45,8 +45,8 @@
       {
         "field_path": "input_summary.tick_input.unresolved_preference",
         "baseline": false,
-        "perturbation": false,
-        "changed": false
+        "perturbation": true,
+        "changed": true
       },
       {
         "field_path": "input_summary.route_class_requested",
@@ -161,7 +161,7 @@
       {
         "field_path": "input_summary.context_flags.require_s02_boundary_consumer",
         "baseline": null,
-        "perturbation": false,
+        "perturbation": true,
         "changed": true
       },
       {
@@ -215,7 +215,7 @@
       {
         "field_path": "input_summary.context_flags.require_t02_raw_vs_propagated_distinction",
         "baseline": null,
-        "perturbation": true,
+        "perturbation": false,
         "changed": true
       },
       {
@@ -309,6 +309,7 @@
       {
         "field_path": "route_and_scope.runtime_order",
         "baseline": [
+          "EPISTEMICS",
           "R",
           "C01",
           "C02",
@@ -325,6 +326,7 @@
           "RT01"
         ],
         "perturbation": [
+          "EPISTEMICS",
           "R",
           "C01",
           "C02",
@@ -370,8 +372,9 @@
           "rt01.world_entry_checkpoint"
         ],
         "perturbation": [
+          "rt01.critical_gate_checkpoint",
           "rt01.world_entry_checkpoint",
-          "rt01.t02_raw_vs_propagated_integrity_checkpoint",
+          "rt01.s02_prediction_boundary_checkpoint",
           "rt01.outcome_resolution_checkpoint"
         ],
         "changed": true
@@ -379,12 +382,28 @@
     ],
     "explicit_checkpoint_differences": [
       {
+        "checkpoint_id": "rt01.epistemic_admission_checkpoint",
+        "baseline_status": "allowed",
+        "perturbation_status": "allowed",
+        "baseline_applied_action": "reported_claim:idle",
+        "perturbation_applied_action": "reported_claim:continue_stream",
+        "changed": true
+      },
+      {
+        "checkpoint_id": "rt01.shared_runtime_domain_checkpoint",
+        "baseline_status": "allowed",
+        "perturbation_status": "allowed",
+        "baseline_applied_action": "idle",
+        "perturbation_applied_action": "continue_stream",
+        "changed": true
+      },
+      {
         "checkpoint_id": "rt01.downstream_obedience_checkpoint",
         "baseline_status": "allowed",
         "perturbation_status": "allowed",
         "baseline_applied_action": "idle",
-        "perturbation_applied_action": "idle",
-        "changed": false
+        "perturbation_applied_action": "continue_stream",
+        "changed": true
       },
       {
         "checkpoint_id": "rt01.outcome_resolution_checkpoint",
@@ -393,6 +412,106 @@
         "baseline_applied_action": "continue_path:idle",
         "perturbation_applied_action": "revalidate_path:revalidate_scope",
         "changed": true
+      }
+    ]
+  },
+  "epistemic_differences": {
+    "changed_fields": [
+      {
+        "field_path": "phase_surfaces.epistemics.epistemic_status",
+        "baseline": "report",
+        "perturbation": "report",
+        "changed": false
+      },
+      {
+        "field_path": "phase_surfaces.epistemics.epistemic_should_abstain",
+        "baseline": false,
+        "perturbation": false,
+        "changed": false
+      },
+      {
+        "field_path": "phase_surfaces.epistemics.epistemic_claim_strength",
+        "baseline": "reported_claim",
+        "perturbation": "reported_claim",
+        "changed": false
+      },
+      {
+        "field_path": "phase_surfaces.epistemics.epistemic_allowance_restrictions",
+        "baseline": [
+          "reported_not_observed"
+        ],
+        "perturbation": [
+          "reported_not_observed"
+        ],
+        "changed": false
+      },
+      {
+        "field_path": "checkpoints.epistemic_admission_checkpoint.status",
+        "baseline": "allowed",
+        "perturbation": "allowed",
+        "changed": false
+      },
+      {
+        "field_path": "checkpoints.epistemic_admission_checkpoint.applied_action",
+        "baseline": "reported_claim:idle",
+        "perturbation": "reported_claim:continue_stream",
+        "changed": true
+      }
+    ]
+  },
+  "regulation_differences": {
+    "changed_fields": [
+      {
+        "field_path": "phase_surfaces.regulation.regulation_override_scope",
+        "baseline": "none",
+        "perturbation": "none",
+        "changed": false
+      },
+      {
+        "field_path": "phase_surfaces.regulation.regulation_no_strong_override_claim",
+        "baseline": true,
+        "perturbation": true,
+        "changed": false
+      },
+      {
+        "field_path": "phase_surfaces.regulation.regulation_gate_accepted",
+        "baseline": false,
+        "perturbation": false,
+        "changed": false
+      },
+      {
+        "field_path": "phase_surfaces.regulation.regulation_pressure_level",
+        "baseline": 0.135,
+        "perturbation": 0.135,
+        "changed": false
+      },
+      {
+        "field_path": "phase_surfaces.regulation.regulation_escalation_stage",
+        "baseline": "baseline",
+        "perturbation": "baseline",
+        "changed": false
+      },
+      {
+        "field_path": "checkpoints.shared_runtime_domain_checkpoint.status",
+        "baseline": "allowed",
+        "perturbation": "allowed",
+        "changed": false
+      },
+      {
+        "field_path": "checkpoints.shared_runtime_domain_checkpoint.applied_action",
+        "baseline": "idle",
+        "perturbation": "continue_stream",
+        "changed": true
+      },
+      {
+        "field_path": "restrictions_and_forbidden_shortcuts.regulation_gate_restrictions",
+        "baseline": [
+          "UNRESOLVED_FOR_V1"
+        ],
+        "perturbation": [
+          "UNRESOLVED_FOR_V1"
+        ],
+        "changed": false
       }
     ]
   },
@@ -494,9 +613,19 @@
           "s02_prediction_boundary_contract_must_be_read",
           "s03_ownership_weighted_learning_contract_must_be_read",
           "downstream_authority_degraded",
-          "t02_raw_vs_propagated_distinction_required"
+          "s02_boundary_consumer_required"
         ],
         "changed": true
+      },
+      {
+        "field_path": "restrictions_and_forbidden_shortcuts.regulation_gate_restrictions",
+        "baseline": [
+          "UNRESOLVED_FOR_V1"
+        ],
+        "perturbation": [
+          "UNRESOLVED_FOR_V1"
+        ],
+        "changed": false
       }
     ],
     "phase_restriction_differences": [],
@@ -527,6 +656,66 @@
         "baseline": "continue",
         "perturbation": "continue",
         "changed": false
+      },
+      {
+        "field_path": "uncertainty_and_fallbacks.epistemic_should_abstain",
+        "baseline": false,
+        "perturbation": false,
+        "changed": false
+      },
+      {
+        "field_path": "uncertainty_and_fallbacks.epistemic_claim_strength",
+        "baseline": "reported_claim",
+        "perturbation": "reported_claim",
+        "changed": false
+      },
+      {
+        "field_path": "uncertainty_and_fallbacks.epistemic_unknown_reason",
+        "baseline": null,
+        "perturbation": null,
+        "changed": false
+      },
+      {
+        "field_path": "uncertainty_and_fallbacks.epistemic_conflict_reason",
+        "baseline": null,
+        "perturbation": null,
+        "changed": false
+      },
+      {
+        "field_path": "uncertainty_and_fallbacks.epistemic_abstain_reason",
+        "baseline": null,
+        "perturbation": null,
+        "changed": false
+      },
+      {
+        "field_path": "uncertainty_and_fallbacks.regulation_no_strong_override_claim",
+        "baseline": true,
+        "perturbation": true,
+        "changed": false
+      },
+      {
+        "field_path": "uncertainty_and_fallbacks.regulation_gate_accepted",
+        "baseline": false,
+        "perturbation": false,
+        "changed": false
+      },
+      {
+        "field_path": "uncertainty_and_fallbacks.regulation_pressure_level",
+        "baseline": 0.135,
+        "perturbation": 0.135,
+        "changed": false
+      },
+      {
+        "field_path": "uncertainty_and_fallbacks.regulation_escalation_stage",
+        "baseline": "baseline",
+        "perturbation": "baseline",
+        "changed": false
+      },
+      {
+        "field_path": "uncertainty_and_fallbacks.regulation_override_scope",
+        "baseline": "none",
+        "perturbation": "none",
+        "changed": false
       }
     ],
     "uncertainty_marker_differences": [],
@@ -556,15 +745,15 @@
       },
       {
         "field_path": "final_outcome.active_execution_mode",
-        "baseline": "UNRESOLVED_FOR_V1",
-        "perturbation": "UNRESOLVED_FOR_V1",
-        "changed": false
+        "baseline": "idle",
+        "perturbation": "revalidate_scope",
+        "changed": true
       },
       {
         "field_path": "final_outcome.repair_needed",
         "baseline": false,
-        "perturbation": false,
-        "changed": false
+        "perturbation": true,
+        "changed": true
       },
       {
         "field_path": "final_outcome.revalidation_needed",
@@ -622,24 +811,24 @@
     "signals": {
       "final_execution_outcome_changed": true,
       "execution_stance_changed": true,
-      "active_execution_mode_changed": false,
+      "active_execution_mode_changed": true,
       "checkpoint_consequence_changed": true,
       "route_binding_consequence_changed": false,
-      "restriction_envelope_changed": true
+      "restriction_envelope_changed": true,
+      "epistemic_status_changed": false,
+      "epistemic_should_abstain_changed": false,
+      "epistemic_claim_strength_changed": false,
+      "epistemic_allowance_restrictions_changed": false,
+      "epistemic_admission_checkpoint_changed": true,
+      "regulation_override_scope_changed": false,
+      "regulation_no_strong_override_claim_changed": false,
+      "regulation_gate_accepted_changed": false,
+      "regulation_pressure_level_changed": false,
+      "regulation_escalation_stage_changed": false,
+      "shared_runtime_domain_checkpoint_changed": true,
+      "regulation_gate_restrictions_changed": false
     },
     "structurally_incomplete": false
   },
-  "unresolved": [
-    {
-      "code": "ACTIVE_EXECUTION_MODE_NOT_EXPOSED",
-      "message": "active_execution_mode is not exposed in one or both compared artifacts",
-      "blocking_surface": "final_outcome.active_execution_mode",
-      "severity": "low",
-      "impacted_sections": [
-        "outcome_differences",
-        "path_affecting_assessment"
-      ],
-      "requires_non_v1_extension": false
-    }
-  ]
+  "unresolved": []
 }

@@ -12,6 +12,8 @@
       "runtime_topology.dispatch_runtime_tick"
     ],
     "source_of_truth_surfaces": [
+      "epistemics.grounded_unit",
+      "epistemics.downstream_allowance",
       "runtime_state.domains",
       "rt01.downstream_obedience_checkpoint",
       "world_adapter.state",
@@ -35,6 +37,7 @@
       "t04_attention_schema.focus_targets"
     ],
     "mandatory_checkpoint_ids": [
+      "rt01.epistemic_admission_checkpoint",
       "rt01.c04_mode_binding",
       "rt01.c05_legality_checkpoint",
       "rt01.downstream_obedience_checkpoint",
@@ -61,53 +64,53 @@
   },
   "input_summary": {
     "tick_input": {
-      "case_id": "battery-route-boundary",
+      "case_id": "battery-regulation-no-strong-override",
       "energy": 66.0,
       "cognitive": 44.0,
       "safety": 74.0,
       "unresolved_preference": false
     },
-    "route_class_requested": "helper_path",
+    "route_class_requested": "production_contour",
     "allow_helper_route": false,
     "allow_test_only_route": false,
     "allow_non_production_consumer_opt_in": false,
     "persist_via_f01_requested": false,
     "context_flags": {
-      "disable_gate_application": null,
-      "disable_c04_mode_execution_binding": null,
-      "disable_c05_validity_enforcement": null,
-      "disable_downstream_obedience_enforcement": null,
-      "disable_s_minimal_enforcement": null,
-      "disable_a_line_enforcement": null,
-      "disable_m_minimal_enforcement": null,
-      "disable_n_minimal_enforcement": null,
-      "disable_t01_unresolved_slot_maintenance": null,
-      "disable_t01_field_enforcement": null,
-      "disable_t02_enforcement": null,
-      "disable_t03_enforcement": null,
-      "disable_t04_enforcement": null,
-      "require_world_grounded_transition": null,
-      "require_world_effect_feedback_for_success_claim": null,
-      "require_t01_preverbal_scene_consumer": null,
-      "require_t01_scene_comparison_consumer": null,
-      "require_t02_constrained_scene_consumer": null,
-      "require_t02_raw_vs_propagated_distinction": null,
-      "require_t03_convergence_consumer": null,
-      "require_t03_frontier_consumer": null,
-      "require_t03_nonconvergence_preservation": null,
-      "require_t04_focus_ownership_consumer": null,
-      "require_t04_reportable_focus_consumer": null,
-      "require_t04_peripheral_preservation": null,
-      "require_s01_comparison_consumer": null,
-      "require_s01_unexpected_change_consumer": null,
-      "require_s01_prediction_validity_consumer": null,
-      "require_s02_boundary_consumer": null,
-      "require_s02_controllability_consumer": null,
-      "require_s02_mixed_source_consumer": null,
-      "require_s03_learning_packet_consumer": null,
-      "require_s03_mixed_update_consumer": null,
-      "require_s03_freeze_obedience_consumer": null,
-      "emit_world_action_candidate": null,
+      "disable_gate_application": false,
+      "disable_c04_mode_execution_binding": false,
+      "disable_c05_validity_enforcement": false,
+      "disable_downstream_obedience_enforcement": true,
+      "disable_s_minimal_enforcement": false,
+      "disable_a_line_enforcement": false,
+      "disable_m_minimal_enforcement": false,
+      "disable_n_minimal_enforcement": false,
+      "disable_t01_unresolved_slot_maintenance": false,
+      "disable_t01_field_enforcement": false,
+      "disable_t02_enforcement": false,
+      "disable_t03_enforcement": false,
+      "disable_t04_enforcement": false,
+      "require_world_grounded_transition": false,
+      "require_world_effect_feedback_for_success_claim": false,
+      "require_t01_preverbal_scene_consumer": false,
+      "require_t01_scene_comparison_consumer": false,
+      "require_t02_constrained_scene_consumer": false,
+      "require_t02_raw_vs_propagated_distinction": false,
+      "require_t03_convergence_consumer": false,
+      "require_t03_frontier_consumer": false,
+      "require_t03_nonconvergence_preservation": false,
+      "require_t04_focus_ownership_consumer": false,
+      "require_t04_reportable_focus_consumer": false,
+      "require_t04_peripheral_preservation": false,
+      "require_s01_comparison_consumer": false,
+      "require_s01_unexpected_change_consumer": false,
+      "require_s01_prediction_validity_consumer": false,
+      "require_s02_boundary_consumer": false,
+      "require_s02_controllability_consumer": false,
+      "require_s02_mixed_source_consumer": false,
+      "require_s03_learning_packet_consumer": false,
+      "require_s03_mixed_update_consumer": false,
+      "require_s03_freeze_obedience_consumer": false,
+      "emit_world_action_candidate": false,
       "t02_assembly_mode": null,
       "t03_competition_mode": null
     }
@@ -115,17 +118,17 @@
   "route_and_scope": {
     "accepted": false,
     "lawful_production_route": false,
-    "route_class": "helper_path",
-    "route_binding_consequence": "non_lawful_helper_route",
+    "route_class": "production_contour",
+    "route_binding_consequence": "lawful_production_contour",
     "decision_restrictions": [
       "dispatch_contract_must_be_read",
       "topology_bound_to_rt01_contour",
-      "helper_route_not_lawful_production",
-      "production_route_required"
+      "production_route_forbids_ablation_flags"
     ],
-    "decision_reason": "helper route rejected for production dispatch; explicit helper allowance required",
+    "decision_reason": "production contour dispatch rejected because ablation flags are test-only",
     "production_consumer_ready": false,
     "runtime_order": [
+      "EPISTEMICS",
       "R",
       "C01",
       "C02",
@@ -260,6 +263,14 @@
       "status": "UNRESOLVED_FOR_V1",
       "reason": "dispatch rejected before subject_tick execution surfaces were materialized"
     },
+    "epistemics": {
+      "status": "UNRESOLVED_FOR_V1",
+      "reason": "dispatch rejected before subject_tick execution surfaces were materialized"
+    },
+    "regulation": {
+      "status": "UNRESOLVED_FOR_V1",
+      "reason": "dispatch rejected before subject_tick execution surfaces were materialized"
+    },
     "world_entry": {
       "status": "UNRESOLVED_FOR_V1",
       "reason": "dispatch rejected before subject_tick execution surfaces were materialized"
@@ -311,6 +322,7 @@
   },
   "checkpoints": {
     "mandatory_checkpoint_ids": [
+      "rt01.epistemic_admission_checkpoint",
       "rt01.c04_mode_binding",
       "rt01.c05_legality_checkpoint",
       "rt01.downstream_obedience_checkpoint",
@@ -332,6 +344,7 @@
     ],
     "observed_checkpoint_results": [],
     "missing_mandatory_checkpoint_ids": [
+      "rt01.epistemic_admission_checkpoint",
       "rt01.c04_mode_binding",
       "rt01.c05_legality_checkpoint",
       "rt01.downstream_obedience_checkpoint",
@@ -354,6 +367,8 @@
     "checkpoint_coverage_complete": false,
     "blocked_checkpoint_ids": [],
     "enforced_detour_checkpoint_ids": [],
+    "epistemic_admission_checkpoint": "UNRESOLVED_FOR_V1",
+    "shared_runtime_domain_checkpoint": "UNRESOLVED_FOR_V1",
     "downstream_obedience_checkpoint": "UNRESOLVED_FOR_V1",
     "outcome_resolution_checkpoint": "UNRESOLVED_FOR_V1"
   },
@@ -361,10 +376,11 @@
     "dispatch_restrictions": [
       "dispatch_contract_must_be_read",
       "topology_bound_to_rt01_contour",
-      "helper_route_not_lawful_production",
-      "production_route_required"
+      "production_route_forbids_ablation_flags"
     ],
     "downstream_gate_restrictions": [],
+    "epistemic_allowance_restrictions": "UNRESOLVED_FOR_V1",
+    "regulation_gate_restrictions": "UNRESOLVED_FOR_V1",
     "phase_restrictions": {
       "world_entry_w01": [],
       "s": [],
@@ -397,6 +413,17 @@
   "uncertainty_and_fallbacks": {
     "abstain": "UNRESOLVED_FOR_V1",
     "abstain_reason": "UNRESOLVED_FOR_V1",
+    "epistemic_should_abstain": "UNRESOLVED_FOR_V1",
+    "epistemic_claim_strength": "UNRESOLVED_FOR_V1",
+    "epistemic_allowance_reason": "UNRESOLVED_FOR_V1",
+    "epistemic_unknown_reason": "UNRESOLVED_FOR_V1",
+    "epistemic_conflict_reason": "UNRESOLVED_FOR_V1",
+    "epistemic_abstain_reason": "UNRESOLVED_FOR_V1",
+    "regulation_no_strong_override_claim": "UNRESOLVED_FOR_V1",
+    "regulation_gate_accepted": "UNRESOLVED_FOR_V1",
+    "regulation_pressure_level": "UNRESOLVED_FOR_V1",
+    "regulation_escalation_stage": "UNRESOLVED_FOR_V1",
+    "regulation_override_scope": "UNRESOLVED_FOR_V1",
     "downstream_obedience_status": "UNRESOLVED_FOR_V1",
     "downstream_obedience_fallback": "UNRESOLVED_FOR_V1",
     "gate_accepted": "UNRESOLVED_FOR_V1",
@@ -409,6 +436,7 @@
   "final_outcome": {
     "final_execution_outcome": "UNRESOLVED_FOR_V1",
     "execution_stance": "UNRESOLVED_FOR_V1",
+    "active_execution_mode": "UNRESOLVED_FOR_V1",
     "repair_needed": "UNRESOLVED_FOR_V1",
     "revalidation_needed": "UNRESOLVED_FOR_V1",
     "halt_reason": "UNRESOLVED_FOR_V1",
@@ -430,6 +458,7 @@
         "route_and_scope.accepted",
         "route_and_scope.lawful_production_route",
         "checkpoints.missing_mandatory_checkpoint_ids",
+        "checkpoints.epistemic_admission_checkpoint",
         "final_outcome.final_execution_outcome"
       ]
     },
@@ -440,6 +469,9 @@
       ],
       "evidence_field_paths": [
         "uncertainty_and_fallbacks.abstain",
+        "uncertainty_and_fallbacks.epistemic_should_abstain",
+        "uncertainty_and_fallbacks.epistemic_unknown_reason",
+        "uncertainty_and_fallbacks.epistemic_conflict_reason",
         "uncertainty_and_fallbacks.uncertainty_markers",
         "uncertainty_and_fallbacks.no_safe_markers",
         "final_outcome.final_execution_outcome"
@@ -491,6 +523,18 @@
       "impacted_sections": [
         "restrictions_and_forbidden_shortcuts",
         "phase_surfaces"
+      ],
+      "requires_non_v1_extension": false
+    },
+    {
+      "code": "REGULATION_GATE_RESTRICTIONS_NOT_EXPOSED_AS_CANONICAL_FIELD",
+      "message": "regulation gate restrictions are not exposed as a dedicated typed field in current RT01 contract projection",
+      "blocking_surface": "runtime_topology.downstream_contract.RuntimeDispatchContractView",
+      "severity": "medium",
+      "impacted_sections": [
+        "restrictions_and_forbidden_shortcuts",
+        "phase_surfaces",
+        "uncertainty_and_fallbacks"
       ],
       "requires_non_v1_extension": false
     },

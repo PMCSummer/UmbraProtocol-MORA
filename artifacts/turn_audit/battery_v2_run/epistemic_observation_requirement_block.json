@@ -1,0 +1,1366 @@
+{
+  "artifact_metadata": {
+    "artifact_version": "turn_audit_artifact_v1",
+    "seam_phase": "RT01",
+    "seam_contract_path": "docs/seams/RT01.seam.md",
+    "bundle_id": "runtime-topology-bundle.rt01.v1",
+    "contour_id": "rt01_subject_tick_contour",
+    "graph_id": "rt01.minimal_runtime_tick_graph.v1",
+    "runtime_entry": "runtime_topology.dispatch_runtime_tick",
+    "execution_spine_phase": "RT01",
+    "dispatch_lineage": [
+      "runtime_topology.dispatch_runtime_tick",
+      "route:production_contour",
+      "execution_spine:RT01"
+    ],
+    "source_of_truth_surfaces": [
+      "epistemics.grounded_unit",
+      "epistemics.downstream_allowance",
+      "runtime_state.domains",
+      "rt01.downstream_obedience_checkpoint",
+      "world_adapter.state",
+      "world_entry_contract.episode",
+      "s_minimal_contour.boundary_state",
+      "a_line_normalization.capability_state",
+      "m_minimal.lifecycle_state",
+      "n_minimal.commitment_state",
+      "s01_efference_copy.latest_comparison",
+      "s02_prediction_boundary.seam_ledger",
+      "s02_prediction_boundary.controllability_vs_predictability",
+      "s03_ownership_weighted_learning.learning_attribution_ledger",
+      "s03_ownership_weighted_learning.target_update_routes",
+      "s03_ownership_weighted_learning.freeze_or_defer_state",
+      "t01_semantic_field.active_scene",
+      "t02_relation_binding.constrained_scene",
+      "t02_relation_binding.raw_vs_propagated_distinction",
+      "t03_hypothesis_competition.competition_ledger",
+      "t03_hypothesis_competition.publication_frontier",
+      "t04_attention_schema.focus_ownership",
+      "t04_attention_schema.focus_targets"
+    ],
+    "mandatory_checkpoint_ids": [
+      "rt01.epistemic_admission_checkpoint",
+      "rt01.c04_mode_binding",
+      "rt01.c05_legality_checkpoint",
+      "rt01.downstream_obedience_checkpoint",
+      "rt01.world_seam_checkpoint",
+      "rt01.world_entry_checkpoint",
+      "rt01.s_minimal_contour_checkpoint",
+      "rt01.a_line_normalization_checkpoint",
+      "rt01.m_minimal_contour_checkpoint",
+      "rt01.n_minimal_contour_checkpoint",
+      "rt01.s01_efference_copy_checkpoint",
+      "rt01.s02_prediction_boundary_checkpoint",
+      "rt01.s03_ownership_weighted_learning_checkpoint",
+      "rt01.t01_semantic_field_checkpoint",
+      "rt01.t02_relation_binding_checkpoint",
+      "rt01.t02_raw_vs_propagated_integrity_checkpoint",
+      "rt01.t03_hypothesis_competition_checkpoint",
+      "rt01.t04_attention_schema_checkpoint",
+      "rt01.outcome_resolution_checkpoint"
+    ],
+    "subject_tick_present": true,
+    "persist_transition_present": false,
+    "transition_id_requested": null,
+    "requested_at": null
+  },
+  "input_summary": {
+    "tick_input": {
+      "case_id": "battery-epi-observation-nearest",
+      "energy": 66.0,
+      "cognitive": 44.0,
+      "safety": 74.0,
+      "unresolved_preference": false
+    },
+    "route_class_requested": "production_contour",
+    "allow_helper_route": false,
+    "allow_test_only_route": false,
+    "allow_non_production_consumer_opt_in": false,
+    "persist_via_f01_requested": false,
+    "context_flags": {
+      "disable_gate_application": false,
+      "disable_c04_mode_execution_binding": false,
+      "disable_c05_validity_enforcement": false,
+      "disable_downstream_obedience_enforcement": false,
+      "disable_s_minimal_enforcement": false,
+      "disable_a_line_enforcement": false,
+      "disable_m_minimal_enforcement": false,
+      "disable_n_minimal_enforcement": false,
+      "disable_t01_unresolved_slot_maintenance": false,
+      "disable_t01_field_enforcement": false,
+      "disable_t02_enforcement": false,
+      "disable_t03_enforcement": false,
+      "disable_t04_enforcement": false,
+      "require_world_grounded_transition": true,
+      "require_world_effect_feedback_for_success_claim": false,
+      "require_t01_preverbal_scene_consumer": false,
+      "require_t01_scene_comparison_consumer": false,
+      "require_t02_constrained_scene_consumer": false,
+      "require_t02_raw_vs_propagated_distinction": false,
+      "require_t03_convergence_consumer": false,
+      "require_t03_frontier_consumer": false,
+      "require_t03_nonconvergence_preservation": false,
+      "require_t04_focus_ownership_consumer": false,
+      "require_t04_reportable_focus_consumer": false,
+      "require_t04_peripheral_preservation": false,
+      "require_s01_comparison_consumer": false,
+      "require_s01_unexpected_change_consumer": false,
+      "require_s01_prediction_validity_consumer": false,
+      "require_s02_boundary_consumer": false,
+      "require_s02_controllability_consumer": false,
+      "require_s02_mixed_source_consumer": false,
+      "require_s03_learning_packet_consumer": false,
+      "require_s03_mixed_update_consumer": false,
+      "require_s03_freeze_obedience_consumer": false,
+      "emit_world_action_candidate": false,
+      "t02_assembly_mode": null,
+      "t03_competition_mode": null
+    }
+  },
+  "route_and_scope": {
+    "accepted": true,
+    "lawful_production_route": true,
+    "route_class": "production_contour",
+    "route_binding_consequence": "lawful_production_contour",
+    "decision_restrictions": [
+      "dispatch_contract_must_be_read",
+      "topology_bound_to_rt01_contour"
+    ],
+    "decision_reason": "lawful production runtime contour route accepted",
+    "production_consumer_ready": true,
+    "runtime_order": [
+      "EPISTEMICS",
+      "R",
+      "C01",
+      "C02",
+      "C03",
+      "C04",
+      "C05",
+      "S01",
+      "S02",
+      "S03",
+      "T01",
+      "T02",
+      "T03",
+      "T04",
+      "RT01"
+    ],
+    "scope_markers": {
+      "world_entry": {
+        "scope": "rt01_contour_only",
+        "admission_layer_only": true,
+        "w01_implemented": false,
+        "w_line_implemented": false,
+        "repo_wide_adoption": false
+      },
+      "s_minimal": {
+        "scope": "rt01_contour_only",
+        "rt01_contour_only": true,
+        "s_minimal_only": true,
+        "s01_implemented": false,
+        "s_line_implemented": false,
+        "minimal_contour_only": true,
+        "s01_s05_implemented": false,
+        "full_self_model_implemented": false,
+        "repo_wide_adoption": false
+      },
+      "a_line_normalization": {
+        "scope": "rt01_contour_only",
+        "rt01_contour_only": true,
+        "a_line_normalization_only": true,
+        "readiness_gate_only": true,
+        "a04_implemented": false,
+        "a05_touched": false,
+        "full_agency_stack_implemented": false,
+        "repo_wide_adoption": false
+      },
+      "m_minimal": {
+        "scope": "rt01_contour_only",
+        "rt01_contour_only": true,
+        "m_minimal_only": true,
+        "readiness_gate_only": true,
+        "m01_implemented": false,
+        "m02_implemented": false,
+        "m03_implemented": false,
+        "full_memory_stack_implemented": false,
+        "repo_wide_adoption": false
+      },
+      "n_minimal": {
+        "scope": "rt01_contour_only",
+        "rt01_contour_only": true,
+        "n_minimal_only": true,
+        "readiness_gate_only": true,
+        "n01_implemented": false,
+        "n02_implemented": false,
+        "n03_implemented": false,
+        "n04_implemented": false,
+        "full_narrative_line_implemented": false,
+        "repo_wide_adoption": false
+      },
+      "t01": {
+        "scope": "rt01_contour_only",
+        "rt01_contour_only": true,
+        "t01_first_slice_only": true,
+        "t02_implemented": false,
+        "t03_implemented": false,
+        "t04_implemented": false,
+        "o01_implemented": false,
+        "full_silent_thought_line_implemented": false,
+        "repo_wide_adoption": false
+      },
+      "s02": {
+        "scope": "rt01_contour_only",
+        "rt01_contour_only": true,
+        "s02_first_slice_only": true,
+        "s03_implemented": false,
+        "s04_implemented": false,
+        "s05_implemented": false,
+        "full_self_model_implemented": false,
+        "repo_wide_adoption": false
+      },
+      "s03": {
+        "scope": "rt01_contour_only",
+        "rt01_contour_only": true,
+        "s03_first_slice_only": true,
+        "s04_implemented": false,
+        "s05_implemented": false,
+        "repo_wide_adoption": false
+      },
+      "t02": {
+        "scope": "rt01_contour_only",
+        "rt01_contour_only": true,
+        "t02_first_slice_only": true,
+        "t03_implemented": false,
+        "t04_implemented": false,
+        "o01_implemented": false,
+        "full_silent_thought_line_implemented": false,
+        "repo_wide_adoption": false
+      },
+      "t03": {
+        "scope": "rt01_contour_only",
+        "rt01_contour_only": true,
+        "t03_first_slice_only": true,
+        "t04_implemented": false,
+        "o01_implemented": false,
+        "o02_implemented": false,
+        "o03_implemented": false,
+        "full_silent_thought_line_implemented": false,
+        "repo_wide_adoption": false
+      },
+      "t04": {
+        "scope": "rt01_contour_only",
+        "rt01_contour_only": true,
+        "t04_first_slice_only": true,
+        "o01_implemented": false,
+        "o02_implemented": false,
+        "o03_implemented": false,
+        "full_attention_line_implemented": false,
+        "repo_wide_adoption": false
+      }
+    }
+  },
+  "phase_surfaces": {
+    "downstream_obedience": {
+      "status": "allow_continue",
+      "fallback": "continue",
+      "lawful_continue": true,
+      "source_of_truth_surface": "phase_local.upstream_surfaces",
+      "requires_restrictions_read": true,
+      "authority_basis_ok": true,
+      "invalidated_upstream_surface": false,
+      "blocked_by_survival_override": false,
+      "reason": "downstream obedience allows bounded continuation"
+    },
+    "epistemics": {
+      "epistemic_unit_id": "epu-02a0610444014a6f8ecd433aa76aa17a",
+      "epistemic_status": "report",
+      "epistemic_confidence": "medium",
+      "epistemic_source_class": "reporter",
+      "epistemic_modality": "user_text",
+      "epistemic_classification_basis": "classified as report from source/modality mapping",
+      "epistemic_can_treat_as_observation": false,
+      "epistemic_should_abstain": false,
+      "epistemic_claim_strength": "reported_claim",
+      "epistemic_allowance_restrictions": [
+        "reported_not_observed"
+      ],
+      "epistemic_allowance_reason": "report cannot be promoted to observation",
+      "epistemic_unknown_reason": null,
+      "epistemic_conflict_reason": null,
+      "epistemic_abstain_reason": null
+    },
+    "regulation": {
+      "regulation_pressure_level": 0.135,
+      "regulation_escalation_stage": "baseline",
+      "regulation_override_scope": "none",
+      "regulation_no_strong_override_claim": true,
+      "regulation_gate_accepted": false,
+      "regulation_source_state_ref": "regulation-step-1"
+    },
+    "world_entry": {
+      "world_entry_episode_id": "world-episode:subject-tick-battery-epi-observation-nearest-1",
+      "world_entry_w01_admission_ready": false,
+      "world_entry_w01_admission_restrictions": [
+        "w_entry_contract_is_admission_layer_only",
+        "sprint8a_not_w01_build",
+        "w01_admission_requires_linked_observation_action_effect_episode"
+      ],
+      "world_entry_forbidden_claim_classes": [
+        "externally_effected_change_claim",
+        "world_grounded_success_claim",
+        "environment_state_change_claim",
+        "action_success_in_world_claim",
+        "stable_world_regularization_claim",
+        "world_calibration_claim"
+      ],
+      "world_entry_world_grounded_transition_admissible": false,
+      "world_entry_world_effect_success_admissible": false,
+      "world_entry_degraded": true,
+      "world_entry_incomplete": true,
+      "scope": {
+        "scope": "rt01_contour_only",
+        "admission_layer_only": true,
+        "w01_implemented": false,
+        "w_line_implemented": false,
+        "repo_wide_adoption": false
+      }
+    },
+    "s_minimal": {
+      "s_boundary_state_id": "s-boundary:subject-tick-battery-epi-observation-nearest-1",
+      "s_attribution_class": "mixed_or_underconstrained_attribution",
+      "s_underconstrained": true,
+      "s_no_safe_self_claim": true,
+      "s_no_safe_world_claim": true,
+      "s_forbidden_shortcuts": [],
+      "s_restrictions": [
+        "s_minimal_contour_must_be_read",
+        "sprint8b_not_full_s_line",
+        "self_world_boundary_requires_typed_basis"
+      ],
+      "s_s01_admission_ready": false,
+      "s_readiness_blockers": [
+        "self_attribution_basis_insufficient",
+        "controllability_basis_insufficient",
+        "ownership_basis_insufficient",
+        "attribution_underconstrained",
+        "no_safe_self_basis",
+        "no_safe_world_basis"
+      ],
+      "scope": {
+        "scope": "rt01_contour_only",
+        "rt01_contour_only": true,
+        "s_minimal_only": true,
+        "s01_implemented": false,
+        "s_line_implemented": false,
+        "minimal_contour_only": true,
+        "s01_s05_implemented": false,
+        "full_self_model_implemented": false,
+        "repo_wide_adoption": false
+      }
+    },
+    "a_line_normalization": {
+      "a_capability_id": "a-capability:subject-tick-battery-epi-observation-nearest-1",
+      "a_capability_status": "unavailable_capability",
+      "a_underconstrained": false,
+      "a_no_safe_capability_claim": true,
+      "a_forbidden_shortcuts": [
+        "capability_claim_without_basis",
+        "affordance_claim_without_world_or_self_basis",
+        "unavailable_capability_reframed_as_available"
+      ],
+      "a_restrictions": [
+        "a_line_normalization_contract_must_be_read",
+        "sprint8c_not_a04_or_a05_build",
+        "capability_shortcuts_must_be_machine_readable",
+        "a_capability_claim_requires_world_or_self_basis",
+        "a_unavailable_capability_must_not_be_treated_as_available",
+        "a_no_safe_capability_claim_requires_repair_or_abstain"
+      ],
+      "a_a04_admission_ready": false,
+      "a_a04_blockers": [
+        "capability_basis_missing",
+        "world_dependency_unmet",
+        "self_dependency_unmet",
+        "available_capability_basis_insufficient",
+        "no_safe_capability_claim",
+        "structurally_present_but_not_ready",
+        "capability_surface_degraded",
+        "capability_confidence_below_readiness_threshold"
+      ],
+      "a_a04_structurally_present_but_not_ready": true,
+      "a_a04_capability_basis_missing": true,
+      "a_a04_world_dependency_unmet": true,
+      "a_a04_self_dependency_unmet": true,
+      "a_a04_policy_legitimacy_unmet": false,
+      "a_a04_underconstrained_capability_surface": false,
+      "a_a04_external_means_not_justified": false,
+      "scope": {
+        "scope": "rt01_contour_only",
+        "rt01_contour_only": true,
+        "a_line_normalization_only": true,
+        "readiness_gate_only": true,
+        "a04_implemented": false,
+        "a05_touched": false,
+        "full_agency_stack_implemented": false,
+        "repo_wide_adoption": false
+      }
+    },
+    "m_minimal": {
+      "m_memory_item_id": "m-memory-item:subject-tick-battery-epi-observation-nearest-1",
+      "m_lifecycle_status": "no_safe_memory_claim",
+      "m_retention_class": "unsafe",
+      "m_underconstrained": true,
+      "m_no_safe_memory_claim": true,
+      "m_forbidden_shortcuts": [
+        "stale_memory_reframed_as_current_truth",
+        "conflict_marked_memory_silently_merged",
+        "no_provenance_memory_claim",
+        "unreviewed_memory_reused_as_safe_basis"
+      ],
+      "m_restrictions": [
+        "m_minimal_contract_must_be_read",
+        "sprint8d_not_m01_m02_m03_build",
+        "memory_lifecycle_states_must_be_respected",
+        "stale_memory_requires_review_or_revalidation",
+        "conflict_marked_memory_must_not_be_silently_merged",
+        "memory_claim_requires_provenance",
+        "review_required_memory_must_not_support_strong_claim",
+        "no_safe_memory_claim_requires_repair_or_abstain"
+      ],
+      "m_m01_admission_ready": false,
+      "m_m01_blockers": [
+        "stale_risk_unacceptable",
+        "conflict_risk_unacceptable",
+        "no_safe_memory_basis",
+        "provenance_insufficient",
+        "lifecycle_underconstrained",
+        "bounded_persistence_not_safe",
+        "review_required_before_memory_admission",
+        "conflict_marked_memory_unresolved",
+        "memory_confidence_below_readiness_threshold",
+        "memory_surface_degraded"
+      ],
+      "m_m01_structurally_present_but_not_ready": true,
+      "m_m01_stale_risk_unacceptable": true,
+      "m_m01_conflict_risk_unacceptable": true,
+      "m_m01_reactivation_requires_review": false,
+      "m_m01_temporary_carry_not_stable_enough": false,
+      "m_m01_no_safe_memory_basis": true,
+      "m_m01_provenance_insufficient": true,
+      "m_m01_lifecycle_underconstrained": true,
+      "scope": {
+        "scope": "rt01_contour_only",
+        "rt01_contour_only": true,
+        "m_minimal_only": true,
+        "readiness_gate_only": true,
+        "m01_implemented": false,
+        "m02_implemented": false,
+        "m03_implemented": false,
+        "full_memory_stack_implemented": false,
+        "repo_wide_adoption": false
+      }
+    },
+    "n_minimal": {
+      "n_narrative_commitment_id": "n-commitment:subject-tick-battery-epi-observation-nearest-1",
+      "n_commitment_status": "no_safe_narrative_claim",
+      "n_ambiguity_residue": true,
+      "n_contradiction_risk": "high",
+      "n_underconstrained": true,
+      "n_safe_narrative_commitment_allowed": false,
+      "n_bounded_commitment_allowed": false,
+      "n_no_safe_narrative_claim": true,
+      "n_forbidden_shortcuts": [
+        "prose_without_commitment_basis",
+        "narrative_reframed_as_self_truth_without_basis",
+        "narrative_reframed_as_world_truth_without_basis",
+        "narrative_reframed_as_memory_truth_without_basis",
+        "narrative_reframed_as_capability_truth_without_basis",
+        "contradiction_hidden_by_fluent_wording"
+      ],
+      "n_restrictions": [
+        "n_minimal_contract_must_be_read",
+        "sprint8e_not_n01_n02_n03_n04_build",
+        "narrative_commitment_basis_must_be_load_bearing",
+        "narrative_commitment_requires_basis",
+        "narrative_ambiguity_must_be_preserved",
+        "narrative_contradiction_must_be_explicitly_marked",
+        "no_safe_narrative_claim_requires_repair_or_abstain"
+      ],
+      "n_n01_admission_ready": false,
+      "n_n01_blockers": [
+        "narrative_basis_missing",
+        "self_basis_missing",
+        "world_basis_missing",
+        "memory_basis_missing",
+        "capability_basis_missing",
+        "ambiguity_residue_open",
+        "contradiction_risk_open",
+        "narrative_underconstrained",
+        "narrative_surface_degraded",
+        "narrative_confidence_below_readiness_threshold",
+        "no_safe_narrative_claim",
+        "safe_narrative_commitment_not_available"
+      ],
+      "scope": {
+        "scope": "rt01_contour_only",
+        "rt01_contour_only": true,
+        "n_minimal_only": true,
+        "readiness_gate_only": true,
+        "n01_implemented": false,
+        "n02_implemented": false,
+        "n03_implemented": false,
+        "n04_implemented": false,
+        "full_narrative_line_implemented": false,
+        "repo_wide_adoption": false
+      }
+    },
+    "s01_efference_copy": {
+      "s01_latest_comparison_status": null,
+      "s01_comparison_ready": false,
+      "s01_unexpected_change_detected": false,
+      "s01_prediction_validity_ready": true,
+      "s01_comparison_blocked_by_contamination": false,
+      "s01_stale_prediction_detected": false,
+      "s01_pending_predictions_count": 3,
+      "s01_comparisons_count": 0,
+      "s01_require_comparison_consumer": false,
+      "s01_require_unexpected_change_consumer": false,
+      "s01_require_prediction_validity_consumer": false
+    },
+    "s02_prediction_boundary": {
+      "s02_boundary_id": "s02-boundary:subject-tick-battery-epi-observation-nearest-1",
+      "s02_active_boundary_status": "seam_invalidated_for_context",
+      "s02_boundary_uncertain": true,
+      "s02_insufficient_coverage": false,
+      "s02_no_clean_seam_claim": true,
+      "s02_controllability_estimate": 0.0,
+      "s02_prediction_reliability_estimate": 0.0,
+      "s02_external_dominance_estimate": 0.0,
+      "s02_mixed_source_score": 0.0,
+      "s02_boundary_confidence": 0.35,
+      "s02_boundary_consumer_ready": false,
+      "s02_controllability_consumer_ready": false,
+      "s02_mixed_source_consumer_ready": false,
+      "s02_forbidden_shortcuts": [],
+      "s02_restrictions": [
+        "s02_prediction_boundary_contract_must_be_read",
+        "s02_controllability_vs_predictability_must_be_read",
+        "s02_mixed_source_status_must_be_preserved",
+        "s02_context_stale_invalidation_must_be_obeyed",
+        "s02_boundary_consumer_not_ready",
+        "s02_controllability_consumer_not_ready",
+        "s02_mixed_source_consumer_not_ready"
+      ],
+      "s02_require_boundary_consumer": false,
+      "s02_require_controllability_consumer": false,
+      "s02_require_mixed_source_consumer": false,
+      "scope": {
+        "scope": "rt01_contour_only",
+        "rt01_contour_only": true,
+        "s02_first_slice_only": true,
+        "s03_implemented": false,
+        "s04_implemented": false,
+        "s05_implemented": false,
+        "full_self_model_implemented": false,
+        "repo_wide_adoption": false
+      }
+    },
+    "s03_ownership_weighted_learning": {
+      "s03_learning_id": "s03-learning:subject-tick-battery-epi-observation-nearest-1",
+      "s03_latest_packet_id": "s03-packet:subject-tick-battery-epi-observation-nearest-1:1",
+      "s03_latest_update_class": "observation_channel_recalibration_candidate",
+      "s03_latest_commit_class": "cap_update_magnitude",
+      "s03_latest_ambiguity_class": "insufficient_ownership_basis",
+      "s03_freeze_or_defer_state": "cap_update_magnitude",
+      "s03_requested_revalidation": false,
+      "s03_self_update_weight": 0.0,
+      "s03_world_update_weight": 0.04,
+      "s03_observation_update_weight": 0.12,
+      "s03_anomaly_update_weight": 0.0,
+      "s03_learning_packet_consumer_ready": true,
+      "s03_mixed_update_consumer_ready": false,
+      "s03_freeze_obedience_consumer_ready": true,
+      "s03_require_learning_packet_consumer": false,
+      "s03_require_mixed_update_consumer": false,
+      "s03_require_freeze_obedience_consumer": false,
+      "scope": {
+        "scope": "rt01_contour_only",
+        "rt01_contour_only": true,
+        "s03_first_slice_only": true,
+        "s04_implemented": false,
+        "s05_implemented": false,
+        "repo_wide_adoption": false
+      }
+    },
+    "t01_semantic_field": {
+      "t01_scene_id": "t01-scene:subject-tick-battery-epi-observation-nearest-1",
+      "t01_scene_status": "authority_insufficient_for_binding",
+      "t01_stability_state": "degraded",
+      "t01_preverbal_consumer_ready": false,
+      "t01_scene_comparison_ready": false,
+      "t01_no_clean_scene_commit": true,
+      "t01_unresolved_slots_count": 3,
+      "t01_forbidden_shortcuts": [],
+      "t01_restrictions": [
+        "t01_semantic_field_contract_must_be_read",
+        "t01_scene_status_must_be_read",
+        "t01_unresolved_slots_must_be_preserved",
+        "t01_scene_must_be_consumed_preverbal",
+        "no_clean_scene_commit_requires_revalidate_or_clarification",
+        "t01_preverbal_consumer_not_ready"
+      ],
+      "t01_require_preverbal_scene_consumer": false,
+      "t01_require_scene_comparison_consumer": false,
+      "scope": {
+        "scope": "rt01_contour_only",
+        "rt01_contour_only": true,
+        "t01_first_slice_only": true,
+        "t02_implemented": false,
+        "t03_implemented": false,
+        "t04_implemented": false,
+        "o01_implemented": false,
+        "full_silent_thought_line_implemented": false,
+        "repo_wide_adoption": false
+      }
+    },
+    "t02_relation_binding": {
+      "t02_constrained_scene_id": "t02-constrained-scene:subject-tick-battery-epi-observation-nearest-1",
+      "t02_scene_status": "fragment_only",
+      "t02_preverbal_constraint_consumer_ready": false,
+      "t02_no_clean_binding_commit": true,
+      "t02_confirmed_bindings_count": 0,
+      "t02_provisional_bindings_count": 0,
+      "t02_blocked_bindings_count": 0,
+      "t02_conflicted_bindings_count": 0,
+      "t02_propagated_consequences_count": 0,
+      "t02_blocked_or_conflicted_consequences_count": 7,
+      "t02_forbidden_shortcuts": [],
+      "t02_require_constrained_scene_consumer": false,
+      "t02_require_raw_vs_propagated_distinction": false,
+      "t02_raw_vs_propagated_distinct": false,
+      "scope": {
+        "scope": "rt01_contour_only",
+        "rt01_contour_only": true,
+        "t02_first_slice_only": true,
+        "t03_implemented": false,
+        "t04_implemented": false,
+        "o01_implemented": false,
+        "full_silent_thought_line_implemented": false,
+        "repo_wide_adoption": false
+      }
+    },
+    "t03_hypothesis_competition": {
+      "t03_competition_id": "t03-competition:subject-tick-battery-epi-observation-nearest-1",
+      "t03_convergence_status": "honest_nonconvergence",
+      "t03_current_leader_hypothesis_id": null,
+      "t03_provisional_frontrunner_hypothesis_id": "t03-hypothesis:ambiguity-preserving",
+      "t03_tied_competitor_count": 2,
+      "t03_blocked_hypothesis_count": 0,
+      "t03_eliminated_hypothesis_count": 0,
+      "t03_reactivated_hypothesis_count": 0,
+      "t03_honest_nonconvergence": true,
+      "t03_bounded_plurality": true,
+      "t03_convergence_consumer_ready": false,
+      "t03_frontier_consumer_ready": true,
+      "t03_nonconvergence_preserved": true,
+      "t03_forbidden_shortcuts": [],
+      "t03_restrictions": [
+        "t03_hypothesis_competition_contract_must_be_read",
+        "t03_authority_weighted_support_must_be_read",
+        "t03_constraint_structure_must_be_read",
+        "t03_convergence_state_must_be_read",
+        "t03_publication_frontier_must_be_read",
+        "t03_convergence_consumer_not_ready"
+      ],
+      "t03_publication_current_leader": null,
+      "t03_publication_competitive_neighborhood": [
+        "t03-hypothesis:ambiguity-preserving",
+        "t03-hypothesis:grounded-scene"
+      ],
+      "t03_publication_unresolved_conflicts": [],
+      "t03_publication_open_slots": [
+        "slot:self_world_attribution",
+        "slot:memory_reuse_legitimacy",
+        "slot:narrative_commitment_scope"
+      ],
+      "t03_publication_stability_status": "honest_nonconvergence",
+      "t03_require_convergence_consumer": false,
+      "t03_require_frontier_consumer": false,
+      "t03_require_nonconvergence_preservation": false,
+      "scope": {
+        "scope": "rt01_contour_only",
+        "rt01_contour_only": true,
+        "t03_first_slice_only": true,
+        "t04_implemented": false,
+        "o01_implemented": false,
+        "o02_implemented": false,
+        "o03_implemented": false,
+        "full_silent_thought_line_implemented": false,
+        "repo_wide_adoption": false
+      }
+    },
+    "t04_attention_schema": {
+      "t04_schema_id": "t04-attention-schema:subject-tick-battery-epi-observation-nearest-1",
+      "t04_focus_targets_count": 1,
+      "t04_peripheral_targets_count": 4,
+      "t04_attention_owner": "mixed_or_provisional",
+      "t04_focus_mode": "guarded_single_focus",
+      "t04_control_estimate": 0.2,
+      "t04_stability_estimate": 0.25,
+      "t04_redirect_cost": 0.59,
+      "t04_reportability_status": "not_reportable",
+      "t04_focus_ownership_consumer_ready": false,
+      "t04_reportable_focus_consumer_ready": false,
+      "t04_peripheral_preservation_ready": true,
+      "t04_forbidden_shortcuts": [],
+      "t04_restrictions": [
+        "t04_attention_schema_contract_must_be_read",
+        "t04_focus_peripheral_split_must_be_read",
+        "t04_attention_owner_must_be_read",
+        "t04_reportability_vs_stability_must_be_read",
+        "t04_focus_ownership_consumer_not_ready",
+        "t04_reportable_focus_consumer_not_ready"
+      ],
+      "t04_require_focus_ownership_consumer": false,
+      "t04_require_reportable_focus_consumer": false,
+      "t04_require_peripheral_preservation": false,
+      "scope": {
+        "scope": "rt01_contour_only",
+        "rt01_contour_only": true,
+        "t04_first_slice_only": true,
+        "o01_implemented": false,
+        "o02_implemented": false,
+        "o03_implemented": false,
+        "full_attention_line_implemented": false,
+        "repo_wide_adoption": false
+      }
+    }
+  },
+  "checkpoints": {
+    "mandatory_checkpoint_ids": [
+      "rt01.epistemic_admission_checkpoint",
+      "rt01.c04_mode_binding",
+      "rt01.c05_legality_checkpoint",
+      "rt01.downstream_obedience_checkpoint",
+      "rt01.world_seam_checkpoint",
+      "rt01.world_entry_checkpoint",
+      "rt01.s_minimal_contour_checkpoint",
+      "rt01.a_line_normalization_checkpoint",
+      "rt01.m_minimal_contour_checkpoint",
+      "rt01.n_minimal_contour_checkpoint",
+      "rt01.s01_efference_copy_checkpoint",
+      "rt01.s02_prediction_boundary_checkpoint",
+      "rt01.s03_ownership_weighted_learning_checkpoint",
+      "rt01.t01_semantic_field_checkpoint",
+      "rt01.t02_relation_binding_checkpoint",
+      "rt01.t02_raw_vs_propagated_integrity_checkpoint",
+      "rt01.t03_hypothesis_competition_checkpoint",
+      "rt01.t04_attention_schema_checkpoint",
+      "rt01.outcome_resolution_checkpoint"
+    ],
+    "observed_checkpoint_results": [
+      {
+        "checkpoint_id": "rt01.c04_mode_binding",
+        "source_contract": "c04.mode_arbitration",
+        "status": "allowed",
+        "required_action": "idle",
+        "applied_action": "idle",
+        "reason": "rt01 consumed c04 execution mode claim without reinterpretation"
+      },
+      {
+        "checkpoint_id": "rt01.c05_legality_checkpoint",
+        "source_contract": "c05.temporal_validity",
+        "status": "allowed",
+        "required_action": "reuse_valid_only",
+        "applied_action": "idle",
+        "reason": "c05 legality allows bounded reuse path"
+      },
+      {
+        "checkpoint_id": "rt01.epistemic_admission_checkpoint",
+        "source_contract": "epistemics.downstream_allowance",
+        "status": "allowed",
+        "required_action": "consume_epistemic_allowance_and_preserve_abstain_unknown_conflict_markers",
+        "applied_action": "reported_claim:idle",
+        "reason": "report cannot be promoted to observation"
+      },
+      {
+        "checkpoint_id": "rt01.d01_observability_guard",
+        "source_contract": "d01.observability_boundary",
+        "status": "allowed",
+        "required_action": "observability_only",
+        "applied_action": "observability_only",
+        "reason": "d01 remains observability-only and is not used as enforcement authority"
+      },
+      {
+        "checkpoint_id": "rt01.authority_role_checkpoint",
+        "source_contract": "roadmap.phase_role_contract",
+        "status": "allowed",
+        "required_action": "f01=observability_only; c04=arbitration; c05=gating|invalidation; d01=observability_only; rt01=gating",
+        "applied_action": "f01=observability_only; c04=arbitration; c05=invalidation; d01=observability_only; rt01=gating; runtime_mode=idle",
+        "reason": "rt01 consumed phase authority roles under bounded frontier contract"
+      },
+      {
+        "checkpoint_id": "rt01.role_coverage_checkpoint",
+        "source_contract": "roadmap.role_readiness_contract",
+        "status": "allowed",
+        "required_action": "frontier_role_typed_required_for_honest_runtime_authority_enforcement",
+        "applied_action": "source=rt01.default_frontier_role_map; frontier_only=True; map_ready=False; frontier_typed=True",
+        "reason": "rt01 consumed explicit role-readiness envelope and kept frontier-only claim bounded"
+      },
+      {
+        "checkpoint_id": "rt01.shared_runtime_domain_checkpoint",
+        "source_contract": "shared.runtime_domains",
+        "status": "allowed",
+        "required_action": "consume_shared_regulation_continuity_validity_domains",
+        "applied_action": "idle",
+        "reason": "no prior shared runtime state supplied; contour followed phase-local contracts"
+      },
+      {
+        "checkpoint_id": "rt01.critical_gate_checkpoint",
+        "source_contract": "rt01.phase_contract_gates",
+        "status": "allowed",
+        "required_action": "enforce_runtime_gate_restrictions",
+        "applied_action": "idle",
+        "reason": "all runtime contour gates passed without critical detour"
+      },
+      {
+        "checkpoint_id": "rt01.downstream_obedience_checkpoint",
+        "source_contract": "rt01.downstream_obedience",
+        "status": "allowed",
+        "required_action": "allow_continue",
+        "applied_action": "idle",
+        "reason": "downstream obedience allows bounded continuation"
+      },
+      {
+        "checkpoint_id": "rt01.world_seam_checkpoint",
+        "source_contract": "world_entry_contract.admission",
+        "status": "enforced_detour",
+        "required_action": "require_world_grounded_transition",
+        "applied_action": "repair_runtime_path",
+        "reason": "world grounded transition required but lawful world-entry episode basis is unavailable"
+      },
+      {
+        "checkpoint_id": "rt01.world_entry_checkpoint",
+        "source_contract": "world_entry_contract.admission",
+        "status": "enforced_detour",
+        "required_action": "forbidden_world_claims_must_be_machine_readable",
+        "applied_action": "w_entry_admission_not_ready",
+        "reason": "w-entry contract remains preparatory; admission criteria are not fully met"
+      },
+      {
+        "checkpoint_id": "rt01.s01_efference_copy_checkpoint",
+        "source_contract": "s01_efference_copy.intended_vs_observed_change",
+        "status": "allowed",
+        "required_action": "s01_optional",
+        "applied_action": "repair_runtime_path",
+        "reason": "s01 compares live pending pre-observation expectations against typed observed window; prediction-compatible outcomes remain attribution-gated"
+      },
+      {
+        "checkpoint_id": "rt01.s02_prediction_boundary_checkpoint",
+        "source_contract": "s02_prediction_boundary.self_vs_world_seam",
+        "status": "allowed",
+        "required_action": "s02_optional",
+        "applied_action": "repair_runtime_path",
+        "reason": "s02 aggregated repeated s01 outcomes into bounded prediction seam ledger with controllability/predictability separation"
+      },
+      {
+        "checkpoint_id": "rt01.s03_ownership_weighted_learning_checkpoint",
+        "source_contract": "s03_ownership_weighted_learning.update_routing",
+        "status": "allowed",
+        "required_action": "s03_optional",
+        "applied_action": "repair_runtime_path",
+        "reason": "s03 mapped s01/s02/c05/context signals into bounded ownership-weighted update packet routing"
+      },
+      {
+        "checkpoint_id": "rt01.s_minimal_contour_checkpoint",
+        "source_contract": "s_minimal_contour.boundary",
+        "status": "allowed",
+        "required_action": "s_minimal_optional",
+        "applied_action": "repair_runtime_path",
+        "reason": "s-minimal contour computed bounded self/world attribution and controllability discipline"
+      },
+      {
+        "checkpoint_id": "rt01.a_line_normalization_checkpoint",
+        "source_contract": "a_line_normalization.a01_a03_substrate",
+        "status": "allowed",
+        "required_action": "a_line_optional",
+        "applied_action": "repair_runtime_path",
+        "reason": "a-line normalization produced bounded capability substrate for a01-a03 without opening a04/a05"
+      },
+      {
+        "checkpoint_id": "rt01.m_minimal_contour_checkpoint",
+        "source_contract": "m_minimal.memory_lifecycle",
+        "status": "allowed",
+        "required_action": "m_minimal_optional",
+        "applied_action": "repair_runtime_path",
+        "reason": "m-minimal produced typed memory lifecycle economy with bounded safe reuse discipline"
+      },
+      {
+        "checkpoint_id": "rt01.n_minimal_contour_checkpoint",
+        "source_contract": "n_minimal.narrative_commitment",
+        "status": "allowed",
+        "required_action": "n_minimal_optional",
+        "applied_action": "repair_runtime_path",
+        "reason": "n-minimal produced typed bounded narrative commitment discipline without opening N01-N04"
+      },
+      {
+        "checkpoint_id": "rt01.t01_semantic_field_checkpoint",
+        "source_contract": "t01_semantic_field.active_non_verbal_scene",
+        "status": "allowed",
+        "required_action": "t01_optional",
+        "applied_action": "repair_runtime_path",
+        "reason": "t01 active semantic field produced bounded non-verbal scene for downstream pre-verbal use"
+      },
+      {
+        "checkpoint_id": "rt01.t02_relation_binding_checkpoint",
+        "source_contract": "t02_relation_binding.constraint_propagation",
+        "status": "allowed",
+        "required_action": "t02_optional",
+        "applied_action": "repair_runtime_path",
+        "reason": "t02 produced bounded relation bindings and scoped propagation over t01 scene"
+      },
+      {
+        "checkpoint_id": "rt01.t02_raw_vs_propagated_integrity_checkpoint",
+        "source_contract": "t02_relation_binding.raw_vs_propagated_distinction",
+        "status": "allowed",
+        "required_action": "t02_raw_vs_propagated_optional",
+        "applied_action": "repair_runtime_path",
+        "reason": "t02 raw-vs-propagated distinction preserved for bounded downstream use"
+      },
+      {
+        "checkpoint_id": "rt01.t03_hypothesis_competition_checkpoint",
+        "source_contract": "t03_hypothesis_competition.silent_convergence",
+        "status": "allowed",
+        "required_action": "t03_optional",
+        "applied_action": "repair_runtime_path",
+        "reason": "t03 produced bounded hypothesis competition and silent convergence frontier over t01/t02 structures"
+      },
+      {
+        "checkpoint_id": "rt01.t04_attention_schema_checkpoint",
+        "source_contract": "t04_attention_schema.focus_ownership_model",
+        "status": "allowed",
+        "required_action": "t04_optional",
+        "applied_action": "repair_runtime_path",
+        "reason": "t04 produced bounded attention schema with explicit focus ownership and peripheral preservation over t03 frontier"
+      },
+      {
+        "checkpoint_id": "rt01.outcome_resolution_checkpoint",
+        "source_contract": "rt01.runtime_outcome",
+        "status": "enforced_detour",
+        "required_action": "bounded_outcome_must_be_resolved",
+        "applied_action": "repair_path:repair_runtime_path",
+        "reason": "runtime contour resolved bounded outcome from enforced contracts"
+      }
+    ],
+    "missing_mandatory_checkpoint_ids": [],
+    "checkpoint_coverage_complete": true,
+    "blocked_checkpoint_ids": [],
+    "enforced_detour_checkpoint_ids": [
+      "rt01.world_seam_checkpoint",
+      "rt01.world_entry_checkpoint",
+      "rt01.outcome_resolution_checkpoint"
+    ],
+    "epistemic_admission_checkpoint": {
+      "checkpoint_id": "rt01.epistemic_admission_checkpoint",
+      "source_contract": "epistemics.downstream_allowance",
+      "status": "allowed",
+      "required_action": "consume_epistemic_allowance_and_preserve_abstain_unknown_conflict_markers",
+      "applied_action": "reported_claim:idle",
+      "reason": "report cannot be promoted to observation"
+    },
+    "shared_runtime_domain_checkpoint": {
+      "checkpoint_id": "rt01.shared_runtime_domain_checkpoint",
+      "source_contract": "shared.runtime_domains",
+      "status": "allowed",
+      "required_action": "consume_shared_regulation_continuity_validity_domains",
+      "applied_action": "idle",
+      "reason": "no prior shared runtime state supplied; contour followed phase-local contracts"
+    },
+    "downstream_obedience_checkpoint": {
+      "checkpoint_id": "rt01.downstream_obedience_checkpoint",
+      "source_contract": "rt01.downstream_obedience",
+      "status": "allowed",
+      "required_action": "allow_continue",
+      "applied_action": "idle",
+      "reason": "downstream obedience allows bounded continuation"
+    },
+    "outcome_resolution_checkpoint": {
+      "checkpoint_id": "rt01.outcome_resolution_checkpoint",
+      "source_contract": "rt01.runtime_outcome",
+      "status": "enforced_detour",
+      "required_action": "bounded_outcome_must_be_resolved",
+      "applied_action": "repair_path:repair_runtime_path",
+      "reason": "runtime contour resolved bounded outcome from enforced contracts"
+    }
+  },
+  "restrictions_and_forbidden_shortcuts": {
+    "dispatch_restrictions": [
+      "dispatch_contract_must_be_read",
+      "topology_bound_to_rt01_contour"
+    ],
+    "downstream_gate_restrictions": [
+      "fixed_order_must_be_read",
+      "r_gate_must_be_read",
+      "c01_gate_must_be_read",
+      "c02_gate_must_be_read",
+      "c03_gate_must_be_read",
+      "c04_gate_must_be_read",
+      "c05_gate_must_be_read",
+      "c04_mode_selection_must_be_enforced",
+      "c05_validity_action_must_be_enforced",
+      "c05_restrictions_must_not_be_ignored",
+      "outcome_must_be_bounded",
+      "execution_stance_must_be_read",
+      "checkpoint_decisions_must_be_read",
+      "c04_mode_claim_must_be_read",
+      "c05_action_claim_must_be_read",
+      "authority_roles_must_be_read",
+      "downstream_obedience_contract_must_be_read",
+      "downstream_obedience_restrictions_must_be_enforced",
+      "world_seam_contract_must_be_read",
+      "w_entry_contract_must_be_read",
+      "w_entry_forbidden_claims_must_be_read",
+      "w_entry_admission_criteria_must_be_read",
+      "s_minimal_contour_contract_must_be_read",
+      "s_forbidden_shortcuts_must_be_read",
+      "a_line_normalization_contract_must_be_read",
+      "a_forbidden_shortcuts_must_be_read",
+      "m_minimal_contour_contract_must_be_read",
+      "m_forbidden_shortcuts_must_be_read",
+      "n_minimal_contour_contract_must_be_read",
+      "n_forbidden_shortcuts_must_be_read",
+      "t01_semantic_field_contract_must_be_read",
+      "t01_forbidden_shortcuts_must_be_read",
+      "t02_relation_binding_contract_must_be_read",
+      "t02_forbidden_shortcuts_must_be_read",
+      "t03_hypothesis_competition_contract_must_be_read",
+      "t04_attention_schema_contract_must_be_read",
+      "s01_efference_copy_contract_must_be_read",
+      "s02_prediction_boundary_contract_must_be_read",
+      "s03_ownership_weighted_learning_contract_must_be_read",
+      "downstream_authority_degraded",
+      "world_grounded_transition_requires_world_presence"
+    ],
+    "epistemic_allowance_restrictions": [
+      "reported_not_observed"
+    ],
+    "regulation_gate_restrictions": "UNRESOLVED_FOR_V1",
+    "phase_restrictions": {
+      "world_entry_w01": [
+        "w_entry_contract_is_admission_layer_only",
+        "sprint8a_not_w01_build",
+        "w01_admission_requires_linked_observation_action_effect_episode"
+      ],
+      "s": [
+        "s_minimal_contour_must_be_read",
+        "sprint8b_not_full_s_line",
+        "self_world_boundary_requires_typed_basis"
+      ],
+      "a": [
+        "a_line_normalization_contract_must_be_read",
+        "sprint8c_not_a04_or_a05_build",
+        "capability_shortcuts_must_be_machine_readable",
+        "a_capability_claim_requires_world_or_self_basis",
+        "a_unavailable_capability_must_not_be_treated_as_available",
+        "a_no_safe_capability_claim_requires_repair_or_abstain"
+      ],
+      "m": [
+        "m_minimal_contract_must_be_read",
+        "sprint8d_not_m01_m02_m03_build",
+        "memory_lifecycle_states_must_be_respected",
+        "stale_memory_requires_review_or_revalidation",
+        "conflict_marked_memory_must_not_be_silently_merged",
+        "memory_claim_requires_provenance",
+        "review_required_memory_must_not_support_strong_claim",
+        "no_safe_memory_claim_requires_repair_or_abstain"
+      ],
+      "n": [
+        "n_minimal_contract_must_be_read",
+        "sprint8e_not_n01_n02_n03_n04_build",
+        "narrative_commitment_basis_must_be_load_bearing",
+        "narrative_commitment_requires_basis",
+        "narrative_ambiguity_must_be_preserved",
+        "narrative_contradiction_must_be_explicitly_marked",
+        "no_safe_narrative_claim_requires_repair_or_abstain"
+      ],
+      "t01": [
+        "t01_semantic_field_contract_must_be_read",
+        "t01_scene_status_must_be_read",
+        "t01_unresolved_slots_must_be_preserved",
+        "t01_scene_must_be_consumed_preverbal",
+        "no_clean_scene_commit_requires_revalidate_or_clarification",
+        "t01_preverbal_consumer_not_ready"
+      ],
+      "s02": [
+        "s02_prediction_boundary_contract_must_be_read",
+        "s02_controllability_vs_predictability_must_be_read",
+        "s02_mixed_source_status_must_be_preserved",
+        "s02_context_stale_invalidation_must_be_obeyed",
+        "s02_boundary_consumer_not_ready",
+        "s02_controllability_consumer_not_ready",
+        "s02_mixed_source_consumer_not_ready"
+      ],
+      "t02": "UNRESOLVED_FOR_V1",
+      "t03": [
+        "t03_hypothesis_competition_contract_must_be_read",
+        "t03_authority_weighted_support_must_be_read",
+        "t03_constraint_structure_must_be_read",
+        "t03_convergence_state_must_be_read",
+        "t03_publication_frontier_must_be_read",
+        "t03_convergence_consumer_not_ready"
+      ],
+      "t04": [
+        "t04_attention_schema_contract_must_be_read",
+        "t04_focus_peripheral_split_must_be_read",
+        "t04_attention_owner_must_be_read",
+        "t04_reportability_vs_stability_must_be_read",
+        "t04_focus_ownership_consumer_not_ready",
+        "t04_reportable_focus_consumer_not_ready"
+      ]
+    },
+    "phase_forbidden_shortcuts": {
+      "s": [],
+      "a": [
+        "capability_claim_without_basis",
+        "affordance_claim_without_world_or_self_basis",
+        "unavailable_capability_reframed_as_available"
+      ],
+      "m": [
+        "stale_memory_reframed_as_current_truth",
+        "conflict_marked_memory_silently_merged",
+        "no_provenance_memory_claim",
+        "unreviewed_memory_reused_as_safe_basis"
+      ],
+      "n": [
+        "prose_without_commitment_basis",
+        "narrative_reframed_as_self_truth_without_basis",
+        "narrative_reframed_as_world_truth_without_basis",
+        "narrative_reframed_as_memory_truth_without_basis",
+        "narrative_reframed_as_capability_truth_without_basis",
+        "contradiction_hidden_by_fluent_wording"
+      ],
+      "t01": [],
+      "s02": [],
+      "t02": [],
+      "t03": [],
+      "t04": []
+    },
+    "requires_restrictions_read_flags": {
+      "dispatch_contract_must_be_read": true,
+      "downstream_obedience_requires_restrictions_read": true,
+      "subject_tick_gate_requires_restrictions_read": true
+    }
+  },
+  "uncertainty_and_fallbacks": {
+    "abstain": true,
+    "abstain_reason": "repair_required",
+    "epistemic_should_abstain": false,
+    "epistemic_claim_strength": "reported_claim",
+    "epistemic_allowance_reason": "report cannot be promoted to observation",
+    "epistemic_unknown_reason": null,
+    "epistemic_conflict_reason": null,
+    "epistemic_abstain_reason": null,
+    "regulation_no_strong_override_claim": true,
+    "regulation_gate_accepted": false,
+    "regulation_pressure_level": 0.135,
+    "regulation_escalation_stage": "baseline",
+    "regulation_override_scope": "none",
+    "downstream_obedience_status": "allow_continue",
+    "downstream_obedience_fallback": "continue",
+    "gate_accepted": true,
+    "usability_class": "degraded_bounded",
+    "uncertainty_markers": {
+      "s_underconstrained": true,
+      "a_underconstrained": false,
+      "m_underconstrained": true,
+      "n_underconstrained": true,
+      "n_ambiguity_residue": true,
+      "n_contradiction_risk": "high",
+      "t01_no_clean_scene_commit": true,
+      "t01_unresolved_slots_count": 3,
+      "s02_boundary_uncertain": true,
+      "s02_insufficient_coverage": false,
+      "s02_no_clean_seam_claim": true,
+      "t03_honest_nonconvergence": true,
+      "t03_nonconvergence_preserved": true,
+      "t03_publication_unresolved_conflicts": [],
+      "t03_publication_open_slots": [
+        "slot:self_world_attribution",
+        "slot:memory_reuse_legitimacy",
+        "slot:narrative_commitment_scope"
+      ],
+      "epistemic_should_abstain": false,
+      "epistemic_unknown": false,
+      "epistemic_conflict": false,
+      "epistemic_abstain": false
+    },
+    "no_safe_markers": {
+      "s_no_safe_self_claim": true,
+      "s_no_safe_world_claim": true,
+      "a_no_safe_capability_claim": true,
+      "m_no_safe_memory_claim": true,
+      "n_no_safe_narrative_claim": true
+    },
+    "degraded_markers": {
+      "world_adapter_degraded": false,
+      "world_entry_degraded": true,
+      "s_degraded": true,
+      "a_degraded": true,
+      "m_degraded": true,
+      "n_degraded": true,
+      "downstream_authority_degraded_restriction": true
+    },
+    "packet_snapshot_precedence_blocked": "UNRESOLVED_FOR_V1"
+  },
+  "final_outcome": {
+    "final_execution_outcome": "repair",
+    "execution_stance": "repair_path",
+    "active_execution_mode": "repair_runtime_path",
+    "repair_needed": true,
+    "revalidation_needed": false,
+    "halt_reason": null,
+    "abstain": true,
+    "abstain_reason": "repair_required",
+    "downstream_gate": {
+      "accepted": true,
+      "usability_class": "degraded_bounded",
+      "restrictions": [
+        "fixed_order_must_be_read",
+        "r_gate_must_be_read",
+        "c01_gate_must_be_read",
+        "c02_gate_must_be_read",
+        "c03_gate_must_be_read",
+        "c04_gate_must_be_read",
+        "c05_gate_must_be_read",
+        "c04_mode_selection_must_be_enforced",
+        "c05_validity_action_must_be_enforced",
+        "c05_restrictions_must_not_be_ignored",
+        "outcome_must_be_bounded",
+        "execution_stance_must_be_read",
+        "checkpoint_decisions_must_be_read",
+        "c04_mode_claim_must_be_read",
+        "c05_action_claim_must_be_read",
+        "authority_roles_must_be_read",
+        "downstream_obedience_contract_must_be_read",
+        "downstream_obedience_restrictions_must_be_enforced",
+        "world_seam_contract_must_be_read",
+        "w_entry_contract_must_be_read",
+        "w_entry_forbidden_claims_must_be_read",
+        "w_entry_admission_criteria_must_be_read",
+        "s_minimal_contour_contract_must_be_read",
+        "s_forbidden_shortcuts_must_be_read",
+        "a_line_normalization_contract_must_be_read",
+        "a_forbidden_shortcuts_must_be_read",
+        "m_minimal_contour_contract_must_be_read",
+        "m_forbidden_shortcuts_must_be_read",
+        "n_minimal_contour_contract_must_be_read",
+        "n_forbidden_shortcuts_must_be_read",
+        "t01_semantic_field_contract_must_be_read",
+        "t01_forbidden_shortcuts_must_be_read",
+        "t02_relation_binding_contract_must_be_read",
+        "t02_forbidden_shortcuts_must_be_read",
+        "t03_hypothesis_competition_contract_must_be_read",
+        "t04_attention_schema_contract_must_be_read",
+        "s01_efference_copy_contract_must_be_read",
+        "s02_prediction_boundary_contract_must_be_read",
+        "s03_ownership_weighted_learning_contract_must_be_read",
+        "downstream_authority_degraded",
+        "world_grounded_transition_requires_world_presence"
+      ],
+      "reason": "runtime contour requires repair path before strong continuation",
+      "state_ref": "subject-tick-battery-epi-observation-nearest-1@1"
+    },
+    "dispatch_contract_final_execution_outcome": "repair",
+    "runtime_domain_recommended_outcome": "UNRESOLVED_FOR_V1",
+    "runtime_domain_reason": "UNRESOLVED_FOR_V1",
+    "persist_transition_accepted": null
+  },
+  "verdicts": {
+    "mechanistic_integrity": {
+      "status": "PASS",
+      "reasons": [
+        "route legality and checkpoint coherence are bounded"
+      ],
+      "evidence_field_paths": [
+        "route_and_scope.accepted",
+        "route_and_scope.lawful_production_route",
+        "checkpoints.missing_mandatory_checkpoint_ids",
+        "checkpoints.epistemic_admission_checkpoint",
+        "final_outcome.final_execution_outcome"
+      ]
+    },
+    "claim_honesty": {
+      "status": "PASS",
+      "reasons": [
+        "uncertainty/no-safe markers are preserved with bounded detour/halt outcome"
+      ],
+      "evidence_field_paths": [
+        "uncertainty_and_fallbacks.abstain",
+        "uncertainty_and_fallbacks.epistemic_should_abstain",
+        "uncertainty_and_fallbacks.epistemic_unknown_reason",
+        "uncertainty_and_fallbacks.epistemic_conflict_reason",
+        "uncertainty_and_fallbacks.uncertainty_markers",
+        "uncertainty_and_fallbacks.no_safe_markers",
+        "final_outcome.final_execution_outcome"
+      ]
+    },
+    "path_affecting_sensitivity": {
+      "status": "PASS",
+      "reasons": [
+        "triggered requirement/ablation flags produced explicit detour/block checkpoints"
+      ],
+      "evidence_field_paths": [
+        "input_summary.context_flags",
+        "checkpoints.enforced_detour_checkpoint_ids",
+        "checkpoints.blocked_checkpoint_ids"
+      ]
+    },
+    "overall": {
+      "status": "PASS",
+      "reasons": [
+        "aggregated from load-bearing verdict statuses without laundering"
+      ],
+      "evidence_field_paths": [
+        "verdicts.mechanistic_integrity.status",
+        "verdicts.claim_honesty.status",
+        "verdicts.path_affecting_sensitivity.status"
+      ]
+    }
+  },
+  "unresolved": [
+    {
+      "code": "T02_RESTRICTIONS_NOT_EXPOSED_AS_CANONICAL_FIELD",
+      "message": "t02 restrictions are not exposed as a stable dedicated field in current contract projection",
+      "blocking_surface": "runtime_topology.downstream_contract.RuntimeDispatchContractView",
+      "severity": "medium",
+      "impacted_sections": [
+        "restrictions_and_forbidden_shortcuts",
+        "phase_surfaces"
+      ],
+      "requires_non_v1_extension": false
+    },
+    {
+      "code": "REGULATION_GATE_RESTRICTIONS_NOT_EXPOSED_AS_CANONICAL_FIELD",
+      "message": "regulation gate restrictions are not exposed as a dedicated typed field in current RT01 contract projection",
+      "blocking_surface": "runtime_topology.downstream_contract.RuntimeDispatchContractView",
+      "severity": "medium",
+      "impacted_sections": [
+        "restrictions_and_forbidden_shortcuts",
+        "phase_surfaces",
+        "uncertainty_and_fallbacks"
+      ],
+      "requires_non_v1_extension": false
+    },
+    {
+      "code": "RUNTIME_DOMAIN_VIEW_NOT_MATERIALIZED_IN_ARTIFACT_RUN",
+      "message": "runtime domain contract view is unavailable without accepted persistence transition in the same run",
+      "blocking_surface": "subject_tick.persist_subject_tick_result_via_f01",
+      "severity": "low",
+      "impacted_sections": [
+        "final_outcome",
+        "uncertainty_and_fallbacks"
+      ],
+      "requires_non_v1_extension": false
+    }
+  ]
+}

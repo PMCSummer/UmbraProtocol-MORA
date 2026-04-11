@@ -14,6 +14,8 @@
       "execution_spine:RT01"
     ],
     "source_of_truth_surfaces": [
+      "epistemics.grounded_unit",
+      "epistemics.downstream_allowance",
       "runtime_state.domains",
       "rt01.downstream_obedience_checkpoint",
       "world_adapter.state",
@@ -37,6 +39,7 @@
       "t04_attention_schema.focus_targets"
     ],
     "mandatory_checkpoint_ids": [
+      "rt01.epistemic_admission_checkpoint",
       "rt01.c04_mode_binding",
       "rt01.c05_legality_checkpoint",
       "rt01.downstream_obedience_checkpoint",
@@ -63,7 +66,7 @@
   },
   "input_summary": {
     "tick_input": {
-      "case_id": "battery-t03-nonconvergence",
+      "case_id": "battery-t02-raw-vs-propagated",
       "energy": 66.0,
       "cognitive": 44.0,
       "safety": 74.0,
@@ -93,10 +96,10 @@
       "require_t01_preverbal_scene_consumer": false,
       "require_t01_scene_comparison_consumer": false,
       "require_t02_constrained_scene_consumer": false,
-      "require_t02_raw_vs_propagated_distinction": false,
+      "require_t02_raw_vs_propagated_distinction": true,
       "require_t03_convergence_consumer": false,
       "require_t03_frontier_consumer": false,
-      "require_t03_nonconvergence_preservation": true,
+      "require_t03_nonconvergence_preservation": false,
       "require_t04_focus_ownership_consumer": false,
       "require_t04_reportable_focus_consumer": false,
       "require_t04_peripheral_preservation": false,
@@ -126,6 +129,7 @@
     "decision_reason": "lawful production runtime contour route accepted",
     "production_consumer_ready": true,
     "runtime_order": [
+      "EPISTEMICS",
       "R",
       "C01",
       "C02",
@@ -267,8 +271,34 @@
       "blocked_by_survival_override": false,
       "reason": "downstream obedience allows bounded continuation"
     },
+    "epistemics": {
+      "epistemic_unit_id": "epu-12bf603ddcde49de9165922e628cff3a",
+      "epistemic_status": "report",
+      "epistemic_confidence": "medium",
+      "epistemic_source_class": "reporter",
+      "epistemic_modality": "user_text",
+      "epistemic_classification_basis": "classified as report from source/modality mapping",
+      "epistemic_can_treat_as_observation": false,
+      "epistemic_should_abstain": false,
+      "epistemic_claim_strength": "reported_claim",
+      "epistemic_allowance_restrictions": [
+        "reported_not_observed"
+      ],
+      "epistemic_allowance_reason": "report cannot be promoted to observation",
+      "epistemic_unknown_reason": null,
+      "epistemic_conflict_reason": null,
+      "epistemic_abstain_reason": null
+    },
+    "regulation": {
+      "regulation_pressure_level": 0.135,
+      "regulation_escalation_stage": "baseline",
+      "regulation_override_scope": "none",
+      "regulation_no_strong_override_claim": true,
+      "regulation_gate_accepted": false,
+      "regulation_source_state_ref": "regulation-step-1"
+    },
     "world_entry": {
-      "world_entry_episode_id": "world-episode:subject-tick-battery-t03-nonconvergence-1",
+      "world_entry_episode_id": "world-episode:subject-tick-battery-t02-raw-vs-propagated-1",
       "world_entry_w01_admission_ready": false,
       "world_entry_w01_admission_restrictions": [
         "w_entry_contract_is_admission_layer_only",
@@ -296,7 +326,7 @@
       }
     },
     "s_minimal": {
-      "s_boundary_state_id": "s-boundary:subject-tick-battery-t03-nonconvergence-1",
+      "s_boundary_state_id": "s-boundary:subject-tick-battery-t02-raw-vs-propagated-1",
       "s_attribution_class": "mixed_or_underconstrained_attribution",
       "s_underconstrained": true,
       "s_no_safe_self_claim": true,
@@ -329,7 +359,7 @@
       }
     },
     "a_line_normalization": {
-      "a_capability_id": "a-capability:subject-tick-battery-t03-nonconvergence-1",
+      "a_capability_id": "a-capability:subject-tick-battery-t02-raw-vs-propagated-1",
       "a_capability_status": "unavailable_capability",
       "a_underconstrained": false,
       "a_no_safe_capability_claim": true,
@@ -376,7 +406,7 @@
       }
     },
     "m_minimal": {
-      "m_memory_item_id": "m-memory-item:subject-tick-battery-t03-nonconvergence-1",
+      "m_memory_item_id": "m-memory-item:subject-tick-battery-t02-raw-vs-propagated-1",
       "m_lifecycle_status": "no_safe_memory_claim",
       "m_retention_class": "unsafe",
       "m_underconstrained": true,
@@ -431,7 +461,7 @@
       }
     },
     "n_minimal": {
-      "n_narrative_commitment_id": "n-commitment:subject-tick-battery-t03-nonconvergence-1",
+      "n_narrative_commitment_id": "n-commitment:subject-tick-battery-t02-raw-vs-propagated-1",
       "n_commitment_status": "no_safe_narrative_claim",
       "n_ambiguity_residue": true,
       "n_contradiction_risk": "high",
@@ -498,7 +528,7 @@
       "s01_require_prediction_validity_consumer": false
     },
     "s02_prediction_boundary": {
-      "s02_boundary_id": "s02-boundary:subject-tick-battery-t03-nonconvergence-1",
+      "s02_boundary_id": "s02-boundary:subject-tick-battery-t02-raw-vs-propagated-1",
       "s02_active_boundary_status": "seam_invalidated_for_context",
       "s02_boundary_uncertain": true,
       "s02_insufficient_coverage": false,
@@ -536,8 +566,8 @@
       }
     },
     "s03_ownership_weighted_learning": {
-      "s03_learning_id": "s03-learning:subject-tick-battery-t03-nonconvergence-1",
-      "s03_latest_packet_id": "s03-packet:subject-tick-battery-t03-nonconvergence-1:1",
+      "s03_learning_id": "s03-learning:subject-tick-battery-t02-raw-vs-propagated-1",
+      "s03_latest_packet_id": "s03-packet:subject-tick-battery-t02-raw-vs-propagated-1:1",
       "s03_latest_update_class": "observation_channel_recalibration_candidate",
       "s03_latest_commit_class": "cap_update_magnitude",
       "s03_latest_ambiguity_class": "insufficient_ownership_basis",
@@ -563,7 +593,7 @@
       }
     },
     "t01_semantic_field": {
-      "t01_scene_id": "t01-scene:subject-tick-battery-t03-nonconvergence-1",
+      "t01_scene_id": "t01-scene:subject-tick-battery-t02-raw-vs-propagated-1",
       "t01_scene_status": "authority_insufficient_for_binding",
       "t01_stability_state": "degraded",
       "t01_preverbal_consumer_ready": false,
@@ -594,7 +624,7 @@
       }
     },
     "t02_relation_binding": {
-      "t02_constrained_scene_id": "t02-constrained-scene:subject-tick-battery-t03-nonconvergence-1",
+      "t02_constrained_scene_id": "t02-constrained-scene:subject-tick-battery-t02-raw-vs-propagated-1",
       "t02_scene_status": "fragment_only",
       "t02_preverbal_constraint_consumer_ready": false,
       "t02_no_clean_binding_commit": true,
@@ -606,7 +636,7 @@
       "t02_blocked_or_conflicted_consequences_count": 7,
       "t02_forbidden_shortcuts": [],
       "t02_require_constrained_scene_consumer": false,
-      "t02_require_raw_vs_propagated_distinction": false,
+      "t02_require_raw_vs_propagated_distinction": true,
       "t02_raw_vs_propagated_distinct": false,
       "scope": {
         "scope": "rt01_contour_only",
@@ -620,7 +650,7 @@
       }
     },
     "t03_hypothesis_competition": {
-      "t03_competition_id": "t03-competition:subject-tick-battery-t03-nonconvergence-1",
+      "t03_competition_id": "t03-competition:subject-tick-battery-t02-raw-vs-propagated-1",
       "t03_convergence_status": "honest_nonconvergence",
       "t03_current_leader_hypothesis_id": null,
       "t03_provisional_frontrunner_hypothesis_id": "t03-hypothesis:ambiguity-preserving",
@@ -656,7 +686,7 @@
       "t03_publication_stability_status": "honest_nonconvergence",
       "t03_require_convergence_consumer": false,
       "t03_require_frontier_consumer": false,
-      "t03_require_nonconvergence_preservation": true,
+      "t03_require_nonconvergence_preservation": false,
       "scope": {
         "scope": "rt01_contour_only",
         "rt01_contour_only": true,
@@ -670,7 +700,7 @@
       }
     },
     "t04_attention_schema": {
-      "t04_schema_id": "t04-attention-schema:subject-tick-battery-t03-nonconvergence-1",
+      "t04_schema_id": "t04-attention-schema:subject-tick-battery-t02-raw-vs-propagated-1",
       "t04_focus_targets_count": 1,
       "t04_peripheral_targets_count": 4,
       "t04_attention_owner": "mixed_or_provisional",
@@ -708,6 +738,7 @@
   },
   "checkpoints": {
     "mandatory_checkpoint_ids": [
+      "rt01.epistemic_admission_checkpoint",
       "rt01.c04_mode_binding",
       "rt01.c05_legality_checkpoint",
       "rt01.downstream_obedience_checkpoint",
@@ -743,6 +774,14 @@
         "required_action": "reuse_valid_only",
         "applied_action": "idle",
         "reason": "c05 legality allows bounded reuse path"
+      },
+      {
+        "checkpoint_id": "rt01.epistemic_admission_checkpoint",
+        "source_contract": "epistemics.downstream_allowance",
+        "status": "allowed",
+        "required_action": "consume_epistemic_allowance_and_preserve_abstain_unknown_conflict_markers",
+        "applied_action": "reported_claim:idle",
+        "reason": "report cannot be promoted to observation"
       },
       {
         "checkpoint_id": "rt01.d01_observability_guard",
@@ -883,17 +922,17 @@
       {
         "checkpoint_id": "rt01.t02_raw_vs_propagated_integrity_checkpoint",
         "source_contract": "t02_relation_binding.raw_vs_propagated_distinction",
-        "status": "allowed",
-        "required_action": "t02_raw_vs_propagated_optional",
-        "applied_action": "idle",
-        "reason": "t02 raw-vs-propagated distinction preserved for bounded downstream use"
+        "status": "enforced_detour",
+        "required_action": "require_t02_raw_vs_propagated_distinction",
+        "applied_action": "revalidate_scope",
+        "reason": "t02 raw-vs-propagated distinction required but collapsed; revalidate detour enforced"
       },
       {
         "checkpoint_id": "rt01.t03_hypothesis_competition_checkpoint",
         "source_contract": "t03_hypothesis_competition.silent_convergence",
         "status": "allowed",
-        "required_action": "require_t03_nonconvergence_preservation",
-        "applied_action": "idle",
+        "required_action": "t03_optional",
+        "applied_action": "revalidate_scope",
         "reason": "t03 produced bounded hypothesis competition and silent convergence frontier over t01/t02 structures"
       },
       {
@@ -901,15 +940,15 @@
         "source_contract": "t04_attention_schema.focus_ownership_model",
         "status": "allowed",
         "required_action": "t04_optional",
-        "applied_action": "idle",
+        "applied_action": "revalidate_scope",
         "reason": "t04 produced bounded attention schema with explicit focus ownership and peripheral preservation over t03 frontier"
       },
       {
         "checkpoint_id": "rt01.outcome_resolution_checkpoint",
         "source_contract": "rt01.runtime_outcome",
-        "status": "allowed",
+        "status": "enforced_detour",
         "required_action": "bounded_outcome_must_be_resolved",
-        "applied_action": "continue_path:idle",
+        "applied_action": "revalidate_path:revalidate_scope",
         "reason": "runtime contour resolved bounded outcome from enforced contracts"
       }
     ],
@@ -917,8 +956,26 @@
     "checkpoint_coverage_complete": true,
     "blocked_checkpoint_ids": [],
     "enforced_detour_checkpoint_ids": [
-      "rt01.world_entry_checkpoint"
+      "rt01.world_entry_checkpoint",
+      "rt01.t02_raw_vs_propagated_integrity_checkpoint",
+      "rt01.outcome_resolution_checkpoint"
     ],
+    "epistemic_admission_checkpoint": {
+      "checkpoint_id": "rt01.epistemic_admission_checkpoint",
+      "source_contract": "epistemics.downstream_allowance",
+      "status": "allowed",
+      "required_action": "consume_epistemic_allowance_and_preserve_abstain_unknown_conflict_markers",
+      "applied_action": "reported_claim:idle",
+      "reason": "report cannot be promoted to observation"
+    },
+    "shared_runtime_domain_checkpoint": {
+      "checkpoint_id": "rt01.shared_runtime_domain_checkpoint",
+      "source_contract": "shared.runtime_domains",
+      "status": "allowed",
+      "required_action": "consume_shared_regulation_continuity_validity_domains",
+      "applied_action": "idle",
+      "reason": "no prior shared runtime state supplied; contour followed phase-local contracts"
+    },
     "downstream_obedience_checkpoint": {
       "checkpoint_id": "rt01.downstream_obedience_checkpoint",
       "source_contract": "rt01.downstream_obedience",
@@ -930,9 +987,9 @@
     "outcome_resolution_checkpoint": {
       "checkpoint_id": "rt01.outcome_resolution_checkpoint",
       "source_contract": "rt01.runtime_outcome",
-      "status": "allowed",
+      "status": "enforced_detour",
       "required_action": "bounded_outcome_must_be_resolved",
-      "applied_action": "continue_path:idle",
+      "applied_action": "revalidate_path:revalidate_scope",
       "reason": "runtime contour resolved bounded outcome from enforced contracts"
     }
   },
@@ -980,8 +1037,14 @@
       "t04_attention_schema_contract_must_be_read",
       "s01_efference_copy_contract_must_be_read",
       "s02_prediction_boundary_contract_must_be_read",
-      "s03_ownership_weighted_learning_contract_must_be_read"
+      "s03_ownership_weighted_learning_contract_must_be_read",
+      "downstream_authority_degraded",
+      "t02_raw_vs_propagated_distinction_required"
     ],
+    "epistemic_allowance_restrictions": [
+      "reported_not_observed"
+    ],
+    "regulation_gate_restrictions": "UNRESOLVED_FOR_V1",
     "phase_restrictions": {
       "world_entry_w01": [
         "w_entry_contract_is_admission_layer_only",
@@ -1089,12 +1152,23 @@
     }
   },
   "uncertainty_and_fallbacks": {
-    "abstain": false,
-    "abstain_reason": null,
+    "abstain": true,
+    "abstain_reason": "revalidation_required",
+    "epistemic_should_abstain": false,
+    "epistemic_claim_strength": "reported_claim",
+    "epistemic_allowance_reason": "report cannot be promoted to observation",
+    "epistemic_unknown_reason": null,
+    "epistemic_conflict_reason": null,
+    "epistemic_abstain_reason": null,
+    "regulation_no_strong_override_claim": true,
+    "regulation_gate_accepted": false,
+    "regulation_pressure_level": 0.135,
+    "regulation_escalation_stage": "baseline",
+    "regulation_override_scope": "none",
     "downstream_obedience_status": "allow_continue",
     "downstream_obedience_fallback": "continue",
     "gate_accepted": true,
-    "usability_class": "usable_bounded",
+    "usability_class": "degraded_bounded",
     "uncertainty_markers": {
       "s_underconstrained": true,
       "a_underconstrained": false,
@@ -1114,7 +1188,11 @@
         "slot:self_world_attribution",
         "slot:memory_reuse_legitimacy",
         "slot:narrative_commitment_scope"
-      ]
+      ],
+      "epistemic_should_abstain": false,
+      "epistemic_unknown": false,
+      "epistemic_conflict": false,
+      "epistemic_abstain": false
     },
     "no_safe_markers": {
       "s_no_safe_self_claim": true,
@@ -1130,21 +1208,22 @@
       "a_degraded": true,
       "m_degraded": true,
       "n_degraded": true,
-      "downstream_authority_degraded_restriction": false
+      "downstream_authority_degraded_restriction": true
     },
     "packet_snapshot_precedence_blocked": "UNRESOLVED_FOR_V1"
   },
   "final_outcome": {
-    "final_execution_outcome": "continue",
-    "execution_stance": "continue_path",
+    "final_execution_outcome": "revalidate",
+    "execution_stance": "revalidate_path",
+    "active_execution_mode": "revalidate_scope",
     "repair_needed": false,
-    "revalidation_needed": false,
+    "revalidation_needed": true,
     "halt_reason": null,
-    "abstain": false,
-    "abstain_reason": null,
+    "abstain": true,
+    "abstain_reason": "revalidation_required",
     "downstream_gate": {
       "accepted": true,
-      "usability_class": "usable_bounded",
+      "usability_class": "degraded_bounded",
       "restrictions": [
         "fixed_order_must_be_read",
         "r_gate_must_be_read",
@@ -1184,12 +1263,14 @@
         "t04_attention_schema_contract_must_be_read",
         "s01_efference_copy_contract_must_be_read",
         "s02_prediction_boundary_contract_must_be_read",
-        "s03_ownership_weighted_learning_contract_must_be_read"
+        "s03_ownership_weighted_learning_contract_must_be_read",
+        "downstream_authority_degraded",
+        "t02_raw_vs_propagated_distinction_required"
       ],
-      "reason": "bounded subject tick contour enforces phase contracts in runtime order",
-      "state_ref": "subject-tick-battery-t03-nonconvergence-1@1"
+      "reason": "runtime contour requires selective revalidation before unrestricted continuation",
+      "state_ref": "subject-tick-battery-t02-raw-vs-propagated-1@1"
     },
-    "dispatch_contract_final_execution_outcome": "continue",
+    "dispatch_contract_final_execution_outcome": "revalidate",
     "runtime_domain_recommended_outcome": "UNRESOLVED_FOR_V1",
     "runtime_domain_reason": "UNRESOLVED_FOR_V1",
     "persist_transition_accepted": null
@@ -1204,6 +1285,7 @@
         "route_and_scope.accepted",
         "route_and_scope.lawful_production_route",
         "checkpoints.missing_mandatory_checkpoint_ids",
+        "checkpoints.epistemic_admission_checkpoint",
         "final_outcome.final_execution_outcome"
       ]
     },
@@ -1214,6 +1296,9 @@
       ],
       "evidence_field_paths": [
         "uncertainty_and_fallbacks.abstain",
+        "uncertainty_and_fallbacks.epistemic_should_abstain",
+        "uncertainty_and_fallbacks.epistemic_unknown_reason",
+        "uncertainty_and_fallbacks.epistemic_conflict_reason",
         "uncertainty_and_fallbacks.uncertainty_markers",
         "uncertainty_and_fallbacks.no_safe_markers",
         "final_outcome.final_execution_outcome"
@@ -1251,6 +1336,18 @@
       "impacted_sections": [
         "restrictions_and_forbidden_shortcuts",
         "phase_surfaces"
+      ],
+      "requires_non_v1_extension": false
+    },
+    {
+      "code": "REGULATION_GATE_RESTRICTIONS_NOT_EXPOSED_AS_CANONICAL_FIELD",
+      "message": "regulation gate restrictions are not exposed as a dedicated typed field in current RT01 contract projection",
+      "blocking_surface": "runtime_topology.downstream_contract.RuntimeDispatchContractView",
+      "severity": "medium",
+      "impacted_sections": [
+        "restrictions_and_forbidden_shortcuts",
+        "phase_surfaces",
+        "uncertainty_and_fallbacks"
       ],
       "requires_non_v1_extension": false
     },
