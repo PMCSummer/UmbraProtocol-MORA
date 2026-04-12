@@ -28,6 +28,82 @@ FORBIDDEN_VOCABULARY = (
     "verdict",
 )
 
+HOSTED_CONTOUR_SEGMENTS = (
+    "c01_stream_kernel",
+    "c02_tension_scheduler",
+    "c03_stream_diversification",
+    "s01_efference_copy",
+    "s02_prediction_boundary",
+    "s03_ownership_weighted_learning",
+    "s_minimal_contour",
+    "a_line_normalization",
+    "m_minimal",
+    "n_minimal",
+)
+
+HOSTED_CONTOUR_FIELDS: dict[str, set[str]] = {
+    "c01_stream_kernel": {
+        "stream_state",
+        "kernel_ready",
+        "stream_load",
+        "kernel_blocked",
+        "active_stream_count",
+    },
+    "c02_tension_scheduler": {
+        "tension_level",
+        "scheduler_state",
+        "pressure_binding",
+        "tension_blocked",
+        "schedule_ready",
+    },
+    "c03_stream_diversification": {
+        "diversification_state",
+        "active_branches",
+        "branch_pressure",
+        "diversification_blocked",
+        "diversification_ready",
+    },
+    "s01_efference_copy": {
+        "efference_available",
+        "trace_ready",
+        "action_projection_present",
+        "efference_blocked",
+    },
+    "s02_prediction_boundary": {
+        "prediction_boundary_status",
+        "boundary_integrity",
+        "boundary_blocked",
+        "prediction_ready",
+    },
+    "s03_ownership_weighted_learning": {
+        "ownership_status",
+        "ownership_confidence",
+        "learning_weight_applied",
+        "ownership_blocked",
+    },
+    "s_minimal_contour": {
+        "minimal_self_status",
+        "minimal_self_ready",
+        "contour_blocked",
+    },
+    "a_line_normalization": {
+        "normalization_status",
+        "normalized_ready",
+        "normalization_blocked",
+        "normalization_scope",
+    },
+    "m_minimal": {
+        "minimal_memory_status",
+        "memory_ready",
+        "memory_blocked",
+    },
+    "n_minimal": {
+        "minimal_narrative_status",
+        "narrative_ready",
+        "narrative_blocked",
+    },
+}
+
 
 def _load_events(path: Path) -> list[dict[str, object]]:
     lines = path.read_text(encoding="utf-8").splitlines()
@@ -62,6 +138,17 @@ def _module_decision_event(events: list[dict[str, object]], module: str) -> dict
         if str(event["module"]) == module and str(event["step"]) == "decision":
             return event
     raise AssertionError(f"decision event not found for module={module}")
+
+
+def _module_events(events: list[dict[str, object]], module: str) -> list[dict[str, object]]:
+    return [event for event in events if str(event["module"]) == module]
+
+
+def _first_order(events: list[dict[str, object]], module: str, step: str = "decision") -> int:
+    for event in events:
+        if str(event["module"]) == module and str(event["step"]) == step:
+            return int(event["order"])
+    raise AssertionError(f"{step} event not found for module={module}")
 
 
 def test_runtime_truth_trace_survives_mid_tick_failure(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -265,6 +352,190 @@ def test_t03_clarity_emits_nonconvergence_basis_signal(tmp_path: Path) -> None:
     assert len(values["nonconvergence_basis"]) <= 64
     if values["convergence_status"] == "honest_nonconvergence":
         assert values["nonconvergence_basis"] != "converged_or_provisional"
+
+
+def test_rt01_contract_gate_segments_emit_runtime_events(tmp_path: Path) -> None:
+    _, events = _run_sample_trace(tmp_path, case_id="runtime-rt01-contract-gates")
+    for module in (
+        "c04_mode_arbitration",
+        "c05_temporal_validity",
+        "world_seam_enforcement",
+        "bounded_outcome_resolution",
+    ):
+        module_events = _module_events(events, module)
+        assert module_events
+        steps = {str(event["step"]) for event in module_events}
+        assert "decision" in steps
+        assert "exit" in steps
+
+
+def test_rt01_contract_gate_segments_emit_local_not_subject_aggregate_values(
+    tmp_path: Path,
+) -> None:
+    _, events = _run_sample_trace(tmp_path, case_id="runtime-rt01-local-vs-aggregate")
+    subject_values = _module_decision_event(events, "subject_tick")["values"]
+    c04_values = _module_decision_event(events, "c04_mode_arbitration")["values"]
+    c05_values = _module_decision_event(events, "c05_temporal_validity")["values"]
+
+    assert isinstance(subject_values, dict)
+    assert isinstance(c04_values, dict)
+    assert isinstance(c05_values, dict)
+
+    assert "selected_mode" in c04_values
+    assert "validity_status" in c05_values
+    assert "selected_mode" not in subject_values
+    assert "validity_status" not in subject_values
+    assert c04_values["selected_mode"] != subject_values["active_execution_mode"]
+    assert c05_values["validity_status"] != subject_values["final_execution_outcome"]
+
+
+def test_rt01_contract_gate_fields_whitelisted_and_compact(tmp_path: Path) -> None:
+    _, events = _run_sample_trace(tmp_path, case_id="runtime-rt01-whitelist")
+    expected_fields: dict[str, set[str]] = {
+        "c04_mode_arbitration": {
+            "selected_mode",
+            "mode_source",
+            "mode_conflict_present",
+            "arbitration_stable",
+            "handoff_ready",
+        },
+        "c05_temporal_validity": {
+            "validity_status",
+            "legality_class",
+            "revalidation_required",
+            "temporal_blocked",
+            "validity_ready",
+        },
+        "world_seam_enforcement": {
+            "world_transition_allowed",
+            "seam_blocked",
+            "seam_block_reason",
+            "world_grounded_ready",
+        },
+        "bounded_outcome_resolution": {
+            "bounded_outcome_class",
+            "output_allowed",
+            "materialization_mode",
+            "bounded_reason",
+            "outcome_ready",
+        },
+    }
+    for module, required in expected_fields.items():
+        values = _module_decision_event(events, module)["values"]
+        assert isinstance(values, dict)
+        assert required.issubset(set(values.keys()))
+        assert set(values.keys()).issubset(set(MODULE_ALLOWED_FIELDS[module]))
+        assert "restrictions" not in values
+        assert "execution_checkpoints" not in values
+        assert len(json.dumps(values, ensure_ascii=True)) < 600
+
+
+def test_rt01_contract_gate_runtime_order_matches_execution_contour(tmp_path: Path) -> None:
+    _, events = _run_sample_trace(tmp_path, case_id="runtime-rt01-order")
+    assert _first_order(events, "regulation") < _first_order(events, "c04_mode_arbitration")
+    assert _first_order(events, "c04_mode_arbitration") < _first_order(events, "c05_temporal_validity")
+    assert _first_order(events, "c05_temporal_validity") < _first_order(events, "downstream_obedience")
+    assert _first_order(events, "world_entry_contract", "exit") < _first_order(
+        events, "world_seam_enforcement"
+    )
+    assert _first_order(events, "world_seam_enforcement") < _first_order(events, "t01_semantic_field")
+    assert _first_order(events, "bounded_outcome_resolution") < _first_order(events, "subject_tick")
+
+
+def test_rt01_contract_gate_runtime_taps_defined_in_execute_subject_tick_source() -> None:
+    source = Path("src/substrate/subject_tick/update.py").read_text(encoding="utf-8")
+    for module in (
+        "c04_mode_arbitration",
+        "c05_temporal_validity",
+        "world_seam_enforcement",
+        "bounded_outcome_resolution",
+    ):
+        assert f'trace_emit_active("{module}"' in source
+
+
+def test_hosted_contour_segments_emit_runtime_events_when_executed(tmp_path: Path) -> None:
+    _, events = _run_sample_trace(tmp_path, case_id="runtime-hosted-contour-presence")
+    for module in HOSTED_CONTOUR_SEGMENTS:
+        module_events = _module_events(events, module)
+        assert module_events
+        steps = {str(event["step"]) for event in module_events}
+        assert "enter" in steps
+        assert "decision" in steps
+        assert "exit" in steps
+
+
+def test_hosted_contour_segments_are_absent_when_route_not_executed(tmp_path: Path) -> None:
+    _, events = _run_sample_trace(
+        tmp_path,
+        case_id="runtime-hosted-contour-not-executed",
+        route_class="helper_path",
+    )
+    modules = {str(event["module"]) for event in events}
+    for module in HOSTED_CONTOUR_SEGMENTS:
+        assert module not in modules
+
+
+def test_hosted_contour_fields_are_whitelisted_compact_and_non_aggregate(tmp_path: Path) -> None:
+    _, events = _run_sample_trace(tmp_path, case_id="runtime-hosted-contour-whitelist")
+    subject_values = _module_decision_event(events, "subject_tick")["values"]
+    assert isinstance(subject_values, dict)
+
+    for module in HOSTED_CONTOUR_SEGMENTS:
+        values = _module_decision_event(events, module)["values"]
+        required = HOSTED_CONTOUR_FIELDS[module]
+        assert isinstance(values, dict)
+        assert required.issubset(set(values.keys()))
+        assert set(values.keys()).issubset(set(MODULE_ALLOWED_FIELDS[module]))
+        assert "state" not in values
+        assert "telemetry" not in values
+        assert "execution_checkpoints" not in values
+        assert len(json.dumps(values, ensure_ascii=True)) < 700
+        for key in required:
+            assert key not in subject_values
+
+
+def test_hosted_contour_segments_follow_real_runtime_order(tmp_path: Path) -> None:
+    _, events = _run_sample_trace(tmp_path, case_id="runtime-hosted-contour-order")
+    assert _first_order(events, "regulation") < _first_order(events, "c01_stream_kernel")
+    assert _first_order(events, "c01_stream_kernel") < _first_order(events, "c02_tension_scheduler")
+    assert _first_order(events, "c02_tension_scheduler") < _first_order(
+        events, "c03_stream_diversification"
+    )
+    assert _first_order(events, "c03_stream_diversification") < _first_order(
+        events, "c04_mode_arbitration"
+    )
+    assert _first_order(events, "world_seam_enforcement") < _first_order(events, "s01_efference_copy")
+    assert _first_order(events, "s01_efference_copy") < _first_order(events, "s02_prediction_boundary")
+    assert _first_order(events, "s02_prediction_boundary") < _first_order(
+        events, "s03_ownership_weighted_learning"
+    )
+    assert _first_order(events, "s03_ownership_weighted_learning") < _first_order(
+        events, "s_minimal_contour"
+    )
+    assert _first_order(events, "s_minimal_contour") < _first_order(events, "a_line_normalization")
+    assert _first_order(events, "a_line_normalization") < _first_order(events, "m_minimal")
+    assert _first_order(events, "m_minimal") < _first_order(events, "n_minimal")
+    assert _first_order(events, "n_minimal") < _first_order(events, "t01_semantic_field")
+    assert _first_order(events, "bounded_outcome_resolution") < _first_order(events, "subject_tick")
+
+
+def test_hosted_contour_middle_gap_is_now_runtime_visible(tmp_path: Path) -> None:
+    _, events = _run_sample_trace(tmp_path, case_id="runtime-hosted-contour-gap-closure")
+    reg_order = _first_order(events, "regulation")
+    subject_order = _first_order(events, "subject_tick")
+    middle_modules = {
+        str(event["module"])
+        for event in events
+        if reg_order < int(event["order"]) < subject_order
+    }
+    visible = middle_modules.intersection(set(HOSTED_CONTOUR_SEGMENTS))
+    assert len(visible) >= 8
+
+
+def test_hosted_contour_runtime_taps_exist_in_subject_tick_source() -> None:
+    source = Path("src/substrate/subject_tick/update.py").read_text(encoding="utf-8")
+    for module in HOSTED_CONTOUR_SEGMENTS:
+        assert f'trace_emit_active("{module}"' in source
 
 
 def test_blocked_steps_only_appear_on_actual_blocked_paths(tmp_path: Path) -> None:

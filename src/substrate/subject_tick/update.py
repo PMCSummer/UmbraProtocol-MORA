@@ -438,6 +438,30 @@ def execute_subject_tick(
     )
     stream_view = derive_stream_kernel_contract_view(stream)
     stream_mode = choose_stream_execution_mode(stream)
+    c01_enter_values = {
+        "stream_state": stream.state.link_decision.value,
+        "kernel_ready": stream_view.gate_accepted,
+        "stream_load": _c01_stream_load(stream),
+        "kernel_blocked": not stream_view.gate_accepted,
+        "active_stream_count": len(stream.state.carryover_items),
+    }
+    trace_emit_active("c01_stream_kernel", "enter", c01_enter_values)
+    c01_trace_values = {
+        "stream_state": stream.state.link_decision.value,
+        "kernel_ready": stream_view.gate_accepted,
+        "stream_load": _c01_stream_load(stream),
+        "kernel_blocked": not stream_view.gate_accepted,
+        "active_stream_count": len(stream.state.carryover_items),
+    }
+    trace_emit_active("c01_stream_kernel", "decision", c01_trace_values)
+    if c01_trace_values["kernel_blocked"]:
+        trace_emit_active(
+            "c01_stream_kernel",
+            "blocked",
+            c01_trace_values,
+            note="kernel_gate_blocked",
+        )
+    trace_emit_active("c01_stream_kernel", "exit", c01_trace_values)
 
     scheduler = build_tension_scheduler(
         stream,
@@ -456,6 +480,30 @@ def execute_subject_tick(
     )
     scheduler_view = derive_tension_scheduler_contract_view(scheduler)
     scheduler_mode = choose_tension_execution_mode(scheduler)
+    c02_enter_values = {
+        "tension_level": len(scheduler.state.active_tension_ids),
+        "scheduler_state": scheduler_mode,
+        "pressure_binding": scheduler_view.usability_class.value,
+        "tension_blocked": not scheduler_view.gate_accepted,
+        "schedule_ready": scheduler_view.gate_accepted,
+    }
+    trace_emit_active("c02_tension_scheduler", "enter", c02_enter_values)
+    c02_trace_values = {
+        "tension_level": len(scheduler.state.active_tension_ids),
+        "scheduler_state": scheduler_mode,
+        "pressure_binding": scheduler_view.usability_class.value,
+        "tension_blocked": not scheduler_view.gate_accepted,
+        "schedule_ready": scheduler_view.gate_accepted,
+    }
+    trace_emit_active("c02_tension_scheduler", "decision", c02_trace_values)
+    if c02_trace_values["tension_blocked"]:
+        trace_emit_active(
+            "c02_tension_scheduler",
+            "blocked",
+            c02_trace_values,
+            note="scheduler_gate_blocked",
+        )
+    trace_emit_active("c02_tension_scheduler", "exit", c02_trace_values)
 
     diversification = build_stream_diversification(
         stream,
@@ -475,6 +523,30 @@ def execute_subject_tick(
     )
     diversification_view = derive_stream_diversification_contract_view(diversification)
     diversification_mode = choose_diversification_execution_mode(diversification)
+    c03_enter_values = {
+        "diversification_state": diversification.state.decision_status.value,
+        "active_branches": len(diversification.state.actionable_alternative_classes),
+        "branch_pressure": diversification.state.diversification_pressure,
+        "diversification_blocked": not diversification_view.gate_accepted,
+        "diversification_ready": diversification_view.gate_accepted,
+    }
+    trace_emit_active("c03_stream_diversification", "enter", c03_enter_values)
+    c03_trace_values = {
+        "diversification_state": diversification.state.decision_status.value,
+        "active_branches": len(diversification.state.actionable_alternative_classes),
+        "branch_pressure": diversification.state.diversification_pressure,
+        "diversification_blocked": not diversification_view.gate_accepted,
+        "diversification_ready": diversification_view.gate_accepted,
+    }
+    trace_emit_active("c03_stream_diversification", "decision", c03_trace_values)
+    if c03_trace_values["diversification_blocked"]:
+        trace_emit_active(
+            "c03_stream_diversification",
+            "blocked",
+            c03_trace_values,
+            note="diversification_gate_blocked",
+        )
+    trace_emit_active("c03_stream_diversification", "exit", c03_trace_values)
 
     mode_arbitration = build_mode_arbitration(
         stream,
@@ -528,6 +600,14 @@ def execute_subject_tick(
 
     c04_execution_mode_claim = c04_execution_mode
     c05_execution_action_claim = c05_validity_action
+    c04_enter_values = {
+        "selected_mode": mode_arbitration.state.active_mode.value,
+        "mode_source": mode_arbitration.state.endogenous_tick_kind.value,
+        "mode_conflict_present": _c04_mode_conflict_present(mode_arbitration, mode_view),
+        "arbitration_stable": _c04_arbitration_stable(mode_arbitration, mode_view),
+        "handoff_ready": mode_view.gate_accepted,
+    }
+    trace_emit_active("c04_mode_arbitration", "enter", c04_enter_values)
     active_execution_mode = c04_execution_mode_claim
     trace_emit_active(
         "subject_tick",
@@ -544,77 +624,124 @@ def execute_subject_tick(
         SubjectTickAuthorityRole.GATING.value,
         SubjectTickAuthorityRole.INVALIDATION.value,
     }
+    c04_checkpoint_status = SubjectTickCheckpointStatus.ALLOWED
+    c04_checkpoint_reason = "rt01 consumed c04 execution mode claim without reinterpretation"
+    c04_block_reason: str | None = None
 
     if c04_authority_role != SubjectTickAuthorityRole.ARBITRATION.value:
         active_execution_mode = "repair_runtime_path"
         repair_needed = True
+        c04_checkpoint_status = SubjectTickCheckpointStatus.BLOCKED
+        c04_checkpoint_reason = (
+            "rt01 rejected c04 mode claim because roadmap authority_role is not arbitration"
+        )
+        c04_block_reason = "authority_role_mismatch"
         checkpoints.append(
             SubjectTickCheckpointResult(
                 checkpoint_id="rt01.c04_mode_binding",
                 source_contract="c04.mode_arbitration",
-                status=SubjectTickCheckpointStatus.BLOCKED,
+                status=c04_checkpoint_status,
                 required_action=SubjectTickAuthorityRole.ARBITRATION.value,
                 applied_action=c04_authority_role,
-                reason="rt01 rejected c04 mode claim because roadmap authority_role is not arbitration",
+                reason=c04_checkpoint_reason,
             )
         )
     elif not context.disable_c04_mode_execution_binding:
         active_execution_mode = c04_execution_mode_claim
+        c04_checkpoint_status = SubjectTickCheckpointStatus.ALLOWED
+        c04_checkpoint_reason = "rt01 consumed c04 execution mode claim without reinterpretation"
         checkpoints.append(
             SubjectTickCheckpointResult(
                 checkpoint_id="rt01.c04_mode_binding",
                 source_contract="c04.mode_arbitration",
-                status=SubjectTickCheckpointStatus.ALLOWED,
+                status=c04_checkpoint_status,
                 required_action=c04_execution_mode_claim,
                 applied_action=active_execution_mode,
-                reason="rt01 consumed c04 execution mode claim without reinterpretation",
+                reason=c04_checkpoint_reason,
             )
         )
     else:
         active_execution_mode = stream_mode
+        c04_checkpoint_status = SubjectTickCheckpointStatus.ENFORCED_DETOUR
+        c04_checkpoint_reason = "c04 mode binding disabled in ablation context"
+        c04_block_reason = "binding_disabled"
         checkpoints.append(
             SubjectTickCheckpointResult(
                 checkpoint_id="rt01.c04_mode_binding",
                 source_contract="c04.mode_arbitration",
-                status=SubjectTickCheckpointStatus.ENFORCED_DETOUR,
+                status=c04_checkpoint_status,
                 required_action=c04_execution_mode_claim,
                 applied_action=active_execution_mode,
-                reason="c04 mode binding disabled in ablation context",
+                reason=c04_checkpoint_reason,
             )
         )
+    c04_trace_values = {
+        "selected_mode": mode_arbitration.state.active_mode.value,
+        "mode_source": mode_arbitration.state.endogenous_tick_kind.value,
+        "mode_conflict_present": _c04_mode_conflict_present(mode_arbitration, mode_view),
+        "arbitration_stable": _c04_arbitration_stable(mode_arbitration, mode_view),
+        "handoff_ready": c04_checkpoint_status == SubjectTickCheckpointStatus.ALLOWED,
+    }
+    trace_emit_active("c04_mode_arbitration", "decision", c04_trace_values)
+    if c04_checkpoint_status != SubjectTickCheckpointStatus.ALLOWED:
+        trace_emit_active(
+            "c04_mode_arbitration",
+            "blocked",
+            c04_trace_values,
+            note=c04_block_reason or "mode_arbitration_detour",
+        )
+    trace_emit_active("c04_mode_arbitration", "exit", c04_trace_values)
+
+    c05_enter_values = {
+        "validity_status": c05_validity_action,
+        "legality_class": temporal_view.usability_class.value,
+        "revalidation_required": _c05_revalidation_required(temporal_validity, c05_validity_action),
+        "temporal_blocked": not temporal_view.gate_accepted,
+        "validity_ready": temporal_view.gate_accepted,
+    }
+    trace_emit_active("c05_temporal_validity", "enter", c05_enter_values)
+    c05_status = SubjectTickCheckpointStatus.ALLOWED
+    c05_reason = "c05 legality allows bounded reuse path"
+    c05_block_reason: str | None = None
 
     if not c05_enforcement_authority:
         repair_needed = True
         active_execution_mode = "repair_runtime_path"
+        c05_status = SubjectTickCheckpointStatus.BLOCKED
+        c05_reason = (
+            "rt01 refused applying c05 legality as authority because roadmap authority_role is non-enforcement"
+        )
+        c05_block_reason = "authority_role_mismatch"
         checkpoints.append(
             SubjectTickCheckpointResult(
                 checkpoint_id="rt01.c05_legality_checkpoint",
                 source_contract="c05.temporal_validity",
-                status=SubjectTickCheckpointStatus.BLOCKED,
+                status=c05_status,
                 required_action="gating_or_invalidation",
                 applied_action=c05_authority_role,
-                reason="rt01 refused applying c05 legality as authority because roadmap authority_role is non-enforcement",
+                reason=c05_reason,
             )
         )
     elif not context.disable_c05_validity_enforcement:
-        c05_status = SubjectTickCheckpointStatus.ALLOWED
-        c05_reason = "c05 legality allows bounded reuse path"
         prior_mode = active_execution_mode
         if active_execution_mode == "continue_stream" and not can_continue_mode_hold(temporal_validity):
             active_execution_mode = "revalidate_mode_hold"
             revalidation_needed = True
             c05_status = SubjectTickCheckpointStatus.ENFORCED_DETOUR
             c05_reason = "c05 blocked mode hold reuse; revalidation detour enforced"
+            c05_block_reason = "mode_hold_revalidation_required"
         if active_execution_mode == "run_revisit" and not can_revisit_with_basis(temporal_validity):
             active_execution_mode = "revalidate_revisit_basis"
             revalidation_needed = True
             c05_status = SubjectTickCheckpointStatus.ENFORCED_DETOUR
             c05_reason = "c05 blocked revisit basis reuse; revalidation detour enforced"
+            c05_block_reason = "revisit_basis_revalidation_required"
         if active_execution_mode == "probe_alternatives" and not can_open_branch_access(temporal_validity):
             active_execution_mode = "repair_branch_access"
             repair_needed = True
             c05_status = SubjectTickCheckpointStatus.ENFORCED_DETOUR
             c05_reason = "c05 blocked branch access; repair detour enforced"
+            c05_block_reason = "branch_access_repair_required"
         if c05_validity_action in {
             "run_selective_revalidation",
             "run_bounded_revalidation",
@@ -624,14 +751,17 @@ def execute_subject_tick(
             revalidation_needed = True
             c05_status = SubjectTickCheckpointStatus.ENFORCED_DETOUR
             c05_reason = "c05 requested revalidation scope before runtime continuation"
+            c05_block_reason = "revalidation_scope_required"
         if c05_validity_action == "halt_reuse_and_rebuild_scope":
             active_execution_mode = "halt_execution"
             halt_reason = "c05_halt_reuse_and_rebuild_scope"
             c05_status = SubjectTickCheckpointStatus.BLOCKED
             c05_reason = "c05 halted reuse legality; runtime continuation blocked"
+            c05_block_reason = "halt_reuse_rebuild_scope"
         if c05_status == SubjectTickCheckpointStatus.ALLOWED and prior_mode != active_execution_mode:
             c05_status = SubjectTickCheckpointStatus.ENFORCED_DETOUR
             c05_reason = "c05 enforcement changed runtime execution path"
+            c05_block_reason = "runtime_path_changed_by_c05"
         checkpoints.append(
             SubjectTickCheckpointResult(
                 checkpoint_id="rt01.c05_legality_checkpoint",
@@ -643,16 +773,40 @@ def execute_subject_tick(
             )
         )
     else:
+        c05_status = SubjectTickCheckpointStatus.ENFORCED_DETOUR
+        c05_reason = "c05 legality enforcement disabled in ablation context"
+        c05_block_reason = "enforcement_disabled"
         checkpoints.append(
             SubjectTickCheckpointResult(
                 checkpoint_id="rt01.c05_legality_checkpoint",
                 source_contract="c05.temporal_validity",
-                status=SubjectTickCheckpointStatus.ENFORCED_DETOUR,
+                status=c05_status,
                 required_action=c05_execution_action_claim,
                 applied_action=active_execution_mode,
-                reason="c05 legality enforcement disabled in ablation context",
+                reason=c05_reason,
             )
         )
+    c05_trace_values = {
+        "validity_status": c05_validity_action,
+        "legality_class": temporal_view.usability_class.value,
+        "revalidation_required": (
+            _c05_revalidation_required(temporal_validity, c05_validity_action)
+            or active_execution_mode in {"revalidate_mode_hold", "revalidate_revisit_basis", "revalidate_scope"}
+        ),
+        "temporal_blocked": c05_status == SubjectTickCheckpointStatus.BLOCKED,
+        "validity_ready": (
+            c05_status == SubjectTickCheckpointStatus.ALLOWED and temporal_view.gate_accepted
+        ),
+    }
+    trace_emit_active("c05_temporal_validity", "decision", c05_trace_values)
+    if c05_status != SubjectTickCheckpointStatus.ALLOWED:
+        trace_emit_active(
+            "c05_temporal_validity",
+            "blocked",
+            c05_trace_values,
+            note=c05_block_reason or "temporal_validity_detour",
+        )
+    trace_emit_active("c05_temporal_validity", "exit", c05_trace_values)
 
     revalidation_modes = {"revalidate_mode_hold", "revalidate_revisit_basis", "revalidate_scope"}
     epistemic_checkpoint_status = SubjectTickCheckpointStatus.ALLOWED
@@ -1101,8 +1255,23 @@ def execute_subject_tick(
             note=world_entry_result.w01_admission.reason,
         )
     trace_emit_active("world_entry_contract", "exit", world_entry_trace_values)
+    world_seam_enter_values = {
+        "world_transition_allowed": (
+            (not context.require_world_grounded_transition)
+            or world_entry_result.world_grounded_transition_admissible
+        )
+        and (
+            (not context.require_world_effect_feedback_for_success_claim)
+            or world_entry_result.world_effect_success_admissible
+        ),
+        "seam_blocked": False,
+        "seam_block_reason": None,
+        "world_grounded_ready": world_entry_result.world_grounded_transition_admissible,
+    }
+    trace_emit_active("world_seam_enforcement", "enter", world_seam_enter_values)
     world_checkpoint_status = SubjectTickCheckpointStatus.ALLOWED
     world_checkpoint_reason = world_entry_result.reason
+    world_seam_block_reason: str | None = None
     if not context.disable_world_seam_enforcement:
         if (
             context.require_world_grounded_transition
@@ -1114,6 +1283,7 @@ def execute_subject_tick(
             world_checkpoint_reason = (
                 "world grounded transition required but lawful world-entry episode basis is unavailable"
             )
+            world_seam_block_reason = "grounded_transition_required_unmet"
             if active_execution_mode not in {"halt_execution", "revalidate_scope"}:
                 active_execution_mode = "repair_runtime_path"
 
@@ -1128,11 +1298,29 @@ def execute_subject_tick(
             world_checkpoint_reason = (
                 "world effect feedback required for success claim but lawful correlated success basis is unavailable"
             )
+            world_seam_block_reason = "effect_feedback_required_unmet"
             if active_execution_mode != "halt_execution":
                 active_execution_mode = "revalidate_scope"
     else:
         world_checkpoint_status = SubjectTickCheckpointStatus.ENFORCED_DETOUR
         world_checkpoint_reason = "world seam enforcement disabled in ablation context"
+        world_seam_block_reason = "enforcement_disabled"
+
+    world_seam_trace_values = {
+        "world_transition_allowed": world_checkpoint_status == SubjectTickCheckpointStatus.ALLOWED,
+        "seam_blocked": world_checkpoint_status != SubjectTickCheckpointStatus.ALLOWED,
+        "seam_block_reason": world_seam_block_reason,
+        "world_grounded_ready": world_entry_result.world_grounded_transition_admissible,
+    }
+    trace_emit_active("world_seam_enforcement", "decision", world_seam_trace_values)
+    if world_checkpoint_status != SubjectTickCheckpointStatus.ALLOWED:
+        trace_emit_active(
+            "world_seam_enforcement",
+            "blocked",
+            world_seam_trace_values,
+            note=world_seam_block_reason or "world_seam_detour",
+        )
+    trace_emit_active("world_seam_enforcement", "exit", world_seam_trace_values)
 
     checkpoints.append(
         SubjectTickCheckpointResult(
@@ -1203,6 +1391,15 @@ def execute_subject_tick(
         source_lineage=lineage,
         register_prediction=not context.disable_s01_prediction_registration,
     )
+    s01_enter_values = {
+        "efference_available": bool(
+            s01_result.state.pending_predictions or s01_result.state.forward_packets
+        ),
+        "trace_ready": s01_result.gate.comparison_ready,
+        "action_projection_present": bool(s01_result.state.forward_packets),
+        "efference_blocked": False,
+    }
+    trace_emit_active("s01_efference_copy", "enter", s01_enter_values)
     s01_checkpoint_status = SubjectTickCheckpointStatus.ALLOWED
     s01_checkpoint_reason = s01_result.gate.reason
     if not context.disable_s01_enforcement:
@@ -1246,6 +1443,23 @@ def execute_subject_tick(
     else:
         s01_checkpoint_status = SubjectTickCheckpointStatus.ENFORCED_DETOUR
         s01_checkpoint_reason = "s01 efference copy enforcement disabled in ablation context"
+    s01_trace_values = {
+        "efference_available": bool(
+            s01_result.state.pending_predictions or s01_result.state.forward_packets
+        ),
+        "trace_ready": s01_result.gate.comparison_ready,
+        "action_projection_present": bool(s01_result.state.forward_packets),
+        "efference_blocked": s01_checkpoint_status != SubjectTickCheckpointStatus.ALLOWED,
+    }
+    trace_emit_active("s01_efference_copy", "decision", s01_trace_values)
+    if s01_trace_values["efference_blocked"]:
+        trace_emit_active(
+            "s01_efference_copy",
+            "blocked",
+            s01_trace_values,
+            note="s01_checkpoint_not_allowed",
+        )
+    trace_emit_active("s01_efference_copy", "exit", s01_trace_values)
     checkpoints.append(
         SubjectTickCheckpointResult(
             checkpoint_id="rt01.s01_efference_copy_checkpoint",
@@ -1296,6 +1510,13 @@ def execute_subject_tick(
         context_scope=("c04_mode", c04_execution_mode_claim, "c05_action", c05_validity_action),
     )
     s02_view = derive_s02_boundary_consumer_view(s02_result)
+    s02_enter_values = {
+        "prediction_boundary_status": s02_result.state.active_boundary_status.value,
+        "boundary_integrity": _s02_boundary_integrity(s02_result),
+        "boundary_blocked": False,
+        "prediction_ready": s02_view.can_consume_boundary,
+    }
+    trace_emit_active("s02_prediction_boundary", "enter", s02_enter_values)
     s02_checkpoint_status = SubjectTickCheckpointStatus.ALLOWED
     s02_checkpoint_reason = s02_result.gate.reason
     if not context.disable_s02_enforcement:
@@ -1338,6 +1559,21 @@ def execute_subject_tick(
     else:
         s02_checkpoint_status = SubjectTickCheckpointStatus.ENFORCED_DETOUR
         s02_checkpoint_reason = "s02 prediction boundary enforcement disabled in ablation context"
+    s02_trace_values = {
+        "prediction_boundary_status": s02_result.state.active_boundary_status.value,
+        "boundary_integrity": _s02_boundary_integrity(s02_result),
+        "boundary_blocked": s02_checkpoint_status != SubjectTickCheckpointStatus.ALLOWED,
+        "prediction_ready": s02_view.can_consume_boundary,
+    }
+    trace_emit_active("s02_prediction_boundary", "decision", s02_trace_values)
+    if s02_trace_values["boundary_blocked"]:
+        trace_emit_active(
+            "s02_prediction_boundary",
+            "blocked",
+            s02_trace_values,
+            note="s02_checkpoint_not_allowed",
+        )
+    trace_emit_active("s02_prediction_boundary", "exit", s02_trace_values)
     checkpoints.append(
         SubjectTickCheckpointResult(
             checkpoint_id="rt01.s02_prediction_boundary_checkpoint",
@@ -1392,6 +1628,13 @@ def execute_subject_tick(
         source_lineage=lineage,
     )
     s03_view = derive_s03_update_packet_consumer_view(s03_result)
+    s03_enter_values = {
+        "ownership_status": s03_result.state.latest_update_class.value,
+        "ownership_confidence": _s03_ownership_confidence(s03_result),
+        "learning_weight_applied": _s03_learning_weight_applied(s03_result),
+        "ownership_blocked": False,
+    }
+    trace_emit_active("s03_ownership_weighted_learning", "enter", s03_enter_values)
     s03_checkpoint_status = SubjectTickCheckpointStatus.ALLOWED
     s03_checkpoint_reason = s03_result.gate.reason
     if not context.disable_s03_enforcement:
@@ -1436,6 +1679,21 @@ def execute_subject_tick(
         s03_checkpoint_reason = (
             "s03 ownership-weighted learning enforcement disabled in ablation context"
         )
+    s03_trace_values = {
+        "ownership_status": s03_result.state.latest_update_class.value,
+        "ownership_confidence": _s03_ownership_confidence(s03_result),
+        "learning_weight_applied": _s03_learning_weight_applied(s03_result),
+        "ownership_blocked": s03_checkpoint_status != SubjectTickCheckpointStatus.ALLOWED,
+    }
+    trace_emit_active("s03_ownership_weighted_learning", "decision", s03_trace_values)
+    if s03_trace_values["ownership_blocked"]:
+        trace_emit_active(
+            "s03_ownership_weighted_learning",
+            "blocked",
+            s03_trace_values,
+            note="s03_checkpoint_not_allowed",
+        )
+    trace_emit_active("s03_ownership_weighted_learning", "exit", s03_trace_values)
     checkpoints.append(
         SubjectTickCheckpointResult(
             checkpoint_id="rt01.s03_ownership_weighted_learning_checkpoint",
@@ -1474,6 +1732,12 @@ def execute_subject_tick(
         require_self_controlled_transition_claim=context.require_self_controlled_transition_claim,
         source_lineage=lineage,
     )
+    s_minimal_enter_values = {
+        "minimal_self_status": s_minimal_result.state.internal_vs_external_source_status.value,
+        "minimal_self_ready": s_minimal_result.admission.admission_ready_for_s01,
+        "contour_blocked": False,
+    }
+    trace_emit_active("s_minimal_contour", "enter", s_minimal_enter_values)
     s_checkpoint_status = SubjectTickCheckpointStatus.ALLOWED
     s_checkpoint_reason = s_minimal_result.gate.reason
     if not context.disable_s_minimal_enforcement:
@@ -1539,6 +1803,20 @@ def execute_subject_tick(
     else:
         s_checkpoint_status = SubjectTickCheckpointStatus.ENFORCED_DETOUR
         s_checkpoint_reason = "s-minimal contour enforcement disabled in ablation context"
+    s_minimal_trace_values = {
+        "minimal_self_status": s_minimal_result.state.internal_vs_external_source_status.value,
+        "minimal_self_ready": s_minimal_result.admission.admission_ready_for_s01,
+        "contour_blocked": s_checkpoint_status != SubjectTickCheckpointStatus.ALLOWED,
+    }
+    trace_emit_active("s_minimal_contour", "decision", s_minimal_trace_values)
+    if s_minimal_trace_values["contour_blocked"]:
+        trace_emit_active(
+            "s_minimal_contour",
+            "blocked",
+            s_minimal_trace_values,
+            note="s_minimal_checkpoint_not_allowed",
+        )
+    trace_emit_active("s_minimal_contour", "exit", s_minimal_trace_values)
     checkpoints.append(
         SubjectTickCheckpointResult(
             checkpoint_id="rt01.s_minimal_contour_checkpoint",
@@ -1565,6 +1843,13 @@ def execute_subject_tick(
         c05_validity_action=c05_validity_action,
         source_lineage=lineage,
     )
+    a_line_enter_values = {
+        "normalization_status": a_line_result.state.capability_status.value,
+        "normalized_ready": a_line_result.a04_readiness.admission_ready_for_a04,
+        "normalization_blocked": False,
+        "normalization_scope": a_line_result.scope_marker.scope,
+    }
+    trace_emit_active("a_line_normalization", "enter", a_line_enter_values)
     a_checkpoint_status = SubjectTickCheckpointStatus.ALLOWED
     a_checkpoint_reason = a_line_result.gate.reason
     if not context.disable_a_line_enforcement:
@@ -1594,6 +1879,21 @@ def execute_subject_tick(
     else:
         a_checkpoint_status = SubjectTickCheckpointStatus.ENFORCED_DETOUR
         a_checkpoint_reason = "a-line normalization enforcement disabled in ablation context"
+    a_line_trace_values = {
+        "normalization_status": a_line_result.state.capability_status.value,
+        "normalized_ready": a_line_result.a04_readiness.admission_ready_for_a04,
+        "normalization_blocked": a_checkpoint_status != SubjectTickCheckpointStatus.ALLOWED,
+        "normalization_scope": a_line_result.scope_marker.scope,
+    }
+    trace_emit_active("a_line_normalization", "decision", a_line_trace_values)
+    if a_line_trace_values["normalization_blocked"]:
+        trace_emit_active(
+            "a_line_normalization",
+            "blocked",
+            a_line_trace_values,
+            note="a_line_checkpoint_not_allowed",
+        )
+    trace_emit_active("a_line_normalization", "exit", a_line_trace_values)
 
     checkpoints.append(
         SubjectTickCheckpointResult(
@@ -1617,6 +1917,12 @@ def execute_subject_tick(
         c05_validity_action=c05_validity_action,
         source_lineage=lineage,
     )
+    m_minimal_enter_values = {
+        "minimal_memory_status": m_minimal_result.state.lifecycle_status.value,
+        "memory_ready": m_minimal_result.admission.admission_ready_for_m01,
+        "memory_blocked": False,
+    }
+    trace_emit_active("m_minimal", "enter", m_minimal_enter_values)
     m_checkpoint_status = SubjectTickCheckpointStatus.ALLOWED
     m_checkpoint_reason = m_minimal_result.gate.reason
     if not context.disable_m_minimal_enforcement:
@@ -1647,6 +1953,20 @@ def execute_subject_tick(
     else:
         m_checkpoint_status = SubjectTickCheckpointStatus.ENFORCED_DETOUR
         m_checkpoint_reason = "m-minimal contour enforcement disabled in ablation context"
+    m_minimal_trace_values = {
+        "minimal_memory_status": m_minimal_result.state.lifecycle_status.value,
+        "memory_ready": m_minimal_result.admission.admission_ready_for_m01,
+        "memory_blocked": m_checkpoint_status != SubjectTickCheckpointStatus.ALLOWED,
+    }
+    trace_emit_active("m_minimal", "decision", m_minimal_trace_values)
+    if m_minimal_trace_values["memory_blocked"]:
+        trace_emit_active(
+            "m_minimal",
+            "blocked",
+            m_minimal_trace_values,
+            note="m_minimal_checkpoint_not_allowed",
+        )
+    trace_emit_active("m_minimal", "exit", m_minimal_trace_values)
     checkpoints.append(
         SubjectTickCheckpointResult(
             checkpoint_id="rt01.m_minimal_contour_checkpoint",
@@ -1670,6 +1990,12 @@ def execute_subject_tick(
         claim_pressure=context.require_narrative_safe_claim,
         source_lineage=lineage,
     )
+    n_minimal_enter_values = {
+        "minimal_narrative_status": n_minimal_result.state.commitment_status.value,
+        "narrative_ready": n_minimal_result.admission.admission_ready_for_n01,
+        "narrative_blocked": False,
+    }
+    trace_emit_active("n_minimal", "enter", n_minimal_enter_values)
     n_checkpoint_status = SubjectTickCheckpointStatus.ALLOWED
     n_checkpoint_reason = n_minimal_result.gate.reason
     if not context.disable_n_minimal_enforcement:
@@ -1700,6 +2026,20 @@ def execute_subject_tick(
     else:
         n_checkpoint_status = SubjectTickCheckpointStatus.ENFORCED_DETOUR
         n_checkpoint_reason = "n-minimal contour enforcement disabled in ablation context"
+    n_minimal_trace_values = {
+        "minimal_narrative_status": n_minimal_result.state.commitment_status.value,
+        "narrative_ready": n_minimal_result.admission.admission_ready_for_n01,
+        "narrative_blocked": n_checkpoint_status != SubjectTickCheckpointStatus.ALLOWED,
+    }
+    trace_emit_active("n_minimal", "decision", n_minimal_trace_values)
+    if n_minimal_trace_values["narrative_blocked"]:
+        trace_emit_active(
+            "n_minimal",
+            "blocked",
+            n_minimal_trace_values,
+            note="n_minimal_checkpoint_not_allowed",
+        )
+    trace_emit_active("n_minimal", "exit", n_minimal_trace_values)
     checkpoints.append(
         SubjectTickCheckpointResult(
             checkpoint_id="rt01.n_minimal_contour_checkpoint",
@@ -2192,17 +2532,31 @@ def execute_subject_tick(
         final_outcome = SubjectTickOutcome.CONTINUE
         execution_stance = SubjectTickExecutionStance.CONTINUE_PATH
 
+    bounded_outcome_checkpoint_status = (
+        SubjectTickCheckpointStatus.BLOCKED
+        if final_outcome == SubjectTickOutcome.HALT
+        else SubjectTickCheckpointStatus.ENFORCED_DETOUR
+        if final_outcome != SubjectTickOutcome.CONTINUE
+        else SubjectTickCheckpointStatus.ALLOWED
+    )
+    bounded_outcome_enter_values = {
+        "bounded_outcome_class": execution_stance.value,
+        "output_allowed": final_outcome == SubjectTickOutcome.CONTINUE,
+        "materialization_mode": active_execution_mode,
+        "bounded_reason": _bounded_outcome_reason(
+            final_outcome=final_outcome,
+            halt_reason=halt_reason,
+            output_allowed=final_outcome == SubjectTickOutcome.CONTINUE,
+        ),
+        "outcome_ready": bounded_outcome_checkpoint_status == SubjectTickCheckpointStatus.ALLOWED,
+    }
+    trace_emit_active("bounded_outcome_resolution", "enter", bounded_outcome_enter_values)
+
     checkpoints.append(
         SubjectTickCheckpointResult(
             checkpoint_id="rt01.outcome_resolution_checkpoint",
             source_contract="rt01.runtime_outcome",
-            status=(
-                SubjectTickCheckpointStatus.BLOCKED
-                if final_outcome == SubjectTickOutcome.HALT
-                else SubjectTickCheckpointStatus.ENFORCED_DETOUR
-                if final_outcome != SubjectTickOutcome.CONTINUE
-                else SubjectTickCheckpointStatus.ALLOWED
-            ),
+            status=bounded_outcome_checkpoint_status,
             required_action="bounded_outcome_must_be_resolved",
             applied_action=f"{execution_stance.value}:{active_execution_mode}",
             reason="runtime contour resolved bounded outcome from enforced contracts",
@@ -2838,6 +3192,32 @@ def execute_subject_tick(
         else None
     )
     materialized_output = gate.accepted
+    bounded_outcome_trace_values = {
+        "bounded_outcome_class": execution_stance.value,
+        "output_allowed": materialized_output,
+        "materialization_mode": active_execution_mode,
+        "bounded_reason": _bounded_outcome_reason(
+            final_outcome=final_outcome,
+            halt_reason=halt_reason,
+            output_allowed=materialized_output,
+        ),
+        "outcome_ready": (
+            bounded_outcome_checkpoint_status == SubjectTickCheckpointStatus.ALLOWED
+            and materialized_output
+        ),
+    }
+    trace_emit_active("bounded_outcome_resolution", "decision", bounded_outcome_trace_values)
+    if (
+        bounded_outcome_checkpoint_status != SubjectTickCheckpointStatus.ALLOWED
+        or not materialized_output
+    ):
+        trace_emit_active(
+            "bounded_outcome_resolution",
+            "blocked",
+            bounded_outcome_trace_values,
+            note=str(bounded_outcome_trace_values["bounded_reason"]),
+        )
+    trace_emit_active("bounded_outcome_resolution", "exit", bounded_outcome_trace_values)
     output_kind = _classify_output_kind(
         final_execution_outcome=final_outcome,
         active_execution_mode=active_execution_mode,
@@ -3173,6 +3553,96 @@ def _resolve_t03_competition_mode(token: str | None) -> T03CompetitionMode:
         return T03CompetitionMode(normalized)
     except ValueError:
         return T03CompetitionMode.BOUNDED_COMPETITION
+
+
+def _c01_stream_load(stream: object) -> int:
+    state = getattr(stream, "state", None)
+    return int(
+        len(getattr(state, "carryover_items", ()))
+        + len(getattr(state, "pending_operations", ()))
+        + len(getattr(state, "unresolved_anchors", ()))
+    )
+
+
+def _s02_boundary_integrity(s02_result: object) -> bool:
+    state = getattr(s02_result, "state", None)
+    return bool(
+        not getattr(state, "boundary_uncertain", True)
+        and not getattr(state, "insufficient_coverage", True)
+        and not getattr(state, "no_clean_seam_claim", True)
+    )
+
+
+def _s03_ownership_confidence(s03_result: object) -> float:
+    state = getattr(s03_result, "state", None)
+    packets = tuple(getattr(state, "packets", ()))
+    if not packets:
+        return 0.0
+    latest = packets[-1]
+    return float(getattr(latest, "confidence", 0.0))
+
+
+def _s03_learning_weight_applied(s03_result: object) -> float:
+    state = getattr(s03_result, "state", None)
+    packets = tuple(getattr(state, "packets", ()))
+    if not packets:
+        return 0.0
+    latest = packets[-1]
+    return float(getattr(latest, "self_update_weight", 0.0))
+
+
+def _c04_mode_conflict_present(mode_arbitration: object, mode_view: object) -> bool:
+    state = getattr(mode_arbitration, "state", None)
+    decision_raw = getattr(state, "hold_or_switch_decision", "")
+    decision = str(getattr(decision_raw, "value", decision_raw))
+    restriction_tokens = {
+        str(getattr(code, "value", code)) for code in getattr(mode_view, "restrictions", ())
+    }
+    return (
+        decision in {"arbitration_conflict", "no_clear_mode_winner", "insufficient_internal_basis"}
+        or "arbitration_conflict_present" in restriction_tokens
+        or "no_clear_mode_winner_present" in restriction_tokens
+        or "insufficient_internal_basis_present" in restriction_tokens
+    )
+
+
+def _c04_arbitration_stable(mode_arbitration: object, mode_view: object) -> bool:
+    state = getattr(mode_arbitration, "state", None)
+    forced_rearbitration = bool(getattr(state, "forced_rearbitration", False))
+    return (
+        bool(getattr(mode_view, "gate_accepted", False))
+        and not forced_rearbitration
+        and not _c04_mode_conflict_present(mode_arbitration, mode_view)
+    )
+
+
+def _c05_revalidation_required(temporal_validity: object, c05_validity_action: str) -> bool:
+    state = getattr(temporal_validity, "state", None)
+    return bool(
+        getattr(state, "revalidation_item_ids", ())
+        or getattr(state, "selective_scope_targets", ())
+        or getattr(state, "insufficient_basis_for_revalidation", False)
+        or getattr(state, "selective_scope_uncertain", False)
+        or c05_validity_action
+        in {"run_selective_revalidation", "run_bounded_revalidation", "suspend_until_revalidation_basis"}
+    )
+
+
+def _bounded_outcome_reason(
+    *,
+    final_outcome: SubjectTickOutcome,
+    halt_reason: str | None,
+    output_allowed: bool,
+) -> str:
+    if final_outcome == SubjectTickOutcome.HALT:
+        return str(halt_reason or "halt_required")
+    if final_outcome == SubjectTickOutcome.REVALIDATE:
+        return "revalidation_required"
+    if final_outcome == SubjectTickOutcome.REPAIR:
+        return "repair_required"
+    if not output_allowed:
+        return "downstream_gate_blocked"
+    return "continue_ready"
 
 
 def _top_restrictions(
