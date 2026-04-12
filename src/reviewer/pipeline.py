@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from reviewer.api_client import OllamaClient
+from reviewer.api_client import OllamaClient, OllamaGenerateDiagnostics
 from reviewer.case_generator import SeededCaseGenerator
 from reviewer.config import ReviewerPipelineConfig, TierConfig
 from reviewer.models import (
@@ -16,36 +16,69 @@ from reviewer.models import (
     ReviewCallResult,
     ReviewerSchemaError,
     extract_first_json_object,
-    validate_reviewer_output,
+    normalize_reviewer_output,
 )
 from reviewer.queue import CaseWorkQueue
 from reviewer.retention import ArtifactRetentionManager
 from reviewer.triage import decide_triage
 
-MODULE_GLOSSARY = {
-    "world_adapter": "external world seam availability and effect feedback",
-    "world_entry_contract": "world claim admissibility and W01 readiness",
-    "epistemics": "source/modality/confidence grounding discipline",
-    "regulation": "pressure and override gate shaping",
-    "c04_mode_arbitration": "mode selection and arbitration stability",
-    "c05_temporal_validity": "legality/revalidation pressure on reuse",
-    "s01_efference_copy": "action projection vs observed change comparison",
-    "s02_prediction_boundary": "self/world seam boundary and integrity",
-    "s03_ownership_weighted_learning": "ownership-weighted update routing",
-    "m_minimal": "minimal memory claim safety",
-    "n_minimal": "minimal narrative commitment safety",
-    "bounded_outcome_resolution": "bounded outcome class before subject output",
-    "subject_tick": "final execution outcome and materialization mode",
+SEMANTIC_STATUS = "semantic_review_completed"
+PROMPT_FILE_BY_TIER = {
+    "tier1": "v2_minimal_live_stabilization.md",
+    "tier2": "v2_minimal_live_stabilization.md",
+    "tier3": "v2_minimal_live_stabilization.md",
 }
-
-MODULE_FILE_MAPPING = {
-    "subject_tick": "src/substrate/subject_tick/update.py",
-    "world_adapter": "src/substrate/world_adapter/adapter.py",
-    "world_entry_contract": "src/substrate/world_entry_contract/policy.py",
-    "epistemics": "src/substrate/epistemics/grounding.py",
-    "regulation": "src/substrate/viability_control/update.py",
-    "c04_mode_arbitration": "src/substrate/mode_arbitration/update.py",
-    "c05_temporal_validity": "src/substrate/temporal_validity/update.py",
+MINIMAL_REVIEW_SCHEMA: dict[str, Any] = {
+    "type": "object",
+    "properties": {
+        "overall_reading": {
+            "type": "string",
+            "enum": [
+                "coherent",
+                "mostly_coherent_with_questions",
+                "suspicious_but_inconclusive",
+                "likely_problematic",
+                "insufficient_evidence",
+            ],
+        },
+        "confidence": {"type": "number", "minimum": 0.0, "maximum": 1.0},
+        "suspicious_segments": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "module": {"type": "string"},
+                    "signal": {"type": "string"},
+                    "severity": {"type": "string", "enum": ["low", "medium", "high"]},
+                },
+                "required": ["module", "signal", "severity"],
+                "additionalProperties": False,
+            },
+        },
+        "likely_observability_gaps": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "module_or_transition": {"type": "string"},
+                    "why_gap_is_possible": {"type": "string"},
+                },
+                "required": ["module_or_transition", "why_gap_is_possible"],
+                "additionalProperties": False,
+            },
+        },
+        "human_review_priority": {"type": "string", "enum": ["low", "medium", "high"]},
+        "final_note": {"type": "string"},
+    },
+    "required": [
+        "overall_reading",
+        "confidence",
+        "suspicious_segments",
+        "likely_observability_gaps",
+        "human_review_priority",
+        "final_note",
+    ],
+    "additionalProperties": False,
 }
 
 
@@ -53,28 +86,6 @@ MODULE_FILE_MAPPING = {
 class _TierCaseResult:
     case: GeneratedCase
     review: ReviewCallResult
-
-
-def _default_review_payload(*, case_id: str, reason: str) -> dict[str, Any]:
-    return {
-        "case_id": case_id,
-        "overall_reading": "insufficient_evidence",
-        "confidence": 0.0,
-        "behavior_summary": [],
-        "coherent_segments": [],
-        "suspicious_segments": [],
-        "likely_observability_gaps": [],
-        "paired_case_comparison": {
-            "used": False,
-            "paired_case_id": None,
-            "main_behavior_shift": "",
-            "is_shift_plausible": False,
-            "notes": "",
-        },
-        "human_review_priority": "high",
-        "code_focus_candidates": [],
-        "final_note": reason,
-    }
 
 
 class LocalStatelessReviewerPipeline:
@@ -133,11 +144,7 @@ class LocalStatelessReviewerPipeline:
     def _load_prompt_template(self, tier_name: str) -> str:
         if tier_name in self._prompt_cache:
             return self._prompt_cache[tier_name]
-        prompt_name = {
-            "tier1": "v1_tier1_prefilter.md",
-            "tier2": "v1_tier2_main.md",
-            "tier3": "v1_tier3_second_opinion.md",
-        }[tier_name]
+        prompt_name = PROMPT_FILE_BY_TIER[tier_name]
         path = Path(self.config.prompt_dir).expanduser().resolve() / prompt_name
         template = path.read_text(encoding="utf-8")
         self._prompt_cache[tier_name] = template
@@ -147,41 +154,128 @@ class LocalStatelessReviewerPipeline:
         trace_text = Path(case.trace_path).read_text(encoding="utf-8")
         package = {
             "case_id": case.case_id,
-            "theme": case.theme,
             "scenario_family": case.scenario_family,
             "scenario_intent": case.scenario_intent,
             "key_tension_axis": list(case.key_tension_axis),
-            "what_to_inspect_in_trace": list(case.what_to_inspect_in_trace),
-            "paired_case_id": case.paired_with,
-            "generation_params": case.generation_params,
-            "module_glossary": MODULE_GLOSSARY,
-            "module_file_mapping": MODULE_FILE_MAPPING,
             "trace_jsonl": trace_text,
         }
         template = self._load_prompt_template(tier_name)
         return f"{template}\n\nREVIEW_PACKAGE_JSON:\n{json.dumps(package, ensure_ascii=True)}"
 
+    def _client_call(
+        self,
+        *,
+        model: str,
+        prompt: str,
+        timeout_seconds: float,
+        retry_count: int,
+        tier_config: TierConfig,
+    ) -> OllamaGenerateDiagnostics:
+        if hasattr(self.client, "generate_with_diagnostics"):
+            return self.client.generate_with_diagnostics(
+                model=model,
+                prompt=prompt,
+                timeout_seconds=timeout_seconds,
+                retry_count=retry_count,
+                output_json_schema=MINIMAL_REVIEW_SCHEMA,
+                temperature=tier_config.temperature,
+                num_predict=tier_config.num_predict,
+                num_ctx=tier_config.num_ctx,
+                think=False,
+            )
+        raw = self.client.generate(
+            model=model,
+            prompt=prompt,
+            timeout_seconds=timeout_seconds,  # type: ignore[call-arg]
+            retry_count=retry_count,  # type: ignore[call-arg]
+        )
+        return OllamaGenerateDiagnostics(
+            endpoint="/api/chat",
+            request_payload={"model": model},
+            raw_http_response_body="",
+            extracted_text=raw,
+            response_field_used="response",
+            thinking_present=False,
+            prompt_eval_count=None,
+            eval_count=None,
+            status="ok" if str(raw).strip() else "empty_response",
+            error_message=None if str(raw).strip() else "empty model response text",
+            timeout=False,
+            retry_count=0,
+            latency_ms=0.0,
+        )
+
     def _review_case(self, *, tier_name: str, tier_config: TierConfig, case: GeneratedCase) -> ReviewCallResult:
-        # Stateless guarantee: each call builds standalone prompt and never reuses prior model context.
         prompt = self._build_review_prompt(tier_name=tier_name, case=case)
+        timeout_s = (
+            self.config.request_timeout_seconds
+            if tier_config.request_timeout_seconds is None
+            else float(tier_config.request_timeout_seconds)
+        )
+        retry_count = (
+            self.config.retry_count
+            if tier_config.retry_count is None
+            else int(tier_config.retry_count)
+        )
+        diagnostics = self._client_call(
+            model=tier_config.model,
+            prompt=prompt,
+            timeout_seconds=timeout_s,
+            retry_count=retry_count,
+            tier_config=tier_config,
+        )
+        base = {
+            "tier": tier_name,
+            "model": tier_config.model,
+            "case_id": case.case_id,
+            "endpoint": diagnostics.endpoint,
+            "request_payload": diagnostics.request_payload,
+            "raw_http_response_body": diagnostics.raw_http_response_body,
+            "extracted_text": diagnostics.extracted_text,
+            "response_field_used": diagnostics.response_field_used,
+            "thinking_present": diagnostics.thinking_present,
+            "prompt_eval_count": diagnostics.prompt_eval_count,
+            "eval_count": diagnostics.eval_count,
+            "latency_ms": diagnostics.latency_ms,
+            "timeout": diagnostics.timeout,
+            "retry_count": diagnostics.retry_count,
+        }
+        if diagnostics.status != "ok":
+            return ReviewCallResult(
+                status=diagnostics.status,
+                parsed_json=None,
+                schema_warnings=(),
+                nonfatal_warnings=(),
+                error_message=diagnostics.error_message,
+                model_case_id=None,
+                **base,
+            )
         try:
-            raw = self.client.generate(model=tier_config.model, prompt=prompt)
-            parsed = extract_first_json_object(raw)
-            parsed = validate_reviewer_output(parsed, expected_case_id=case.case_id)
+            parsed = extract_first_json_object(diagnostics.extracted_text)
+        except ReviewerSchemaError as exc:
             return ReviewCallResult(
-                tier=tier_name,
-                model=tier_config.model,
-                raw_text=raw,
-                parsed_json=parsed,
+                status="parse_error",
+                parsed_json=None,
+                schema_warnings=(),
+                nonfatal_warnings=(),
+                error_message=str(exc),
+                model_case_id=None,
+                **base,
             )
-        except Exception as exc:  # noqa: BLE001
-            fallback = _default_review_payload(case_id=case.case_id, reason=str(exc))
-            return ReviewCallResult(
-                tier=tier_name,
-                model=tier_config.model,
-                raw_text="",
-                parsed_json=fallback,
-            )
+        normalized = normalize_reviewer_output(parsed, expected_case_id=case.case_id)
+        status = SEMANTIC_STATUS if not normalized.schema_warnings else "schema_warning"
+        error_message = None
+        if normalized.schema_warnings:
+            error_message = "schema_warning:" + ",".join(normalized.schema_warnings)
+        return ReviewCallResult(
+            status=status,
+            parsed_json=normalized.normalized_payload,
+            schema_warnings=normalized.schema_warnings,
+            nonfatal_warnings=normalized.nonfatal_warnings,
+            error_message=error_message,
+            model_case_id=normalized.model_case_id,
+            **base,
+        )
 
     def _run_tier_workers(self, *, tier_name: str, cases: list[GeneratedCase]) -> list[_TierCaseResult]:
         if not cases:
@@ -261,6 +355,9 @@ class LocalStatelessReviewerPipeline:
         pending = list(cases)
         theme_counters: dict[str, int] = defaultdict(int)
         tier_counters: dict[str, int] = defaultdict(int)
+        status_counters: dict[str, int] = defaultdict(int)
+        all_latencies_ms: list[float] = []
+        prompt_eval_counts: list[int] = []
         suspicious_count = 0
         closed_count = 0
 
@@ -285,30 +382,49 @@ class LocalStatelessReviewerPipeline:
                 case_state[item.case.case_id]["reviews"].append(item.review)
                 theme_counters[item.case.theme] += 1
                 tier_counters[tier_name] += 1
-                decision = decide_triage(
-                    review_json=item.review.parsed_json,
-                    tier_name=tier_name,
-                    config=self.config,
+                status_counters[item.review.status] += 1
+                all_latencies_ms.append(float(item.review.latency_ms))
+                if isinstance(item.review.prompt_eval_count, int):
+                    prompt_eval_counts.append(item.review.prompt_eval_count)
+
+                if self.config.diagnostic_mode:
+                    self.retention.record_call_diagnostics(case=item.case, review=item.review)
+
+                if item.review.status == SEMANTIC_STATUS:
+                    self.retention.record_semantic_review(case=item.case, review=item.review)
+                    decision = decide_triage(
+                        review_json=item.review.parsed_json or {},
+                        tier_name=tier_name,
+                        config=self.config,
+                    )
+                    if decision.action == "close":
+                        closed_count += 1
+                        self.retention.record_ordinary(
+                            case=item.case,
+                            reviews=case_state[item.case.case_id]["reviews"],
+                            triage_reason=decision.reason,
+                        )
+                    elif decision.action == "freeze":
+                        suspicious_count += 1
+                        self.retention.record_suspicious(
+                            case=item.case,
+                            reviews=case_state[item.case.case_id]["reviews"],
+                            triage_reason=decision.reason,
+                        )
+                    elif decision.action == "escalate":
+                        next_pending.append(item.case)
+                    continue
+
+                # Non-semantic states are infra/contract failures and must not escalate tiers.
+                self.retention.record_failure(case=item.case, review=item.review)
+                suspicious_count += 1
+                self.retention.record_suspicious(
+                    case=item.case,
+                    reviews=case_state[item.case.case_id]["reviews"],
+                    triage_reason=f"infrastructure_or_schema_failure:{item.review.status}",
                 )
-                if decision.action == "close":
-                    closed_count += 1
-                    self.retention.record_ordinary(
-                        case=item.case,
-                        reviews=case_state[item.case.case_id]["reviews"],
-                        triage_reason=decision.reason,
-                    )
-                elif decision.action == "freeze":
-                    suspicious_count += 1
-                    self.retention.record_suspicious(
-                        case=item.case,
-                        reviews=case_state[item.case.case_id]["reviews"],
-                        triage_reason=decision.reason,
-                    )
-                elif decision.action == "escalate":
-                    next_pending.append(item.case)
             pending = next_pending
 
-        # If any case still pending after the last enabled tier, freeze it for human review.
         for case in pending:
             suspicious_count += 1
             self.retention.record_suspicious(
@@ -318,6 +434,16 @@ class LocalStatelessReviewerPipeline:
             )
 
         duration_s = round(time.time() - cycle_started, 3)
+        avg_latency_ms = round(sum(all_latencies_ms) / len(all_latencies_ms), 3) if all_latencies_ms else 0.0
+        prompt_eval_distribution = {
+            "count": len(prompt_eval_counts),
+            "min": min(prompt_eval_counts) if prompt_eval_counts else None,
+            "max": max(prompt_eval_counts) if prompt_eval_counts else None,
+            "avg": round(sum(prompt_eval_counts) / len(prompt_eval_counts), 3)
+            if prompt_eval_counts
+            else None,
+            "values": sorted(prompt_eval_counts),
+        }
         summary = {
             "cycle_duration_s": duration_s,
             "generated_cases": len(cases),
@@ -325,11 +451,48 @@ class LocalStatelessReviewerPipeline:
             "suspicious_cases": suspicious_count,
             "per_theme_reviews": dict(theme_counters),
             "per_tier_reviews": dict(tier_counters),
+            "per_status_reviews": dict(status_counters),
+            "avg_latency_ms": avg_latency_ms,
+            "prompt_eval_count_distribution": prompt_eval_distribution,
+            "diagnostic_mode": self.config.diagnostic_mode,
             "model_health": self.health(),
             "stop_requested": self._stop_flag.is_set(),
         }
         self._set_status({"stage": "idle", **summary})
         return summary
+
+    def run_sequential_diagnostics(
+        self,
+        *,
+        tier_name: str = "tier1",
+        case_count: int = 1,
+        themes: list[str] | None = None,
+    ) -> dict[str, Any]:
+        if tier_name not in self.config.tiers:
+            raise ValueError(f"unknown tier_name={tier_name!r}")
+        original_diagnostic_mode = self.config.diagnostic_mode
+        original_tier_enabled = {
+            key: tier.enabled for key, tier in self.config.tiers.items()
+        }
+        original_workers = {
+            key: tier.max_parallel_workers for key, tier in self.config.tiers.items()
+        }
+        try:
+            self.config.diagnostic_mode = True
+            for key, tier in self.config.tiers.items():
+                tier.enabled = key == tier_name
+                if key == tier_name:
+                    tier.max_parallel_workers = 1
+            summary = self.run_cycle(case_count=case_count, themes=themes)
+            summary["sequential_diagnostic_mode"] = True
+            summary["sequential_tier"] = tier_name
+            return summary
+        finally:
+            self.config.diagnostic_mode = original_diagnostic_mode
+            for key, enabled in original_tier_enabled.items():
+                self.config.tiers[key].enabled = enabled
+            for key, workers in original_workers.items():
+                self.config.tiers[key].max_parallel_workers = workers
 
     def run_forever(self, *, cycle_interval_seconds: float = 0.2) -> None:
         while not self._stop_flag.is_set():
@@ -339,4 +502,3 @@ class LocalStatelessReviewerPipeline:
                 self._wait_if_paused()
                 time.sleep(0.05)
                 elapsed += 0.05
-

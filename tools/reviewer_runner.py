@@ -52,6 +52,23 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Run cycles continuously until interrupted.",
     )
     parser.add_argument(
+        "--diagnostic-mode",
+        action="store_true",
+        help="Enable per-call diagnostics artifact writing.",
+    )
+    parser.add_argument(
+        "--sequential-diagnostics",
+        action="store_true",
+        help="Run one-tier single-worker sequential diagnostics cycle.",
+    )
+    parser.add_argument(
+        "--tier",
+        type=str,
+        default="tier1",
+        choices=("tier1", "tier2", "tier3"),
+        help="Tier for sequential diagnostics mode.",
+    )
+    parser.add_argument(
         "--json",
         dest="json_output",
         action="store_true",
@@ -73,6 +90,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         return 0
 
     config = _load_config(args.config)
+    if args.diagnostic_mode:
+        config.diagnostic_mode = True
     pipeline = LocalStatelessReviewerPipeline(config=config)
 
     def _stop_handler(_sig, _frame) -> None:  # noqa: ANN001
@@ -85,7 +104,13 @@ def main(argv: Sequence[str] | None = None) -> int:
     if args.themes:
         themes = [item.strip() for item in args.themes.split(",") if item.strip()]
 
-    if args.continuous:
+    if args.sequential_diagnostics:
+        summary = pipeline.run_sequential_diagnostics(
+            tier_name=args.tier,
+            case_count=args.case_count or 1,
+            themes=themes,
+        )
+    elif args.continuous:
         pipeline.run_forever()
         summary = pipeline.latest_status()
     else:

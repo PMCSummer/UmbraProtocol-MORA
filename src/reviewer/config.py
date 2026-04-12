@@ -10,6 +10,11 @@ class TierConfig:
     enabled: bool
     model: str
     max_parallel_workers: int
+    request_timeout_seconds: float | None = None
+    retry_count: int | None = None
+    num_ctx: int = 8192
+    num_predict: int = 384
+    temperature: float = 0.0
 
 
 @dataclass(slots=True)
@@ -45,6 +50,7 @@ class ReviewerPipelineConfig:
     retry_count: int = 1
     prompt_dir: str = "tools/reviewer_prompts"
     artifacts_root: str = "artifacts/reviewer"
+    diagnostic_mode: bool = False
     tiers: dict[str, TierConfig] = field(default_factory=dict)
     escalation: EscalationPolicy = field(default_factory=EscalationPolicy)
     retention: RetentionPolicy = field(default_factory=RetentionPolicy)
@@ -57,17 +63,32 @@ class ReviewerPipelineConfig:
                 "tier1": TierConfig(
                     enabled=True,
                     model="gemma3:4b",
-                    max_parallel_workers=2,
+                    max_parallel_workers=1,
+                    request_timeout_seconds=60.0,
+                    retry_count=1,
+                    num_ctx=8192,
+                    num_predict=512,
+                    temperature=0.0,
                 ),
                 "tier2": TierConfig(
-                    enabled=True,
+                    enabled=False,
                     model="qwen3.5:9b",
                     max_parallel_workers=1,
+                    request_timeout_seconds=120.0,
+                    retry_count=2,
+                    num_ctx=8192,
+                    num_predict=512,
+                    temperature=0.0,
                 ),
                 "tier3": TierConfig(
-                    enabled=True,
+                    enabled=False,
                     model="llama3.1:8b",
                     max_parallel_workers=1,
+                    request_timeout_seconds=90.0,
+                    retry_count=1,
+                    num_ctx=8192,
+                    num_predict=512,
+                    temperature=0.0,
                 ),
             }
         )
@@ -99,9 +120,9 @@ class ReviewerPipelineConfig:
             retry_count=int(raw.get("retry_count", 1)),
             prompt_dir=str(raw.get("prompt_dir", "tools/reviewer_prompts")),
             artifacts_root=str(raw.get("artifacts_root", "artifacts/reviewer")),
+            diagnostic_mode=bool(raw.get("diagnostic_mode", False)),
             tiers=tiers if tiers else ReviewerPipelineConfig.default().tiers,
             escalation=EscalationPolicy(**dict(raw.get("escalation", {}))),
             retention=RetentionPolicy(**dict(raw.get("retention", {}))),
             generation=GenerationPolicy(**dict(raw.get("generation", {}))),
         )
-
