@@ -20,6 +20,7 @@ from substrate.runtime_topology.policy import (
     build_minimal_runtime_topology_bundle,
     evaluate_runtime_dispatch_decision,
 )
+from substrate.runtime_tap_trace import trace_emit_active
 from substrate.subject_tick import (
     SubjectTickContext,
     SubjectTickInput,
@@ -186,8 +187,31 @@ def dispatch_runtime_tick(request: RuntimeDispatchRequest) -> RuntimeDispatchRes
 
     bundle = build_minimal_runtime_topology_bundle()
     tick_graph = bundle.tick_graph
+    trace_emit_active(
+        "runtime_topology",
+        "enter",
+        {
+            "route_class": request.route_class.value,
+            "runtime_entry": bundle.runtime_entry,
+        },
+    )
     decision = evaluate_runtime_dispatch_decision(request=request, bundle=bundle)
+    topology_values = {
+        "route_class": decision.route_class.value,
+        "accepted": decision.accepted,
+        "route_binding_consequence": decision.route_binding_consequence.value,
+        "runtime_entry": bundle.runtime_entry,
+        "reason": decision.reason,
+    }
+    trace_emit_active("runtime_topology", "decision", topology_values)
     if not decision.accepted:
+        trace_emit_active(
+            "runtime_topology",
+            "blocked",
+            topology_values,
+            note="dispatch_rejected",
+        )
+        trace_emit_active("runtime_topology", "exit", topology_values, note="dispatch_return")
         return RuntimeDispatchResult(
             decision=decision,
             bundle=bundle,
@@ -219,6 +243,7 @@ def dispatch_runtime_tick(request: RuntimeDispatchRequest) -> RuntimeDispatchRes
             cause_chain=effective_request.cause_chain,
         )
 
+    trace_emit_active("runtime_topology", "exit", topology_values, note="dispatch_return")
     return RuntimeDispatchResult(
         decision=decision,
         bundle=bundle,

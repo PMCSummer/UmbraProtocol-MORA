@@ -1,0 +1,221 @@
+from __future__ import annotations
+
+import json
+from contextvars import ContextVar, Token
+from dataclasses import asdict, is_dataclass
+from enum import Enum
+from pathlib import Path
+from typing import Any
+
+TRACE_STEP_ALLOWED = {"enter", "decision", "blocked", "exit"}
+
+MODULE_ALLOWED_FIELDS: dict[str, tuple[str, ...]] = {
+    "world_adapter": (
+        "adapter_presence",
+        "adapter_available",
+        "adapter_degraded",
+        "world_link_status",
+        "effect_status",
+        "world_grounded_transition_allowed",
+        "effect_feedback_correlated",
+    ),
+    "world_entry_contract": (
+        "world_presence_mode",
+        "observation_basis_present",
+        "action_trace_present",
+        "effect_basis_present",
+        "effect_feedback_correlated",
+        "w01_admission_ready",
+    ),
+    "runtime_topology": (
+        "route_class",
+        "accepted",
+        "route_binding_consequence",
+        "runtime_entry",
+        "reason",
+    ),
+    "epistemics": (
+        "epistemic_status",
+        "claim_strength",
+        "should_abstain",
+        "can_treat_as_observation",
+    ),
+    "regulation": (
+        "pressure_level",
+        "escalation_stage",
+        "override_scope",
+        "gate_accepted",
+        "dominant_axis",
+        "claim_strength",
+    ),
+    "t01_semantic_field": (
+        "scene_status",
+        "unresolved_slots_count",
+        "pre_verbal_consumer_ready",
+        "no_clean_scene_commit",
+    ),
+    "t02_relation_binding": (
+        "scene_status",
+        "no_clean_binding_commit",
+        "pre_verbal_constraint_consumer_ready",
+        "raw_vs_propagated_distinct",
+    ),
+    "t03_hypothesis_competition": (
+        "leader",
+        "conflict_count",
+        "open_slot_count",
+        "convergence_status",
+        "nonconvergence_preserved",
+        "no_viable_leader",
+        "nonconvergence_basis",
+    ),
+    "t04_attention_schema": (
+        "attention_owner",
+        "focus_mode",
+        "reportability_status",
+        "focus_ownership_consumer_ready",
+    ),
+    "downstream_obedience": (
+        "accepted",
+        "usability_class",
+        "top_restrictions",
+        "blocked_reason",
+        "restriction_count",
+    ),
+    "subject_tick": (
+        "output_kind",
+        "final_execution_outcome",
+        "active_execution_mode",
+        "abstain",
+        "abstain_reason",
+        "materialized_output",
+    ),
+}
+
+_trace_output_root = Path("artifacts") / "simple_tick_trace"
+_tick_orders: dict[str, int] = {}
+_initialized_ticks: set[str] = set()
+_active_tick_id: ContextVar[str | None] = ContextVar("runtime_tap_trace.active_tick_id", default=None)
+
+
+def _to_jsonable(value: Any) -> Any:
+    if is_dataclass(value):
+        return _to_jsonable(asdict(value))
+    if isinstance(value, Enum):
+        return _to_jsonable(value.value)
+    if isinstance(value, dict):
+        return {str(k): _to_jsonable(v) for k, v in value.items()}
+    if isinstance(value, tuple):
+        return [_to_jsonable(item) for item in value]
+    if isinstance(value, list):
+        return [_to_jsonable(item) for item in value]
+    if isinstance(value, set):
+        return [_to_jsonable(item) for item in sorted(value, key=lambda item: str(item))]
+    if isinstance(value, (str, int, float, bool)) or value is None:
+        return value
+    return str(value)
+
+
+def set_trace_output_root(path: str | Path) -> None:
+    global _trace_output_root
+    _trace_output_root = Path(path)
+
+
+def reset_trace_state() -> None:
+    _tick_orders.clear()
+    _initialized_ticks.clear()
+    _active_tick_id.set(None)
+
+
+def derive_tick_id(case_id: str, *, prior_tick_index: int | None = None) -> str:
+    tick_index = 1 if prior_tick_index is None else prior_tick_index + 1
+    return f"subject-tick-{case_id}-{tick_index}"
+
+
+def get_tick_trace_path(tick_id: str) -> Path:
+    return _trace_output_root / f"{tick_id}.jsonl"
+
+
+def _prepare_tick_trace(tick_id: str) -> Path:
+    path = get_tick_trace_path(tick_id)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text("", encoding="utf-8")
+    _initialized_ticks.add(tick_id)
+    _tick_orders[tick_id] = 0
+    return path
+
+
+def _ensure_tick_file(tick_id: str) -> Path:
+    if tick_id not in _initialized_ticks:
+        return _prepare_tick_trace(tick_id)
+    return get_tick_trace_path(tick_id)
+
+
+def start_tick_trace(*, tick_id: str, output_root: str | Path) -> Token[str | None]:
+    set_trace_output_root(output_root)
+    _prepare_tick_trace(tick_id)
+    return _active_tick_id.set(tick_id)
+
+
+def activate_tick_trace(*, tick_id: str, output_root: str | Path) -> Token[str | None]:
+    return start_tick_trace(tick_id=tick_id, output_root=output_root)
+
+
+def deactivate_tick_trace(token: Token[str | None]) -> None:
+    _active_tick_id.reset(token)
+
+
+def finish_tick_trace(*, tick_id: str) -> dict[str, Any]:
+    return {
+        "tick_id": tick_id,
+        "trace_path": str(get_tick_trace_path(tick_id)),
+        "event_count": _tick_orders.get(tick_id, 0),
+    }
+
+
+def trace_emit(
+    tick_id: str,
+    module: str,
+    step: str,
+    values: dict[str, Any],
+    note: str | None = None,
+) -> dict[str, Any]:
+    if step not in TRACE_STEP_ALLOWED:
+        raise ValueError(f"invalid step: {step}")
+    if module not in MODULE_ALLOWED_FIELDS:
+        raise ValueError(f"unknown module: {module}")
+    if not isinstance(values, dict):
+        raise TypeError("values must be dict")
+
+    allowed = set(MODULE_ALLOWED_FIELDS[module])
+    extra = sorted(str(field) for field in values if field not in allowed)
+    if extra:
+        raise ValueError(f"module {module} emitted non-allowlisted fields: {', '.join(extra)}")
+
+    path = _ensure_tick_file(tick_id)
+    order = _tick_orders[tick_id]
+    event = {
+        "tick_id": tick_id,
+        "order": order,
+        "module": module,
+        "step": step,
+        "values": _to_jsonable(values),
+        "note": None if note is None else str(note),
+    }
+    with path.open("a", encoding="utf-8") as handle:
+        handle.write(json.dumps(event, ensure_ascii=True, sort_keys=True))
+        handle.write("\n")
+    _tick_orders[tick_id] = order + 1
+    return event
+
+
+def trace_emit_active(
+    module: str,
+    step: str,
+    values: dict[str, Any],
+    note: str | None = None,
+) -> dict[str, Any] | None:
+    tick_id = _active_tick_id.get()
+    if tick_id is None:
+        return None
+    return trace_emit(tick_id=tick_id, module=module, step=step, values=values, note=note)

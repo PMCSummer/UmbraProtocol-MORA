@@ -44,6 +44,7 @@ from substrate.affordances.policy import evaluate_affordance_landscape_for_downs
 from substrate.authority import issue_rt01_route_auth_nonce
 from substrate.downstream_obedience import (
     ObedienceFallback,
+    ObedienceStatus,
     build_downstream_obedience_decision,
 )
 from substrate.contracts import (
@@ -98,6 +99,7 @@ from substrate.stream_kernel import (
     choose_stream_execution_mode,
     derive_stream_kernel_contract_view,
 )
+from substrate.runtime_tap_trace import trace_emit_active
 from substrate.subject_tick.models import (
     SubjectTickAuthorityRole,
     SubjectTickCheckpointResult,
@@ -268,6 +270,13 @@ def execute_subject_tick(
             require_observation=context.require_epistemic_observation,
         ),
     )
+    trace_emit_active(
+        "epistemics",
+        "enter",
+        {
+            "epistemic_status": epistemic.unit.status,
+        },
+    )
     epistemic_allowance = evaluate_downstream_allowance(
         epistemic.unit,
         require_observation=context.require_epistemic_observation,
@@ -276,6 +285,21 @@ def execute_subject_tick(
         context.disable_epistemic_admission_enforcement
         or not epistemic_allowance.should_abstain
     )
+    epistemic_trace_values = {
+        "epistemic_status": epistemic.unit.status,
+        "claim_strength": epistemic_allowance.claim_strength,
+        "should_abstain": epistemic_allowance.should_abstain,
+        "can_treat_as_observation": epistemic_allowance.can_treat_as_observation,
+    }
+    trace_emit_active("epistemics", "decision", epistemic_trace_values)
+    if epistemic_allowance.should_abstain:
+        trace_emit_active(
+            "epistemics",
+            "blocked",
+            epistemic_trace_values,
+            note=epistemic_allowance.reason,
+        )
+    trace_emit_active("epistemics", "exit", epistemic_trace_values)
 
     regulation = update_regulation_state(
         (
@@ -305,6 +329,11 @@ def execute_subject_tick(
             require_strong_claim=context.require_strong_regulation_claim,
         ),
     )
+    regulation_enter_values = {
+        "dominant_axis": regulation.tradeoff.dominant_axis,
+        "claim_strength": regulation.bias.claim_strength,
+    }
+    trace_emit_active("regulation", "enter", regulation_enter_values)
     affordances = generate_regulation_affordances(
         regulation_state=regulation.state,
         capability_state=create_default_capability_state(),
@@ -375,6 +404,23 @@ def execute_subject_tick(
         and bool(affordance_gate.accepted_candidate_ids)
         and preference_gate.accepted
     )
+    regulation_trace_values = {
+        "pressure_level": viability.state.pressure_level,
+        "escalation_stage": viability.state.escalation_stage,
+        "override_scope": viability.state.override_scope,
+        "gate_accepted": regulation_gate.allowed,
+        "dominant_axis": regulation.tradeoff.dominant_axis,
+        "claim_strength": regulation.bias.claim_strength,
+    }
+    trace_emit_active("regulation", "decision", regulation_trace_values)
+    if not regulation_gate.allowed:
+        trace_emit_active(
+            "regulation",
+            "blocked",
+            regulation_trace_values,
+            note=regulation_gate.reason,
+        )
+    trace_emit_active("regulation", "exit", regulation_trace_values)
 
     stream = build_stream_kernel(
         regulation,
@@ -483,6 +529,13 @@ def execute_subject_tick(
     c04_execution_mode_claim = c04_execution_mode
     c05_execution_action_claim = c05_validity_action
     active_execution_mode = c04_execution_mode_claim
+    trace_emit_active(
+        "subject_tick",
+        "enter",
+        {
+            "active_execution_mode": active_execution_mode,
+        },
+    )
     repair_needed = False
     revalidation_needed = False
     halt_reason: str | None = None
@@ -904,6 +957,18 @@ def execute_subject_tick(
         r04_computational_role=r04_computational_role,
         c05_surface_invalidated=obedience_c05_surface_invalidated,
     )
+    top_restrictions = _top_restrictions(
+        tuple(item.restriction_code for item in obedience_decision.restrictions)
+    )
+    obedience_usability_class = _downstream_usability_class(obedience_decision.status)
+    obedience_enter_values = {
+        "accepted": obedience_decision.lawful_continue,
+        "usability_class": obedience_usability_class,
+        "top_restrictions": top_restrictions,
+        "blocked_reason": None if obedience_decision.lawful_continue else obedience_decision.reason,
+        "restriction_count": len(obedience_decision.restrictions),
+    }
+    trace_emit_active("downstream_obedience", "enter", obedience_enter_values)
     obedience_pre_enforcement_action = active_execution_mode
     obedience_checkpoint_status = (
         SubjectTickCheckpointStatus.BLOCKED
@@ -940,6 +1005,22 @@ def execute_subject_tick(
         obedience_reason = (
             f"{obedience_reason}; action_transition={obedience_pre_enforcement_action}->{active_execution_mode}"
         )
+    obedience_trace_values = {
+        "accepted": obedience_decision.lawful_continue,
+        "usability_class": obedience_usability_class,
+        "top_restrictions": top_restrictions,
+        "blocked_reason": None if obedience_decision.lawful_continue else obedience_reason,
+        "restriction_count": len(obedience_decision.restrictions),
+    }
+    trace_emit_active("downstream_obedience", "decision", obedience_trace_values)
+    if not obedience_decision.lawful_continue:
+        trace_emit_active(
+            "downstream_obedience",
+            "blocked",
+            obedience_trace_values,
+            note=obedience_reason,
+        )
+    trace_emit_active("downstream_obedience", "exit", obedience_trace_values)
     checkpoints.append(
         SubjectTickCheckpointResult(
             checkpoint_id="rt01.downstream_obedience_checkpoint",
@@ -951,21 +1032,75 @@ def execute_subject_tick(
         )
     )
 
+    adapter_input = context.world_adapter_input
+    world_adapter_enter_values = {
+        "adapter_presence": False if adapter_input is None else adapter_input.adapter_presence,
+        "adapter_available": False if adapter_input is None else adapter_input.adapter_available,
+        "adapter_degraded": False if adapter_input is None else adapter_input.adapter_degraded,
+    }
+    trace_emit_active("world_adapter", "enter", world_adapter_enter_values)
     world_adapter_result = run_world_adapter_cycle(
         tick_id=tick_id,
         execution_mode=active_execution_mode,
-        adapter_input=context.world_adapter_input,
+        adapter_input=adapter_input,
         request_action_candidate=(
             context.emit_world_action_candidate
             or context.require_world_effect_feedback_for_success_claim
         ),
         source_lineage=lineage,
     )
+    world_adapter_trace_values = {
+        "adapter_presence": world_adapter_result.state.adapter_presence,
+        "adapter_available": world_adapter_result.state.adapter_available,
+        "adapter_degraded": world_adapter_result.state.adapter_degraded,
+        "world_link_status": world_adapter_result.state.world_link_status,
+        "effect_status": world_adapter_result.state.effect_status,
+        "world_grounded_transition_allowed": (
+            world_adapter_result.gate.world_grounded_transition_allowed
+        ),
+        "effect_feedback_correlated": world_adapter_result.gate.effect_feedback_correlated,
+    }
+    trace_emit_active("world_adapter", "decision", world_adapter_trace_values)
+    if not world_adapter_result.gate.world_grounded_transition_allowed:
+        trace_emit_active(
+            "world_adapter",
+            "blocked",
+            world_adapter_trace_values,
+            note=world_adapter_result.gate.reason,
+        )
+    trace_emit_active("world_adapter", "exit", world_adapter_trace_values)
+    world_entry_enter_values = {
+        "world_presence_mode": world_adapter_result.state.world_link_status,
+        "observation_basis_present": (
+            world_adapter_result.state.last_observation_packet is not None
+        ),
+        "action_trace_present": world_adapter_result.state.last_action_packet is not None,
+        "effect_basis_present": world_adapter_result.state.last_effect_packet is not None,
+        "effect_feedback_correlated": world_adapter_result.gate.effect_feedback_correlated,
+    }
+    trace_emit_active("world_entry_contract", "enter", world_entry_enter_values)
     world_entry_result = build_world_entry_contract(
         tick_id=tick_id,
         world_adapter_result=world_adapter_result,
         source_lineage=lineage,
     )
+    world_entry_trace_values = {
+        "world_presence_mode": world_entry_result.episode.world_presence_mode,
+        "observation_basis_present": world_entry_result.episode.observation_basis_present,
+        "action_trace_present": world_entry_result.episode.action_trace_present,
+        "effect_basis_present": world_entry_result.episode.effect_basis_present,
+        "effect_feedback_correlated": world_entry_result.episode.effect_feedback_correlated,
+        "w01_admission_ready": world_entry_result.w01_admission.admission_ready,
+    }
+    trace_emit_active("world_entry_contract", "decision", world_entry_trace_values)
+    if not world_entry_result.w01_admission.admission_ready:
+        trace_emit_active(
+            "world_entry_contract",
+            "blocked",
+            world_entry_trace_values,
+            note=world_entry_result.w01_admission.reason,
+        )
+    trace_emit_active("world_entry_contract", "exit", world_entry_trace_values)
     world_checkpoint_status = SubjectTickCheckpointStatus.ALLOWED
     world_checkpoint_reason = world_entry_result.reason
     if not context.disable_world_seam_enforcement:
@@ -1592,6 +1727,11 @@ def execute_subject_tick(
         maintain_unresolved_slots=not context.disable_t01_unresolved_slot_maintenance,
         source_lineage=lineage,
     )
+    t01_enter_values = {
+        "scene_status": t01_result.state.scene_status,
+        "unresolved_slots_count": len(t01_result.state.unresolved_slots),
+    }
+    trace_emit_active("t01_semantic_field", "enter", t01_enter_values)
     t01_preverbal_view = derive_t01_preverbal_consumer_view(t01_result)
     t01_scene_comparison_ready = bool(
         t01_preverbal_view.comparison_ready and not t01_preverbal_view.clarification_required
@@ -1646,6 +1786,21 @@ def execute_subject_tick(
     else:
         t01_checkpoint_status = SubjectTickCheckpointStatus.ENFORCED_DETOUR
         t01_checkpoint_reason = "t01 semantic field enforcement disabled in ablation context"
+    t01_trace_values = {
+        "scene_status": t01_result.state.scene_status,
+        "unresolved_slots_count": len(t01_result.state.unresolved_slots),
+        "pre_verbal_consumer_ready": t01_result.gate.pre_verbal_consumer_ready,
+        "no_clean_scene_commit": t01_result.gate.no_clean_scene_commit,
+    }
+    trace_emit_active("t01_semantic_field", "decision", t01_trace_values)
+    if t01_checkpoint_status != SubjectTickCheckpointStatus.ALLOWED:
+        trace_emit_active(
+            "t01_semantic_field",
+            "blocked",
+            t01_trace_values,
+            note=t01_checkpoint_reason,
+        )
+    trace_emit_active("t01_semantic_field", "exit", t01_trace_values)
     checkpoints.append(
         SubjectTickCheckpointResult(
             checkpoint_id="rt01.t01_semantic_field_checkpoint",
@@ -1680,6 +1835,10 @@ def execute_subject_tick(
         assembly_mode=t02_assembly_mode,
         source_lineage=lineage,
     )
+    t02_enter_values = {
+        "scene_status": t02_result.state.scene_status,
+    }
+    trace_emit_active("t02_relation_binding", "enter", t02_enter_values)
     t02_preverbal_view = derive_t02_preverbal_constraint_consumer_view(t02_result)
     t02_raw_vs_propagated_distinct = t02_preverbal_view.raw_vs_propagated_distinct
     t02_checkpoint_status = SubjectTickCheckpointStatus.ALLOWED
@@ -1770,6 +1929,26 @@ def execute_subject_tick(
             reason=t02_integrity_checkpoint_reason,
         )
     )
+    t02_trace_values = {
+        "scene_status": t02_result.state.scene_status,
+        "no_clean_binding_commit": t02_result.gate.no_clean_binding_commit,
+        "pre_verbal_constraint_consumer_ready": (
+            t02_result.gate.pre_verbal_constraint_consumer_ready
+        ),
+        "raw_vs_propagated_distinct": t02_raw_vs_propagated_distinct,
+    }
+    trace_emit_active("t02_relation_binding", "decision", t02_trace_values)
+    if (
+        t02_checkpoint_status != SubjectTickCheckpointStatus.ALLOWED
+        or t02_integrity_checkpoint_status != SubjectTickCheckpointStatus.ALLOWED
+    ):
+        trace_emit_active(
+            "t02_relation_binding",
+            "blocked",
+            t02_trace_values,
+            note=f"{t02_checkpoint_reason}; {t02_integrity_checkpoint_reason}",
+        )
+    trace_emit_active("t02_relation_binding", "exit", t02_trace_values)
     t03_competition_mode = _resolve_t03_competition_mode(context.t03_competition_mode)
     t03_result = build_t03_hypothesis_competition(
         tick_id=tick_id,
@@ -1784,6 +1963,12 @@ def execute_subject_tick(
         competition_mode=t03_competition_mode,
         source_lineage=lineage,
     )
+    t03_enter_values = {
+        "leader": t03_result.state.publication_frontier.current_leader,
+        "conflict_count": len(t03_result.state.publication_frontier.unresolved_conflicts),
+        "open_slot_count": len(t03_result.state.publication_frontier.open_slots),
+    }
+    trace_emit_active("t03_hypothesis_competition", "enter", t03_enter_values)
     t03_preverbal_view = derive_t03_preverbal_competition_consumer_view(t03_result)
     t03_checkpoint_status = SubjectTickCheckpointStatus.ALLOWED
     t03_checkpoint_reason = t03_result.gate.reason
@@ -1837,6 +2022,31 @@ def execute_subject_tick(
         t03_checkpoint_reason = (
             "t03 hypothesis competition enforcement disabled in ablation context"
         )
+    t03_no_viable_leader = t03_result.state.publication_frontier.current_leader is None
+    t03_nonconvergence_basis = _t03_nonconvergence_basis(
+        convergence_status=t03_result.state.convergence_status.value,
+        conflict_count=len(t03_result.state.publication_frontier.unresolved_conflicts),
+        open_slot_count=len(t03_result.state.publication_frontier.open_slots),
+        no_viable_leader=t03_no_viable_leader,
+    )
+    t03_trace_values = {
+        "leader": t03_result.state.publication_frontier.current_leader,
+        "conflict_count": len(t03_result.state.publication_frontier.unresolved_conflicts),
+        "open_slot_count": len(t03_result.state.publication_frontier.open_slots),
+        "convergence_status": t03_result.state.convergence_status,
+        "nonconvergence_preserved": t03_result.gate.nonconvergence_preserved,
+        "no_viable_leader": t03_no_viable_leader,
+        "nonconvergence_basis": t03_nonconvergence_basis,
+    }
+    trace_emit_active("t03_hypothesis_competition", "decision", t03_trace_values)
+    if t03_checkpoint_status != SubjectTickCheckpointStatus.ALLOWED:
+        trace_emit_active(
+            "t03_hypothesis_competition",
+            "blocked",
+            t03_trace_values,
+            note=t03_checkpoint_reason,
+        )
+    trace_emit_active("t03_hypothesis_competition", "exit", t03_trace_values)
     checkpoints.append(
         SubjectTickCheckpointResult(
             checkpoint_id="rt01.t03_hypothesis_competition_checkpoint",
@@ -1873,6 +2083,12 @@ def execute_subject_tick(
         c05_validity_action=c05_validity_action,
         source_lineage=lineage,
     )
+    t04_enter_values = {
+        "attention_owner": t04_result.state.attention_owner,
+        "focus_mode": t04_result.state.focus_mode,
+        "reportability_status": t04_result.state.reportability_status,
+    }
+    trace_emit_active("t04_attention_schema", "enter", t04_enter_values)
     t04_preverbal_view = derive_t04_preverbal_focus_consumer_view(t04_result)
     t04_checkpoint_status = SubjectTickCheckpointStatus.ALLOWED
     t04_checkpoint_reason = t04_result.gate.reason
@@ -1916,6 +2132,21 @@ def execute_subject_tick(
     else:
         t04_checkpoint_status = SubjectTickCheckpointStatus.ENFORCED_DETOUR
         t04_checkpoint_reason = "t04 attention schema enforcement disabled in ablation context"
+    t04_trace_values = {
+        "attention_owner": t04_result.state.attention_owner,
+        "focus_mode": t04_result.state.focus_mode,
+        "reportability_status": t04_result.state.reportability_status,
+        "focus_ownership_consumer_ready": t04_result.gate.focus_ownership_consumer_ready,
+    }
+    trace_emit_active("t04_attention_schema", "decision", t04_trace_values)
+    if t04_checkpoint_status != SubjectTickCheckpointStatus.ALLOWED:
+        trace_emit_active(
+            "t04_attention_schema",
+            "blocked",
+            t04_trace_values,
+            note=t04_checkpoint_reason,
+        )
+    trace_emit_active("t04_attention_schema", "exit", t04_trace_values)
     checkpoints.append(
         SubjectTickCheckpointResult(
             checkpoint_id="rt01.t04_attention_schema_checkpoint",
@@ -2606,6 +2837,30 @@ def execute_subject_tick(
         if final_outcome == SubjectTickOutcome.REPAIR
         else None
     )
+    materialized_output = gate.accepted
+    output_kind = _classify_output_kind(
+        final_execution_outcome=final_outcome,
+        active_execution_mode=active_execution_mode,
+        abstain=abstain,
+        materialized_output=materialized_output,
+    )
+    subject_tick_trace_values = {
+        "output_kind": output_kind,
+        "final_execution_outcome": final_outcome,
+        "active_execution_mode": active_execution_mode,
+        "abstain": abstain,
+        "abstain_reason": abstain_reason,
+        "materialized_output": materialized_output,
+    }
+    trace_emit_active("subject_tick", "decision", subject_tick_trace_values)
+    if final_outcome != SubjectTickOutcome.CONTINUE or not materialized_output:
+        trace_emit_active(
+            "subject_tick",
+            "blocked",
+            subject_tick_trace_values,
+            note=abstain_reason or gate.reason,
+        )
+    trace_emit_active("subject_tick", "exit", subject_tick_trace_values)
     return SubjectTickResult(
         state=state,
         downstream_gate=gate,
@@ -2918,6 +3173,56 @@ def _resolve_t03_competition_mode(token: str | None) -> T03CompetitionMode:
         return T03CompetitionMode(normalized)
     except ValueError:
         return T03CompetitionMode.BOUNDED_COMPETITION
+
+
+def _top_restrictions(
+    restrictions: tuple[str, ...],
+    *,
+    limit: int = 3,
+) -> tuple[str, ...]:
+    return tuple(restrictions[: max(0, limit)])
+
+
+def _downstream_usability_class(status: ObedienceStatus) -> str:
+    if status == ObedienceStatus.ALLOW_CONTINUE:
+        return "usable_bounded"
+    if status == ObedienceStatus.ALLOW_CONTINUE_WITH_RESTRICTION:
+        return "degraded_bounded"
+    return "blocked"
+
+
+def _classify_output_kind(
+    *,
+    final_execution_outcome: SubjectTickOutcome,
+    active_execution_mode: str,
+    abstain: bool,
+    materialized_output: bool,
+) -> str:
+    if abstain:
+        return "abstention_output"
+    if not materialized_output or final_execution_outcome == SubjectTickOutcome.HALT:
+        return "no_material_output"
+    if active_execution_mode in {"idle", "hold_safe_idle"}:
+        return "bounded_idle_continuation"
+    return "contentful_output"
+
+
+def _t03_nonconvergence_basis(
+    *,
+    convergence_status: str,
+    conflict_count: int,
+    open_slot_count: int,
+    no_viable_leader: bool,
+) -> str:
+    if convergence_status != "honest_nonconvergence":
+        return "converged_or_provisional"
+    if conflict_count > 0:
+        return "conflict"
+    if open_slot_count > 0:
+        return "open_slot_incompleteness"
+    if no_viable_leader:
+        return "no_admissible_leader"
+    return "nonconvergence_unspecified"
 
 
 def _phase_step(
