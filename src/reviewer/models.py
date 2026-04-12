@@ -37,6 +37,15 @@ GAP_CODE_ALLOWED = {
     "ambiguous_world_basis",
     "unclear_resolution_step",
 }
+_MISMATCH_SIGNAL_CODES = {
+    "causal_transition_mismatch",
+    "unexpected_mode_shift",
+}
+_DEFAULT_UNCLEAR_MODULES = {
+    "t03_hypothesis_competition",
+    "bounded_outcome_resolution",
+    "subject_tick",
+}
 REVIEW_CALL_STATUS_ALLOWED = {
     "transport_error",
     "timeout",
@@ -271,6 +280,25 @@ def normalize_reviewer_output(
         warnings=schema_warnings,
         nonfatal_warnings=nonfatal_warnings,
     )
+
+    has_mismatch_signal = any(
+        isinstance(item, dict) and str(item.get("signal_code", "")) in _MISMATCH_SIGNAL_CODES
+        for item in suspicious_segments
+    )
+    if not has_mismatch_signal:
+        filtered_gaps: list[dict[str, str]] = []
+        pruned = 0
+        for gap in likely_observability_gaps:
+            if (
+                gap.get("gap_code") == "unclear_resolution_step"
+                and gap.get("module_or_transition") in _DEFAULT_UNCLEAR_MODULES
+            ):
+                pruned += 1
+                continue
+            filtered_gaps.append(gap)
+        if pruned:
+            nonfatal_warnings.append("default_unclear_resolution_gaps_pruned")
+            likely_observability_gaps = filtered_gaps
 
     normalized = {
         "case_id": expected_case_id,

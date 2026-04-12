@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import shutil
 import time
+from hashlib import sha1
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
@@ -31,6 +32,7 @@ class ArtifactRetentionManager:
     failures_dir: Path = field(init=False)
     behavioral_review_dir: Path = field(init=False)
     infra_review_dir: Path = field(init=False)
+    ordinary_samples_dir: Path = field(init=False)
 
     def __post_init__(self) -> None:
         self.active_dir = self.root / "active"
@@ -41,6 +43,7 @@ class ArtifactRetentionManager:
         self.failures_dir = self.root / "failures"
         self.behavioral_review_dir = self.root / "behavioral_review_queue"
         self.infra_review_dir = self.root / "infra_review_queue"
+        self.ordinary_samples_dir = self.root / "ordinary_samples"
         for directory in (
             self.active_dir,
             self.summaries_dir,
@@ -50,6 +53,7 @@ class ArtifactRetentionManager:
             self.failures_dir,
             self.behavioral_review_dir,
             self.infra_review_dir,
+            self.ordinary_samples_dir,
         ):
             directory.mkdir(parents=True, exist_ok=True)
 
@@ -162,7 +166,20 @@ class ArtifactRetentionManager:
             json.dumps(payload, ensure_ascii=True, indent=2, sort_keys=True),
             encoding="utf-8",
         )
+        self._apply_diagnostics_retention_cap()
         return path
+
+    def _apply_diagnostics_retention_cap(self) -> None:
+        cap = self.policy.diagnostics_retention_max_files
+        if cap is None or cap <= 0:
+            return
+        files = sorted(
+            self.diagnostics_dir.glob("**/*.json"),
+            key=lambda item: item.stat().st_mtime,
+        )
+        overflow = max(0, len(files) - cap)
+        for path in files[:overflow]:
+            path.unlink(missing_ok=True)
 
     def record_semantic_review(
         self,
@@ -272,12 +289,28 @@ class ArtifactRetentionManager:
         }
         _append_jsonl(self.summaries_dir / "ordinary_cases.jsonl", row)
 
-        if not self.policy.keep_non_suspicious_trace:
+        keep_traces = (
+            self.policy.keep_non_suspicious_trace
+            if self.policy.keep_full_for_ordinary is None
+            else bool(self.policy.keep_full_for_ordinary)
+        )
+        if not keep_traces:
             trace_path = Path(case.trace_path)
             if trace_path.exists():
                 trace_path.unlink()
         else:
             self._apply_non_suspicious_retention_cap()
+
+        sample_rate = max(0.0, min(1.0, float(self.policy.ordinary_full_bundle_sample_rate)))
+        if sample_rate > 0.0:
+            digest = sha1(case.case_id.encode("utf-8")).hexdigest()
+            ratio = int(digest[:8], 16) / float(0xFFFFFFFF)
+            if ratio <= sample_rate:
+                self._write_case_bundle(
+                    queue_dir=self.ordinary_samples_dir,
+                    case=case,
+                    reviews=reviews,
+                )
 
     def _apply_non_suspicious_retention_cap(self) -> None:
         if self.policy.max_non_suspicious_traces <= 0:

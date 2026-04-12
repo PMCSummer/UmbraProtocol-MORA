@@ -7,7 +7,12 @@ import pytest
 
 from reviewer.api_client import OllamaGenerateDiagnostics
 from reviewer.config import ReviewerPipelineConfig
-from reviewer.models import GeneratedCase, ReviewerSchemaError, validate_reviewer_output
+from reviewer.models import (
+    GeneratedCase,
+    ReviewerSchemaError,
+    normalize_reviewer_output,
+    validate_reviewer_output,
+)
 from reviewer.pipeline import LocalStatelessReviewerPipeline
 
 
@@ -189,6 +194,18 @@ def _cfg(tmp_path: Path) -> ReviewerPipelineConfig:
     return cfg
 
 
+def _read_jsonl_rows(path: Path) -> list[dict[str, object]]:
+    if not path.exists():
+        return []
+    rows: list[dict[str, object]] = []
+    for line in path.read_text(encoding="utf-8").splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        rows.append(json.loads(line))
+    return rows
+
+
 def test_signal_code_schema_enforcement() -> None:
     good = _minimal_payload(overall_reading="likely_behavioral_problem", priority="high")
     good["case_id"] = "x"
@@ -220,13 +237,14 @@ def test_bounded_coherent_trace_can_be_coherent_bounded_caution(tmp_path: Path) 
     cfg = _cfg(tmp_path)
 
     def handler(*, case_id: str, model: str, prompt: str) -> OllamaGenerateDiagnostics:
-        payload = _minimal_payload(overall_reading="coherent_bounded_caution", priority="low")
+        payload = _minimal_payload(overall_reading="coherent_bounded_caution", priority="high")
         return _diag(model=model, prompt=prompt, status="ok", extracted_text=json.dumps(payload, ensure_ascii=True))
 
     pipeline = LocalStatelessReviewerPipeline(config=cfg, generator=DummyGenerator(), client=FakeDiagnosticClient(handler))
     summary = pipeline.run_cycle(case_count=1, themes=["epistemic_fragility"])
     assert summary["coherent_ordinary_cases"] == 1
     assert summary["behavioral_review_cases"] == 0
+    assert summary["priority_distribution"] == {"low": 1}
 
 
 def test_revalidation_abstention_can_be_coherent_abstention_or_revalidation(tmp_path: Path) -> None:
@@ -240,6 +258,47 @@ def test_revalidation_abstention_can_be_coherent_abstention_or_revalidation(tmp_
     summary = pipeline.run_cycle(case_count=1, themes=["epistemic_fragility"])
     assert summary["coherent_ordinary_cases"] == 1
     assert summary["behavioral_review_cases"] == 0
+    assert summary["priority_distribution"] == {"low": 1}
+
+
+def test_t03_honest_nonconvergence_alone_does_not_force_behavioral_review(tmp_path: Path) -> None:
+    cfg = _cfg(tmp_path)
+
+    def handler(*, case_id: str, model: str, prompt: str) -> OllamaGenerateDiagnostics:
+        payload = _minimal_payload(overall_reading="plausible_but_needs_review", priority="high")
+        payload["suspicious_segments"] = [
+            {"module": "t03_hypothesis_competition", "signal_code": "t03_honest_nonconvergence", "severity": "medium"}
+        ]
+        payload["likely_observability_gaps"] = [
+            {"module_or_transition": "t03_hypothesis_competition", "gap_code": "unclear_resolution_step"}
+        ]
+        return _diag(model=model, prompt=prompt, status="ok", extracted_text=json.dumps(payload, ensure_ascii=True))
+
+    pipeline = LocalStatelessReviewerPipeline(config=cfg, generator=DummyGenerator(), client=FakeDiagnosticClient(handler))
+    summary = pipeline.run_cycle(case_count=1, themes=["epistemic_fragility"])
+    assert summary["behavioral_review_cases"] == 0
+    assert summary["coherent_ordinary_cases"] == 1
+    assert summary["priority_distribution"] == {"low": 1}
+
+
+def test_bounded_revalidation_alone_does_not_force_behavioral_review(tmp_path: Path) -> None:
+    cfg = _cfg(tmp_path)
+
+    def handler(*, case_id: str, model: str, prompt: str) -> OllamaGenerateDiagnostics:
+        payload = _minimal_payload(overall_reading="plausible_but_needs_review", priority="high")
+        payload["suspicious_segments"] = [
+            {"module": "bounded_outcome_resolution", "signal_code": "bounded_revalidation_required", "severity": "medium"}
+        ]
+        payload["likely_observability_gaps"] = [
+            {"module_or_transition": "bounded_outcome_resolution", "gap_code": "unclear_resolution_step"}
+        ]
+        return _diag(model=model, prompt=prompt, status="ok", extracted_text=json.dumps(payload, ensure_ascii=True))
+
+    pipeline = LocalStatelessReviewerPipeline(config=cfg, generator=DummyGenerator(), client=FakeDiagnosticClient(handler))
+    summary = pipeline.run_cycle(case_count=1, themes=["regulation_mode_validity_pressure"])
+    assert summary["behavioral_review_cases"] == 0
+    assert summary["coherent_ordinary_cases"] == 1
+    assert summary["priority_distribution"] == {"low": 1}
 
 
 def test_likely_behavioral_problem_routes_to_behavioral_queue(tmp_path: Path) -> None:
@@ -256,6 +315,7 @@ def test_likely_behavioral_problem_routes_to_behavioral_queue(tmp_path: Path) ->
     summary = pipeline.run_cycle(case_count=1, themes=["epistemic_fragility"])
     assert summary["behavioral_review_cases"] == 1
     assert summary["infra_review_cases"] == 0
+    assert summary["priority_distribution"] in ({"high": 1}, {"medium": 1})
     assert list((Path(cfg.artifacts_root) / "behavioral_review_queue").glob("**/reviews.json"))
     assert list((Path(cfg.artifacts_root) / "summaries").glob("behavioral_review_queue.jsonl"))
 
@@ -315,6 +375,53 @@ def test_small_run_summary_metrics_are_separated(tmp_path: Path) -> None:
     assert summary["infra_review_cases"] == 1
     assert summary["per_status_reviews"]["semantic_review_completed"] == 2
     assert summary["per_status_reviews"]["parse_error"] == 1
+
+
+def test_unclear_resolution_gap_is_pruned_for_default_nonconvergence_without_mismatch() -> None:
+    payload = _minimal_payload(overall_reading="coherent_bounded_caution", priority="high")
+    payload["case_id"] = "x"
+    payload["suspicious_segments"] = [
+        {"module": "t03_hypothesis_competition", "signal_code": "t03_honest_nonconvergence", "severity": "medium"}
+    ]
+    payload["likely_observability_gaps"] = [
+        {"module_or_transition": "t03_hypothesis_competition", "gap_code": "unclear_resolution_step"},
+        {"module_or_transition": "bounded_outcome_resolution", "gap_code": "unclear_resolution_step"},
+    ]
+    normalized = normalize_reviewer_output(payload, expected_case_id="x")
+    assert normalized.normalized_payload["likely_observability_gaps"] == []
+    assert "default_unclear_resolution_gaps_pruned" in normalized.nonfatal_warnings
+
+
+def test_stronger_support_mismatch_counterfactual_still_routes_behavioral_review(tmp_path: Path) -> None:
+    cfg = _cfg(tmp_path)
+    cfg.generation.max_cases_per_cycle = 2
+
+    def handler(*, case_id: str, model: str, prompt: str) -> OllamaGenerateDiagnostics:
+        seed = int(case_id.rsplit("-", 1)[-1])
+        if seed % 2 == 0:
+            payload = _minimal_payload(overall_reading="plausible_but_needs_review", priority="high")
+            payload["suspicious_segments"] = [
+                {"module": "t03_hypothesis_competition", "signal_code": "t03_honest_nonconvergence", "severity": "medium"}
+            ]
+            return _diag(model=model, prompt=prompt, status="ok", extracted_text=json.dumps(payload, ensure_ascii=True))
+        payload = _minimal_payload(overall_reading="plausible_but_needs_review", priority="high")
+        payload["suspicious_segments"] = [
+            {"module": "bounded_outcome_resolution", "signal_code": "causal_transition_mismatch", "severity": "high"},
+            {"module": "subject_tick", "signal_code": "unexpected_mode_shift", "severity": "high"},
+        ]
+        payload["likely_observability_gaps"] = [
+            {"module_or_transition": "world_entry_contract", "gap_code": "ambiguous_world_basis"},
+            {"module_or_transition": "subject_tick", "gap_code": "unclear_resolution_step"},
+        ]
+        return _diag(model=model, prompt=prompt, status="ok", extracted_text=json.dumps(payload, ensure_ascii=True))
+
+    pipeline = LocalStatelessReviewerPipeline(config=cfg, generator=DummyGenerator(), client=FakeDiagnosticClient(handler))
+    summary = pipeline.run_cycle(case_count=2, themes=["epistemic_fragility"])
+    assert summary["generated_cases"] == 2
+    assert summary["coherent_ordinary_cases"] == 1
+    assert summary["behavioral_review_cases"] == 1
+    assert summary["priority_distribution"].get("high", 0) >= 1
+    assert summary["priority_distribution"].get("low", 0) >= 1
 
 
 def test_ui_smoke_instantiates_basic_views(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

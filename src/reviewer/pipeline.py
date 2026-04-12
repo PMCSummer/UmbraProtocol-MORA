@@ -26,9 +26,9 @@ from reviewer.triage import decide_triage
 
 SEMANTIC_STATUS = "semantic_review_completed"
 PROMPT_FILE_BY_TIER = {
-    "tier1": "v3_tier1_bounded_signal_code_contract.md",
-    "tier2": "v3_tier1_bounded_signal_code_contract.md",
-    "tier3": "v3_tier1_bounded_signal_code_contract.md",
+    "tier1": "v4_tier1_calibrated_bounded_deoverflag.md",
+    "tier2": "v4_tier1_calibrated_bounded_deoverflag.md",
+    "tier3": "v4_tier1_calibrated_bounded_deoverflag.md",
 }
 MINIMAL_REVIEW_SCHEMA: dict[str, Any] = {
     "type": "object",
@@ -158,8 +158,30 @@ class LocalStatelessReviewerPipeline:
         self._prompt_cache[tier_name] = template
         return template
 
-    def _build_review_prompt(self, *, tier_name: str, case: GeneratedCase) -> str:
+    def _compact_trace_payload(self, trace_text: str, *, tier_config: TierConfig) -> str:
+        max_chars = tier_config.max_trace_payload_chars
+        if max_chars is None or int(max_chars) <= 0 or len(trace_text) <= int(max_chars):
+            return trace_text
+        limit = int(max_chars)
+        policy = str(tier_config.trace_compaction_policy or "none").lower()
+        if policy == "tail":
+            return trace_text[-limit:]
+        if policy == "head_tail":
+            head = max(1, int(limit * 0.6))
+            tail = max(1, limit - head)
+            marker = "\n...TRUNCATED...\n"
+            return trace_text[:head] + marker + trace_text[-tail:]
+        return trace_text[:limit]
+
+    def _build_review_prompt(
+        self,
+        *,
+        tier_name: str,
+        tier_config: TierConfig,
+        case: GeneratedCase,
+    ) -> str:
         trace_text = Path(case.trace_path).read_text(encoding="utf-8")
+        trace_text = self._compact_trace_payload(trace_text, tier_config=tier_config)
         package = {
             "case_id": case.case_id,
             "scenario_family": case.scenario_family,
@@ -214,7 +236,11 @@ class LocalStatelessReviewerPipeline:
         )
 
     def _review_case(self, *, tier_name: str, tier_config: TierConfig, case: GeneratedCase) -> ReviewCallResult:
-        prompt = self._build_review_prompt(tier_name=tier_name, case=case)
+        prompt = self._build_review_prompt(
+            tier_name=tier_name,
+            tier_config=tier_config,
+            case=case,
+        )
         timeout_s = (
             self.config.request_timeout_seconds
             if tier_config.request_timeout_seconds is None
@@ -328,6 +354,12 @@ class LocalStatelessReviewerPipeline:
         with self._status_lock:
             return dict(self._last_status)
 
+    def current_seed_cursor(self) -> int:
+        return int(self._seed_cursor)
+
+    def set_seed_cursor(self, seed: int) -> None:
+        self._seed_cursor = int(seed)
+
     def _generate_cases(self, *, count: int, themes: list[str] | None) -> list[GeneratedCase]:
         traces_dir = self.artifacts_root / "active"
         cases: list[GeneratedCase] = []
@@ -364,6 +396,10 @@ class LocalStatelessReviewerPipeline:
         theme_counters: dict[str, int] = defaultdict(int)
         tier_counters: dict[str, int] = defaultdict(int)
         status_counters: dict[str, int] = defaultdict(int)
+        priority_counters: dict[str, int] = defaultdict(int)
+        signal_code_counters: dict[str, int] = defaultdict(int)
+        gap_code_counters: dict[str, int] = defaultdict(int)
+        processed_cases: list[dict[str, Any]] = []
         all_latencies_ms: list[float] = []
         prompt_eval_counts: list[int] = []
         behavioral_review_count = 0
@@ -408,14 +444,65 @@ class LocalStatelessReviewerPipeline:
                         reviews=case_state[item.case.case_id]["reviews"],
                         triage_reason=f"infrastructure_or_schema_failure:{item.review.status}",
                     )
+                    processed_cases.append(
+                        {
+                            "case_id": item.case.case_id,
+                            "seed": item.case.seed,
+                            "theme": item.case.theme,
+                            "scenario_family": item.case.scenario_family,
+                            "status": item.review.status,
+                            "action": "infra_review",
+                            "overall_reading": None,
+                            "priority": None,
+                            "signal_codes": [],
+                            "gap_codes": [],
+                            "triage_reason": f"infrastructure_or_schema_failure:{item.review.status}",
+                        }
+                    )
                     continue
 
-                self.retention.record_semantic_review(case=item.case, review=item.review)
                 decision = decide_triage(
                     review_json=item.review.parsed_json or {},
                     tier_name=tier_name,
                     config=self.config,
                 )
+                if item.review.parsed_json is not None:
+                    item.review.parsed_json["human_review_priority"] = decision.normalized_priority
+                    priority_counters[decision.normalized_priority] += 1
+                    suspicious_segments = item.review.parsed_json.get("suspicious_segments")
+                    if isinstance(suspicious_segments, list):
+                        for segment in suspicious_segments:
+                            if not isinstance(segment, dict):
+                                continue
+                            signal_code = str(segment.get("signal_code", "")).strip()
+                            if signal_code:
+                                signal_code_counters[signal_code] += 1
+                    gaps = item.review.parsed_json.get("likely_observability_gaps")
+                    if isinstance(gaps, list):
+                        for gap in gaps:
+                            if not isinstance(gap, dict):
+                                continue
+                            gap_code = str(gap.get("gap_code", "")).strip()
+                            if gap_code:
+                                gap_code_counters[gap_code] += 1
+                self.retention.record_semantic_review(case=item.case, review=item.review)
+                parsed_json = item.review.parsed_json or {}
+                signal_codes: list[str] = []
+                suspicious_segments = parsed_json.get("suspicious_segments")
+                if isinstance(suspicious_segments, list):
+                    for segment in suspicious_segments:
+                        if isinstance(segment, dict):
+                            code = str(segment.get("signal_code", "")).strip()
+                            if code:
+                                signal_codes.append(code)
+                gap_codes: list[str] = []
+                gaps = parsed_json.get("likely_observability_gaps")
+                if isinstance(gaps, list):
+                    for gap in gaps:
+                        if isinstance(gap, dict):
+                            code = str(gap.get("gap_code", "")).strip()
+                            if code:
+                                gap_codes.append(code)
                 if decision.action == "close":
                     coherent_ordinary_count += 1
                     self.retention.record_ordinary(
@@ -439,6 +526,21 @@ class LocalStatelessReviewerPipeline:
                     )
                 elif decision.action == "escalate":
                     next_pending.append(item.case)
+                processed_cases.append(
+                    {
+                        "case_id": item.case.case_id,
+                        "seed": item.case.seed,
+                        "theme": item.case.theme,
+                        "scenario_family": item.case.scenario_family,
+                        "status": item.review.status,
+                        "action": decision.action,
+                        "overall_reading": parsed_json.get("overall_reading"),
+                        "priority": parsed_json.get("human_review_priority"),
+                        "signal_codes": signal_codes,
+                        "gap_codes": gap_codes,
+                        "triage_reason": decision.reason,
+                    }
+                )
             pending = next_pending
 
         for case in pending:
@@ -447,6 +549,21 @@ class LocalStatelessReviewerPipeline:
                 case=case,
                 reviews=case_state[case.case_id]["reviews"],
                 triage_reason="exhausted_tiers_without_close",
+            )
+            processed_cases.append(
+                {
+                    "case_id": case.case_id,
+                    "seed": case.seed,
+                    "theme": case.theme,
+                    "scenario_family": case.scenario_family,
+                    "status": "exhausted_tiers_without_close",
+                    "action": "infra_review",
+                    "overall_reading": None,
+                    "priority": None,
+                    "signal_codes": [],
+                    "gap_codes": [],
+                    "triage_reason": "exhausted_tiers_without_close",
+                }
             )
 
         duration_s = round(time.time() - cycle_started, 3)
@@ -472,11 +589,19 @@ class LocalStatelessReviewerPipeline:
             "per_theme_reviews": dict(theme_counters),
             "per_tier_reviews": dict(tier_counters),
             "per_status_reviews": dict(status_counters),
+            "priority_distribution": dict(priority_counters),
+            "top_signal_code_counts": dict(
+                sorted(signal_code_counters.items(), key=lambda item: (-item[1], item[0]))[:10]
+            ),
+            "top_gap_code_counts": dict(
+                sorted(gap_code_counters.items(), key=lambda item: (-item[1], item[0]))[:10]
+            ),
             "avg_latency_ms": avg_latency_ms,
             "prompt_eval_count_distribution": prompt_eval_distribution,
             "diagnostic_mode": self.config.diagnostic_mode,
             "model_health": self.health(),
             "stop_requested": self._stop_flag.is_set(),
+            "processed_cases": processed_cases,
         }
         self._set_status({"stage": "idle", **summary})
         return summary

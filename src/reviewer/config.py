@@ -15,6 +15,8 @@ class TierConfig:
     num_ctx: int = 8192
     num_predict: int = 384
     temperature: float = 0.0
+    max_trace_payload_chars: int | None = None
+    trace_compaction_policy: str = "none"  # none | tail | head_tail
 
 
 @dataclass(slots=True)
@@ -28,6 +30,9 @@ class EscalationPolicy:
 class RetentionPolicy:
     keep_non_suspicious_trace: bool = False
     max_non_suspicious_traces: int = 25
+    keep_full_for_ordinary: bool | None = None
+    ordinary_full_bundle_sample_rate: float = 0.0
+    diagnostics_retention_max_files: int | None = None
 
 
 @dataclass(slots=True)
@@ -44,6 +49,56 @@ class GenerationPolicy:
 
 
 @dataclass(slots=True)
+class SchedulerPolicy:
+    mode: str = "balanced_round_robin"  # balanced_round_robin | weighted
+    family_weights: dict[str, float] = field(default_factory=dict)
+    family_quotas: dict[str, int] = field(default_factory=dict)
+    family_min_share: dict[str, float] = field(default_factory=dict)
+    family_max_share: dict[str, float] = field(default_factory=dict)
+    max_same_family_streak: int = 3
+    shuffle_window: int = 0
+
+
+@dataclass(slots=True)
+class GuardrailPolicy:
+    max_case_count: int = 1600
+    max_duration_seconds: int = 12 * 60 * 60
+    max_consecutive_infra_failures: int = 20
+    rolling_window_size: int = 50
+    max_rolling_infra_failure_rate: float = 0.25
+    max_rolling_behavioral_flag_rate: float = 0.75
+    rolling_behavioral_rate_action: str = "warn"  # warn | pause | stop
+    max_repeated_same_family_streak: int = 5
+    max_ordinary_storage_mb: int | None = None
+    heartbeat_interval_seconds: int = 10
+    checkpoint_interval_cases: int = 10
+    warn_signal_code_dominance: float = 0.75
+    warn_gap_code_dominance: float = 0.8
+    warn_family_imbalance_share: float = 0.55
+    warn_insufficient_evidence_rate: float = 0.2
+
+
+@dataclass(slots=True)
+class WarmupPolicy:
+    enabled: bool = True
+    case_count: int = 8
+    max_infra_failures: int = 1
+    max_parse_failures: int = 0
+
+
+@dataclass(slots=True)
+class NightRunPolicy:
+    enabled: bool = False
+    run_mode: str = "long"  # batch | long
+    scheduler: SchedulerPolicy = field(default_factory=SchedulerPolicy)
+    guardrails: GuardrailPolicy = field(default_factory=GuardrailPolicy)
+    warmup: WarmupPolicy = field(default_factory=WarmupPolicy)
+    batch_case_count: int = 100
+    run_id_prefix: str = "tier1-night-run"
+    checkpoint_resume: bool = True
+
+
+@dataclass(slots=True)
 class ReviewerPipelineConfig:
     ollama_base_url: str = "http://127.0.0.1:11434"
     request_timeout_seconds: float = 60.0
@@ -55,6 +110,7 @@ class ReviewerPipelineConfig:
     escalation: EscalationPolicy = field(default_factory=EscalationPolicy)
     retention: RetentionPolicy = field(default_factory=RetentionPolicy)
     generation: GenerationPolicy = field(default_factory=GenerationPolicy)
+    night_run: NightRunPolicy = field(default_factory=NightRunPolicy)
 
     @staticmethod
     def default() -> "ReviewerPipelineConfig":
@@ -125,4 +181,18 @@ class ReviewerPipelineConfig:
             escalation=EscalationPolicy(**dict(raw.get("escalation", {}))),
             retention=RetentionPolicy(**dict(raw.get("retention", {}))),
             generation=GenerationPolicy(**dict(raw.get("generation", {}))),
+            night_run=NightRunPolicy(
+                **{
+                    **dict(raw.get("night_run", {})),
+                    "scheduler": SchedulerPolicy(
+                        **dict(dict(raw.get("night_run", {})).get("scheduler", {}))
+                    ),
+                    "guardrails": GuardrailPolicy(
+                        **dict(dict(raw.get("night_run", {})).get("guardrails", {}))
+                    ),
+                    "warmup": WarmupPolicy(
+                        **dict(dict(raw.get("night_run", {})).get("warmup", {}))
+                    ),
+                }
+            ),
         )

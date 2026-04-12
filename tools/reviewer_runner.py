@@ -15,6 +15,7 @@ if str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))
 
 from reviewer.config import ReviewerPipelineConfig
+from reviewer.night_run import NightRunController
 from reviewer.pipeline import LocalStatelessReviewerPipeline
 
 
@@ -74,6 +75,71 @@ def _build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Print summaries as JSON.",
     )
+    parser.add_argument(
+        "--night-run-mode",
+        choices=("batch", "long", "resume"),
+        default=None,
+        help="Run long unattended tier1 sweep mode.",
+    )
+    parser.add_argument(
+        "--run-id",
+        type=str,
+        default=None,
+        help="Optional run id for night-run mode. Required for resume.",
+    )
+    parser.add_argument(
+        "--max-cases",
+        type=int,
+        default=None,
+        help="Override max cases for night-run mode.",
+    )
+    parser.add_argument(
+        "--max-duration-seconds",
+        type=int,
+        default=None,
+        help="Override max wall-clock duration for night-run mode.",
+    )
+    parser.add_argument(
+        "--scheduler-mode",
+        choices=("balanced_round_robin", "weighted"),
+        default=None,
+        help="Override family scheduler mode for night-run mode.",
+    )
+    parser.add_argument(
+        "--family-weights-json",
+        type=str,
+        default=None,
+        help="JSON object with per-family weights.",
+    )
+    parser.add_argument(
+        "--family-quotas-json",
+        type=str,
+        default=None,
+        help="JSON object with per-family quotas.",
+    )
+    parser.add_argument(
+        "--family-min-share-json",
+        type=str,
+        default=None,
+        help="JSON object with per-family min share.",
+    )
+    parser.add_argument(
+        "--family-max-share-json",
+        type=str,
+        default=None,
+        help="JSON object with per-family max share.",
+    )
+    parser.add_argument(
+        "--warmup-cases",
+        type=int,
+        default=None,
+        help="Override warm-up case count for night-run mode.",
+    )
+    parser.add_argument(
+        "--disable-warmup",
+        action="store_true",
+        help="Disable warm-up phase for night-run mode.",
+    )
     return parser
 
 
@@ -92,6 +158,29 @@ def main(argv: Sequence[str] | None = None) -> int:
     config = _load_config(args.config)
     if args.diagnostic_mode:
         config.diagnostic_mode = True
+    if args.scheduler_mode is not None:
+        config.night_run.scheduler.mode = args.scheduler_mode
+    if args.family_weights_json:
+        config.night_run.scheduler.family_weights = dict(json.loads(args.family_weights_json))
+    if args.family_quotas_json:
+        config.night_run.scheduler.family_quotas = {
+            str(key): int(value)
+            for key, value in dict(json.loads(args.family_quotas_json)).items()
+        }
+    if args.family_min_share_json:
+        config.night_run.scheduler.family_min_share = {
+            str(key): float(value)
+            for key, value in dict(json.loads(args.family_min_share_json)).items()
+        }
+    if args.family_max_share_json:
+        config.night_run.scheduler.family_max_share = {
+            str(key): float(value)
+            for key, value in dict(json.loads(args.family_max_share_json)).items()
+        }
+    if args.warmup_cases is not None:
+        config.night_run.warmup.case_count = int(args.warmup_cases)
+    if args.disable_warmup:
+        config.night_run.warmup.enabled = False
     pipeline = LocalStatelessReviewerPipeline(config=config)
 
     def _stop_handler(_sig, _frame) -> None:  # noqa: ANN001
@@ -104,7 +193,17 @@ def main(argv: Sequence[str] | None = None) -> int:
     if args.themes:
         themes = [item.strip() for item in args.themes.split(",") if item.strip()]
 
-    if args.sequential_diagnostics:
+    if args.night_run_mode is not None:
+        controller = NightRunController(pipeline=pipeline, config=config)
+        summary = controller.run(
+            mode=("long" if args.night_run_mode == "resume" else args.night_run_mode),
+            run_id=args.run_id,
+            max_cases=args.max_cases,
+            max_duration_seconds=args.max_duration_seconds,
+            themes=themes,
+            resume=(args.night_run_mode == "resume"),
+        )
+    elif args.sequential_diagnostics:
         summary = pipeline.run_sequential_diagnostics(
             tier_name=args.tier,
             case_count=args.case_count or 1,
