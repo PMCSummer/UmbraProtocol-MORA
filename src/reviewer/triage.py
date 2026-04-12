@@ -8,7 +8,7 @@ from reviewer.config import ReviewerPipelineConfig
 
 @dataclass(frozen=True, slots=True)
 class TriageDecision:
-    action: str  # close | escalate | freeze
+    action: str  # close | behavioral_review | infra_review | escalate
     reason: str
     next_tier: str | None = None
 
@@ -31,56 +31,38 @@ def decide_triage(
     current_idx = enabled_tiers.index(tier_name) if tier_name in enabled_tiers else -1
     next_tier = enabled_tiers[current_idx + 1] if 0 <= current_idx < len(enabled_tiers) - 1 else None
 
-    if overall in {"likely_problematic"} or priority == "high":
-        if tier_name == "tier1" and next_tier is not None:
-            return TriageDecision(
-                action="escalate",
-                reason="tier1 high-risk signal requires stronger model review",
-                next_tier=next_tier,
-            )
-        if (
-            tier_name == "tier2"
-            and next_tier is not None
-            and config.escalation.second_opinion_on_high_priority
-        ):
-            return TriageDecision(
-                action="escalate",
-                reason="high priority routed for second opinion",
-                next_tier=next_tier,
-            )
-        return TriageDecision(action="freeze", reason="high-priority suspicious case")
+    if overall in {"coherent_bounded_caution", "coherent_abstention_or_revalidation"}:
+        return TriageDecision(action="close", reason="coherent bounded behavior")
 
-    if overall == "suspicious_but_inconclusive":
-        if (
-            next_tier is not None
-            and confidence <= (
-                config.escalation.tier1_escalate_confidence_max
-                if tier_name == "tier1"
-                else config.escalation.tier2_second_opinion_confidence_max
+    if overall == "plausible_but_needs_review":
+        if priority in {"medium", "high"}:
+            return TriageDecision(
+                action="behavioral_review",
+                reason="plausible but requires behavioral inspection",
             )
-        ):
+        return TriageDecision(action="close", reason="plausible low-priority case")
+
+    if overall == "likely_behavioral_problem":
+        if next_tier is not None and confidence <= config.escalation.tier1_escalate_confidence_max:
             return TriageDecision(
                 action="escalate",
-                reason="suspicious and low-confidence review requires escalation",
+                reason="likely behavioral problem with low confidence",
                 next_tier=next_tier,
             )
-        return TriageDecision(action="freeze", reason="suspicious case kept for human review")
-
-    if overall == "insufficient_evidence":
-        if next_tier is not None:
-            return TriageDecision(
-                action="escalate",
-                reason="insufficient evidence routed upward",
-                next_tier=next_tier,
-            )
-        return TriageDecision(action="freeze", reason="insufficient evidence at top tier")
-
-    if overall == "mostly_coherent_with_questions" and priority in {"medium", "high"} and next_tier is not None:
         return TriageDecision(
-            action="escalate",
-            reason="questions with non-low priority escalated",
-            next_tier=next_tier,
+            action="behavioral_review",
+            reason="likely behavioral problem",
         )
 
-    return TriageDecision(action="close", reason="coherent enough for compact closure")
+    if overall == "insufficient_evidence":
+        if priority == "low":
+            return TriageDecision(
+                action="close",
+                reason="insufficient evidence but low priority",
+            )
+        return TriageDecision(
+            action="infra_review",
+            reason="insufficient evidence requires infra-level review",
+        )
 
+    return TriageDecision(action="close", reason="default close")

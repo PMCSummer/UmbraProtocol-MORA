@@ -12,6 +12,8 @@ from reviewer.api_client import OllamaClient, OllamaGenerateDiagnostics
 from reviewer.case_generator import SeededCaseGenerator
 from reviewer.config import ReviewerPipelineConfig, TierConfig
 from reviewer.models import (
+    GAP_CODE_ALLOWED,
+    SIGNAL_CODE_ALLOWED,
     GeneratedCase,
     ReviewCallResult,
     ReviewerSchemaError,
@@ -24,9 +26,9 @@ from reviewer.triage import decide_triage
 
 SEMANTIC_STATUS = "semantic_review_completed"
 PROMPT_FILE_BY_TIER = {
-    "tier1": "v2_minimal_live_stabilization.md",
-    "tier2": "v2_minimal_live_stabilization.md",
-    "tier3": "v2_minimal_live_stabilization.md",
+    "tier1": "v3_tier1_bounded_signal_code_contract.md",
+    "tier2": "v3_tier1_bounded_signal_code_contract.md",
+    "tier3": "v3_tier1_bounded_signal_code_contract.md",
 }
 MINIMAL_REVIEW_SCHEMA: dict[str, Any] = {
     "type": "object",
@@ -34,10 +36,10 @@ MINIMAL_REVIEW_SCHEMA: dict[str, Any] = {
         "overall_reading": {
             "type": "string",
             "enum": [
-                "coherent",
-                "mostly_coherent_with_questions",
-                "suspicious_but_inconclusive",
-                "likely_problematic",
+                "coherent_bounded_caution",
+                "coherent_abstention_or_revalidation",
+                "plausible_but_needs_review",
+                "likely_behavioral_problem",
                 "insufficient_evidence",
             ],
         },
@@ -48,10 +50,13 @@ MINIMAL_REVIEW_SCHEMA: dict[str, Any] = {
                 "type": "object",
                 "properties": {
                     "module": {"type": "string"},
-                    "signal": {"type": "string"},
+                    "signal_code": {
+                        "type": "string",
+                        "enum": sorted(SIGNAL_CODE_ALLOWED),
+                    },
                     "severity": {"type": "string", "enum": ["low", "medium", "high"]},
                 },
-                "required": ["module", "signal", "severity"],
+                "required": ["module", "signal_code", "severity"],
                 "additionalProperties": False,
             },
         },
@@ -61,9 +66,12 @@ MINIMAL_REVIEW_SCHEMA: dict[str, Any] = {
                 "type": "object",
                 "properties": {
                     "module_or_transition": {"type": "string"},
-                    "why_gap_is_possible": {"type": "string"},
+                    "gap_code": {
+                        "type": "string",
+                        "enum": sorted(GAP_CODE_ALLOWED),
+                    },
                 },
-                "required": ["module_or_transition", "why_gap_is_possible"],
+                "required": ["module_or_transition", "gap_code"],
                 "additionalProperties": False,
             },
         },
@@ -358,8 +366,9 @@ class LocalStatelessReviewerPipeline:
         status_counters: dict[str, int] = defaultdict(int)
         all_latencies_ms: list[float] = []
         prompt_eval_counts: list[int] = []
-        suspicious_count = 0
-        closed_count = 0
+        behavioral_review_count = 0
+        infra_review_count = 0
+        coherent_ordinary_count = 0
 
         for tier_name in enabled_tiers:
             if not pending or self._stop_flag.is_set():
@@ -372,8 +381,9 @@ class LocalStatelessReviewerPipeline:
                     "total_cases": len(cases),
                     "active_workers": self.config.tiers[tier_name].max_parallel_workers,
                     "queue_size": len(pending),
-                    "suspicious_count": suspicious_count,
-                    "closed_count": closed_count,
+                    "behavioral_review_cases": behavioral_review_count,
+                    "infra_review_cases": infra_review_count,
+                    "coherent_ordinary_cases": coherent_ordinary_count,
                 }
             )
             tier_results = self._run_tier_workers(tier_name=tier_name, cases=pending)
@@ -390,44 +400,50 @@ class LocalStatelessReviewerPipeline:
                 if self.config.diagnostic_mode:
                     self.retention.record_call_diagnostics(case=item.case, review=item.review)
 
-                if item.review.status == SEMANTIC_STATUS:
-                    self.retention.record_semantic_review(case=item.case, review=item.review)
-                    decision = decide_triage(
-                        review_json=item.review.parsed_json or {},
-                        tier_name=tier_name,
-                        config=self.config,
+                if item.review.status != SEMANTIC_STATUS:
+                    self.retention.record_failure(case=item.case, review=item.review)
+                    infra_review_count += 1
+                    self.retention.record_infra_review(
+                        case=item.case,
+                        reviews=case_state[item.case.case_id]["reviews"],
+                        triage_reason=f"infrastructure_or_schema_failure:{item.review.status}",
                     )
-                    if decision.action == "close":
-                        closed_count += 1
-                        self.retention.record_ordinary(
-                            case=item.case,
-                            reviews=case_state[item.case.case_id]["reviews"],
-                            triage_reason=decision.reason,
-                        )
-                    elif decision.action == "freeze":
-                        suspicious_count += 1
-                        self.retention.record_suspicious(
-                            case=item.case,
-                            reviews=case_state[item.case.case_id]["reviews"],
-                            triage_reason=decision.reason,
-                        )
-                    elif decision.action == "escalate":
-                        next_pending.append(item.case)
                     continue
 
-                # Non-semantic states are infra/contract failures and must not escalate tiers.
-                self.retention.record_failure(case=item.case, review=item.review)
-                suspicious_count += 1
-                self.retention.record_suspicious(
-                    case=item.case,
-                    reviews=case_state[item.case.case_id]["reviews"],
-                    triage_reason=f"infrastructure_or_schema_failure:{item.review.status}",
+                self.retention.record_semantic_review(case=item.case, review=item.review)
+                decision = decide_triage(
+                    review_json=item.review.parsed_json or {},
+                    tier_name=tier_name,
+                    config=self.config,
                 )
+                if decision.action == "close":
+                    coherent_ordinary_count += 1
+                    self.retention.record_ordinary(
+                        case=item.case,
+                        reviews=case_state[item.case.case_id]["reviews"],
+                        triage_reason=decision.reason,
+                    )
+                elif decision.action == "behavioral_review":
+                    behavioral_review_count += 1
+                    self.retention.record_behavioral_review(
+                        case=item.case,
+                        reviews=case_state[item.case.case_id]["reviews"],
+                        triage_reason=decision.reason,
+                    )
+                elif decision.action == "infra_review":
+                    infra_review_count += 1
+                    self.retention.record_infra_review(
+                        case=item.case,
+                        reviews=case_state[item.case.case_id]["reviews"],
+                        triage_reason=decision.reason,
+                    )
+                elif decision.action == "escalate":
+                    next_pending.append(item.case)
             pending = next_pending
 
         for case in pending:
-            suspicious_count += 1
-            self.retention.record_suspicious(
+            infra_review_count += 1
+            self.retention.record_infra_review(
                 case=case,
                 reviews=case_state[case.case_id]["reviews"],
                 triage_reason="exhausted_tiers_without_close",
@@ -447,8 +463,12 @@ class LocalStatelessReviewerPipeline:
         summary = {
             "cycle_duration_s": duration_s,
             "generated_cases": len(cases),
-            "closed_cases": closed_count,
-            "suspicious_cases": suspicious_count,
+            "coherent_ordinary_cases": coherent_ordinary_count,
+            "behavioral_review_cases": behavioral_review_count,
+            "infra_review_cases": infra_review_count,
+            # Backward-compatible aliases:
+            "closed_cases": coherent_ordinary_count,
+            "suspicious_cases": behavioral_review_count,
             "per_theme_reviews": dict(theme_counters),
             "per_tier_reviews": dict(tier_counters),
             "per_status_reviews": dict(status_counters),

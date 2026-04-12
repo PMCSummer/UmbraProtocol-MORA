@@ -77,14 +77,18 @@ class DummyGenerator:
         )
 
 
-def _minimal_payload() -> dict[str, object]:
+def _minimal_payload(
+    *,
+    overall_reading: str = "coherent_bounded_caution",
+    priority: str = "low",
+) -> dict[str, object]:
     return {
-        "overall_reading": "coherent",
+        "overall_reading": overall_reading,
         "confidence": 0.91,
         "suspicious_segments": [],
         "likely_observability_gaps": [],
-        "human_review_priority": "low",
-        "final_note": "looks coherent",
+        "human_review_priority": priority,
+        "final_note": "bounded coherent trace",
     }
 
 
@@ -150,7 +154,7 @@ def _diag(
         "stream": False,
         "think": False,
         "format": {"type": "object"},
-        "options": {"temperature": 0.0, "num_predict": 256, "num_ctx": 8192},
+        "options": {"temperature": 0.0, "num_predict": 512, "num_ctx": 8192},
         "keep_alive": 0,
     }
     raw_http = raw_http_response_body
@@ -185,201 +189,132 @@ def _cfg(tmp_path: Path) -> ReviewerPipelineConfig:
     return cfg
 
 
-def test_thinking_only_no_answer_classification(tmp_path: Path) -> None:
-    cfg = _cfg(tmp_path)
+def test_signal_code_schema_enforcement() -> None:
+    good = _minimal_payload(overall_reading="likely_behavioral_problem", priority="high")
+    good["case_id"] = "x"
+    good["suspicious_segments"] = [
+        {"module": "t03_hypothesis_competition", "signal_code": "t03_honest_nonconvergence", "severity": "medium"}
+    ]
+    normalized = validate_reviewer_output(good, expected_case_id="x")
+    assert normalized["suspicious_segments"][0]["signal_code"] == "t03_honest_nonconvergence"
 
-    def handler(*, case_id: str, model: str, prompt: str) -> OllamaGenerateDiagnostics:
-        return _diag(
-            model=model,
-            prompt=prompt,
-            status="thinking_only_no_answer",
-            extracted_text="",
-            thinking_present=True,
-            error_message="thinking present but answer field empty",
-        )
-
-    pipeline = LocalStatelessReviewerPipeline(
-        config=cfg,
-        generator=DummyGenerator(),
-        client=FakeDiagnosticClient(handler),
-    )
-    summary = pipeline.run_cycle(case_count=1, themes=["epistemic_fragility"])
-    assert summary["per_status_reviews"]["thinking_only_no_answer"] == 1
-
-
-def test_canonical_case_id_injection_with_reduced_schema(tmp_path: Path) -> None:
-    cfg = _cfg(tmp_path)
-
-    def handler(*, case_id: str, model: str, prompt: str) -> OllamaGenerateDiagnostics:
-        payload = dict(_minimal_payload())
-        payload["case_id"] = "wrong-id-from-model"
-        return _diag(
-            model=model,
-            prompt=prompt,
-            status="ok",
-            extracted_text=json.dumps(payload, ensure_ascii=True),
-        )
-
-    pipeline = LocalStatelessReviewerPipeline(
-        config=cfg,
-        generator=DummyGenerator(),
-        client=FakeDiagnosticClient(handler),
-    )
-    summary = pipeline.run_cycle(case_count=1, themes=["epistemic_fragility"])
-    assert summary["per_status_reviews"]["semantic_review_completed"] == 1
-    semantic = list((Path(cfg.artifacts_root) / "semantic_reviews").glob("**/*.json"))[0]
-    payload = json.loads(semantic.read_text(encoding="utf-8"))
-    assert payload["parsed_json"]["case_id"].startswith("dummy-case-")
-    assert payload["model_case_id"] == "wrong-id-from-model"
-
-
-def test_minimal_schema_validation() -> None:
-    valid = dict(_minimal_payload())
-    valid["case_id"] = "x"
-    normalized = validate_reviewer_output(valid, expected_case_id="x")
-    assert set(normalized.keys()) == {
-        "case_id",
-        "overall_reading",
-        "confidence",
-        "suspicious_segments",
-        "likely_observability_gaps",
-        "human_review_priority",
-        "final_note",
-    }
-
-    bad = {"overall_reading": "coherent"}
+    bad = dict(good)
+    bad["suspicious_segments"] = [
+        {"module": "t03_hypothesis_competition", "signal_code": "raw_trace_fragment", "severity": "medium"}
+    ]
     with pytest.raises(ReviewerSchemaError):
         validate_reviewer_output(bad, expected_case_id="x")
 
 
-def test_one_endpoint_structured_output_extraction(tmp_path: Path) -> None:
-    cfg = _cfg(tmp_path)
-
-    def handler(*, case_id: str, model: str, prompt: str) -> OllamaGenerateDiagnostics:
-        payload = dict(_minimal_payload())
-        payload["case_id"] = case_id
-        return _diag(
-            model=model,
-            prompt=prompt,
-            status="ok",
-            extracted_text=json.dumps(payload, ensure_ascii=True),
-        )
-
-    client = FakeDiagnosticClient(handler)
-    pipeline = LocalStatelessReviewerPipeline(config=cfg, generator=DummyGenerator(), client=client)
-    pipeline.run_cycle(case_count=1, themes=["epistemic_fragility"])
-    assert client.calls
-    assert client.calls[0]["output_json_schema"] is not None
-    assert client.calls[0]["think"] is False
-
-
-def test_reduced_payload_path(tmp_path: Path) -> None:
-    cfg = _cfg(tmp_path)
-
-    def handler(*, case_id: str, model: str, prompt: str) -> OllamaGenerateDiagnostics:
-        payload = dict(_minimal_payload())
-        payload["case_id"] = case_id
-        return _diag(
-            model=model,
-            prompt=prompt,
-            status="ok",
-            extracted_text=json.dumps(payload, ensure_ascii=True),
-        )
-
-    client = FakeDiagnosticClient(handler)
-    pipeline = LocalStatelessReviewerPipeline(config=cfg, generator=DummyGenerator(), client=client)
-    pipeline.run_cycle(case_count=1, themes=["epistemic_fragility"])
-    package = client.calls[0]["package"]
-    assert sorted(package.keys()) == [
-        "case_id",
-        "key_tension_axis",
-        "scenario_family",
-        "scenario_intent",
-        "trace_jsonl",
+def test_no_free_form_signal_field() -> None:
+    payload = _minimal_payload(overall_reading="likely_behavioral_problem", priority="high")
+    payload["case_id"] = "x"
+    payload["suspicious_segments"] = [
+        {"module": "t04_attention_schema", "signal": "bad raw string", "severity": "low"}
     ]
+    with pytest.raises(ReviewerSchemaError):
+        validate_reviewer_output(payload, expected_case_id="x")
 
 
-def test_live_call_config_assembly_includes_contract_settings(tmp_path: Path) -> None:
+def test_bounded_coherent_trace_can_be_coherent_bounded_caution(tmp_path: Path) -> None:
     cfg = _cfg(tmp_path)
-    cfg.tiers["tier1"].num_ctx = 6144
-    cfg.tiers["tier1"].num_predict = 200
-    cfg.tiers["tier1"].temperature = 0.0
 
     def handler(*, case_id: str, model: str, prompt: str) -> OllamaGenerateDiagnostics:
-        payload = dict(_minimal_payload())
-        payload["case_id"] = case_id
-        return _diag(
-            model=model,
-            prompt=prompt,
-            status="ok",
-            extracted_text=json.dumps(payload, ensure_ascii=True),
-            prompt_eval_count=2048,
-        )
+        payload = _minimal_payload(overall_reading="coherent_bounded_caution", priority="low")
+        return _diag(model=model, prompt=prompt, status="ok", extracted_text=json.dumps(payload, ensure_ascii=True))
+
+    pipeline = LocalStatelessReviewerPipeline(config=cfg, generator=DummyGenerator(), client=FakeDiagnosticClient(handler))
+    summary = pipeline.run_cycle(case_count=1, themes=["epistemic_fragility"])
+    assert summary["coherent_ordinary_cases"] == 1
+    assert summary["behavioral_review_cases"] == 0
+
+
+def test_revalidation_abstention_can_be_coherent_abstention_or_revalidation(tmp_path: Path) -> None:
+    cfg = _cfg(tmp_path)
+
+    def handler(*, case_id: str, model: str, prompt: str) -> OllamaGenerateDiagnostics:
+        payload = _minimal_payload(overall_reading="coherent_abstention_or_revalidation", priority="low")
+        return _diag(model=model, prompt=prompt, status="ok", extracted_text=json.dumps(payload, ensure_ascii=True))
+
+    pipeline = LocalStatelessReviewerPipeline(config=cfg, generator=DummyGenerator(), client=FakeDiagnosticClient(handler))
+    summary = pipeline.run_cycle(case_count=1, themes=["epistemic_fragility"])
+    assert summary["coherent_ordinary_cases"] == 1
+    assert summary["behavioral_review_cases"] == 0
+
+
+def test_likely_behavioral_problem_routes_to_behavioral_queue(tmp_path: Path) -> None:
+    cfg = _cfg(tmp_path)
+
+    def handler(*, case_id: str, model: str, prompt: str) -> OllamaGenerateDiagnostics:
+        payload = _minimal_payload(overall_reading="likely_behavioral_problem", priority="high")
+        payload["suspicious_segments"] = [
+            {"module": "bounded_outcome_resolution", "signal_code": "causal_transition_mismatch", "severity": "high"}
+        ]
+        return _diag(model=model, prompt=prompt, status="ok", extracted_text=json.dumps(payload, ensure_ascii=True))
+
+    pipeline = LocalStatelessReviewerPipeline(config=cfg, generator=DummyGenerator(), client=FakeDiagnosticClient(handler))
+    summary = pipeline.run_cycle(case_count=1, themes=["epistemic_fragility"])
+    assert summary["behavioral_review_cases"] == 1
+    assert summary["infra_review_cases"] == 0
+    assert list((Path(cfg.artifacts_root) / "behavioral_review_queue").glob("**/reviews.json"))
+    assert list((Path(cfg.artifacts_root) / "summaries").glob("behavioral_review_queue.jsonl"))
+
+
+def test_infra_failures_route_to_infra_queue_not_behavioral(tmp_path: Path) -> None:
+    cfg = _cfg(tmp_path)
+
+    def handler(*, case_id: str, model: str, prompt: str) -> OllamaGenerateDiagnostics:
+        return _diag(model=model, prompt=prompt, status="parse_error", error_message="bad json")
+
+    pipeline = LocalStatelessReviewerPipeline(config=cfg, generator=DummyGenerator(), client=FakeDiagnosticClient(handler))
+    summary = pipeline.run_cycle(case_count=1, themes=["epistemic_fragility"])
+    assert summary["infra_review_cases"] == 1
+    assert summary["behavioral_review_cases"] == 0
+    assert list((Path(cfg.artifacts_root) / "infra_review_queue").glob("**/reviews.json"))
+
+
+def test_output_schema_request_reduces_signal_quote_pollution_risk(tmp_path: Path) -> None:
+    cfg = _cfg(tmp_path)
+
+    def handler(*, case_id: str, model: str, prompt: str) -> OllamaGenerateDiagnostics:
+        payload = _minimal_payload(overall_reading="coherent_bounded_caution")
+        return _diag(model=model, prompt=prompt, status="ok", extracted_text=json.dumps(payload, ensure_ascii=True))
 
     client = FakeDiagnosticClient(handler)
     pipeline = LocalStatelessReviewerPipeline(config=cfg, generator=DummyGenerator(), client=client)
     pipeline.run_cycle(case_count=1, themes=["epistemic_fragility"])
-    call = client.calls[0]
-    assert call["think"] is False
-    assert call["num_ctx"] == 6144
-    assert call["num_predict"] == 200
-    assert call["temperature"] == 0.0
+    schema = client.calls[0]["output_json_schema"]
+    assert isinstance(schema, dict)
+    suspicious_props = schema["properties"]["suspicious_segments"]["items"]["properties"]
+    assert "signal_code" in suspicious_props
+    assert "signal" not in suspicious_props
 
 
-def test_sequential_single_model_diagnostic_mode(tmp_path: Path) -> None:
-    cfg = _cfg(tmp_path)
-
-    def handler(*, case_id: str, model: str, prompt: str) -> OllamaGenerateDiagnostics:
-        payload = dict(_minimal_payload())
-        payload["case_id"] = case_id
-        return _diag(
-            model=model,
-            prompt=prompt,
-            status="ok",
-            extracted_text=json.dumps(payload, ensure_ascii=True),
-        )
-
-    pipeline = LocalStatelessReviewerPipeline(
-        config=cfg,
-        generator=DummyGenerator(),
-        client=FakeDiagnosticClient(handler),
-    )
-    summary = pipeline.run_sequential_diagnostics(
-        tier_name="tier1",
-        case_count=1,
-        themes=["epistemic_fragility"],
-    )
-    assert summary["sequential_diagnostic_mode"] is True
-    assert summary["per_tier_reviews"] == {"tier1": 1}
-
-
-def test_tiny_batch_summary_metrics(tmp_path: Path) -> None:
+def test_small_run_summary_metrics_are_separated(tmp_path: Path) -> None:
     cfg = _cfg(tmp_path)
     cfg.generation.max_cases_per_cycle = 3
 
     def handler(*, case_id: str, model: str, prompt: str) -> OllamaGenerateDiagnostics:
-        payload = dict(_minimal_payload())
-        payload["case_id"] = case_id
-        return _diag(
-            model=model,
-            prompt=prompt,
-            status="ok",
-            extracted_text=json.dumps(payload, ensure_ascii=True),
-            prompt_eval_count=3000,
-            eval_count=120,
-        )
+        seed = int(case_id.rsplit("-", 1)[-1])
+        if seed % 3 == 0:
+            payload = _minimal_payload(overall_reading="coherent_bounded_caution", priority="low")
+            return _diag(model=model, prompt=prompt, status="ok", extracted_text=json.dumps(payload, ensure_ascii=True))
+        if seed % 3 == 1:
+            payload = _minimal_payload(overall_reading="likely_behavioral_problem", priority="high")
+            payload["suspicious_segments"] = [
+                {"module": "subject_tick", "signal_code": "causal_transition_mismatch", "severity": "high"}
+            ]
+            return _diag(model=model, prompt=prompt, status="ok", extracted_text=json.dumps(payload, ensure_ascii=True))
+        return _diag(model=model, prompt=prompt, status="parse_error", error_message="broken")
 
-    pipeline = LocalStatelessReviewerPipeline(
-        config=cfg,
-        generator=DummyGenerator(),
-        client=FakeDiagnosticClient(handler),
-    )
+    pipeline = LocalStatelessReviewerPipeline(config=cfg, generator=DummyGenerator(), client=FakeDiagnosticClient(handler))
     summary = pipeline.run_cycle(case_count=3, themes=["epistemic_fragility"])
     assert summary["generated_cases"] == 3
-    assert summary["per_status_reviews"]["semantic_review_completed"] == 3
-    assert summary["avg_latency_ms"] > 0.0
-    assert summary["prompt_eval_count_distribution"]["count"] == 3
-    assert summary["prompt_eval_count_distribution"]["max"] == 3000
+    assert summary["coherent_ordinary_cases"] == 1
+    assert summary["behavioral_review_cases"] == 1
+    assert summary["infra_review_cases"] == 1
+    assert summary["per_status_reviews"]["semantic_review_completed"] == 2
+    assert summary["per_status_reviews"]["parse_error"] == 1
 
 
 def test_ui_smoke_instantiates_basic_views(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

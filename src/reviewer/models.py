@@ -6,14 +6,37 @@ from typing import Any
 
 
 REVIEW_OVERALL_ALLOWED = {
-    "coherent",
-    "mostly_coherent_with_questions",
-    "suspicious_but_inconclusive",
-    "likely_problematic",
+    "coherent_bounded_caution",
+    "coherent_abstention_or_revalidation",
+    "plausible_but_needs_review",
+    "likely_behavioral_problem",
     "insufficient_evidence",
 }
 PRIORITY_ALLOWED = {"low", "medium", "high"}
 SEVERITY_ALLOWED = {"low", "medium", "high"}
+SIGNAL_CODE_ALLOWED = {
+    "t03_honest_nonconvergence",
+    "t04_not_reportable",
+    "bounded_revalidation_required",
+    "subject_idle_continuation",
+    "world_basis_missing",
+    "ownership_confidence_low",
+    "memory_claim_denied",
+    "narrative_claim_denied",
+    "mode_safe_idle_selected",
+    "validity_reuse_only",
+    "bounded_repair_required",
+    "subject_abstention_revalidation",
+    "causal_transition_mismatch",
+    "unexpected_mode_shift",
+    "unknown_or_unmapped_signal",
+}
+GAP_CODE_ALLOWED = {
+    "hidden_transition",
+    "insufficient_local_state",
+    "ambiguous_world_basis",
+    "unclear_resolution_step",
+}
 REVIEW_CALL_STATUS_ALLOWED = {
     "transport_error",
     "timeout",
@@ -124,12 +147,15 @@ def _normalize_suspicious_segments(
             default="unknown",
             warnings=warnings,
         )
-        signal = _as_str(
-            item.get("signal"),
-            field_name="suspicious_segment_signal",
-            default="unspecified",
+        signal_code = _as_str(
+            item.get("signal_code"),
+            field_name="suspicious_segment_signal_code",
+            default="unknown_or_unmapped_signal",
             warnings=warnings,
         )
+        if signal_code not in SIGNAL_CODE_ALLOWED:
+            warnings.append("suspicious_segment_signal_code_invalid")
+            signal_code = "unknown_or_unmapped_signal"
         severity = _as_str(
             item.get("severity"),
             field_name="suspicious_segment_severity",
@@ -139,7 +165,7 @@ def _normalize_suspicious_segments(
         if severity not in SEVERITY_ALLOWED:
             warnings.append("suspicious_segment_severity_invalid")
             severity = "low"
-        out.append({"module": module, "signal": signal, "severity": severity})
+        out.append({"module": module, "signal_code": signal_code, "severity": severity})
     if len(out) > 3:
         nonfatal_warnings.append("suspicious_segments_truncated")
         return out[:3]
@@ -168,18 +194,16 @@ def _normalize_observability_gaps(
             default="unknown",
             warnings=warnings,
         )
-        why_gap_is_possible = _as_str(
-            item.get("why_gap_is_possible"),
-            field_name="likely_observability_gap_why_gap_is_possible",
-            default="unspecified",
+        gap_code = _as_str(
+            item.get("gap_code"),
+            field_name="likely_observability_gap_gap_code",
+            default="insufficient_local_state",
             warnings=warnings,
         )
-        out.append(
-            {
-                "module_or_transition": module_or_transition,
-                "why_gap_is_possible": why_gap_is_possible,
-            }
-        )
+        if gap_code not in GAP_CODE_ALLOWED:
+            warnings.append("likely_observability_gap_gap_code_invalid")
+            gap_code = "insufficient_local_state"
+        out.append({"module_or_transition": module_or_transition, "gap_code": gap_code})
     if len(out) > 3:
         nonfatal_warnings.append("likely_observability_gaps_truncated")
         return out[:3]
@@ -233,9 +257,9 @@ def normalize_reviewer_output(
     if not isinstance(final_note, str):
         schema_warnings.append("final_note_invalid")
         final_note = ""
-    if len(final_note) > 280:
+    if len(final_note) > 220:
         nonfatal_warnings.append("final_note_truncated")
-        final_note = final_note[:280]
+        final_note = final_note[:220]
 
     suspicious_segments = _normalize_suspicious_segments(
         payload.get("suspicious_segments"),
