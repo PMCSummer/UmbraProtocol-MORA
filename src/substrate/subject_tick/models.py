@@ -11,6 +11,10 @@ if TYPE_CHECKING:
         S03OwnershipWeightedLearningResult,
         S03OwnershipWeightedLearningState,
     )
+    from substrate.s04_interoceptive_self_binding import (
+        S04InteroceptiveSelfBindingResult,
+        S04InteroceptiveSelfBindingState,
+    )
     from substrate.s02_prediction_boundary import (
         S02PredictionBoundaryResult,
         S02PredictionBoundaryState,
@@ -149,6 +153,14 @@ class SubjectTickRestrictionCode(StrEnum):
     S03_FREEZE_OBEDIENCE_CONSUMER_REQUIRED = (
         "s03_freeze_obedience_consumer_required"
     )
+    S04_INTEROCEPTIVE_SELF_BINDING_CONTRACT_MUST_BE_READ = (
+        "s04_interoceptive_self_binding_contract_must_be_read"
+    )
+    S04_STABLE_CORE_CONSUMER_REQUIRED = "s04_stable_core_consumer_required"
+    S04_CONTESTED_CONSUMER_REQUIRED = "s04_contested_consumer_required"
+    S04_NO_STABLE_CORE_CONSUMER_REQUIRED = (
+        "s04_no_stable_core_consumer_required"
+    )
     DOWNSTREAM_AUTHORITY_DEGRADED = "downstream_authority_degraded"
 
 
@@ -215,6 +227,7 @@ class SubjectTickContext:
     prior_s01_state: S01EfferenceCopyState | None = None
     prior_s02_state: S02PredictionBoundaryState | None = None
     prior_s03_state: S03OwnershipWeightedLearningState | None = None
+    prior_s04_state: S04InteroceptiveSelfBindingState | None = None
     dependency_trigger_hits: tuple[str, ...] = ()
     context_shift_markers: tuple[str, ...] = ()
     contradicted_source_refs: tuple[str, ...] = ()
@@ -282,6 +295,10 @@ class SubjectTickContext:
     require_s03_mixed_update_consumer: bool = False
     require_s03_freeze_obedience_consumer: bool = False
     disable_s03_enforcement: bool = False
+    require_s04_stable_core_consumer: bool = False
+    require_s04_contested_consumer: bool = False
+    require_s04_no_stable_core_consumer: bool = False
+    disable_s04_enforcement: bool = False
     source_lineage: tuple[str, ...] = ()
 
 
@@ -1042,6 +1059,7 @@ class SubjectTickResult:
     s01_result: S01EfferenceCopyResult
     s02_result: S02PredictionBoundaryResult
     s03_result: S03OwnershipWeightedLearningResult
+    s04_result: S04InteroceptiveSelfBindingResult
     t01_result: T01ActiveFieldResult
     t02_result: T02ConstrainedSceneResult
     t03_result: T03CompetitionResult

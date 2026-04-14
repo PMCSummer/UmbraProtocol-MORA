@@ -862,6 +862,44 @@ def subject_tick_result_snapshot(result: SubjectTickResult) -> dict[str, object]
             },
             "reason": result.self_contour_result.reason,
         },
+        "s04_interoceptive_self_binding_result": {
+            "binding_id": result.s04_result.state.binding_id,
+            "tick_index": result.s04_result.state.tick_index,
+            "strong_core_channels": result.s04_result.state.core_bound_channels,
+            "weak_or_peripheral_channels": (
+                result.s04_result.state.peripheral_or_weakly_bound_channels
+            ),
+            "contested_channels": result.s04_result.state.contested_channels,
+            "recently_unbound_channels": result.s04_result.state.recently_unbound_channels,
+            "no_stable_self_core_claim": result.s04_result.state.no_stable_self_core_claim,
+            "strongest_binding_strength": result.s04_result.state.strongest_binding_strength,
+            "contamination_detected": result.s04_result.state.contamination_detected,
+            "rebinding_event": result.s04_result.state.rebinding_event,
+            "stale_binding_drop_count": result.s04_result.state.stale_binding_drop_count,
+            "candidate_channels": result.s04_result.state.candidate_channels,
+            "excluded_channels": result.s04_result.state.excluded_channels,
+            "gate": {
+                "core_consumer_ready": result.s04_result.gate.core_consumer_ready,
+                "contested_consumer_ready": result.s04_result.gate.contested_consumer_ready,
+                "no_stable_core_consumer_ready": (
+                    result.s04_result.gate.no_stable_core_consumer_ready
+                ),
+                "restrictions": result.s04_result.gate.restrictions,
+                "reason": result.s04_result.gate.reason,
+            },
+            "scope_marker": {
+                "scope": result.s04_result.scope_marker.scope,
+                "rt01_contour_only": result.s04_result.scope_marker.rt01_contour_only,
+                "s04_first_slice_only": result.s04_result.scope_marker.s04_first_slice_only,
+                "s05_implemented": result.s04_result.scope_marker.s05_implemented,
+                "full_self_model_implemented": (
+                    result.s04_result.scope_marker.full_self_model_implemented
+                ),
+                "repo_wide_adoption": result.s04_result.scope_marker.repo_wide_adoption,
+                "reason": result.s04_result.scope_marker.reason,
+            },
+            "reason": result.s04_result.reason,
+        },
         "a_line_result": {
             "capability_id": result.a_line_result.state.capability_id,
             "affordance_id": result.a_line_result.state.affordance_id,

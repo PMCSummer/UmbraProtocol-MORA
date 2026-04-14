@@ -62,6 +62,7 @@ def evaluate_subject_tick_downstream_gate(
         SubjectTickRestrictionCode.S01_EFFERENCE_COPY_CONTRACT_MUST_BE_READ,
         SubjectTickRestrictionCode.S02_PREDICTION_BOUNDARY_CONTRACT_MUST_BE_READ,
         SubjectTickRestrictionCode.S03_OWNERSHIP_WEIGHTED_LEARNING_CONTRACT_MUST_BE_READ,
+        SubjectTickRestrictionCode.S04_INTEROCEPTIVE_SELF_BINDING_CONTRACT_MUST_BE_READ,
     ]
     usability = SubjectTickUsabilityClass.USABLE_BOUNDED
     accepted = True
@@ -548,6 +549,35 @@ def evaluate_subject_tick_downstream_gate(
             accepted = False
             usability = SubjectTickUsabilityClass.BLOCKED
             reason = "s03 ownership-weighted learning checkpoint requires detour before downstream continuation"
+
+    s04_checkpoint = next(
+        (
+            checkpoint
+            for checkpoint in state.execution_checkpoints
+            if checkpoint.checkpoint_id == "rt01.s04_interoceptive_self_binding_checkpoint"
+        ),
+        None,
+    )
+    if s04_checkpoint is not None and s04_checkpoint.status.value != "allowed":
+        if "stable_core" in s04_checkpoint.required_action:
+            restrictions.append(
+                SubjectTickRestrictionCode.S04_STABLE_CORE_CONSUMER_REQUIRED
+            )
+        if "contested" in s04_checkpoint.required_action:
+            restrictions.append(
+                SubjectTickRestrictionCode.S04_CONTESTED_CONSUMER_REQUIRED
+            )
+        if "no_stable_core" in s04_checkpoint.required_action:
+            restrictions.append(
+                SubjectTickRestrictionCode.S04_NO_STABLE_CORE_CONSUMER_REQUIRED
+            )
+        restrictions.append(SubjectTickRestrictionCode.DOWNSTREAM_AUTHORITY_DEGRADED)
+        if state.final_execution_outcome == SubjectTickOutcome.CONTINUE:
+            accepted = False
+            usability = SubjectTickUsabilityClass.BLOCKED
+            reason = (
+                "s04 interoceptive self-binding checkpoint requires detour before downstream continuation"
+            )
 
     return SubjectTickGateDecision(
         accepted=accepted,

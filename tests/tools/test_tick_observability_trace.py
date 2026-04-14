@@ -35,6 +35,7 @@ HOSTED_CONTOUR_SEGMENTS = (
     "s01_efference_copy",
     "s02_prediction_boundary",
     "s03_ownership_weighted_learning",
+    "s04_interoceptive_self_binding",
     "s_minimal_contour",
     "a_line_normalization",
     "m_minimal",
@@ -80,6 +81,17 @@ HOSTED_CONTOUR_FIELDS: dict[str, set[str]] = {
         "ownership_confidence",
         "learning_weight_applied",
         "ownership_blocked",
+    },
+    "s04_interoceptive_self_binding": {
+        "strong_bound_count",
+        "weak_bound_count",
+        "contested_count",
+        "provisional_count",
+        "no_stable_core_claim",
+        "strongest_binding_strength",
+        "contamination_detected",
+        "rebinding_event",
+        "stale_binding_drop_count",
     },
     "s_minimal_contour": {
         "minimal_self_status",
@@ -510,6 +522,9 @@ def test_hosted_contour_segments_follow_real_runtime_order(tmp_path: Path) -> No
         events, "s03_ownership_weighted_learning"
     )
     assert _first_order(events, "s03_ownership_weighted_learning") < _first_order(
+        events, "s04_interoceptive_self_binding"
+    )
+    assert _first_order(events, "s04_interoceptive_self_binding") < _first_order(
         events, "s_minimal_contour"
     )
     assert _first_order(events, "s_minimal_contour") < _first_order(events, "a_line_normalization")

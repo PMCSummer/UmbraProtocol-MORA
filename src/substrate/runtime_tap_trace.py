@@ -114,6 +114,17 @@ MODULE_ALLOWED_FIELDS: dict[str, tuple[str, ...]] = {
         "learning_weight_applied",
         "ownership_blocked",
     ),
+    "s04_interoceptive_self_binding": (
+        "strong_bound_count",
+        "weak_bound_count",
+        "contested_count",
+        "provisional_count",
+        "no_stable_core_claim",
+        "strongest_binding_strength",
+        "contamination_detected",
+        "rebinding_event",
+        "stale_binding_drop_count",
+    ),
     "s_minimal_contour": (
         "minimal_self_status",
         "minimal_self_ready",

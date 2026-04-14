@@ -154,6 +154,10 @@ from substrate.s03_ownership_weighted_learning import (
     build_s03_ownership_weighted_learning,
     derive_s03_update_packet_consumer_view,
 )
+from substrate.s04_interoceptive_self_binding import (
+    build_s04_interoceptive_self_binding,
+    derive_s04_interoceptive_self_binding_consumer_view,
+)
 from substrate.s01_efference_copy import (
     S01EfferenceCopyState,
     build_s01_efference_copy,
@@ -175,6 +179,7 @@ ATTEMPTED_SUBJECT_TICK_PATHS: tuple[str, ...] = (
     "subject_tick.evaluate_s01_efference_copy",
     "subject_tick.evaluate_s02_prediction_boundary",
     "subject_tick.evaluate_s03_ownership_weighted_learning",
+    "subject_tick.evaluate_s04_interoceptive_self_binding",
     "subject_tick.evaluate_s_minimal_contour",
     "subject_tick.evaluate_a_line_normalization",
     "subject_tick.evaluate_m_minimal_contour",
@@ -1723,6 +1728,150 @@ def execute_subject_tick(
             reason=s03_checkpoint_reason,
         )
     )
+    s04_result = build_s04_interoceptive_self_binding(
+        tick_id=tick_id,
+        tick_index=tick_index,
+        s01_result=s01_result,
+        s02_result=s02_result,
+        s03_result=s03_result,
+        regulation_pressure_level=viability.state.pressure_level,
+        regulation_dominant_axis=regulation.tradeoff.dominant_axis,
+        c05_revalidation_required=bool(
+            temporal_validity.state.revalidation_item_ids
+            or temporal_validity.state.selective_scope_targets
+            or temporal_validity.state.selective_scope_uncertain
+            or temporal_validity.state.insufficient_basis_for_revalidation
+        ),
+        context_shift_detected=bool(context.context_shift_markers),
+        prior_state=context.prior_s04_state,
+        source_lineage=lineage,
+        binding_enabled=not context.disable_s04_enforcement,
+    )
+    s04_view = derive_s04_interoceptive_self_binding_consumer_view(s04_result)
+    s04_enter_values = {
+        "strong_bound_count": len(s04_result.state.core_bound_channels),
+        "weak_bound_count": len(
+            [
+                item
+                for item in s04_result.state.entries
+                if item.binding_status.value == "weakly_self_bound"
+            ]
+        ),
+        "contested_count": len(s04_result.state.contested_channels),
+        "provisional_count": len(
+            [
+                item
+                for item in s04_result.state.entries
+                if item.binding_status.value == "provisionally_bound"
+            ]
+        ),
+        "no_stable_core_claim": s04_result.state.no_stable_self_core_claim,
+        "strongest_binding_strength": s04_result.state.strongest_binding_strength,
+        "contamination_detected": s04_result.state.contamination_detected,
+        "rebinding_event": s04_result.state.rebinding_event,
+        "stale_binding_drop_count": s04_result.state.stale_binding_drop_count,
+    }
+    trace_emit_active("s04_interoceptive_self_binding", "enter", s04_enter_values)
+    s04_checkpoint_status = SubjectTickCheckpointStatus.ALLOWED
+    s04_checkpoint_reason = s04_result.gate.reason
+    if not context.disable_s04_enforcement:
+        if (
+            context.require_s04_stable_core_consumer
+            and not s04_view.can_consume_stable_core
+            and halt_reason is None
+        ):
+            repair_needed = True
+            s04_checkpoint_status = SubjectTickCheckpointStatus.ENFORCED_DETOUR
+            s04_checkpoint_reason = (
+                "s04 stable-core consumer requested but no convergent self-binding core is available"
+            )
+            if active_execution_mode not in {"halt_execution", "revalidate_scope"}:
+                active_execution_mode = "repair_runtime_path"
+        if (
+            context.require_s04_contested_consumer
+            and not s04_view.can_consume_contested
+            and halt_reason is None
+        ):
+            revalidation_needed = True
+            s04_checkpoint_status = SubjectTickCheckpointStatus.ENFORCED_DETOUR
+            s04_checkpoint_reason = (
+                "s04 contested consumer requested but no contested/mixed channels are present"
+            )
+            if active_execution_mode != "halt_execution":
+                active_execution_mode = "revalidate_scope"
+        if (
+            context.require_s04_no_stable_core_consumer
+            and not s04_view.can_consume_no_stable_core
+            and halt_reason is None
+        ):
+            revalidation_needed = True
+            s04_checkpoint_status = SubjectTickCheckpointStatus.ENFORCED_DETOUR
+            s04_checkpoint_reason = (
+                "s04 no-stable-core consumer requested but stable self-core claim is active"
+            )
+            if active_execution_mode != "halt_execution":
+                active_execution_mode = "revalidate_scope"
+    else:
+        s04_checkpoint_status = SubjectTickCheckpointStatus.ENFORCED_DETOUR
+        s04_checkpoint_reason = (
+            "s04 interoceptive self-binding enforcement disabled in ablation context"
+        )
+    s04_trace_values = {
+        "strong_bound_count": len(s04_result.state.core_bound_channels),
+        "weak_bound_count": len(
+            [
+                item
+                for item in s04_result.state.entries
+                if item.binding_status.value == "weakly_self_bound"
+            ]
+        ),
+        "contested_count": len(s04_result.state.contested_channels),
+        "provisional_count": len(
+            [
+                item
+                for item in s04_result.state.entries
+                if item.binding_status.value == "provisionally_bound"
+            ]
+        ),
+        "no_stable_core_claim": s04_result.state.no_stable_self_core_claim,
+        "strongest_binding_strength": s04_result.state.strongest_binding_strength,
+        "contamination_detected": s04_result.state.contamination_detected,
+        "rebinding_event": s04_result.state.rebinding_event,
+        "stale_binding_drop_count": s04_result.state.stale_binding_drop_count,
+    }
+    trace_emit_active("s04_interoceptive_self_binding", "decision", s04_trace_values)
+    if s04_checkpoint_status != SubjectTickCheckpointStatus.ALLOWED:
+        trace_emit_active(
+            "s04_interoceptive_self_binding",
+            "blocked",
+            s04_trace_values,
+            note="s04_checkpoint_not_allowed",
+        )
+    trace_emit_active("s04_interoceptive_self_binding", "exit", s04_trace_values)
+    checkpoints.append(
+        SubjectTickCheckpointResult(
+            checkpoint_id="rt01.s04_interoceptive_self_binding_checkpoint",
+            source_contract="s04_interoceptive_self_binding.binding_ledger",
+            status=s04_checkpoint_status,
+            required_action=(
+                "require_s04_stable_core_and_contested_and_no_stable_core_consumer"
+                if (
+                    context.require_s04_stable_core_consumer
+                    and context.require_s04_contested_consumer
+                    and context.require_s04_no_stable_core_consumer
+                )
+                else "require_s04_stable_core_consumer"
+                if context.require_s04_stable_core_consumer
+                else "require_s04_contested_consumer"
+                if context.require_s04_contested_consumer
+                else "require_s04_no_stable_core_consumer"
+                if context.require_s04_no_stable_core_consumer
+                else "s04_optional"
+            ),
+            applied_action=active_execution_mode,
+            reason=s04_checkpoint_reason,
+        )
+    )
     s_minimal_result = build_s_minimal_contour(
         tick_id=tick_id,
         world_entry_result=world_entry_result,
@@ -3178,7 +3327,7 @@ def execute_subject_tick(
         attempted_paths=ATTEMPTED_SUBJECT_TICK_PATHS,
         downstream_gate=gate,
         causal_basis=(
-            "bounded runtime execution spine enforces roadmap authority roles for C04/C05, consumes world-entry, s01 efference-copy, s02 prediction-boundary seam, s03 ownership-weighted learning, s-minimal, a-line, m-minimal, n-minimal, t01 semantic-field, t02 relation-binding, t03 hypothesis-competition, and t04 attention-schema gates, and keeps D01 observability-only over fixed R->C order"
+            "bounded runtime execution spine enforces roadmap authority roles for C04/C05, consumes world-entry, s01 efference-copy, s02 prediction-boundary seam, s03 ownership-weighted learning, s04 interoceptive self-binding, s-minimal, a-line, m-minimal, n-minimal, t01 semantic-field, t02 relation-binding, t03 hypothesis-competition, and t04 attention-schema gates, and keeps D01 observability-only over fixed R->C order"
         ),
     )
     abstain = final_outcome in {SubjectTickOutcome.REPAIR, SubjectTickOutcome.REVALIDATE}
@@ -3264,6 +3413,7 @@ def execute_subject_tick(
         s01_result=s01_result,
         s02_result=s02_result,
         s03_result=s03_result,
+        s04_result=s04_result,
         t01_result=t01_result,
         t02_result=t02_result,
         t03_result=t03_result,

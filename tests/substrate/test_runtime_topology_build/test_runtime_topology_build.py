@@ -111,6 +111,7 @@ def test_runtime_topology_bundle_and_graph_are_materialized() -> None:
         "S01",
         "S02",
         "S03",
+        "S04",
         "T01",
         "T02",
         "T03",
@@ -128,6 +129,7 @@ def test_runtime_topology_bundle_and_graph_are_materialized() -> None:
     assert "rt01.s01_efference_copy_checkpoint" in graph.mandatory_checkpoint_ids
     assert "rt01.s02_prediction_boundary_checkpoint" in graph.mandatory_checkpoint_ids
     assert "rt01.s03_ownership_weighted_learning_checkpoint" in graph.mandatory_checkpoint_ids
+    assert "rt01.s04_interoceptive_self_binding_checkpoint" in graph.mandatory_checkpoint_ids
     assert "rt01.t01_semantic_field_checkpoint" in graph.mandatory_checkpoint_ids
     assert "rt01.t02_relation_binding_checkpoint" in graph.mandatory_checkpoint_ids
     assert "rt01.t02_raw_vs_propagated_integrity_checkpoint" in graph.mandatory_checkpoint_ids
@@ -157,6 +159,14 @@ def test_runtime_topology_bundle_and_graph_are_materialized() -> None:
     )
     assert (
         "s03_ownership_weighted_learning.freeze_or_defer_state"
+        in graph.source_of_truth_surfaces
+    )
+    assert (
+        "s04_interoceptive_self_binding.binding_entries"
+        in graph.source_of_truth_surfaces
+    )
+    assert (
+        "s04_interoceptive_self_binding.core_channels"
         in graph.source_of_truth_surfaces
     )
     assert "t01_semantic_field.active_scene" in graph.source_of_truth_surfaces
