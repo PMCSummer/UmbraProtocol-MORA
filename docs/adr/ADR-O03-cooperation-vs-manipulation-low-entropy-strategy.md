@@ -11,8 +11,9 @@ Introduce `o03_strategy_class_evaluation` as a distinct RT01 segment placed afte
 This first slice provides:
 - explicit typed strategy state (`strategy_class`, hidden-divergence/asymmetry/dependency bands, reversibility/repairability, transparency, uncertainty flags);
 - bounded strategy-class evaluation from typed candidate inputs plus O01/O02/S05 context;
+- narrow structural hidden-divergence contrast between disclosed-limitation and concealment-dependent omission profiles (without belief-state simulation);
 - conservative underclassification fallback (`strategy_class_underconstrained` / `no_safe_classification`) when evidence is thin;
-- narrow RT01 gating consequences for transparency increase, cooperative default preference, and exploitative-candidate blocking;
+- narrow RT01 gating consequences for transparency increase, cooperative default preference, exploitative-candidate blocking, and dependency lock-in + low-reversibility guard under matched local utility;
 - explicit require-path checkpoints plus one narrow default-path detour.
 
 ## Inputs
@@ -40,7 +41,7 @@ RT01 now has bounded O03 effects:
   - `require_o03_cooperative_selection_consumer`
   - `require_o03_transparency_preserving_consumer`
 - narrow default-path detours for concealment/high-entropy strategy shapes;
-- one typed-semantic downstream gate branch that reads O03 state fields (not only checkpoint tokens) and applies cooperative/transparency/exploitative restrictions.
+- one typed-semantic downstream gate branch that reads O03 state-field combinations (not only checkpoint tokens) and applies cooperative/transparency/exploitative restrictions.
 
 ## Authority Boundary
 O03 does not claim:
@@ -60,3 +61,4 @@ This ADR does **not** claim:
 - O03 remains RT01-local with a single narrow consumer surface.
 - Candidate strategy input is frontier-hosted and intentionally compact (not planner-wide).
 - Long-horizon accumulation of dependency risk remains an open seam for future hardening.
+- O03 remains a narrow RT01-local strategy-evaluation shim, not planner-wide strategy governance.

@@ -1,8 +1,13 @@
 from __future__ import annotations
 
+from dataclasses import replace
+
 import pytest
 
 from substrate.o03_strategy_class_evaluation import (
+    O03CandidateMoveKind,
+    O03CandidateStrategyInput,
+    O03LocalEffectivenessBand,
     O03StrategyClass,
     derive_o03_strategy_consumer_view,
 )
@@ -106,6 +111,120 @@ def test_politeness_baseline_does_not_match_true_strategy_evaluation() -> None:
     assert warm_view.block_exploitative_move_required != transparent_view.block_exploitative_move_required
     assert warm_view.transparency_increase_required is True
     assert transparent_view.transparency_increase_required is False
+
+
+def test_disclosed_limitation_beats_concealment_dependent_omission() -> None:
+    disclosed = build_o03_harness_case(
+        O03HarnessCase(
+            case_id="disclosed-limitation",
+            tick_index=1,
+            o01_signals=harness_cases()["cooperative_transparent"].o01_signals,
+            candidate_strategy=O03CandidateStrategyInput(
+                candidate_move_id="dl-1",
+                candidate_move_kind=O03CandidateMoveKind.RECOMMENDATION,
+                explicit_disclosure_present=True,
+                material_uncertainty_omitted=False,
+                selective_omission_risk_marker=True,
+                downstream_effect_visibility_marker=True,
+                truthfulness_constraint_tension=0.34,
+                expected_local_effectiveness_band=O03LocalEffectivenessBand.HIGH,
+            ),
+        )
+    )
+    concealed = build_o03_harness_case(
+        O03HarnessCase(
+            case_id="concealment-dependent-omission",
+            tick_index=1,
+            o01_signals=harness_cases()["cooperative_transparent"].o01_signals,
+            candidate_strategy=O03CandidateStrategyInput(
+                candidate_move_id="cd-1",
+                candidate_move_kind=O03CandidateMoveKind.RECOMMENDATION,
+                explicit_disclosure_present=False,
+                material_uncertainty_omitted=True,
+                selective_omission_risk_marker=True,
+                downstream_effect_visibility_marker=False,
+                truthfulness_constraint_tension=0.34,
+                expected_local_effectiveness_band=O03LocalEffectivenessBand.HIGH,
+                strong_compliance_pull_marker=True,
+            ),
+        )
+    )
+    assert concealed.state.hidden_divergence_cost > disclosed.state.hidden_divergence_cost
+    assert concealed.state.concealed_state_divergence_required is True
+    assert disclosed.state.concealed_state_divergence_required is False
+    assert concealed.gate.exploitative_move_block_required is True
+
+
+def test_candidate_move_kind_is_behaviorally_relevant_under_same_markers() -> None:
+    base = O03CandidateStrategyInput(
+        candidate_move_id="kind-base",
+        explicit_disclosure_present=True,
+        material_uncertainty_omitted=False,
+        selective_omission_risk_marker=False,
+        autonomy_narrowing_marker=True,
+        strong_compliance_pull_marker=True,
+        expected_local_effectiveness_band=O03LocalEffectivenessBand.HIGH,
+    )
+    clarification = build_o03_harness_case(
+        O03HarnessCase(
+            case_id="kind-clarification",
+            tick_index=1,
+            o01_signals=harness_cases()["cooperative_transparent"].o01_signals,
+            candidate_strategy=replace(
+                base,
+                candidate_move_id="kind-clarification",
+                candidate_move_kind=O03CandidateMoveKind.CLARIFICATION,
+            ),
+        )
+    )
+    constraint = build_o03_harness_case(
+        O03HarnessCase(
+            case_id="kind-constraint",
+            tick_index=1,
+            o01_signals=harness_cases()["cooperative_transparent"].o01_signals,
+            candidate_strategy=replace(
+                base,
+                candidate_move_id="kind-constraint",
+                candidate_move_kind=O03CandidateMoveKind.CONSTRAINT_PROPOSAL,
+            ),
+        )
+    )
+    assert constraint.state.asymmetry_exploitation_score > clarification.state.asymmetry_exploitation_score
+    assert constraint.state.manipulation_risk_score >= clarification.state.manipulation_risk_score
+
+
+def test_regulation_pressure_level_is_behaviorally_relevant() -> None:
+    risky = O03CandidateStrategyInput(
+        candidate_move_id="pressure-risky",
+        candidate_move_kind=O03CandidateMoveKind.RECOMMENDATION,
+        explicit_disclosure_present=False,
+        material_uncertainty_omitted=True,
+        selective_omission_risk_marker=True,
+        dependency_shaping_marker=True,
+        autonomy_narrowing_marker=True,
+        strong_compliance_pull_marker=True,
+        expected_local_effectiveness_band=O03LocalEffectivenessBand.HIGH,
+    )
+    low_pressure = build_o03_harness_case(
+        O03HarnessCase(
+            case_id="pressure-low",
+            tick_index=1,
+            o01_signals=harness_cases()["cooperative_transparent"].o01_signals,
+            candidate_strategy=risky,
+            regulation_pressure_level=0.35,
+        )
+    )
+    high_pressure = build_o03_harness_case(
+        O03HarnessCase(
+            case_id="pressure-high",
+            tick_index=1,
+            o01_signals=harness_cases()["cooperative_transparent"].o01_signals,
+            candidate_strategy=replace(risky, candidate_move_id="pressure-risky-high"),
+            regulation_pressure_level=0.9,
+        )
+    )
+    assert high_pressure.state.hidden_divergence_cost >= low_pressure.state.hidden_divergence_cost
+    assert high_pressure.state.dependency_induction_risk >= low_pressure.state.dependency_induction_risk
 
 
 def test_ablation_without_o03_collapses_to_honest_underconstrained_fallback() -> None:

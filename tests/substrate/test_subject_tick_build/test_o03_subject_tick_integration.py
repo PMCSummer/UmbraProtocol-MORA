@@ -1,11 +1,19 @@
 from __future__ import annotations
 
+from dataclasses import replace
+
 from substrate.o01_other_entity_model import O01EntitySignal
 from substrate.o03_strategy_class_evaluation import (
     O03CandidateMoveKind,
     O03CandidateStrategyInput,
+    O03LocalEffectivenessBand,
 )
-from substrate.subject_tick import SubjectTickContext, SubjectTickOutcome, SubjectTickRestrictionCode
+from substrate.subject_tick import (
+    SubjectTickContext,
+    SubjectTickOutcome,
+    SubjectTickRestrictionCode,
+    evaluate_subject_tick_downstream_gate,
+)
 from tests.substrate.subject_tick_testkit import build_subject_tick
 
 
@@ -94,6 +102,39 @@ def _concealed_candidate(candidate_id: str) -> O03CandidateStrategyInput:
     )
 
 
+def _dependency_lock_in_candidate(candidate_id: str) -> O03CandidateStrategyInput:
+    return O03CandidateStrategyInput(
+        candidate_move_id=candidate_id,
+        candidate_move_kind=O03CandidateMoveKind.RECOMMENDATION,
+        explicit_disclosure_present=True,
+        material_uncertainty_omitted=False,
+        selective_omission_risk_marker=False,
+        dependency_shaping_marker=True,
+        autonomy_narrowing_marker=True,
+        strong_compliance_pull_marker=True,
+        reversibility_preserved=False,
+        repairability_preserved=False,
+        expected_local_effectiveness_band=O03LocalEffectivenessBand.HIGH,
+        repeated_dependency_pressure_count=3,
+    )
+
+
+def _high_utility_reversible_candidate(candidate_id: str) -> O03CandidateStrategyInput:
+    return O03CandidateStrategyInput(
+        candidate_move_id=candidate_id,
+        candidate_move_kind=O03CandidateMoveKind.RECOMMENDATION,
+        explicit_disclosure_present=True,
+        material_uncertainty_omitted=False,
+        selective_omission_risk_marker=False,
+        dependency_shaping_marker=False,
+        autonomy_narrowing_marker=False,
+        strong_compliance_pull_marker=False,
+        reversibility_preserved=True,
+        repairability_preserved=True,
+        expected_local_effectiveness_band=O03LocalEffectivenessBand.HIGH,
+    )
+
+
 def test_subject_tick_emits_o03_checkpoint_in_runtime_order_after_o02() -> None:
     result = _result(
         "rt-o03-order",
@@ -166,6 +207,113 @@ def test_subject_tick_default_path_high_entropy_detour_is_load_bearing() -> None
     }
 
 
+def test_no_candidate_no_default_o03_detour() -> None:
+    result = _result(
+        "rt-o03-no-candidate-default",
+        context=SubjectTickContext(
+            o01_entity_signals=_grounded_user_signals(),
+        ),
+    )
+    checkpoint = next(
+        item
+        for item in result.state.execution_checkpoints
+        if item.checkpoint_id == "rt01.o03_strategy_class_evaluation_checkpoint"
+    )
+    assert "default_o03_transparency_clarification_detour" not in checkpoint.required_action
+    assert "default_o03_exploitative_candidate_block_detour" not in checkpoint.required_action
+    assert "default_o03_dependency_lock_in_detour" not in checkpoint.required_action
+    assert checkpoint.status.value == "allowed"
+
+
+def test_matched_utility_dependency_reversibility_changes_downstream_action() -> None:
+    cooperative = _result(
+        "rt-o03-matched-utility-cooperative",
+        context=SubjectTickContext(
+            o01_entity_signals=_grounded_user_signals(),
+            o03_candidate_strategy=_high_utility_reversible_candidate(
+                "rt-o03-matched-utility-cooperative"
+            ),
+        ),
+    )
+    lock_in = _result(
+        "rt-o03-matched-utility-lock-in",
+        context=SubjectTickContext(
+            o01_entity_signals=_grounded_user_signals(),
+            o03_candidate_strategy=_dependency_lock_in_candidate(
+                "rt-o03-matched-utility-lock-in"
+            ),
+        ),
+    )
+    cooperative_checkpoint = next(
+        item
+        for item in cooperative.state.execution_checkpoints
+        if item.checkpoint_id == "rt01.o03_strategy_class_evaluation_checkpoint"
+    )
+    lock_in_checkpoint = next(
+        item
+        for item in lock_in.state.execution_checkpoints
+        if item.checkpoint_id == "rt01.o03_strategy_class_evaluation_checkpoint"
+    )
+    assert cooperative.o03_result.state.local_effectiveness_pressure.value == "high"
+    assert lock_in.o03_result.state.local_effectiveness_pressure.value == "high"
+    assert cooperative_checkpoint.status.value == "allowed"
+    assert lock_in_checkpoint.status.value == "enforced_detour"
+    assert lock_in.state.final_execution_outcome in {
+        SubjectTickOutcome.REPAIR,
+        SubjectTickOutcome.REVALIDATE,
+        SubjectTickOutcome.HALT,
+    }
+
+
+def test_disclosed_limitation_beats_concealment_dependent_omission() -> None:
+    disclosed = _result(
+        "rt-o03-disclosed-limitation",
+        context=SubjectTickContext(
+            o01_entity_signals=_grounded_user_signals(),
+            o03_candidate_strategy=O03CandidateStrategyInput(
+                candidate_move_id="rt-o03-disclosed-limitation",
+                candidate_move_kind=O03CandidateMoveKind.RECOMMENDATION,
+                explicit_disclosure_present=True,
+                material_uncertainty_omitted=False,
+                selective_omission_risk_marker=True,
+                downstream_effect_visibility_marker=True,
+                truthfulness_constraint_tension=0.34,
+                expected_local_effectiveness_band=O03LocalEffectivenessBand.HIGH,
+            ),
+        ),
+    )
+    concealed = _result(
+        "rt-o03-concealment-dependent-omission",
+        context=SubjectTickContext(
+            o01_entity_signals=_grounded_user_signals(),
+            o03_candidate_strategy=O03CandidateStrategyInput(
+                candidate_move_id="rt-o03-concealment-dependent-omission",
+                candidate_move_kind=O03CandidateMoveKind.RECOMMENDATION,
+                explicit_disclosure_present=False,
+                material_uncertainty_omitted=True,
+                selective_omission_risk_marker=True,
+                downstream_effect_visibility_marker=False,
+                truthfulness_constraint_tension=0.34,
+                strong_compliance_pull_marker=True,
+                expected_local_effectiveness_band=O03LocalEffectivenessBand.HIGH,
+            ),
+        ),
+    )
+    disclosed_checkpoint = next(
+        item
+        for item in disclosed.state.execution_checkpoints
+        if item.checkpoint_id == "rt01.o03_strategy_class_evaluation_checkpoint"
+    )
+    concealed_checkpoint = next(
+        item
+        for item in concealed.state.execution_checkpoints
+        if item.checkpoint_id == "rt01.o03_strategy_class_evaluation_checkpoint"
+    )
+    assert disclosed.o03_result.state.hidden_divergence_cost < concealed.o03_result.state.hidden_divergence_cost
+    assert disclosed_checkpoint.status.value == "allowed"
+    assert concealed_checkpoint.status.value == "enforced_detour"
+
+
 def test_subject_tick_explicit_o03_require_paths_are_load_bearing() -> None:
     result = _result(
         "rt-o03-required",
@@ -231,3 +379,28 @@ def test_subject_tick_policy_reads_typed_o03_semantics_not_only_checkpoint_token
         or SubjectTickRestrictionCode.O03_EXPLOITATIVE_CANDIDATE_BLOCK_REQUIRED in restrictions
     )
     assert SubjectTickRestrictionCode.O03_POLITENESS_EQUIVALENCE_FORBIDDEN in restrictions
+
+
+def test_typed_o03_semantics_not_only_checkpoint_token_drive_policy() -> None:
+    lock_in = _result(
+        "rt-o03-semantic-branch-lock-in",
+        context=SubjectTickContext(
+            o01_entity_signals=_grounded_user_signals(),
+            o03_candidate_strategy=_dependency_lock_in_candidate("rt-o03-semantic-branch-lock-in"),
+        ),
+    )
+    sanitized_checkpoints = tuple(
+        replace(
+            checkpoint,
+            required_action="o03_optional",
+        )
+        if checkpoint.checkpoint_id == "rt01.o03_strategy_class_evaluation_checkpoint"
+        else checkpoint
+        for checkpoint in lock_in.state.execution_checkpoints
+    )
+    semantic_state = replace(lock_in.state, execution_checkpoints=sanitized_checkpoints)
+    semantic_gate = evaluate_subject_tick_downstream_gate(semantic_state)
+    restrictions = set(semantic_gate.restrictions)
+    assert SubjectTickRestrictionCode.O03_EXPLOITATIVE_CANDIDATE_BLOCK_REQUIRED in restrictions
+    assert SubjectTickRestrictionCode.O03_COOPERATIVE_DEFAULT_REQUIRED in restrictions
+    assert SubjectTickRestrictionCode.O03_TRANSPARENCY_INCREASE_REQUIRED in restrictions

@@ -816,6 +816,8 @@ class SubjectTickState:
     o03_strategy_class: str = "strategy_class_underconstrained"
     o03_hidden_divergence_band: str = "medium"
     o03_dependency_risk_band: str = "medium"
+    o03_reversibility_band: str = "medium"
+    o03_local_effectiveness_pressure: str = "medium"
     o03_no_safe_classification: bool = True
     o03_strategy_underconstrained: bool = True
     o03_concealed_state_divergence_required: bool = False

@@ -176,6 +176,9 @@ from substrate.o02_intersubjective_allostasis import (
 from substrate.o03_strategy_class_evaluation import (
     O03CandidateMoveKind,
     O03CandidateStrategyInput,
+    O03DependencyRiskBand,
+    O03LocalEffectivenessBand,
+    O03ReversibilityBand,
     build_o03_strategy_class_evaluation,
     derive_o03_strategy_consumer_view,
 )
@@ -3192,6 +3195,7 @@ def execute_subject_tick(
     o03_checkpoint_reason = o03_result.gate.reason
     o03_default_transparency_detour = False
     o03_default_exploitative_detour = False
+    o03_default_dependency_lock_in_detour = False
     if not context.disable_o03_enforcement:
         if (
             context.require_o03_strategy_contract_consumer
@@ -3264,6 +3268,26 @@ def execute_subject_tick(
             )
             if active_execution_mode not in {"halt_execution", "revalidate_scope"}:
                 active_execution_mode = "repair_runtime_path"
+        if (
+            not context.require_o03_strategy_contract_consumer
+            and not context.require_o03_cooperative_selection_consumer
+            and not context.require_o03_transparency_preserving_consumer
+            and context.o03_candidate_strategy is not None
+            and o03_result.state.dependency_risk_band is O03DependencyRiskBand.HIGH
+            and o03_result.state.reversibility_band is O03ReversibilityBand.LOW
+            and o03_result.state.local_effectiveness_pressure is O03LocalEffectivenessBand.HIGH
+            and halt_reason is None
+            and not repair_needed
+            and not revalidation_needed
+        ):
+            repair_needed = True
+            o03_default_dependency_lock_in_detour = True
+            o03_checkpoint_status = SubjectTickCheckpointStatus.ENFORCED_DETOUR
+            o03_checkpoint_reason = (
+                "o03 default contour blocks dependency lock-in strategy under low reversibility/high local gain profile"
+            )
+            if active_execution_mode not in {"halt_execution", "revalidate_scope"}:
+                active_execution_mode = "repair_runtime_path"
     else:
         o03_checkpoint_status = SubjectTickCheckpointStatus.ENFORCED_DETOUR
         o03_checkpoint_reason = (
@@ -3280,6 +3304,8 @@ def execute_subject_tick(
         o03_required_actions.append("default_o03_transparency_clarification_detour")
     if o03_default_exploitative_detour:
         o03_required_actions.append("default_o03_exploitative_candidate_block_detour")
+    if o03_default_dependency_lock_in_detour:
+        o03_required_actions.append("default_o03_dependency_lock_in_detour")
     if o03_result.state.no_safe_classification:
         o03_required_actions.append("no_safe_classification")
     if o03_result.state.strategy_underconstrained:
@@ -3986,6 +4012,8 @@ def execute_subject_tick(
         o03_strategy_class=o03_result.state.strategy_class.value,
         o03_hidden_divergence_band=o03_result.state.hidden_divergence_band.value,
         o03_dependency_risk_band=o03_result.state.dependency_risk_band.value,
+        o03_reversibility_band=o03_result.state.reversibility_band.value,
+        o03_local_effectiveness_pressure=o03_result.state.local_effectiveness_pressure.value,
         o03_no_safe_classification=o03_result.state.no_safe_classification,
         o03_strategy_underconstrained=o03_result.state.strategy_underconstrained,
         o03_concealed_state_divergence_required=(

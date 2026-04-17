@@ -728,6 +728,11 @@ def evaluate_subject_tick_downstream_gate(
             restrictions.append(
                 SubjectTickRestrictionCode.O03_EXPLOITATIVE_CANDIDATE_BLOCK_REQUIRED
             )
+        if "default_o03_dependency_lock_in_detour" in o03_checkpoint.required_action:
+            restrictions.append(
+                SubjectTickRestrictionCode.O03_EXPLOITATIVE_CANDIDATE_BLOCK_REQUIRED
+            )
+            restrictions.append(SubjectTickRestrictionCode.O03_COOPERATIVE_DEFAULT_REQUIRED)
         if "o03_politeness_equivalence_forbidden" in o03_checkpoint.required_action:
             restrictions.append(
                 SubjectTickRestrictionCode.O03_POLITENESS_EQUIVALENCE_FORBIDDEN
@@ -742,6 +747,22 @@ def evaluate_subject_tick_downstream_gate(
         restrictions.append(
             SubjectTickRestrictionCode.O03_EXPLOITATIVE_CANDIDATE_BLOCK_REQUIRED
         )
+    if (
+        state.o03_dependency_risk_band == "high"
+        and state.o03_reversibility_band == "low"
+        and state.o03_local_effectiveness_pressure == "high"
+    ):
+        restrictions.append(SubjectTickRestrictionCode.O03_EXPLOITATIVE_CANDIDATE_BLOCK_REQUIRED)
+        restrictions.append(SubjectTickRestrictionCode.O03_COOPERATIVE_DEFAULT_REQUIRED)
+        restrictions.append(SubjectTickRestrictionCode.O03_TRANSPARENCY_INCREASE_REQUIRED)
+        if (
+            state.final_execution_outcome == SubjectTickOutcome.CONTINUE
+            and usability == SubjectTickUsabilityClass.USABLE_BOUNDED
+        ):
+            usability = SubjectTickUsabilityClass.DEGRADED_BOUNDED
+            reason = (
+                "o03 dependency/reversibility semantic guard blocks lock-in style candidate even under matched local utility"
+            )
     if state.o03_strategy_class in {
         "manipulation_risk_high",
         "high_local_gain_but_high_entropy",

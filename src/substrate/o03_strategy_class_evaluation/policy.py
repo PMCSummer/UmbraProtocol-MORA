@@ -73,15 +73,80 @@ def build_o03_strategy_class_evaluation(
         S05DownstreamRouteClass.HIGH_RESIDUAL_UNDERDETERMINED,
     }
 
+    omission_requires_miscalibration = bool(
+        candidate_strategy.material_uncertainty_omitted
+        and (
+            candidate_strategy.truthfulness_constraint_tension >= 0.3
+            or not candidate_strategy.downstream_effect_visibility_marker
+        )
+    )
+    omission_without_material_calibration_effect = bool(
+        candidate_strategy.selective_omission_risk_marker
+        and not omission_requires_miscalibration
+        and candidate_strategy.explicit_disclosure_present
+    )
+    concealment_dependent_omission = bool(
+        omission_requires_miscalibration
+        and not candidate_strategy.explicit_disclosure_present
+        and (
+            candidate_strategy.selective_omission_risk_marker
+            or candidate_strategy.strong_compliance_pull_marker
+        )
+    )
+    transparent_limited_disclosure = bool(
+        candidate_strategy.explicit_disclosure_present
+        and not candidate_strategy.material_uncertainty_omitted
+        and (
+            candidate_strategy.truthfulness_constraint_tension >= 0.2
+            or candidate_strategy.authority_constraint_tension >= 0.2
+        )
+    )
+    pressure_exploitability = bool(
+        regulation_pressure_level >= 0.72
+        and candidate_strategy.expected_local_effectiveness_band
+        is O03LocalEffectivenessBand.HIGH
+        and (
+            concealment_dependent_omission
+            or candidate_strategy.dependency_shaping_marker
+            or candidate_strategy.autonomy_narrowing_marker
+        )
+    )
+    clarification_transparency_credit = (
+        -0.08
+        if candidate_strategy.candidate_move_kind is O03CandidateMoveKind.CLARIFICATION
+        and candidate_strategy.explicit_disclosure_present
+        and not candidate_strategy.material_uncertainty_omitted
+        else 0.0
+    )
+    constraint_pressure_penalty = (
+        0.08
+        if candidate_strategy.candidate_move_kind is O03CandidateMoveKind.CONSTRAINT_PROPOSAL
+        and candidate_strategy.strong_compliance_pull_marker
+        else 0.0
+    )
+
     hidden_divergence_cost = _clamp(
         0.0,
         1.0,
-        (0.38 if candidate_strategy.material_uncertainty_omitted else 0.0)
-        + (0.32 if candidate_strategy.selective_omission_risk_marker else 0.0)
+        (0.44 if concealment_dependent_omission else 0.0)
+        + (
+            0.18
+            if candidate_strategy.material_uncertainty_omitted
+            and not concealment_dependent_omission
+            else 0.0
+        )
+        + (
+            0.07
+            if omission_without_material_calibration_effect
+            else 0.22 if candidate_strategy.selective_omission_risk_marker else 0.0
+        )
         + (0.18 if not candidate_strategy.explicit_disclosure_present else -0.08)
         + 0.2 * _clamp(0.0, 1.0, candidate_strategy.truthfulness_constraint_tension)
         + (0.1 if candidate_strategy.strong_compliance_pull_marker else 0.0)
-        + (0.1 if s05_ambiguity and route_world_or_artifact_heavy else 0.0),
+        + (0.1 if s05_ambiguity and route_world_or_artifact_heavy else 0.0)
+        + (0.07 if pressure_exploitability else 0.0)
+        + clarification_transparency_credit
+        + (-0.06 if transparent_limited_disclosure else 0.0),
     )
     asymmetry_exploitation_score = _clamp(
         0.0,
@@ -89,7 +154,8 @@ def build_o03_strategy_class_evaluation(
         (0.4 if candidate_strategy.asymmetry_opportunity_marker else 0.0)
         + (0.2 if candidate_strategy.autonomy_narrowing_marker else 0.0)
         + (0.15 if candidate_strategy.authority_constraint_tension >= 0.4 else 0.0)
-        + (0.12 if not candidate_strategy.explicit_disclosure_present else -0.12),
+        + (0.12 if not candidate_strategy.explicit_disclosure_present else -0.12)
+        + constraint_pressure_penalty,
     )
     dependency_induction_risk = _clamp(
         0.0,
@@ -104,6 +170,14 @@ def build_o03_strategy_class_evaluation(
             0.05
             if candidate_strategy.expected_local_effectiveness_band
             is O03LocalEffectivenessBand.HIGH
+            else 0.0
+        )
+        + (0.08 if pressure_exploitability else 0.0)
+        + (
+            -0.08
+            if candidate_strategy.candidate_move_kind is O03CandidateMoveKind.CLARIFICATION
+            and not candidate_strategy.dependency_shaping_marker
+            and candidate_strategy.reversibility_preserved
             else 0.0
         ),
     )
@@ -202,10 +276,13 @@ def build_o03_strategy_class_evaluation(
     )
 
     concealed_state_divergence_required = bool(
-        hidden_divergence_cost >= 0.65
-        and (
-            candidate_strategy.material_uncertainty_omitted
-            or candidate_strategy.selective_omission_risk_marker
+        concealment_dependent_omission
+        or (
+            hidden_divergence_cost >= 0.65
+            and (
+                candidate_strategy.material_uncertainty_omitted
+                or candidate_strategy.selective_omission_risk_marker
+            )
         )
     )
     strategy_underconstrained = bool(
@@ -223,7 +300,13 @@ def build_o03_strategy_class_evaluation(
     )
     high_local_gain_but_high_entropy = bool(
         candidate_strategy.expected_local_effectiveness_band is O03LocalEffectivenessBand.HIGH
-        and entropy_burden_score >= 0.58
+        and (
+            entropy_burden_score >= 0.58
+            or (
+                dependency_band is O03DependencyRiskBand.HIGH
+                and reversibility_band is O03ReversibilityBand.LOW
+            )
+        )
     )
 
     manipulation_risk_score = _clamp(
@@ -285,6 +368,15 @@ def build_o03_strategy_class_evaluation(
                 f"divergence:{hidden_divergence_band.value}",
                 f"asymmetry:{asymmetry_band.value}",
                 f"dependency:{dependency_band.value}",
+                (
+                    "divergence_profile:concealment_dependent_omission"
+                    if concealment_dependent_omission
+                    else "divergence_profile:transparent_limited_disclosure"
+                    if transparent_limited_disclosure
+                    else "divergence_profile:non_material_omission"
+                    if omission_without_material_calibration_effect
+                    else "divergence_profile:none"
+                ),
             )
         )
     )
@@ -472,6 +564,11 @@ def _build_gate(state: O03StrategyEvaluationState) -> O03StrategyEvaluationGateD
     strategy_contract_ready = bool(
         not state.no_safe_classification and state.strategy_classification_confidence >= 0.48
     )
+    dependency_lock_in_risk = bool(
+        state.dependency_risk_band is O03DependencyRiskBand.HIGH
+        and state.reversibility_band is O03ReversibilityBand.LOW
+        and state.local_effectiveness_pressure is O03LocalEffectivenessBand.HIGH
+    )
     cooperative_selection_ready = bool(
         strategy_contract_ready
         and state.strategy_class
@@ -481,6 +578,7 @@ def _build_gate(state: O03StrategyEvaluationState) -> O03StrategyEvaluationGateD
             O03StrategyClass.NEUTRAL_COORDINATION,
             O03StrategyClass.ASYMMETRY_PRESENT_BUT_BOUNDED,
         }
+        and not dependency_lock_in_risk
     )
     transparency_ready = bool(
         state.transparency_score >= 0.45
@@ -491,6 +589,7 @@ def _build_gate(state: O03StrategyEvaluationState) -> O03StrategyEvaluationGateD
     exploitative_move_block_required = bool(
         state.strategy_class is O03StrategyClass.MANIPULATION_RISK_HIGH
         or state.concealed_state_divergence_required
+        or dependency_lock_in_risk
     )
     restrictions: list[str] = []
     if state.no_safe_classification:
@@ -507,6 +606,8 @@ def _build_gate(state: O03StrategyEvaluationState) -> O03StrategyEvaluationGateD
         restrictions.append("dependency_risk_elevated")
     if state.autonomy_pressure_band is O03AutonomyPressureBand.HIGH:
         restrictions.append("autonomy_pressure_high")
+    if dependency_lock_in_risk:
+        restrictions.append("dependency_lock_in_risk")
     if exploitative_move_block_required:
         restrictions.append("exploitative_move_block_required")
     if not cooperative_selection_ready:
