@@ -161,6 +161,16 @@ MODULE_ALLOWED_FIELDS: dict[str, tuple[str, ...]] = {
         "self_other_constraint_conflict",
         "downstream_consumer_ready",
     ),
+    "o03_strategy_class_evaluation": (
+        "strategy_class",
+        "hidden_divergence_band",
+        "asymmetry_exploitation_band",
+        "dependency_risk_band",
+        "entropy_burden_band",
+        "no_safe_classification",
+        "strategy_underconstrained",
+        "downstream_consumer_ready",
+    ),
     "s_minimal_contour": (
         "minimal_self_status",
         "minimal_self_ready",

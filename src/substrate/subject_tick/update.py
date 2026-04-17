@@ -173,6 +173,12 @@ from substrate.o02_intersubjective_allostasis import (
     build_o02_intersubjective_allostasis,
     derive_o02_intersubjective_allostasis_consumer_view,
 )
+from substrate.o03_strategy_class_evaluation import (
+    O03CandidateMoveKind,
+    O03CandidateStrategyInput,
+    build_o03_strategy_class_evaluation,
+    derive_o03_strategy_consumer_view,
+)
 from substrate.s01_efference_copy import (
     S01EfferenceCopyState,
     build_s01_efference_copy,
@@ -206,6 +212,7 @@ ATTEMPTED_SUBJECT_TICK_PATHS: tuple[str, ...] = (
     "subject_tick.evaluate_t04_attention_schema",
     "subject_tick.evaluate_o01_other_entity_model",
     "subject_tick.evaluate_o02_intersubjective_allostasis",
+    "subject_tick.evaluate_o03_strategy_class_evaluation",
     "subject_tick.world_seam_enforcement",
     "subject_tick.resolve_bounded_runtime_outcome",
     "subject_tick.downstream_gate",
@@ -3149,6 +3156,172 @@ def execute_subject_tick(
         )
     )
 
+    o03_candidate = context.o03_candidate_strategy
+    if o03_candidate is None:
+        o03_candidate = O03CandidateStrategyInput(
+            candidate_move_id=f"o03-candidate:{tick_id}",
+            candidate_move_kind=O03CandidateMoveKind.EXPLANATION,
+        )
+    o03_result = build_o03_strategy_class_evaluation(
+        tick_id=tick_id,
+        tick_index=tick_index,
+        o01_result=o01_result,
+        o02_result=o02_result,
+        s05_result=s05_result,
+        candidate_strategy=o03_candidate,
+        regulation_pressure_level=viability.state.pressure_level,
+        c05_revalidation_required=_c05_revalidation_required(
+            temporal_validity, c05_validity_action
+        ),
+        source_lineage=lineage,
+        evaluation_enabled=not context.disable_o03_enforcement,
+    )
+    o03_view = derive_o03_strategy_consumer_view(o03_result)
+    o03_enter_values = {
+        "strategy_class": o03_result.telemetry.strategy_class.value,
+        "hidden_divergence_band": o03_result.telemetry.hidden_divergence_band.value,
+        "asymmetry_exploitation_band": o03_result.telemetry.asymmetry_exploitation_band.value,
+        "dependency_risk_band": o03_result.telemetry.dependency_risk_band.value,
+        "entropy_burden_band": o03_result.telemetry.entropy_burden_band.value,
+        "no_safe_classification": o03_result.telemetry.no_safe_classification,
+        "strategy_underconstrained": o03_result.state.strategy_underconstrained,
+        "downstream_consumer_ready": o03_result.telemetry.downstream_consumer_ready,
+    }
+    trace_emit_active("o03_strategy_class_evaluation", "enter", o03_enter_values)
+    o03_checkpoint_status = SubjectTickCheckpointStatus.ALLOWED
+    o03_checkpoint_reason = o03_result.gate.reason
+    o03_default_transparency_detour = False
+    o03_default_exploitative_detour = False
+    if not context.disable_o03_enforcement:
+        if (
+            context.require_o03_strategy_contract_consumer
+            and not o03_view.strategy_contract_consumer_ready
+            and halt_reason is None
+        ):
+            revalidation_needed = True
+            o03_checkpoint_status = SubjectTickCheckpointStatus.ENFORCED_DETOUR
+            o03_checkpoint_reason = (
+                "o03 strategy contract consumer requested but bounded strategy classification is not ready"
+            )
+            if active_execution_mode != "halt_execution":
+                active_execution_mode = "revalidate_scope"
+        if (
+            context.require_o03_cooperative_selection_consumer
+            and not o03_view.cooperative_selection_consumer_ready
+            and halt_reason is None
+        ):
+            revalidation_needed = True
+            o03_checkpoint_status = SubjectTickCheckpointStatus.ENFORCED_DETOUR
+            o03_checkpoint_reason = (
+                "o03 cooperative selection consumer requested but strategy class is not lawfully cooperative-ready"
+            )
+            if active_execution_mode != "halt_execution":
+                active_execution_mode = "revalidate_scope"
+        if (
+            context.require_o03_transparency_preserving_consumer
+            and not o03_view.transparency_preserving_consumer_ready
+            and halt_reason is None
+        ):
+            revalidation_needed = True
+            o03_checkpoint_status = SubjectTickCheckpointStatus.ENFORCED_DETOUR
+            o03_checkpoint_reason = (
+                "o03 transparency-preserving consumer requested but candidate strategy still requires explicit disclosure"
+            )
+            if active_execution_mode != "halt_execution":
+                active_execution_mode = "revalidate_scope"
+        if (
+            not context.require_o03_strategy_contract_consumer
+            and not context.require_o03_cooperative_selection_consumer
+            and not context.require_o03_transparency_preserving_consumer
+            and context.o03_candidate_strategy is not None
+            and o03_view.transparency_increase_required
+            and o03_view.clarification_required
+            and halt_reason is None
+            and not revalidation_needed
+        ):
+            revalidation_needed = True
+            o03_default_transparency_detour = True
+            o03_checkpoint_status = SubjectTickCheckpointStatus.ENFORCED_DETOUR
+            o03_checkpoint_reason = (
+                "o03 default contour requires transparency/clarification before continuing concealment-sensitive candidate"
+            )
+            if active_execution_mode != "halt_execution":
+                active_execution_mode = "revalidate_scope"
+        if (
+            not context.require_o03_strategy_contract_consumer
+            and not context.require_o03_cooperative_selection_consumer
+            and not context.require_o03_transparency_preserving_consumer
+            and context.o03_candidate_strategy is not None
+            and o03_view.block_exploitative_move_required
+            and halt_reason is None
+            and not repair_needed
+        ):
+            repair_needed = True
+            o03_default_exploitative_detour = True
+            o03_checkpoint_status = SubjectTickCheckpointStatus.ENFORCED_DETOUR
+            o03_checkpoint_reason = (
+                "o03 default contour blocks exploitative/high-entropy candidate and requires repair/rewrite"
+            )
+            if active_execution_mode not in {"halt_execution", "revalidate_scope"}:
+                active_execution_mode = "repair_runtime_path"
+    else:
+        o03_checkpoint_status = SubjectTickCheckpointStatus.ENFORCED_DETOUR
+        o03_checkpoint_reason = (
+            "o03 strategy evaluation enforcement disabled in ablation context"
+        )
+    o03_required_actions: list[str] = []
+    if context.require_o03_strategy_contract_consumer:
+        o03_required_actions.append("require_o03_strategy_contract_consumer")
+    if context.require_o03_cooperative_selection_consumer:
+        o03_required_actions.append("require_o03_cooperative_selection_consumer")
+    if context.require_o03_transparency_preserving_consumer:
+        o03_required_actions.append("require_o03_transparency_preserving_consumer")
+    if o03_default_transparency_detour:
+        o03_required_actions.append("default_o03_transparency_clarification_detour")
+    if o03_default_exploitative_detour:
+        o03_required_actions.append("default_o03_exploitative_candidate_block_detour")
+    if o03_result.state.no_safe_classification:
+        o03_required_actions.append("no_safe_classification")
+    if o03_result.state.strategy_underconstrained:
+        o03_required_actions.append("strategy_underconstrained")
+    if o03_result.state.concealed_state_divergence_required:
+        o03_required_actions.append("concealed_state_divergence_required")
+    if o03_result.state.high_local_gain_but_high_entropy:
+        o03_required_actions.append("high_local_gain_but_high_entropy")
+    if o03_view.do_not_collapse_to_politeness:
+        o03_required_actions.append("o03_politeness_equivalence_forbidden")
+    if not o03_required_actions:
+        o03_required_actions.append("o03_optional")
+    o03_trace_values = {
+        "strategy_class": o03_result.telemetry.strategy_class.value,
+        "hidden_divergence_band": o03_result.telemetry.hidden_divergence_band.value,
+        "asymmetry_exploitation_band": o03_result.telemetry.asymmetry_exploitation_band.value,
+        "dependency_risk_band": o03_result.telemetry.dependency_risk_band.value,
+        "entropy_burden_band": o03_result.telemetry.entropy_burden_band.value,
+        "no_safe_classification": o03_result.telemetry.no_safe_classification,
+        "strategy_underconstrained": o03_result.state.strategy_underconstrained,
+        "downstream_consumer_ready": o03_result.telemetry.downstream_consumer_ready,
+    }
+    trace_emit_active("o03_strategy_class_evaluation", "decision", o03_trace_values)
+    if o03_checkpoint_status != SubjectTickCheckpointStatus.ALLOWED:
+        trace_emit_active(
+            "o03_strategy_class_evaluation",
+            "blocked",
+            o03_trace_values,
+            note=o03_checkpoint_reason,
+        )
+    trace_emit_active("o03_strategy_class_evaluation", "exit", o03_trace_values)
+    checkpoints.append(
+        SubjectTickCheckpointResult(
+            checkpoint_id="rt01.o03_strategy_class_evaluation_checkpoint",
+            source_contract="o03_strategy_class_evaluation.strategy_state",
+            status=o03_checkpoint_status,
+            required_action=";".join(dict.fromkeys(o03_required_actions)),
+            applied_action=active_execution_mode,
+            reason=o03_checkpoint_reason,
+        )
+    )
+
     if halt_reason is not None:
         final_outcome = SubjectTickOutcome.HALT
         execution_stance = SubjectTickExecutionStance.HALT_PATH
@@ -3810,6 +3983,15 @@ def execute_subject_tick(
         o02_s05_shape_modulation_applied=o02_result.state.s05_shape_modulation_applied,
         o02_prior_mode_carry_applied=o02_result.state.prior_mode_carry_applied,
         o02_strong_disagreement_guard_applied=o02_result.state.strong_disagreement_guard_applied,
+        o03_strategy_class=o03_result.state.strategy_class.value,
+        o03_hidden_divergence_band=o03_result.state.hidden_divergence_band.value,
+        o03_dependency_risk_band=o03_result.state.dependency_risk_band.value,
+        o03_no_safe_classification=o03_result.state.no_safe_classification,
+        o03_strategy_underconstrained=o03_result.state.strategy_underconstrained,
+        o03_concealed_state_divergence_required=(
+            o03_result.state.concealed_state_divergence_required
+        ),
+        o03_high_local_gain_but_high_entropy=o03_result.state.high_local_gain_but_high_entropy,
     )
     gate = evaluate_subject_tick_downstream_gate(state)
     telemetry = build_subject_tick_telemetry(
@@ -3817,7 +3999,7 @@ def execute_subject_tick(
         attempted_paths=ATTEMPTED_SUBJECT_TICK_PATHS,
         downstream_gate=gate,
         causal_basis=(
-            "bounded runtime execution spine enforces roadmap authority roles for C04/C05, consumes world-entry, s01 efference-copy, s02 prediction-boundary seam, s03 ownership-weighted learning, s04 interoceptive self-binding, s05 multi-cause attribution, s-minimal, a-line, m-minimal, n-minimal, t01 semantic-field, t02 relation-binding, t03 hypothesis-competition, t04 attention-schema, o01 other-entity modeling, and o02 intersubjective allostasis gates, and keeps D01 observability-only over fixed R->C order"
+            "bounded runtime execution spine enforces roadmap authority roles for C04/C05, consumes world-entry, s01 efference-copy, s02 prediction-boundary seam, s03 ownership-weighted learning, s04 interoceptive self-binding, s05 multi-cause attribution, s-minimal, a-line, m-minimal, n-minimal, t01 semantic-field, t02 relation-binding, t03 hypothesis-competition, t04 attention-schema, o01 other-entity modeling, o02 intersubjective allostasis, and o03 strategy-class evaluation gates, and keeps D01 observability-only over fixed R->C order"
         ),
     )
     abstain = final_outcome in {SubjectTickOutcome.REPAIR, SubjectTickOutcome.REVALIDATE}
@@ -3907,6 +4089,7 @@ def execute_subject_tick(
         s05_result=s05_result,
         o01_result=o01_result,
         o02_result=o02_result,
+        o03_result=o03_result,
         t01_result=t01_result,
         t02_result=t02_result,
         t03_result=t03_result,

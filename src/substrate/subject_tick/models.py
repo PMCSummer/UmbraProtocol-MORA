@@ -17,6 +17,10 @@ if TYPE_CHECKING:
         O02IntersubjectiveAllostasisState,
         O02InteractionDiagnosticsInput,
     )
+    from substrate.o03_strategy_class_evaluation import (
+        O03CandidateStrategyInput,
+        O03StrategyEvaluationResult,
+    )
     from substrate.s03_ownership_weighted_learning import (
         S03OwnershipWeightedLearningResult,
         S03OwnershipWeightedLearningState,
@@ -205,6 +209,24 @@ class SubjectTickRestrictionCode(StrEnum):
     O02_POLITENESS_ONLY_COLLAPSE_FORBIDDEN = (
         "o02_politeness_only_collapse_forbidden"
     )
+    O03_STRATEGY_CLASS_EVALUATION_CONTRACT_MUST_BE_READ = (
+        "o03_strategy_class_evaluation_contract_must_be_read"
+    )
+    O03_STRATEGY_CONTRACT_CONSUMER_REQUIRED = (
+        "o03_strategy_contract_consumer_required"
+    )
+    O03_COOPERATIVE_SELECTION_CONSUMER_REQUIRED = (
+        "o03_cooperative_selection_consumer_required"
+    )
+    O03_TRANSPARENCY_PRESERVING_CONSUMER_REQUIRED = (
+        "o03_transparency_preserving_consumer_required"
+    )
+    O03_COOPERATIVE_DEFAULT_REQUIRED = "o03_cooperative_default_required"
+    O03_TRANSPARENCY_INCREASE_REQUIRED = "o03_transparency_increase_required"
+    O03_EXPLOITATIVE_CANDIDATE_BLOCK_REQUIRED = (
+        "o03_exploitative_candidate_block_required"
+    )
+    O03_POLITENESS_EQUIVALENCE_FORBIDDEN = "o03_politeness_equivalence_forbidden"
     DOWNSTREAM_AUTHORITY_DEGRADED = "downstream_authority_degraded"
 
 
@@ -355,8 +377,13 @@ class SubjectTickContext:
     require_o02_repair_sensitive_consumer: bool = False
     require_o02_boundary_preserving_consumer: bool = False
     disable_o02_enforcement: bool = False
+    require_o03_strategy_contract_consumer: bool = False
+    require_o03_cooperative_selection_consumer: bool = False
+    require_o03_transparency_preserving_consumer: bool = False
+    disable_o03_enforcement: bool = False
     o01_entity_signals: tuple[O01EntitySignal, ...] = ()
     o02_interaction_diagnostics: O02InteractionDiagnosticsInput | None = None
+    o03_candidate_strategy: O03CandidateStrategyInput | None = None
     source_lineage: tuple[str, ...] = ()
 
 
@@ -786,6 +813,13 @@ class SubjectTickState:
     o02_s05_shape_modulation_applied: bool = False
     o02_prior_mode_carry_applied: bool = False
     o02_strong_disagreement_guard_applied: bool = False
+    o03_strategy_class: str = "strategy_class_underconstrained"
+    o03_hidden_divergence_band: str = "medium"
+    o03_dependency_risk_band: str = "medium"
+    o03_no_safe_classification: bool = True
+    o03_strategy_underconstrained: bool = True
+    o03_concealed_state_divergence_required: bool = False
+    o03_high_local_gain_but_high_entropy: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -1128,6 +1162,7 @@ class SubjectTickResult:
     s05_result: S05MultiCauseAttributionResult
     o01_result: O01OtherEntityModelResult
     o02_result: O02IntersubjectiveAllostasisResult
+    o03_result: O03StrategyEvaluationResult
     t01_result: T01ActiveFieldResult
     t02_result: T02ConstrainedSceneResult
     t03_result: T03CompetitionResult

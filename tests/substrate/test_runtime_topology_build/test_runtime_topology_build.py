@@ -168,6 +168,7 @@ def test_runtime_topology_bundle_and_graph_are_materialized() -> None:
         "T04",
         "O01",
         "O02",
+        "O03",
         "RT01",
     )
     assert "rt01.epistemic_admission_checkpoint" in graph.mandatory_checkpoint_ids
@@ -190,6 +191,7 @@ def test_runtime_topology_bundle_and_graph_are_materialized() -> None:
     assert "rt01.t04_attention_schema_checkpoint" in graph.mandatory_checkpoint_ids
     assert "rt01.o01_other_entity_model_checkpoint" in graph.mandatory_checkpoint_ids
     assert "rt01.o02_intersubjective_allostasis_checkpoint" in graph.mandatory_checkpoint_ids
+    assert "rt01.o03_strategy_class_evaluation_checkpoint" in graph.mandatory_checkpoint_ids
     assert "epistemics.grounded_unit" in graph.source_of_truth_surfaces
     assert "epistemics.downstream_allowance" in graph.source_of_truth_surfaces
     assert "world_adapter.state" in graph.source_of_truth_surfaces
@@ -246,6 +248,8 @@ def test_runtime_topology_bundle_and_graph_are_materialized() -> None:
         "o02_intersubjective_allostasis.boundary_protection_status"
         in graph.source_of_truth_surfaces
     )
+    assert "o03_strategy_class_evaluation.strategy_state" in graph.source_of_truth_surfaces
+    assert "o03_strategy_class_evaluation.hidden_divergence_band" in graph.source_of_truth_surfaces
 
 
 def test_dispatch_happy_path_runs_lawful_production_contour() -> None:

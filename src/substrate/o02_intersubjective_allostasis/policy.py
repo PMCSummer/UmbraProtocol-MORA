@@ -207,9 +207,9 @@ def build_o02_intersubjective_allostasis(
         scope="rt01_hosted_o02_first_slice",
         rt01_hosted_only=True,
         o02_first_slice_only=True,
-        o03_not_implemented=True,
+        o03_not_implemented=False,
         repo_wide_adoption=False,
-        reason="first bounded o02 slice; social strategy line remains out-of-scope",
+        reason="bounded o02 slice with o03 downstream strategy-class seam available",
     )
     telemetry = O02Telemetry(
         regulation_id=state.regulation_id,
@@ -292,7 +292,7 @@ def _build_disabled_result(
         scope="rt01_hosted_o02_first_slice",
         rt01_hosted_only=True,
         o02_first_slice_only=True,
-        o03_not_implemented=True,
+        o03_not_implemented=False,
         repo_wide_adoption=False,
         reason="o02 disabled path",
     )

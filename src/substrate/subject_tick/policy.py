@@ -66,6 +66,7 @@ def evaluate_subject_tick_downstream_gate(
         SubjectTickRestrictionCode.S05_MULTI_CAUSE_ATTRIBUTION_CONTRACT_MUST_BE_READ,
         SubjectTickRestrictionCode.O01_OTHER_ENTITY_MODEL_CONTRACT_MUST_BE_READ,
         SubjectTickRestrictionCode.O02_INTERSUBJECTIVE_ALLOSTASIS_CONTRACT_MUST_BE_READ,
+        SubjectTickRestrictionCode.O03_STRATEGY_CLASS_EVALUATION_CONTRACT_MUST_BE_READ,
     ]
     usability = SubjectTickUsabilityClass.USABLE_BOUNDED
     accepted = True
@@ -698,6 +699,67 @@ def evaluate_subject_tick_downstream_gate(
             usability = SubjectTickUsabilityClass.BLOCKED
             reason = (
                 "o02 intersubjective allostasis checkpoint requires detour before downstream continuation"
+            )
+
+    o03_checkpoint = next(
+        (
+            checkpoint
+            for checkpoint in state.execution_checkpoints
+            if checkpoint.checkpoint_id == "rt01.o03_strategy_class_evaluation_checkpoint"
+        ),
+        None,
+    )
+    if o03_checkpoint is not None:
+        if "require_o03_strategy_contract_consumer" in o03_checkpoint.required_action:
+            restrictions.append(
+                SubjectTickRestrictionCode.O03_STRATEGY_CONTRACT_CONSUMER_REQUIRED
+            )
+        if "require_o03_cooperative_selection_consumer" in o03_checkpoint.required_action:
+            restrictions.append(
+                SubjectTickRestrictionCode.O03_COOPERATIVE_SELECTION_CONSUMER_REQUIRED
+            )
+        if "require_o03_transparency_preserving_consumer" in o03_checkpoint.required_action:
+            restrictions.append(
+                SubjectTickRestrictionCode.O03_TRANSPARENCY_PRESERVING_CONSUMER_REQUIRED
+            )
+        if "default_o03_transparency_clarification_detour" in o03_checkpoint.required_action:
+            restrictions.append(SubjectTickRestrictionCode.O03_TRANSPARENCY_INCREASE_REQUIRED)
+        if "default_o03_exploitative_candidate_block_detour" in o03_checkpoint.required_action:
+            restrictions.append(
+                SubjectTickRestrictionCode.O03_EXPLOITATIVE_CANDIDATE_BLOCK_REQUIRED
+            )
+        if "o03_politeness_equivalence_forbidden" in o03_checkpoint.required_action:
+            restrictions.append(
+                SubjectTickRestrictionCode.O03_POLITENESS_EQUIVALENCE_FORBIDDEN
+            )
+    if state.o03_no_safe_classification or state.o03_strategy_underconstrained:
+        restrictions.append(SubjectTickRestrictionCode.O03_COOPERATIVE_DEFAULT_REQUIRED)
+    if state.o03_concealed_state_divergence_required:
+        restrictions.append(SubjectTickRestrictionCode.O03_TRANSPARENCY_INCREASE_REQUIRED)
+        restrictions.append(SubjectTickRestrictionCode.O03_POLITENESS_EQUIVALENCE_FORBIDDEN)
+    if state.o03_high_local_gain_but_high_entropy:
+        restrictions.append(SubjectTickRestrictionCode.O03_COOPERATIVE_DEFAULT_REQUIRED)
+        restrictions.append(
+            SubjectTickRestrictionCode.O03_EXPLOITATIVE_CANDIDATE_BLOCK_REQUIRED
+        )
+    if state.o03_strategy_class in {
+        "manipulation_risk_high",
+        "high_local_gain_but_high_entropy",
+    } and state.final_execution_outcome == SubjectTickOutcome.CONTINUE:
+        restrictions.append(
+            SubjectTickRestrictionCode.O03_EXPLOITATIVE_CANDIDATE_BLOCK_REQUIRED
+        )
+        usability = SubjectTickUsabilityClass.DEGRADED_BOUNDED
+        reason = (
+            "o03 strategy-class semantics require transparency/cooperative safeguards before unrestricted continuation"
+        )
+    if o03_checkpoint is not None and o03_checkpoint.status.value != "allowed":
+        restrictions.append(SubjectTickRestrictionCode.DOWNSTREAM_AUTHORITY_DEGRADED)
+        if state.final_execution_outcome == SubjectTickOutcome.CONTINUE:
+            accepted = False
+            usability = SubjectTickUsabilityClass.BLOCKED
+            reason = (
+                "o03 strategy class checkpoint requires detour before downstream continuation"
             )
 
     return SubjectTickGateDecision(
