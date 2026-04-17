@@ -900,6 +900,67 @@ def subject_tick_result_snapshot(result: SubjectTickResult) -> dict[str, object]
             },
             "reason": result.s04_result.reason,
         },
+        "s05_multi_cause_attribution_factorization_result": {
+            "factorization_id": result.s05_result.state.factorization_id,
+            "tick_index": result.s05_result.state.tick_index,
+            "latest_packet_id": result.s05_result.state.latest_packet_id,
+            "dominant_cause_classes": tuple(
+                item.value for item in result.s05_result.state.dominant_cause_classes
+            ),
+            "unexplained_residual": result.s05_result.state.unexplained_residual,
+            "residual_class": result.s05_result.state.residual_class.value,
+            "underdetermined_split": result.s05_result.state.underdetermined_split,
+            "incompatible_candidates_present": (
+                result.s05_result.state.incompatible_candidates_present
+            ),
+            "temporal_misalignment_present": (
+                result.s05_result.state.temporal_misalignment_present
+            ),
+            "contamination_present": result.s05_result.state.contamination_present,
+            "reattribution_happened": result.s05_result.state.reattribution_happened,
+            "gate": {
+                "factorization_consumer_ready": (
+                    result.s05_result.gate.factorization_consumer_ready
+                ),
+                "learning_route_ready": result.s05_result.gate.learning_route_ready,
+                "no_binary_recollapse_required": (
+                    result.s05_result.gate.no_binary_recollapse_required
+                ),
+                "restrictions": result.s05_result.gate.restrictions,
+                "reason": result.s05_result.gate.reason,
+            },
+            "scope_marker": {
+                "scope": result.s05_result.scope_marker.scope,
+                "rt01_contour_only": result.s05_result.scope_marker.rt01_contour_only,
+                "s05_first_slice_only": result.s05_result.scope_marker.s05_first_slice_only,
+                "downstream_rollout_minimal": (
+                    result.s05_result.scope_marker.downstream_rollout_minimal
+                ),
+                "repo_wide_adoption": result.s05_result.scope_marker.repo_wide_adoption,
+                "reason": result.s05_result.scope_marker.reason,
+            },
+            "telemetry": {
+                "dominant_slot_count": result.s05_result.telemetry.dominant_slot_count,
+                "residual_share": result.s05_result.telemetry.residual_share,
+                "residual_class": result.s05_result.telemetry.residual_class.value,
+                "underdetermined_split": result.s05_result.telemetry.underdetermined_split,
+                "contamination_present": result.s05_result.telemetry.contamination_present,
+                "temporal_misalignment_present": (
+                    result.s05_result.telemetry.temporal_misalignment_present
+                ),
+                "reattribution_happened": result.s05_result.telemetry.reattribution_happened,
+                "downstream_route_class": (
+                    result.s05_result.telemetry.downstream_route_class.value
+                ),
+                "factorization_consumer_ready": (
+                    result.s05_result.telemetry.factorization_consumer_ready
+                ),
+                "learning_route_ready": result.s05_result.telemetry.learning_route_ready,
+                "restrictions": result.s05_result.telemetry.restrictions,
+                "reason": result.s05_result.telemetry.reason,
+            },
+            "reason": result.s05_result.reason,
+        },
         "a_line_result": {
             "capability_id": result.a_line_result.state.capability_id,
             "affordance_id": result.a_line_result.state.affordance_id,

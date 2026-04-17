@@ -95,7 +95,7 @@ def build_s04_harness_case(config: S04HarnessConfig):
             coupling_support_hint=config.coupling_support,
             temporal_validity_hint=config.temporal_validity,
             contamination_hint=config.contamination,
-            source_authority="harness",
+            source_authority="s04.authorized:test_harness",
             provenance="harness.core_regulatory",
         )
     ]
@@ -111,7 +111,7 @@ def build_s04_harness_case(config: S04HarnessConfig):
                 coupling_support_hint=max(0.2, config.coupling_support * 0.5),
                 temporal_validity_hint=max(0.3, config.temporal_validity * 0.8),
                 contamination_hint=max(config.contamination, 0.3),
-                source_authority="harness",
+                source_authority="s04.authorized:test_harness",
                 provenance="harness.mixed",
             )
         )

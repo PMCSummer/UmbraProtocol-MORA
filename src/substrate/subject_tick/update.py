@@ -158,6 +158,10 @@ from substrate.s04_interoceptive_self_binding import (
     build_s04_interoceptive_self_binding,
     derive_s04_interoceptive_self_binding_consumer_view,
 )
+from substrate.s05_multi_cause_attribution_factorization import (
+    build_s05_multi_cause_attribution_factorization,
+    derive_s05_multi_cause_attribution_consumer_view,
+)
 from substrate.s01_efference_copy import (
     S01EfferenceCopyState,
     build_s01_efference_copy,
@@ -180,6 +184,7 @@ ATTEMPTED_SUBJECT_TICK_PATHS: tuple[str, ...] = (
     "subject_tick.evaluate_s02_prediction_boundary",
     "subject_tick.evaluate_s03_ownership_weighted_learning",
     "subject_tick.evaluate_s04_interoceptive_self_binding",
+    "subject_tick.evaluate_s05_multi_cause_attribution_factorization",
     "subject_tick.evaluate_s_minimal_contour",
     "subject_tick.evaluate_a_line_normalization",
     "subject_tick.evaluate_m_minimal_contour",
@@ -1872,6 +1877,128 @@ def execute_subject_tick(
             reason=s04_checkpoint_reason,
         )
     )
+    s05_result = build_s05_multi_cause_attribution_factorization(
+        tick_id=tick_id,
+        tick_index=tick_index,
+        s01_result=s01_result,
+        s02_result=s02_result,
+        s03_result=s03_result,
+        s04_result=s04_result,
+        c04_selected_mode=mode_arbitration.state.active_mode.value,
+        c05_validity_action=c05_validity_action,
+        c05_revalidation_required=_c05_revalidation_required(
+            temporal_validity, c05_validity_action
+        ),
+        world_presence_mode=world_entry_result.episode.world_presence_mode.value,
+        world_effect_feedback_correlated=world_entry_result.episode.effect_feedback_correlated,
+        context_shift_detected=bool(context.context_shift_markers),
+        late_evidence_tokens=tuple(
+            dict.fromkeys(
+                (
+                    *context.context_shift_markers,
+                    *context.contradicted_source_refs,
+                    *context.withdrawn_source_refs,
+                )
+            )
+        ),
+        prior_state=context.prior_s05_state,
+        source_lineage=lineage,
+        factorization_enabled=not context.disable_s05_enforcement,
+    )
+    s05_view = derive_s05_multi_cause_attribution_consumer_view(s05_result)
+    s05_enter_values = {
+        "dominant_slot_count": s05_result.telemetry.dominant_slot_count,
+        "residual_share": s05_result.telemetry.residual_share,
+        "residual_class": s05_result.telemetry.residual_class.value,
+        "underdetermined_split": s05_result.telemetry.underdetermined_split,
+        "contamination_present": s05_result.telemetry.contamination_present,
+        "temporal_misalignment_present": s05_result.telemetry.temporal_misalignment_present,
+        "reattribution_happened": s05_result.telemetry.reattribution_happened,
+        "downstream_route_class": s05_result.telemetry.downstream_route_class.value,
+        "factorization_consumer_ready": s05_result.telemetry.factorization_consumer_ready,
+        "learning_route_ready": s05_result.telemetry.learning_route_ready,
+    }
+    trace_emit_active(
+        "s05_multi_cause_attribution_factorization", "enter", s05_enter_values
+    )
+    s05_checkpoint_status = SubjectTickCheckpointStatus.ALLOWED
+    s05_checkpoint_reason = s05_result.gate.reason
+    if not context.disable_s05_enforcement:
+        if (
+            context.require_s05_factorized_consumer
+            and not s05_view.can_consume_factorization
+            and halt_reason is None
+        ):
+            revalidation_needed = True
+            s05_checkpoint_status = SubjectTickCheckpointStatus.ENFORCED_DETOUR
+            s05_checkpoint_reason = (
+                "s05 factorized-consumer requested but compatible factorization packet is not consumable"
+            )
+            if active_execution_mode != "halt_execution":
+                active_execution_mode = "revalidate_scope"
+        if (
+            context.require_s05_low_residual_learning_route
+            and not s05_view.can_route_learning_attribution
+            and halt_reason is None
+        ):
+            revalidation_needed = True
+            s05_checkpoint_status = SubjectTickCheckpointStatus.ENFORCED_DETOUR
+            s05_checkpoint_reason = (
+                "s05 low-residual learning-route requested but residual/compatibility keeps routing underdetermined"
+            )
+            if active_execution_mode != "halt_execution":
+                active_execution_mode = "revalidate_scope"
+    else:
+        s05_checkpoint_status = SubjectTickCheckpointStatus.ENFORCED_DETOUR
+        s05_checkpoint_reason = (
+            "s05 multi-cause attribution enforcement disabled in ablation context"
+        )
+    s05_trace_values = {
+        "dominant_slot_count": s05_result.telemetry.dominant_slot_count,
+        "residual_share": s05_result.telemetry.residual_share,
+        "residual_class": s05_result.telemetry.residual_class.value,
+        "underdetermined_split": s05_result.telemetry.underdetermined_split,
+        "contamination_present": s05_result.telemetry.contamination_present,
+        "temporal_misalignment_present": s05_result.telemetry.temporal_misalignment_present,
+        "reattribution_happened": s05_result.telemetry.reattribution_happened,
+        "downstream_route_class": s05_result.telemetry.downstream_route_class.value,
+        "factorization_consumer_ready": s05_result.telemetry.factorization_consumer_ready,
+        "learning_route_ready": s05_result.telemetry.learning_route_ready,
+    }
+    trace_emit_active(
+        "s05_multi_cause_attribution_factorization", "decision", s05_trace_values
+    )
+    if s05_checkpoint_status != SubjectTickCheckpointStatus.ALLOWED:
+        trace_emit_active(
+            "s05_multi_cause_attribution_factorization",
+            "blocked",
+            s05_trace_values,
+            note="s05_checkpoint_not_allowed",
+        )
+    trace_emit_active(
+        "s05_multi_cause_attribution_factorization", "exit", s05_trace_values
+    )
+    checkpoints.append(
+        SubjectTickCheckpointResult(
+            checkpoint_id="rt01.s05_multi_cause_attribution_checkpoint",
+            source_contract="s05_multi_cause_attribution_factorization.factorization_packet",
+            status=s05_checkpoint_status,
+            required_action=(
+                "require_s05_factorized_consumer_and_low_residual_learning_route"
+                if (
+                    context.require_s05_factorized_consumer
+                    and context.require_s05_low_residual_learning_route
+                )
+                else "require_s05_factorized_consumer"
+                if context.require_s05_factorized_consumer
+                else "require_s05_low_residual_learning_route"
+                if context.require_s05_low_residual_learning_route
+                else "s05_optional"
+            ),
+            applied_action=active_execution_mode,
+            reason=s05_checkpoint_reason,
+        )
+    )
     s_minimal_result = build_s_minimal_contour(
         tick_id=tick_id,
         world_entry_result=world_entry_result,
@@ -3414,6 +3541,7 @@ def execute_subject_tick(
         s02_result=s02_result,
         s03_result=s03_result,
         s04_result=s04_result,
+        s05_result=s05_result,
         t01_result=t01_result,
         t02_result=t02_result,
         t03_result=t03_result,

@@ -63,6 +63,7 @@ def evaluate_subject_tick_downstream_gate(
         SubjectTickRestrictionCode.S02_PREDICTION_BOUNDARY_CONTRACT_MUST_BE_READ,
         SubjectTickRestrictionCode.S03_OWNERSHIP_WEIGHTED_LEARNING_CONTRACT_MUST_BE_READ,
         SubjectTickRestrictionCode.S04_INTEROCEPTIVE_SELF_BINDING_CONTRACT_MUST_BE_READ,
+        SubjectTickRestrictionCode.S05_MULTI_CAUSE_ATTRIBUTION_CONTRACT_MUST_BE_READ,
     ]
     usability = SubjectTickUsabilityClass.USABLE_BOUNDED
     accepted = True
@@ -577,6 +578,33 @@ def evaluate_subject_tick_downstream_gate(
             usability = SubjectTickUsabilityClass.BLOCKED
             reason = (
                 "s04 interoceptive self-binding checkpoint requires detour before downstream continuation"
+            )
+
+    s05_checkpoint = next(
+        (
+            checkpoint
+            for checkpoint in state.execution_checkpoints
+            if checkpoint.checkpoint_id == "rt01.s05_multi_cause_attribution_checkpoint"
+        ),
+        None,
+    )
+    if s05_checkpoint is not None:
+        if "factorized_consumer" in s05_checkpoint.required_action:
+            restrictions.append(
+                SubjectTickRestrictionCode.S05_FACTORIZED_CONSUMER_REQUIRED
+            )
+        if "low_residual_learning_route" in s05_checkpoint.required_action:
+            restrictions.append(
+                SubjectTickRestrictionCode.S05_LOW_RESIDUAL_LEARNING_ROUTE_REQUIRED
+            )
+        restrictions.append(SubjectTickRestrictionCode.S05_SINGLE_CAUSE_COLLAPSE_FORBIDDEN)
+    if s05_checkpoint is not None and s05_checkpoint.status.value != "allowed":
+        restrictions.append(SubjectTickRestrictionCode.DOWNSTREAM_AUTHORITY_DEGRADED)
+        if state.final_execution_outcome == SubjectTickOutcome.CONTINUE:
+            accepted = False
+            usability = SubjectTickUsabilityClass.BLOCKED
+            reason = (
+                "s05 multi-cause attribution checkpoint requires detour before downstream continuation"
             )
 
     return SubjectTickGateDecision(

@@ -30,6 +30,7 @@ def build_minimal_runtime_tick_graph() -> RuntimeTickGraph:
             "S02",
             "S03",
             "S04",
+            "S05",
             "T01",
             "T02",
             "T03",
@@ -183,6 +184,19 @@ def build_minimal_runtime_tick_graph() -> RuntimeTickGraph:
                 checkpoint_ids=("rt01.s04_interoceptive_self_binding_checkpoint",),
             ),
             RuntimeContourNode(
+                node_id="node.s05_multi_cause_attribution_factorization",
+                phase_id="S05",
+                authority_role="factorized_attribution_contract",
+                computational_role="bounded_multi_cause_factorizer",
+                surfaces=(
+                    "s05_multi_cause_attribution_factorization.factorization_packet",
+                    "s05_multi_cause_attribution_factorization.compatibility_filtering",
+                    "s05_multi_cause_attribution_factorization.residual_discipline",
+                    "s05_multi_cause_attribution_factorization.downstream_route_contract",
+                ),
+                checkpoint_ids=("rt01.s05_multi_cause_attribution_checkpoint",),
+            ),
+            RuntimeContourNode(
                 node_id="node.t01_semantic_field",
                 phase_id="T01",
                 authority_role="semantic_field_contract",
@@ -253,6 +267,7 @@ def build_minimal_runtime_tick_graph() -> RuntimeTickGraph:
                     "rt01.t01_semantic_field_checkpoint",
                     "rt01.s02_prediction_boundary_checkpoint",
                     "rt01.s04_interoceptive_self_binding_checkpoint",
+                    "rt01.s05_multi_cause_attribution_checkpoint",
                     "rt01.t02_relation_binding_checkpoint",
                     "rt01.t02_raw_vs_propagated_integrity_checkpoint",
                     "rt01.t03_hypothesis_competition_checkpoint",
@@ -271,6 +286,7 @@ def build_minimal_runtime_tick_graph() -> RuntimeTickGraph:
                     "rt01.t01_semantic_field_checkpoint",
                     "rt01.s02_prediction_boundary_checkpoint",
                     "rt01.s04_interoceptive_self_binding_checkpoint",
+                    "rt01.s05_multi_cause_attribution_checkpoint",
                     "rt01.t02_relation_binding_checkpoint",
                     "rt01.t02_raw_vs_propagated_integrity_checkpoint",
                     "rt01.t03_hypothesis_competition_checkpoint",
@@ -305,7 +321,10 @@ def build_minimal_runtime_tick_graph() -> RuntimeTickGraph:
             RuntimeContourEdge(source_phase="S03", target_phase="S04", relation="requires"),
             RuntimeContourEdge(source_phase="C04", target_phase="S04", relation="arbitrates"),
             RuntimeContourEdge(source_phase="C05", target_phase="S04", relation="requests_revalidation"),
-            RuntimeContourEdge(source_phase="S04", target_phase="S_MINIMAL", relation="requires"),
+            RuntimeContourEdge(source_phase="S04", target_phase="S05", relation="requires"),
+            RuntimeContourEdge(source_phase="C04", target_phase="S05", relation="arbitrates"),
+            RuntimeContourEdge(source_phase="C05", target_phase="S05", relation="requests_revalidation"),
+            RuntimeContourEdge(source_phase="S05", target_phase="S_MINIMAL", relation="requires"),
             RuntimeContourEdge(source_phase="S03", target_phase="T01", relation="modulates"),
             RuntimeContourEdge(source_phase="WORLD_SEAM", target_phase="RT01", relation="requires"),
             RuntimeContourEdge(source_phase="WORLD_SEAM", target_phase="S_MINIMAL", relation="requires"),
@@ -347,6 +366,7 @@ def build_minimal_runtime_tick_graph() -> RuntimeTickGraph:
             "rt01.s02_prediction_boundary_checkpoint",
             "rt01.s03_ownership_weighted_learning_checkpoint",
             "rt01.s04_interoceptive_self_binding_checkpoint",
+            "rt01.s05_multi_cause_attribution_checkpoint",
             "rt01.t01_semantic_field_checkpoint",
             "rt01.t02_relation_binding_checkpoint",
             "rt01.t02_raw_vs_propagated_integrity_checkpoint",
@@ -374,6 +394,9 @@ def build_minimal_runtime_tick_graph() -> RuntimeTickGraph:
             "s04_interoceptive_self_binding.binding_entries",
             "s04_interoceptive_self_binding.core_channels",
             "s04_interoceptive_self_binding.contested_channels",
+            "s05_multi_cause_attribution_factorization.factorization_packet",
+            "s05_multi_cause_attribution_factorization.compatibility_filtering",
+            "s05_multi_cause_attribution_factorization.residual_discipline",
             "t01_semantic_field.active_scene",
             "t02_relation_binding.constrained_scene",
             "t02_relation_binding.raw_vs_propagated_distinction",
@@ -414,6 +437,7 @@ def build_minimal_runtime_topology_bundle() -> RuntimeTopologyBundle:
             "s02_prediction_boundary_self_vs_world_seam_contract",
             "s03_ownership_weighted_learning_packet_routing_contract",
             "s04_interoceptive_self_binding_binding_ledger_contract",
+            "s05_multi_cause_attribution_factorization_contract",
             "t01_semantic_field_contract",
             "t02_relation_binding_constraint_propagation_contract",
             "t02_raw_vs_propagated_integrity_contract",
@@ -584,6 +608,7 @@ def _context_has_ablation_flags(context: SubjectTickContext | None) -> bool:
         or context.disable_s02_enforcement
         or context.disable_s03_enforcement
         or context.disable_s04_enforcement
+        or context.disable_s05_enforcement
         or context.disable_t01_unresolved_slot_maintenance
         or context.disable_t01_field_enforcement
         or (

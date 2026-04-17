@@ -112,6 +112,7 @@ def test_runtime_topology_bundle_and_graph_are_materialized() -> None:
         "S02",
         "S03",
         "S04",
+        "S05",
         "T01",
         "T02",
         "T03",
@@ -130,6 +131,7 @@ def test_runtime_topology_bundle_and_graph_are_materialized() -> None:
     assert "rt01.s02_prediction_boundary_checkpoint" in graph.mandatory_checkpoint_ids
     assert "rt01.s03_ownership_weighted_learning_checkpoint" in graph.mandatory_checkpoint_ids
     assert "rt01.s04_interoceptive_self_binding_checkpoint" in graph.mandatory_checkpoint_ids
+    assert "rt01.s05_multi_cause_attribution_checkpoint" in graph.mandatory_checkpoint_ids
     assert "rt01.t01_semantic_field_checkpoint" in graph.mandatory_checkpoint_ids
     assert "rt01.t02_relation_binding_checkpoint" in graph.mandatory_checkpoint_ids
     assert "rt01.t02_raw_vs_propagated_integrity_checkpoint" in graph.mandatory_checkpoint_ids
@@ -167,6 +169,14 @@ def test_runtime_topology_bundle_and_graph_are_materialized() -> None:
     )
     assert (
         "s04_interoceptive_self_binding.core_channels"
+        in graph.source_of_truth_surfaces
+    )
+    assert (
+        "s05_multi_cause_attribution_factorization.factorization_packet"
+        in graph.source_of_truth_surfaces
+    )
+    assert (
+        "s05_multi_cause_attribution_factorization.compatibility_filtering"
         in graph.source_of_truth_surfaces
     )
     assert "t01_semantic_field.active_scene" in graph.source_of_truth_surfaces
@@ -1824,3 +1834,91 @@ def test_dispatch_contract_view_exposes_s03_ownership_weighted_learning_surface(
     assert view.s03_require_learning_packet_consumer is True
     assert view.s03_require_mixed_update_consumer is True
     assert view.s03_require_freeze_obedience_consumer is True
+
+
+def test_dispatch_s05_factorized_consumer_requirement_is_load_bearing() -> None:
+    baseline = dispatch_runtime_tick(
+        RuntimeDispatchRequest(
+            tick_input=_tick_input("runtime-topology-s05-factorized-baseline"),
+            context=SubjectTickContext(
+                context_shift_markers=("shift:s05",),
+                dependency_trigger_hits=("trigger:mode_shift",),
+            ),
+            route_class=RuntimeRouteClass.PRODUCTION_CONTOUR,
+        )
+    )
+    required = dispatch_runtime_tick(
+        RuntimeDispatchRequest(
+            tick_input=_tick_input("runtime-topology-s05-factorized-required"),
+            context=SubjectTickContext(
+                context_shift_markers=("shift:s05",),
+                dependency_trigger_hits=("trigger:mode_shift",),
+                require_s05_factorized_consumer=True,
+            ),
+            route_class=RuntimeRouteClass.PRODUCTION_CONTOUR,
+        )
+    )
+    assert baseline.subject_tick_result is not None
+    assert required.subject_tick_result is not None
+    baseline_checkpoint = next(
+        checkpoint
+        for checkpoint in baseline.subject_tick_result.state.execution_checkpoints
+        if checkpoint.checkpoint_id == "rt01.s05_multi_cause_attribution_checkpoint"
+    )
+    required_checkpoint = next(
+        checkpoint
+        for checkpoint in required.subject_tick_result.state.execution_checkpoints
+        if checkpoint.checkpoint_id == "rt01.s05_multi_cause_attribution_checkpoint"
+    )
+    assert baseline_checkpoint.status.value == "allowed"
+    if not required.subject_tick_result.s05_result.gate.factorization_consumer_ready:
+        assert required_checkpoint.status.value == "enforced_detour"
+        assert required.subject_tick_result.state.final_execution_outcome in {
+            SubjectTickOutcome.REVALIDATE,
+            SubjectTickOutcome.REPAIR,
+            SubjectTickOutcome.HALT,
+        }
+
+
+def test_dispatch_s05_low_residual_learning_route_requirement_is_load_bearing() -> None:
+    baseline = dispatch_runtime_tick(
+        RuntimeDispatchRequest(
+            tick_input=_tick_input("runtime-topology-s05-learning-baseline", unresolved=True),
+            context=SubjectTickContext(
+                context_shift_markers=("shift:s05-learning",),
+                dependency_trigger_hits=("trigger:mode_shift",),
+            ),
+            route_class=RuntimeRouteClass.PRODUCTION_CONTOUR,
+        )
+    )
+    required = dispatch_runtime_tick(
+        RuntimeDispatchRequest(
+            tick_input=_tick_input("runtime-topology-s05-learning-required", unresolved=True),
+            context=SubjectTickContext(
+                context_shift_markers=("shift:s05-learning",),
+                dependency_trigger_hits=("trigger:mode_shift",),
+                require_s05_low_residual_learning_route=True,
+            ),
+            route_class=RuntimeRouteClass.PRODUCTION_CONTOUR,
+        )
+    )
+    assert baseline.subject_tick_result is not None
+    assert required.subject_tick_result is not None
+    baseline_checkpoint = next(
+        checkpoint
+        for checkpoint in baseline.subject_tick_result.state.execution_checkpoints
+        if checkpoint.checkpoint_id == "rt01.s05_multi_cause_attribution_checkpoint"
+    )
+    required_checkpoint = next(
+        checkpoint
+        for checkpoint in required.subject_tick_result.state.execution_checkpoints
+        if checkpoint.checkpoint_id == "rt01.s05_multi_cause_attribution_checkpoint"
+    )
+    assert baseline_checkpoint.status.value == "allowed"
+    if not required.subject_tick_result.s05_result.gate.learning_route_ready:
+        assert required_checkpoint.status.value == "enforced_detour"
+        assert required.subject_tick_result.state.final_execution_outcome in {
+            SubjectTickOutcome.REVALIDATE,
+            SubjectTickOutcome.REPAIR,
+            SubjectTickOutcome.HALT,
+        }

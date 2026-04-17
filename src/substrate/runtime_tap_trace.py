@@ -125,6 +125,18 @@ MODULE_ALLOWED_FIELDS: dict[str, tuple[str, ...]] = {
         "rebinding_event",
         "stale_binding_drop_count",
     ),
+    "s05_multi_cause_attribution_factorization": (
+        "dominant_slot_count",
+        "residual_share",
+        "residual_class",
+        "underdetermined_split",
+        "contamination_present",
+        "temporal_misalignment_present",
+        "reattribution_happened",
+        "downstream_route_class",
+        "factorization_consumer_ready",
+        "learning_route_ready",
+    ),
     "s_minimal_contour": (
         "minimal_self_status",
         "minimal_self_ready",

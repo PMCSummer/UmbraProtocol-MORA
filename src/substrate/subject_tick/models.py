@@ -15,6 +15,10 @@ if TYPE_CHECKING:
         S04InteroceptiveSelfBindingResult,
         S04InteroceptiveSelfBindingState,
     )
+    from substrate.s05_multi_cause_attribution_factorization import (
+        S05MultiCauseAttributionResult,
+        S05MultiCauseAttributionState,
+    )
     from substrate.s02_prediction_boundary import (
         S02PredictionBoundaryResult,
         S02PredictionBoundaryState,
@@ -161,6 +165,14 @@ class SubjectTickRestrictionCode(StrEnum):
     S04_NO_STABLE_CORE_CONSUMER_REQUIRED = (
         "s04_no_stable_core_consumer_required"
     )
+    S05_MULTI_CAUSE_ATTRIBUTION_CONTRACT_MUST_BE_READ = (
+        "s05_multi_cause_attribution_contract_must_be_read"
+    )
+    S05_FACTORIZED_CONSUMER_REQUIRED = "s05_factorized_consumer_required"
+    S05_LOW_RESIDUAL_LEARNING_ROUTE_REQUIRED = (
+        "s05_low_residual_learning_route_required"
+    )
+    S05_SINGLE_CAUSE_COLLAPSE_FORBIDDEN = "s05_single_cause_collapse_forbidden"
     DOWNSTREAM_AUTHORITY_DEGRADED = "downstream_authority_degraded"
 
 
@@ -228,6 +240,7 @@ class SubjectTickContext:
     prior_s02_state: S02PredictionBoundaryState | None = None
     prior_s03_state: S03OwnershipWeightedLearningState | None = None
     prior_s04_state: S04InteroceptiveSelfBindingState | None = None
+    prior_s05_state: S05MultiCauseAttributionState | None = None
     dependency_trigger_hits: tuple[str, ...] = ()
     context_shift_markers: tuple[str, ...] = ()
     contradicted_source_refs: tuple[str, ...] = ()
@@ -299,6 +312,9 @@ class SubjectTickContext:
     require_s04_contested_consumer: bool = False
     require_s04_no_stable_core_consumer: bool = False
     disable_s04_enforcement: bool = False
+    require_s05_factorized_consumer: bool = False
+    require_s05_low_residual_learning_route: bool = False
+    disable_s05_enforcement: bool = False
     source_lineage: tuple[str, ...] = ()
 
 
@@ -1060,6 +1076,7 @@ class SubjectTickResult:
     s02_result: S02PredictionBoundaryResult
     s03_result: S03OwnershipWeightedLearningResult
     s04_result: S04InteroceptiveSelfBindingResult
+    s05_result: S05MultiCauseAttributionResult
     t01_result: T01ActiveFieldResult
     t02_result: T02ConstrainedSceneResult
     t03_result: T03CompetitionResult

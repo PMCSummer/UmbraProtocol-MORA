@@ -20,6 +20,8 @@ from substrate.s04_interoceptive_self_binding.models import (
     S04Telemetry,
 )
 
+_AUTHORIZED_EXTERNAL_CANDIDATE_SOURCE_PREFIX = "s04.authorized:"
+
 
 def build_s04_interoceptive_self_binding(
     *,
@@ -56,8 +58,9 @@ def build_s04_interoceptive_self_binding(
         regulation_pressure_level=regulation_pressure_level,
         regulation_dominant_axis=regulation_dominant_axis,
     )
+    guarded_candidate_signals = _guard_external_candidate_signals(candidate_signals)
     observed = _derive_observed_channel_signals(observed_internal_channels)
-    merged = _merge_candidate_signals((*upstream, *candidate_signals, *observed))
+    merged = _merge_candidate_signals((*upstream, *guarded_candidate_signals, *observed))
     candidate_ids = tuple(item.channel_id for item in merged)
 
     excluded_channels = tuple(
@@ -510,6 +513,39 @@ def _derive_observed_channel_signals(
             )
         )
     return tuple(signals)
+
+
+def _guard_external_candidate_signals(
+    signals: tuple[S04CandidateSignal, ...],
+) -> tuple[S04CandidateSignal, ...]:
+    guarded: list[S04CandidateSignal] = []
+    for item in signals:
+        if not isinstance(item, S04CandidateSignal):
+            continue
+        if item.candidate_class in {
+            S04CandidateClass.PRIVILEGED_INTEROCEPTIVE_REGULATORY,
+            S04CandidateClass.MIXED_INTERNAL_EXTERNAL,
+        } and not str(item.source_authority or "").strip().lower().startswith(
+            _AUTHORIZED_EXTERNAL_CANDIDATE_SOURCE_PREFIX
+        ):
+            guarded.append(
+                S04CandidateSignal(
+                    channel_id=item.channel_id,
+                    candidate_class=S04CandidateClass.TRANSIENT_CONTEXT_BOUND,
+                    regulatory_support_hint=min(item.regulatory_support_hint, 0.2),
+                    continuity_support_hint=min(item.continuity_support_hint, 0.24),
+                    boundary_support_hint=min(item.boundary_support_hint, 0.22),
+                    ownership_support_hint=min(item.ownership_support_hint, 0.22),
+                    coupling_support_hint=min(item.coupling_support_hint, 0.2),
+                    temporal_validity_hint=min(item.temporal_validity_hint, 0.45),
+                    contamination_hint=max(item.contamination_hint, 0.3),
+                    source_authority=item.source_authority,
+                    provenance=f"{item.provenance}|s04.external_candidate_authority_downgraded",
+                )
+            )
+            continue
+        guarded.append(item)
+    return tuple(guarded)
 
 
 def _merge_candidate_signals(

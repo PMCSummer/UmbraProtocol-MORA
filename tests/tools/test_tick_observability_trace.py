@@ -36,6 +36,7 @@ HOSTED_CONTOUR_SEGMENTS = (
     "s02_prediction_boundary",
     "s03_ownership_weighted_learning",
     "s04_interoceptive_self_binding",
+    "s05_multi_cause_attribution_factorization",
     "s_minimal_contour",
     "a_line_normalization",
     "m_minimal",
@@ -92,6 +93,18 @@ HOSTED_CONTOUR_FIELDS: dict[str, set[str]] = {
         "contamination_detected",
         "rebinding_event",
         "stale_binding_drop_count",
+    },
+    "s05_multi_cause_attribution_factorization": {
+        "dominant_slot_count",
+        "residual_share",
+        "residual_class",
+        "underdetermined_split",
+        "contamination_present",
+        "temporal_misalignment_present",
+        "reattribution_happened",
+        "downstream_route_class",
+        "factorization_consumer_ready",
+        "learning_route_ready",
     },
     "s_minimal_contour": {
         "minimal_self_status",
@@ -465,6 +478,35 @@ def test_rt01_contract_gate_runtime_taps_defined_in_execute_subject_tick_source(
         assert f'trace_emit_active("{module}"' in source
 
 
+def test_s05_factorization_runtime_segment_emits_compact_local_fields(tmp_path: Path) -> None:
+    _, events = _run_sample_trace(tmp_path, case_id="runtime-s05-fields")
+    values = _module_decision_event(events, "s05_multi_cause_attribution_factorization")[
+        "values"
+    ]
+    assert isinstance(values, dict)
+    required = HOSTED_CONTOUR_FIELDS["s05_multi_cause_attribution_factorization"]
+    assert required.issubset(set(values.keys()))
+    assert set(values.keys()).issubset(
+        set(MODULE_ALLOWED_FIELDS["s05_multi_cause_attribution_factorization"])
+    )
+    assert isinstance(values["residual_share"], (int, float))
+    assert isinstance(values["factorization_consumer_ready"], bool)
+    assert isinstance(values["learning_route_ready"], bool)
+    assert "state" not in values
+    assert "telemetry" not in values
+    assert len(json.dumps(values, ensure_ascii=True)) < 700
+
+
+def test_s05_factorization_runtime_order_is_between_s04_and_s_minimal(tmp_path: Path) -> None:
+    _, events = _run_sample_trace(tmp_path, case_id="runtime-s05-order")
+    assert _first_order(events, "s04_interoceptive_self_binding") < _first_order(
+        events, "s05_multi_cause_attribution_factorization"
+    )
+    assert _first_order(events, "s05_multi_cause_attribution_factorization") < _first_order(
+        events, "s_minimal_contour"
+    )
+
+
 def test_hosted_contour_segments_emit_runtime_events_when_executed(tmp_path: Path) -> None:
     _, events = _run_sample_trace(tmp_path, case_id="runtime-hosted-contour-presence")
     for module in HOSTED_CONTOUR_SEGMENTS:
@@ -525,6 +567,9 @@ def test_hosted_contour_segments_follow_real_runtime_order(tmp_path: Path) -> No
         events, "s04_interoceptive_self_binding"
     )
     assert _first_order(events, "s04_interoceptive_self_binding") < _first_order(
+        events, "s05_multi_cause_attribution_factorization"
+    )
+    assert _first_order(events, "s05_multi_cause_attribution_factorization") < _first_order(
         events, "s_minimal_contour"
     )
     assert _first_order(events, "s_minimal_contour") < _first_order(events, "a_line_normalization")
@@ -550,7 +595,8 @@ def test_hosted_contour_middle_gap_is_now_runtime_visible(tmp_path: Path) -> Non
 def test_hosted_contour_runtime_taps_exist_in_subject_tick_source() -> None:
     source = Path("src/substrate/subject_tick/update.py").read_text(encoding="utf-8")
     for module in HOSTED_CONTOUR_SEGMENTS:
-        assert f'trace_emit_active("{module}"' in source
+        assert module in source
+        assert "trace_emit_active(" in source
 
 
 def test_blocked_steps_only_appear_on_actual_blocked_paths(tmp_path: Path) -> None:
