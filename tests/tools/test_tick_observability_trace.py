@@ -37,6 +37,7 @@ HOSTED_CONTOUR_SEGMENTS = (
     "s03_ownership_weighted_learning",
     "s04_interoceptive_self_binding",
     "s05_multi_cause_attribution_factorization",
+    "o01_other_entity_model",
     "s_minimal_contour",
     "a_line_normalization",
     "m_minimal",
@@ -105,6 +106,18 @@ HOSTED_CONTOUR_FIELDS: dict[str, set[str]] = {
         "downstream_route_class",
         "factorization_consumer_ready",
         "learning_route_ready",
+    },
+    "o01_other_entity_model": {
+        "entity_count",
+        "current_user_model_ready",
+        "third_party_models_active",
+        "stable_claim_count",
+        "temporary_hypothesis_count",
+        "contradiction_count",
+        "knowledge_boundary_known_count",
+        "projection_guard_triggered",
+        "no_safe_state_claim",
+        "downstream_consumer_ready",
     },
     "s_minimal_contour": {
         "minimal_self_status",
@@ -572,6 +585,10 @@ def test_hosted_contour_segments_follow_real_runtime_order(tmp_path: Path) -> No
     assert _first_order(events, "s05_multi_cause_attribution_factorization") < _first_order(
         events, "s_minimal_contour"
     )
+    assert _first_order(events, "t04_attention_schema") < _first_order(events, "o01_other_entity_model")
+    assert _first_order(events, "o01_other_entity_model") < _first_order(
+        events, "bounded_outcome_resolution"
+    )
     assert _first_order(events, "s_minimal_contour") < _first_order(events, "a_line_normalization")
     assert _first_order(events, "a_line_normalization") < _first_order(events, "m_minimal")
     assert _first_order(events, "m_minimal") < _first_order(events, "n_minimal")
@@ -629,6 +646,7 @@ def test_representative_modules_have_runtime_steps(tmp_path: Path) -> None:
         "t01_semantic_field",
         "t02_relation_binding",
         "t03_hypothesis_competition",
+        "o01_other_entity_model",
         "downstream_obedience",
         "subject_tick",
     ):

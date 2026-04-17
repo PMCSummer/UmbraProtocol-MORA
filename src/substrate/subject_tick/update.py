@@ -164,6 +164,10 @@ from substrate.s05_multi_cause_attribution_factorization import (
     build_s05_multi_cause_attribution_factorization,
     derive_s05_multi_cause_attribution_consumer_view,
 )
+from substrate.o01_other_entity_model import (
+    build_o01_other_entity_model,
+    derive_o01_other_entity_model_consumer_view,
+)
 from substrate.s01_efference_copy import (
     S01EfferenceCopyState,
     build_s01_efference_copy,
@@ -195,6 +199,7 @@ ATTEMPTED_SUBJECT_TICK_PATHS: tuple[str, ...] = (
     "subject_tick.evaluate_t02_relation_binding",
     "subject_tick.evaluate_t03_hypothesis_competition",
     "subject_tick.evaluate_t04_attention_schema",
+    "subject_tick.evaluate_o01_other_entity_model",
     "subject_tick.world_seam_enforcement",
     "subject_tick.resolve_bounded_runtime_outcome",
     "subject_tick.downstream_gate",
@@ -2842,6 +2847,102 @@ def execute_subject_tick(
         )
     )
 
+    o01_result = build_o01_other_entity_model(
+        tick_id=tick_id,
+        tick_index=tick_index,
+        signals=context.o01_entity_signals,
+        prior_state=context.prior_o01_state,
+        source_lineage=lineage,
+        model_enabled=not context.disable_o01_enforcement,
+    )
+    o01_view = derive_o01_other_entity_model_consumer_view(o01_result)
+    o01_enter_values = {
+        "entity_count": o01_result.telemetry.entity_count,
+        "current_user_model_ready": o01_result.telemetry.current_user_model_ready,
+        "third_party_models_active": o01_result.telemetry.third_party_models_active,
+        "stable_claim_count": o01_result.telemetry.stable_claim_count,
+        "temporary_hypothesis_count": o01_result.telemetry.temporary_hypothesis_count,
+        "contradiction_count": o01_result.telemetry.contradiction_count,
+        "knowledge_boundary_known_count": o01_result.telemetry.knowledge_boundary_known_count,
+        "projection_guard_triggered": o01_result.telemetry.projection_guard_triggered,
+        "no_safe_state_claim": o01_result.telemetry.no_safe_state_claim,
+        "downstream_consumer_ready": o01_result.telemetry.downstream_consumer_ready,
+    }
+    trace_emit_active("o01_other_entity_model", "enter", o01_enter_values)
+    o01_checkpoint_status = SubjectTickCheckpointStatus.ALLOWED
+    o01_checkpoint_reason = o01_result.gate.reason
+    if not context.disable_o01_enforcement:
+        if (
+            context.require_o01_entity_individuation_consumer
+            and not o01_view.can_consume_current_user_model
+            and halt_reason is None
+            and not revalidation_needed
+        ):
+            repair_needed = True
+            o01_checkpoint_status = SubjectTickCheckpointStatus.ENFORCED_DETOUR
+            o01_checkpoint_reason = (
+                "o01 entity-individuation consumer requested but current-user model remains underconstrained"
+            )
+            if active_execution_mode not in {"halt_execution", "revalidate_scope"}:
+                active_execution_mode = "repair_runtime_path"
+        if (
+            context.require_o01_clarification_ready_consumer
+            and o01_view.clarification_required
+            and halt_reason is None
+        ):
+            revalidation_needed = True
+            o01_checkpoint_status = SubjectTickCheckpointStatus.ENFORCED_DETOUR
+            o01_checkpoint_reason = (
+                "o01 clarification-ready consumer requested but perspective remains ambiguous/competing"
+            )
+            if active_execution_mode != "halt_execution":
+                active_execution_mode = "revalidate_scope"
+    else:
+        o01_checkpoint_status = SubjectTickCheckpointStatus.ENFORCED_DETOUR
+        o01_checkpoint_reason = "o01 other-entity model enforcement disabled in ablation context"
+    o01_required_actions: list[str] = []
+    if context.require_o01_entity_individuation_consumer:
+        o01_required_actions.append("require_o01_entity_individuation_consumer")
+    if context.require_o01_clarification_ready_consumer:
+        o01_required_actions.append("require_o01_clarification_ready_consumer")
+    if o01_result.state.projection_guard_triggered:
+        o01_required_actions.append("o01_projection_guard_triggered")
+    if o01_result.state.competing_entity_models:
+        o01_required_actions.append("o01_competing_entity_models")
+    if not o01_required_actions:
+        o01_required_actions.append("o01_optional")
+    o01_trace_values = {
+        "entity_count": o01_result.telemetry.entity_count,
+        "current_user_model_ready": o01_result.telemetry.current_user_model_ready,
+        "third_party_models_active": o01_result.telemetry.third_party_models_active,
+        "stable_claim_count": o01_result.telemetry.stable_claim_count,
+        "temporary_hypothesis_count": o01_result.telemetry.temporary_hypothesis_count,
+        "contradiction_count": o01_result.telemetry.contradiction_count,
+        "knowledge_boundary_known_count": o01_result.telemetry.knowledge_boundary_known_count,
+        "projection_guard_triggered": o01_result.telemetry.projection_guard_triggered,
+        "no_safe_state_claim": o01_result.telemetry.no_safe_state_claim,
+        "downstream_consumer_ready": o01_result.telemetry.downstream_consumer_ready,
+    }
+    trace_emit_active("o01_other_entity_model", "decision", o01_trace_values)
+    if o01_checkpoint_status != SubjectTickCheckpointStatus.ALLOWED:
+        trace_emit_active(
+            "o01_other_entity_model",
+            "blocked",
+            o01_trace_values,
+            note=o01_checkpoint_reason,
+        )
+    trace_emit_active("o01_other_entity_model", "exit", o01_trace_values)
+    checkpoints.append(
+        SubjectTickCheckpointResult(
+            checkpoint_id="rt01.o01_other_entity_model_checkpoint",
+            source_contract="o01_other_entity_model.entities",
+            status=o01_checkpoint_status,
+            required_action=";".join(dict.fromkeys(o01_required_actions)),
+            applied_action=active_execution_mode,
+            reason=o01_checkpoint_reason,
+        )
+    )
+
     if halt_reason is not None:
         final_outcome = SubjectTickOutcome.HALT
         execution_stance = SubjectTickExecutionStance.HALT_PATH
@@ -3503,7 +3604,7 @@ def execute_subject_tick(
         attempted_paths=ATTEMPTED_SUBJECT_TICK_PATHS,
         downstream_gate=gate,
         causal_basis=(
-            "bounded runtime execution spine enforces roadmap authority roles for C04/C05, consumes world-entry, s01 efference-copy, s02 prediction-boundary seam, s03 ownership-weighted learning, s04 interoceptive self-binding, s-minimal, a-line, m-minimal, n-minimal, t01 semantic-field, t02 relation-binding, t03 hypothesis-competition, and t04 attention-schema gates, and keeps D01 observability-only over fixed R->C order"
+            "bounded runtime execution spine enforces roadmap authority roles for C04/C05, consumes world-entry, s01 efference-copy, s02 prediction-boundary seam, s03 ownership-weighted learning, s04 interoceptive self-binding, s05 multi-cause attribution, s-minimal, a-line, m-minimal, n-minimal, t01 semantic-field, t02 relation-binding, t03 hypothesis-competition, t04 attention-schema, and o01 other-entity model gates, and keeps D01 observability-only over fixed R->C order"
         ),
     )
     abstain = final_outcome in {SubjectTickOutcome.REPAIR, SubjectTickOutcome.REVALIDATE}
@@ -3591,6 +3692,7 @@ def execute_subject_tick(
         s03_result=s03_result,
         s04_result=s04_result,
         s05_result=s05_result,
+        o01_result=o01_result,
         t01_result=t01_result,
         t02_result=t02_result,
         t03_result=t03_result,

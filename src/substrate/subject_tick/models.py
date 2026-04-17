@@ -7,6 +7,11 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from substrate.epistemics import EpistemicResult, EpistemicUnit
+    from substrate.o01_other_entity_model import (
+        O01EntitySignal,
+        O01OtherEntityModelResult,
+        O01OtherEntityModelState,
+    )
     from substrate.s03_ownership_weighted_learning import (
         S03OwnershipWeightedLearningResult,
         S03OwnershipWeightedLearningState,
@@ -173,6 +178,16 @@ class SubjectTickRestrictionCode(StrEnum):
         "s05_low_residual_learning_route_required"
     )
     S05_SINGLE_CAUSE_COLLAPSE_FORBIDDEN = "s05_single_cause_collapse_forbidden"
+    O01_OTHER_ENTITY_MODEL_CONTRACT_MUST_BE_READ = (
+        "o01_other_entity_model_contract_must_be_read"
+    )
+    O01_ENTITY_INDIVIDUATION_CONSUMER_REQUIRED = (
+        "o01_entity_individuation_consumer_required"
+    )
+    O01_CLARIFICATION_READY_CONSUMER_REQUIRED = (
+        "o01_clarification_ready_consumer_required"
+    )
+    O01_PROJECTION_GUARD_REQUIRED = "o01_projection_guard_required"
     DOWNSTREAM_AUTHORITY_DEGRADED = "downstream_authority_degraded"
 
 
@@ -241,6 +256,7 @@ class SubjectTickContext:
     prior_s03_state: S03OwnershipWeightedLearningState | None = None
     prior_s04_state: S04InteroceptiveSelfBindingState | None = None
     prior_s05_state: S05MultiCauseAttributionState | None = None
+    prior_o01_state: O01OtherEntityModelState | None = None
     dependency_trigger_hits: tuple[str, ...] = ()
     context_shift_markers: tuple[str, ...] = ()
     contradicted_source_refs: tuple[str, ...] = ()
@@ -315,6 +331,10 @@ class SubjectTickContext:
     require_s05_factorized_consumer: bool = False
     require_s05_low_residual_learning_route: bool = False
     disable_s05_enforcement: bool = False
+    require_o01_entity_individuation_consumer: bool = False
+    require_o01_clarification_ready_consumer: bool = False
+    disable_o01_enforcement: bool = False
+    o01_entity_signals: tuple[O01EntitySignal, ...] = ()
     source_lineage: tuple[str, ...] = ()
 
 
@@ -1077,6 +1097,7 @@ class SubjectTickResult:
     s03_result: S03OwnershipWeightedLearningResult
     s04_result: S04InteroceptiveSelfBindingResult
     s05_result: S05MultiCauseAttributionResult
+    o01_result: O01OtherEntityModelResult
     t01_result: T01ActiveFieldResult
     t02_result: T02ConstrainedSceneResult
     t03_result: T03CompetitionResult

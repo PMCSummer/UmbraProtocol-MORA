@@ -137,6 +137,18 @@ MODULE_ALLOWED_FIELDS: dict[str, tuple[str, ...]] = {
         "factorization_consumer_ready",
         "learning_route_ready",
     ),
+    "o01_other_entity_model": (
+        "entity_count",
+        "current_user_model_ready",
+        "third_party_models_active",
+        "stable_claim_count",
+        "temporary_hypothesis_count",
+        "contradiction_count",
+        "knowledge_boundary_known_count",
+        "projection_guard_triggered",
+        "no_safe_state_claim",
+        "downstream_consumer_ready",
+    ),
     "s_minimal_contour": (
         "minimal_self_status",
         "minimal_self_ready",

@@ -23,6 +23,7 @@ from substrate.runtime_topology import (
     require_lawful_production_dispatch,
     runtime_dispatch_snapshot,
 )
+from substrate.o01_other_entity_model import O01EntitySignal
 from substrate.s05_multi_cause_attribution_factorization import (
     S05CauseClass,
     S05DownstreamRouteClass,
@@ -165,6 +166,7 @@ def test_runtime_topology_bundle_and_graph_are_materialized() -> None:
         "T02",
         "T03",
         "T04",
+        "O01",
         "RT01",
     )
     assert "rt01.epistemic_admission_checkpoint" in graph.mandatory_checkpoint_ids
@@ -185,6 +187,7 @@ def test_runtime_topology_bundle_and_graph_are_materialized() -> None:
     assert "rt01.t02_raw_vs_propagated_integrity_checkpoint" in graph.mandatory_checkpoint_ids
     assert "rt01.t03_hypothesis_competition_checkpoint" in graph.mandatory_checkpoint_ids
     assert "rt01.t04_attention_schema_checkpoint" in graph.mandatory_checkpoint_ids
+    assert "rt01.o01_other_entity_model_checkpoint" in graph.mandatory_checkpoint_ids
     assert "epistemics.grounded_unit" in graph.source_of_truth_surfaces
     assert "epistemics.downstream_allowance" in graph.source_of_truth_surfaces
     assert "world_adapter.state" in graph.source_of_truth_surfaces
@@ -234,6 +237,8 @@ def test_runtime_topology_bundle_and_graph_are_materialized() -> None:
     assert "t03_hypothesis_competition.publication_frontier" in graph.source_of_truth_surfaces
     assert "t04_attention_schema.focus_ownership" in graph.source_of_truth_surfaces
     assert "t04_attention_schema.focus_targets" in graph.source_of_truth_surfaces
+    assert "o01_other_entity_model.entities" in graph.source_of_truth_surfaces
+    assert "o01_other_entity_model.entity_individuation" in graph.source_of_truth_surfaces
 
 
 def test_dispatch_happy_path_runs_lawful_production_contour() -> None:
@@ -1159,6 +1164,90 @@ def test_dispatch_contract_view_exposes_t04_attention_schema_surface() -> None:
         is False
     )
     assert snapshot["subject_tick_state"]["t04_scope_repo_wide_adoption"] is False
+
+
+def test_dispatch_o01_entity_individuation_requirement_is_load_bearing() -> None:
+    baseline = dispatch_runtime_tick(
+        RuntimeDispatchRequest(
+            tick_input=_tick_input("runtime-topology-o01-entity-baseline"),
+            route_class=RuntimeRouteClass.PRODUCTION_CONTOUR,
+        )
+    )
+    required = dispatch_runtime_tick(
+        RuntimeDispatchRequest(
+            tick_input=_tick_input("runtime-topology-o01-entity-required"),
+            context=SubjectTickContext(require_o01_entity_individuation_consumer=True),
+            route_class=RuntimeRouteClass.PRODUCTION_CONTOUR,
+        )
+    )
+    assert baseline.subject_tick_result is not None
+    assert required.subject_tick_result is not None
+    baseline_checkpoint = next(
+        checkpoint
+        for checkpoint in baseline.subject_tick_result.state.execution_checkpoints
+        if checkpoint.checkpoint_id == "rt01.o01_other_entity_model_checkpoint"
+    )
+    required_checkpoint = next(
+        checkpoint
+        for checkpoint in required.subject_tick_result.state.execution_checkpoints
+        if checkpoint.checkpoint_id == "rt01.o01_other_entity_model_checkpoint"
+    )
+    assert baseline_checkpoint.status.value == "allowed"
+    assert required_checkpoint.status.value == "enforced_detour"
+    assert required.subject_tick_result.state.final_execution_outcome in {
+        SubjectTickOutcome.REPAIR,
+        SubjectTickOutcome.REVALIDATE,
+        SubjectTickOutcome.HALT,
+    }
+
+
+def test_dispatch_o01_clarification_requirement_is_load_bearing() -> None:
+    ambiguous_signals = (
+        O01EntitySignal(
+            signal_id="topology-o01-competing-1",
+            entity_id_hint="referenced_other:manager_v1",
+            referent_label="manager",
+            source_authority="referenced_other",
+            relation_class="goal_hint",
+            claim_value="needs_report",
+            confidence=0.82,
+            grounded=True,
+            quoted=False,
+            turn_index=1,
+            provenance="tests.runtime_topology.o01.competing.1",
+        ),
+        O01EntitySignal(
+            signal_id="topology-o01-competing-2",
+            entity_id_hint="referenced_other:manager_v2",
+            referent_label="manager",
+            source_authority="referenced_other",
+            relation_class="goal_hint",
+            claim_value="needs_report",
+            confidence=0.78,
+            grounded=True,
+            quoted=False,
+            turn_index=2,
+            provenance="tests.runtime_topology.o01.competing.2",
+        ),
+    )
+    result = dispatch_runtime_tick(
+        RuntimeDispatchRequest(
+            tick_input=_tick_input("runtime-topology-o01-clarification-required"),
+            context=SubjectTickContext(
+                require_o01_clarification_ready_consumer=True,
+                o01_entity_signals=ambiguous_signals,
+            ),
+            route_class=RuntimeRouteClass.PRODUCTION_CONTOUR,
+        )
+    )
+    assert result.subject_tick_result is not None
+    checkpoint = next(
+        checkpoint
+        for checkpoint in result.subject_tick_result.state.execution_checkpoints
+        if checkpoint.checkpoint_id == "rt01.o01_other_entity_model_checkpoint"
+    )
+    assert checkpoint.status.value == "enforced_detour"
+    assert "require_o01_clarification_ready_consumer" in checkpoint.required_action
 
 
 def test_dispatch_s01_comparison_consumer_requirement_is_load_bearing() -> None:
