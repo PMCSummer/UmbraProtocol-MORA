@@ -10,6 +10,7 @@ from substrate.s05_multi_cause_attribution_factorization import (
     S05DownstreamRouteClass,
     S05EligibilityStatus,
     S05ResidualClass,
+    S05RevisionStatus,
     derive_s05_multi_cause_attribution_consumer_view,
     require_s05_factorized_consumer_ready,
     require_s05_learning_route_consumer_ready,
@@ -240,6 +241,50 @@ def test_regression_packet_history_preserves_prior_factorization_versions() -> N
     assert len(second.state.packets) >= 2
     assert second.state.packets[-1].outcome_packet_id != second.state.packets[0].outcome_packet_id
     assert second.state.reattribution_happened in {True, False}
+
+
+def test_multi_step_late_evidence_reattribution_is_bounded_and_provenance_preserving() -> None:
+    state = None
+    residuals: list[float] = []
+    revisions: list[S05RevisionStatus] = []
+    packet_ids: list[str] = []
+
+    for index in range(1, 11):
+        result = build_s05_harness_case(
+            S05HarnessConfig(
+                case_id="s05-late-evidence-stress",
+                tick_index=index,
+                deliberate_internal_act=(index % 2 == 0),
+                endogenous_mode_shift=(index % 3 == 0),
+                interoceptive_support=0.72 if index % 2 == 0 else 0.46,
+                world_perturbation=(index % 4 in {1, 2}),
+                observation_noise=0.2 if index % 2 == 0 else 0.52,
+                c05_revalidation_required=(index % 3 == 0),
+                context_shift_detected=(index % 5 == 0),
+                late_evidence_tokens=(f"late:evidence:{index}",) if index > 1 else (),
+            ),
+            prior_state=state,
+        )
+        state = result.state
+        packet = result.state.packets[-1]
+        residuals.append(result.state.unexplained_residual)
+        revisions.append(packet.revision_status)
+        packet_ids.append(packet.outcome_packet_id)
+
+    assert state is not None
+    # History is bounded but preserved as a packet ledger window.
+    assert len(state.packets) == 8
+    assert len(set(item.outcome_packet_id for item in state.packets)) == len(state.packets)
+    assert all(packet.provenance.startswith("s05.multi_cause_attribution.") for packet in state.packets)
+    assert any(status is S05RevisionStatus.REVISED_WITH_LATE_EVIDENCE for status in revisions[1:])
+
+    # Bounded re-attribution should revise, but not flap chaotically between revisions.
+    deltas = [abs(curr - prev) for prev, curr in zip(residuals, residuals[1:])]
+    assert max(deltas) <= 0.38
+    assert abs(residuals[-1] - residuals[-2]) <= 0.35
+
+    # No silent rewrite: latest packets remain distinct runtime packets, not overwritten ids.
+    assert len(set(packet_ids[-8:])) == len(state.packets)
 
 
 def test_temporal_alignment_changes_slot_eligibility_for_same_support_pattern() -> None:

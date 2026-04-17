@@ -1,5 +1,13 @@
 from __future__ import annotations
 
+from dataclasses import replace
+
+import pytest
+
+from substrate.s05_multi_cause_attribution_factorization import (
+    S05CauseClass,
+    S05DownstreamRouteClass,
+)
 from substrate.subject_tick import (
     SubjectTickContext,
     SubjectTickOutcome,
@@ -16,6 +24,50 @@ def _result(case_id: str, *, context: SubjectTickContext | None = None, unresolv
         safety=34.0 if unresolved else 74.0,
         unresolved_preference=unresolved,
         context=context,
+    )
+
+
+def _force_s05_shape(
+    result,
+    *,
+    route_class: S05DownstreamRouteClass,
+    dominant: tuple[S05CauseClass, ...],
+    residual: float,
+    factorization_ready: bool,
+    learning_ready: bool,
+    no_binary_recollapse_required: bool,
+):
+    latest = result.state.packets[-1]
+    latest = replace(
+        latest,
+        downstream_route_class=route_class,
+        unexplained_residual=residual,
+    )
+    state = replace(
+        result.state,
+        packets=(*result.state.packets[:-1], latest),
+        dominant_cause_classes=dominant,
+        unexplained_residual=residual,
+    )
+    gate = replace(
+        result.gate,
+        factorization_consumer_ready=factorization_ready,
+        learning_route_ready=learning_ready,
+        no_binary_recollapse_required=no_binary_recollapse_required,
+    )
+    telemetry = replace(
+        result.telemetry,
+        downstream_route_class=route_class,
+        dominant_slot_count=len(dominant),
+        residual_share=residual,
+        factorization_consumer_ready=factorization_ready,
+        learning_route_ready=learning_ready,
+    )
+    return replace(
+        result,
+        state=state,
+        gate=gate,
+        telemetry=telemetry,
     )
 
 
@@ -43,21 +95,51 @@ def test_subject_tick_carries_typed_s05_result_for_downstream_consumers() -> Non
     assert isinstance(result.s05_result.gate.restrictions, tuple)
 
 
-def test_subject_tick_s05_low_residual_route_requirement_is_load_bearing() -> None:
+def test_subject_tick_s05_low_residual_route_requirement_is_load_bearing(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import substrate.subject_tick.update as subject_tick_update
+
+    original = subject_tick_update.build_s05_multi_cause_attribution_factorization
+
+    def _patched_builder(*, tick_id: str, **kwargs):
+        result = original(tick_id=tick_id, **kwargs)
+        if "rt-s05-low-residual-required" in tick_id:
+            return _force_s05_shape(
+                result,
+                route_class=S05DownstreamRouteClass.HIGH_RESIDUAL_UNDERDETERMINED,
+                dominant=(S05CauseClass.UNEXPLAINED_RESIDUAL,),
+                residual=0.62,
+                factorization_ready=True,
+                learning_ready=False,
+                no_binary_recollapse_required=True,
+            )
+        if "rt-s05-low-residual-baseline" in tick_id:
+            return _force_s05_shape(
+                result,
+                route_class=S05DownstreamRouteClass.WORLD_HEAVY,
+                dominant=(S05CauseClass.EXTERNAL_OR_WORLD_CONTRIBUTION,),
+                residual=0.34,
+                factorization_ready=True,
+                learning_ready=True,
+                no_binary_recollapse_required=False,
+            )
+        return result
+
+    monkeypatch.setattr(
+        subject_tick_update,
+        "build_s05_multi_cause_attribution_factorization",
+        _patched_builder,
+    )
     baseline = _result(
         "rt-s05-low-residual-baseline",
-        unresolved=True,
-        context=SubjectTickContext(
-            context_shift_markers=("shift:s05",),
-            dependency_trigger_hits=("trigger:mode_shift",),
-        ),
+        unresolved=False,
+        context=SubjectTickContext(),
     )
     required = _result(
         "rt-s05-low-residual-required",
-        unresolved=True,
+        unresolved=False,
         context=SubjectTickContext(
-            context_shift_markers=("shift:s05",),
-            dependency_trigger_hits=("trigger:mode_shift",),
             require_s05_low_residual_learning_route=True,
         ),
     )
@@ -72,16 +154,153 @@ def test_subject_tick_s05_low_residual_route_requirement_is_load_bearing() -> No
         if checkpoint.checkpoint_id == "rt01.s05_multi_cause_attribution_checkpoint"
     )
     assert baseline_checkpoint.status.value == "allowed"
-    if not required.s05_result.gate.learning_route_ready:
-        assert required_checkpoint.status.value == "enforced_detour"
-        assert required.state.final_execution_outcome in {
-            SubjectTickOutcome.REVALIDATE,
-            SubjectTickOutcome.REPAIR,
-            SubjectTickOutcome.HALT,
-        }
+    assert required.s05_result.gate.learning_route_ready is False
+    assert required_checkpoint.status.value == "enforced_detour"
+    assert required.state.final_execution_outcome in {
+        SubjectTickOutcome.REVALIDATE,
+        SubjectTickOutcome.REPAIR,
+        SubjectTickOutcome.HALT,
+    }
 
 
-def test_subject_tick_s05_checkpoint_restrictions_are_downstream_visible() -> None:
+def test_subject_tick_s05_default_split_sensitive_contrast_with_matched_residual(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import substrate.subject_tick.update as subject_tick_update
+
+    original = subject_tick_update.build_s05_multi_cause_attribution_factorization
+
+    def _patched_builder(*, tick_id: str, **kwargs):
+        result = original(tick_id=tick_id, **kwargs)
+        if "rt-s05-shape-mixed" in tick_id:
+            return _force_s05_shape(
+                result,
+                route_class=S05DownstreamRouteClass.MIXED_FACTORIZED,
+                dominant=(
+                    S05CauseClass.SELF_INITIATED_ACT,
+                    S05CauseClass.EXTERNAL_OR_WORLD_CONTRIBUTION,
+                ),
+                residual=0.36,
+                factorization_ready=True,
+                learning_ready=True,
+                no_binary_recollapse_required=True,
+            )
+        if "rt-s05-shape-world" in tick_id:
+            return _force_s05_shape(
+                result,
+                route_class=S05DownstreamRouteClass.WORLD_HEAVY,
+                dominant=(S05CauseClass.EXTERNAL_OR_WORLD_CONTRIBUTION,),
+                residual=0.35,
+                factorization_ready=True,
+                learning_ready=True,
+                no_binary_recollapse_required=False,
+            )
+        return result
+
+    monkeypatch.setattr(
+        subject_tick_update,
+        "build_s05_multi_cause_attribution_factorization",
+        _patched_builder,
+    )
+    mixed = _result("rt-s05-shape-mixed", unresolved=False, context=SubjectTickContext())
+    world = _result("rt-s05-shape-world", unresolved=False, context=SubjectTickContext())
+    mixed_checkpoint = next(
+        checkpoint
+        for checkpoint in mixed.state.execution_checkpoints
+        if checkpoint.checkpoint_id == "rt01.s05_multi_cause_attribution_checkpoint"
+    )
+    world_checkpoint = next(
+        checkpoint
+        for checkpoint in world.state.execution_checkpoints
+        if checkpoint.checkpoint_id == "rt01.s05_multi_cause_attribution_checkpoint"
+    )
+    assert abs(mixed.s05_result.state.unexplained_residual - world.s05_result.state.unexplained_residual) <= 0.02
+    assert mixed.s05_result.state.packets[-1].downstream_route_class.value == "mixed_factorized"
+    assert world.s05_result.state.packets[-1].downstream_route_class.value == "world_heavy"
+    assert mixed_checkpoint.status.value == "enforced_detour"
+    assert "split_shape_mixed_internal_external" in mixed_checkpoint.required_action
+    assert mixed.state.final_execution_outcome == SubjectTickOutcome.REVALIDATE
+    assert world_checkpoint.status.value == "allowed"
+    assert "split_shape_world_or_artifact_heavy" in world_checkpoint.required_action
+    assert world.state.final_execution_outcome == SubjectTickOutcome.CONTINUE
+
+
+def test_subject_tick_s05_single_cause_collapse_restriction_is_shape_aware(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import substrate.subject_tick.update as subject_tick_update
+
+    original = subject_tick_update.build_s05_multi_cause_attribution_factorization
+
+    def _patched_builder(*, tick_id: str, **kwargs):
+        result = original(tick_id=tick_id, **kwargs)
+        if "rt-s05-collapse-mixed" in tick_id:
+            return _force_s05_shape(
+                result,
+                route_class=S05DownstreamRouteClass.MIXED_FACTORIZED,
+                dominant=(
+                    S05CauseClass.SELF_INITIATED_ACT,
+                    S05CauseClass.EXTERNAL_OR_WORLD_CONTRIBUTION,
+                ),
+                residual=0.34,
+                factorization_ready=True,
+                learning_ready=True,
+                no_binary_recollapse_required=True,
+            )
+        if "rt-s05-collapse-world" in tick_id:
+            return _force_s05_shape(
+                result,
+                route_class=S05DownstreamRouteClass.WORLD_HEAVY,
+                dominant=(S05CauseClass.EXTERNAL_OR_WORLD_CONTRIBUTION,),
+                residual=0.33,
+                factorization_ready=True,
+                learning_ready=True,
+                no_binary_recollapse_required=False,
+            )
+        return result
+
+    monkeypatch.setattr(
+        subject_tick_update,
+        "build_s05_multi_cause_attribution_factorization",
+        _patched_builder,
+    )
+    mixed = _result("rt-s05-collapse-mixed", unresolved=False)
+    world = _result("rt-s05-collapse-world", unresolved=False)
+    mixed_restrictions = set(mixed.downstream_gate.restrictions)
+    world_restrictions = set(world.downstream_gate.restrictions)
+    assert SubjectTickRestrictionCode.S05_SINGLE_CAUSE_COLLAPSE_FORBIDDEN in mixed_restrictions
+    assert SubjectTickRestrictionCode.S05_SINGLE_CAUSE_COLLAPSE_FORBIDDEN not in world_restrictions
+
+
+def test_subject_tick_s05_checkpoint_restrictions_are_downstream_visible(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import substrate.subject_tick.update as subject_tick_update
+
+    original = subject_tick_update.build_s05_multi_cause_attribution_factorization
+
+    def _patched_builder(*, tick_id: str, **kwargs):
+        result = original(tick_id=tick_id, **kwargs)
+        if "rt-s05-restrictions" in tick_id:
+            return _force_s05_shape(
+                result,
+                route_class=S05DownstreamRouteClass.MIXED_FACTORIZED,
+                dominant=(
+                    S05CauseClass.SELF_INITIATED_ACT,
+                    S05CauseClass.EXTERNAL_OR_WORLD_CONTRIBUTION,
+                ),
+                residual=0.34,
+                factorization_ready=True,
+                learning_ready=True,
+                no_binary_recollapse_required=True,
+            )
+        return result
+
+    monkeypatch.setattr(
+        subject_tick_update,
+        "build_s05_multi_cause_attribution_factorization",
+        _patched_builder,
+    )
     result = _result(
         "rt-s05-restrictions",
         context=SubjectTickContext(
@@ -111,4 +330,3 @@ def test_subject_tick_s05_disabled_enforcement_marks_checkpoint_detour() -> None
     )
     assert checkpoint.status.value == "enforced_detour"
     assert "disabled" in checkpoint.reason
-

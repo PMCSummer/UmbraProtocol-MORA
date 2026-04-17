@@ -159,6 +159,8 @@ from substrate.s04_interoceptive_self_binding import (
     derive_s04_interoceptive_self_binding_consumer_view,
 )
 from substrate.s05_multi_cause_attribution_factorization import (
+    S05CauseClass,
+    S05DownstreamRouteClass,
     build_s05_multi_cause_attribution_factorization,
     derive_s05_multi_cause_attribution_consumer_view,
 )
@@ -1906,6 +1908,32 @@ def execute_subject_tick(
         factorization_enabled=not context.disable_s05_enforcement,
     )
     s05_view = derive_s05_multi_cause_attribution_consumer_view(s05_result)
+    s05_dominant_causes = set(s05_result.state.dominant_cause_classes)
+    s05_internal_present = bool(
+        s05_dominant_causes
+        & {
+            S05CauseClass.SELF_INITIATED_ACT,
+            S05CauseClass.ENDOGENOUS_MODE_CONTRIBUTION,
+            S05CauseClass.INTEROCEPTIVE_OR_REGULATORY_DRIFT,
+        }
+    )
+    s05_external_present = bool(
+        s05_dominant_causes
+        & {
+            S05CauseClass.EXTERNAL_OR_WORLD_CONTRIBUTION,
+            S05CauseClass.OBSERVATION_OR_CHANNEL_ARTIFACT,
+        }
+    )
+    s05_shape_profile = _classify_s05_shape_profile(
+        downstream_route_class=s05_result.telemetry.downstream_route_class,
+        internal_present=s05_internal_present,
+        external_present=s05_external_present,
+    )
+    s05_shape_aware_collapse_forbidden = (
+        s05_view.do_not_collapse_to_single_cause
+        and s05_internal_present
+        and s05_external_present
+    )
     s05_enter_values = {
         "dominant_slot_count": s05_result.telemetry.dominant_slot_count,
         "residual_share": s05_result.telemetry.residual_share,
@@ -1924,6 +1952,19 @@ def execute_subject_tick(
     s05_checkpoint_status = SubjectTickCheckpointStatus.ALLOWED
     s05_checkpoint_reason = s05_result.gate.reason
     if not context.disable_s05_enforcement:
+        if (
+            s05_shape_profile == "mixed_internal_external"
+            and halt_reason is None
+            and not context.require_s05_factorized_consumer
+            and not context.require_s05_low_residual_learning_route
+        ):
+            revalidation_needed = True
+            s05_checkpoint_status = SubjectTickCheckpointStatus.ENFORCED_DETOUR
+            s05_checkpoint_reason = (
+                "s05 mixed internal/external split requires split-preserving revalidation before continuation"
+            )
+            if active_execution_mode != "halt_execution":
+                active_execution_mode = "revalidate_scope"
         if (
             context.require_s05_factorized_consumer
             and not s05_view.can_consume_factorization
@@ -1953,6 +1994,25 @@ def execute_subject_tick(
         s05_checkpoint_reason = (
             "s05 multi-cause attribution enforcement disabled in ablation context"
         )
+    s05_required_actions: list[str] = []
+    if context.require_s05_factorized_consumer and context.require_s05_low_residual_learning_route:
+        s05_required_actions.append(
+            "require_s05_factorized_consumer_and_low_residual_learning_route"
+        )
+    elif context.require_s05_factorized_consumer:
+        s05_required_actions.append("require_s05_factorized_consumer")
+    elif context.require_s05_low_residual_learning_route:
+        s05_required_actions.append("require_s05_low_residual_learning_route")
+    if s05_shape_profile == "mixed_internal_external":
+        s05_required_actions.append("split_shape_mixed_internal_external")
+    elif s05_shape_profile == "world_or_artifact_heavy":
+        s05_required_actions.append("split_shape_world_or_artifact_heavy")
+    elif s05_shape_profile == "internal_multi_cause":
+        s05_required_actions.append("split_shape_internal_multi_cause")
+    if s05_shape_aware_collapse_forbidden:
+        s05_required_actions.append("forbid_single_cause_collapse_shape_aware")
+    if not s05_required_actions:
+        s05_required_actions.append("s05_optional")
     s05_trace_values = {
         "dominant_slot_count": s05_result.telemetry.dominant_slot_count,
         "residual_share": s05_result.telemetry.residual_share,
@@ -1983,18 +2043,7 @@ def execute_subject_tick(
             checkpoint_id="rt01.s05_multi_cause_attribution_checkpoint",
             source_contract="s05_multi_cause_attribution_factorization.factorization_packet",
             status=s05_checkpoint_status,
-            required_action=(
-                "require_s05_factorized_consumer_and_low_residual_learning_route"
-                if (
-                    context.require_s05_factorized_consumer
-                    and context.require_s05_low_residual_learning_route
-                )
-                else "require_s05_factorized_consumer"
-                if context.require_s05_factorized_consumer
-                else "require_s05_low_residual_learning_route"
-                if context.require_s05_low_residual_learning_route
-                else "s05_optional"
-            ),
+            required_action=";".join(dict.fromkeys(s05_required_actions)),
             applied_action=active_execution_mode,
             reason=s05_checkpoint_reason,
         )
@@ -3971,6 +4020,34 @@ def _t03_nonconvergence_basis(
     if no_viable_leader:
         return "no_admissible_leader"
     return "nonconvergence_unspecified"
+
+
+def _classify_s05_shape_profile(
+    *,
+    downstream_route_class: S05DownstreamRouteClass,
+    internal_present: bool,
+    external_present: bool,
+) -> str:
+    if (
+        downstream_route_class is S05DownstreamRouteClass.MIXED_FACTORIZED
+        and internal_present
+        and external_present
+    ):
+        return "mixed_internal_external"
+    if downstream_route_class in {
+        S05DownstreamRouteClass.WORLD_HEAVY,
+        S05DownstreamRouteClass.OBSERVATION_ARTIFACT_HEAVY,
+    }:
+        return "world_or_artifact_heavy"
+    if downstream_route_class in {
+        S05DownstreamRouteClass.SELF_ACT_HEAVY,
+        S05DownstreamRouteClass.MODE_DRIFT_HEAVY,
+        S05DownstreamRouteClass.INTEROCEPTIVE_DRIFT_HEAVY,
+    }:
+        return "internal_multi_cause"
+    if downstream_route_class is S05DownstreamRouteClass.HIGH_RESIDUAL_UNDERDETERMINED:
+        return "high_residual_underdetermined"
+    return "other"
 
 
 def _phase_step(

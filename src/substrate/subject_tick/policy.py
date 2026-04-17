@@ -597,7 +597,10 @@ def evaluate_subject_tick_downstream_gate(
             restrictions.append(
                 SubjectTickRestrictionCode.S05_LOW_RESIDUAL_LEARNING_ROUTE_REQUIRED
             )
-        restrictions.append(SubjectTickRestrictionCode.S05_SINGLE_CAUSE_COLLAPSE_FORBIDDEN)
+        if "forbid_single_cause_collapse_shape_aware" in s05_checkpoint.required_action:
+            restrictions.append(
+                SubjectTickRestrictionCode.S05_SINGLE_CAUSE_COLLAPSE_FORBIDDEN
+            )
     if s05_checkpoint is not None and s05_checkpoint.status.value != "allowed":
         restrictions.append(SubjectTickRestrictionCode.DOWNSTREAM_AUTHORITY_DEGRADED)
         if state.final_execution_outcome == SubjectTickOutcome.CONTINUE:

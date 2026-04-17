@@ -23,6 +23,10 @@ from substrate.runtime_topology import (
     require_lawful_production_dispatch,
     runtime_dispatch_snapshot,
 )
+from substrate.s05_multi_cause_attribution_factorization import (
+    S05CauseClass,
+    S05DownstreamRouteClass,
+)
 from substrate.state import create_empty_state
 from substrate.subject_tick import (
     SubjectTickContext,
@@ -88,6 +92,50 @@ def _persist_domain_update(runtime_state, seed_result, domain_update, transition
     )
     assert result.accepted is True
     return result.state
+
+
+def _force_s05_shape(
+    result,
+    *,
+    route_class: S05DownstreamRouteClass,
+    dominant: tuple[S05CauseClass, ...],
+    residual: float,
+    factorization_ready: bool,
+    learning_ready: bool,
+    no_binary_recollapse_required: bool,
+):
+    latest = result.state.packets[-1]
+    latest = replace(
+        latest,
+        downstream_route_class=route_class,
+        unexplained_residual=residual,
+    )
+    state = replace(
+        result.state,
+        packets=(*result.state.packets[:-1], latest),
+        dominant_cause_classes=dominant,
+        unexplained_residual=residual,
+    )
+    gate = replace(
+        result.gate,
+        factorization_consumer_ready=factorization_ready,
+        learning_route_ready=learning_ready,
+        no_binary_recollapse_required=no_binary_recollapse_required,
+    )
+    telemetry = replace(
+        result.telemetry,
+        downstream_route_class=route_class,
+        dominant_slot_count=len(dominant),
+        residual_share=residual,
+        factorization_consumer_ready=factorization_ready,
+        learning_route_ready=learning_ready,
+    )
+    return replace(
+        result,
+        state=state,
+        gate=gate,
+        telemetry=telemetry,
+    )
 
 
 def test_runtime_topology_bundle_and_graph_are_materialized() -> None:
@@ -1836,14 +1884,46 @@ def test_dispatch_contract_view_exposes_s03_ownership_weighted_learning_surface(
     assert view.s03_require_freeze_obedience_consumer is True
 
 
-def test_dispatch_s05_factorized_consumer_requirement_is_load_bearing() -> None:
+def test_dispatch_s05_factorized_consumer_requirement_is_load_bearing(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import substrate.subject_tick.update as subject_tick_update
+
+    original = subject_tick_update.build_s05_multi_cause_attribution_factorization
+
+    def _patched_builder(*, tick_id: str, **kwargs):
+        result = original(tick_id=tick_id, **kwargs)
+        if "runtime-topology-s05-factorized-required" in tick_id:
+            return _force_s05_shape(
+                result,
+                route_class=S05DownstreamRouteClass.HIGH_RESIDUAL_UNDERDETERMINED,
+                dominant=(S05CauseClass.UNEXPLAINED_RESIDUAL,),
+                residual=0.64,
+                factorization_ready=False,
+                learning_ready=False,
+                no_binary_recollapse_required=True,
+            )
+        if "runtime-topology-s05-factorized-baseline" in tick_id:
+            return _force_s05_shape(
+                result,
+                route_class=S05DownstreamRouteClass.WORLD_HEAVY,
+                dominant=(S05CauseClass.EXTERNAL_OR_WORLD_CONTRIBUTION,),
+                residual=0.34,
+                factorization_ready=True,
+                learning_ready=True,
+                no_binary_recollapse_required=False,
+            )
+        return result
+
+    monkeypatch.setattr(
+        subject_tick_update,
+        "build_s05_multi_cause_attribution_factorization",
+        _patched_builder,
+    )
     baseline = dispatch_runtime_tick(
         RuntimeDispatchRequest(
             tick_input=_tick_input("runtime-topology-s05-factorized-baseline"),
-            context=SubjectTickContext(
-                context_shift_markers=("shift:s05",),
-                dependency_trigger_hits=("trigger:mode_shift",),
-            ),
+            context=SubjectTickContext(),
             route_class=RuntimeRouteClass.PRODUCTION_CONTOUR,
         )
     )
@@ -1871,32 +1951,62 @@ def test_dispatch_s05_factorized_consumer_requirement_is_load_bearing() -> None:
         if checkpoint.checkpoint_id == "rt01.s05_multi_cause_attribution_checkpoint"
     )
     assert baseline_checkpoint.status.value == "allowed"
-    if not required.subject_tick_result.s05_result.gate.factorization_consumer_ready:
-        assert required_checkpoint.status.value == "enforced_detour"
-        assert required.subject_tick_result.state.final_execution_outcome in {
-            SubjectTickOutcome.REVALIDATE,
-            SubjectTickOutcome.REPAIR,
-            SubjectTickOutcome.HALT,
-        }
+    assert required.subject_tick_result.s05_result.gate.factorization_consumer_ready is False
+    assert required_checkpoint.status.value == "enforced_detour"
+    assert required.subject_tick_result.state.final_execution_outcome in {
+        SubjectTickOutcome.REVALIDATE,
+        SubjectTickOutcome.REPAIR,
+        SubjectTickOutcome.HALT,
+    }
 
 
-def test_dispatch_s05_low_residual_learning_route_requirement_is_load_bearing() -> None:
+def test_dispatch_s05_low_residual_learning_route_requirement_is_load_bearing(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import substrate.subject_tick.update as subject_tick_update
+
+    original = subject_tick_update.build_s05_multi_cause_attribution_factorization
+
+    def _patched_builder(*, tick_id: str, **kwargs):
+        result = original(tick_id=tick_id, **kwargs)
+        if "runtime-topology-s05-learning-required" in tick_id:
+            return _force_s05_shape(
+                result,
+                route_class=S05DownstreamRouteClass.HIGH_RESIDUAL_UNDERDETERMINED,
+                dominant=(S05CauseClass.UNEXPLAINED_RESIDUAL,),
+                residual=0.63,
+                factorization_ready=True,
+                learning_ready=False,
+                no_binary_recollapse_required=True,
+            )
+        if "runtime-topology-s05-learning-baseline" in tick_id:
+            return _force_s05_shape(
+                result,
+                route_class=S05DownstreamRouteClass.WORLD_HEAVY,
+                dominant=(S05CauseClass.EXTERNAL_OR_WORLD_CONTRIBUTION,),
+                residual=0.34,
+                factorization_ready=True,
+                learning_ready=True,
+                no_binary_recollapse_required=False,
+            )
+        return result
+
+    monkeypatch.setattr(
+        subject_tick_update,
+        "build_s05_multi_cause_attribution_factorization",
+        _patched_builder,
+    )
     baseline = dispatch_runtime_tick(
         RuntimeDispatchRequest(
-            tick_input=_tick_input("runtime-topology-s05-learning-baseline", unresolved=True),
-            context=SubjectTickContext(
-                context_shift_markers=("shift:s05-learning",),
-                dependency_trigger_hits=("trigger:mode_shift",),
-            ),
+            tick_input=_tick_input("runtime-topology-s05-learning-baseline", unresolved=False),
+            context=SubjectTickContext(),
             route_class=RuntimeRouteClass.PRODUCTION_CONTOUR,
         )
     )
     required = dispatch_runtime_tick(
         RuntimeDispatchRequest(
-            tick_input=_tick_input("runtime-topology-s05-learning-required", unresolved=True),
+            tick_input=_tick_input("runtime-topology-s05-learning-required", unresolved=False),
             context=SubjectTickContext(
-                context_shift_markers=("shift:s05-learning",),
-                dependency_trigger_hits=("trigger:mode_shift",),
                 require_s05_low_residual_learning_route=True,
             ),
             route_class=RuntimeRouteClass.PRODUCTION_CONTOUR,
@@ -1915,10 +2025,10 @@ def test_dispatch_s05_low_residual_learning_route_requirement_is_load_bearing() 
         if checkpoint.checkpoint_id == "rt01.s05_multi_cause_attribution_checkpoint"
     )
     assert baseline_checkpoint.status.value == "allowed"
-    if not required.subject_tick_result.s05_result.gate.learning_route_ready:
-        assert required_checkpoint.status.value == "enforced_detour"
-        assert required.subject_tick_result.state.final_execution_outcome in {
-            SubjectTickOutcome.REVALIDATE,
-            SubjectTickOutcome.REPAIR,
-            SubjectTickOutcome.HALT,
-        }
+    assert required.subject_tick_result.s05_result.gate.learning_route_ready is False
+    assert required_checkpoint.status.value == "enforced_detour"
+    assert required.subject_tick_result.state.final_execution_outcome in {
+        SubjectTickOutcome.REVALIDATE,
+        SubjectTickOutcome.REPAIR,
+        SubjectTickOutcome.HALT,
+    }
