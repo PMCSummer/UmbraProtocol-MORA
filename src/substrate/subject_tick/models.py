@@ -779,6 +779,13 @@ class SubjectTickState:
     source_c05_state_ref: str
     source_lineage: tuple[str, ...]
     last_update_provenance: str
+    o02_interaction_mode: str = "conservative_mode_only"
+    o02_boundary_protection_status: str = "not_required"
+    o02_other_model_reliance_status: str = "underconstrained"
+    o02_no_safe_regulation_claim: bool = True
+    o02_s05_shape_modulation_applied: bool = False
+    o02_prior_mode_carry_applied: bool = False
+    o02_strong_disagreement_guard_applied: bool = False
 
 
 @dataclass(frozen=True, slots=True)

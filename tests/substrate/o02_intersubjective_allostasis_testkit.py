@@ -24,6 +24,7 @@ class O02HarnessCase:
     c05_revalidation_required: bool = False
     regulation_pressure_level: float = 0.42
     allostasis_enabled: bool = True
+    s05_config: S05HarnessConfig | None = None
 
 
 def _signal(
@@ -94,7 +95,8 @@ def build_o02_harness_case(
         model_enabled=True,
     )
     s05_result = build_s05_harness_case(
-        S05HarnessConfig(
+        case.s05_config
+        or S05HarnessConfig(
             case_id=f"o02-s05:{case.case_id}",
             tick_index=case.tick_index,
             deliberate_internal_act=True,

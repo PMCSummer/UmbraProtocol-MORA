@@ -17,6 +17,10 @@ from substrate.o02_intersubjective_allostasis.models import (
     O02Telemetry,
 )
 from substrate.s05_multi_cause_attribution_factorization import S05MultiCauseAttributionResult
+from substrate.s05_multi_cause_attribution_factorization.models import (
+    S05DownstreamRouteClass,
+    S05ResidualClass,
+)
 
 
 def build_o02_intersubjective_allostasis(
@@ -63,6 +67,15 @@ def build_o02_intersubjective_allostasis(
         + diagnostics.repetition_request_count
     )
     repair_pressure = _repair_band(repair_score)
+    s05_shape_modulation_applied = _s05_shape_modulation_applied(s05_result)
+    c04_idle_or_safe_mode = _c04_idle_or_safe_mode(c04_selected_mode)
+    strong_disagreement_guard_applied = bool(
+        diagnostics.strong_disagreement_risk
+        and (
+            diagnostics.impatience_or_compression_request
+            or repair_pressure in {O02RepairPressureBand.MEDIUM, O02RepairPressureBand.HIGH}
+        )
+    )
     predicted_other_load = _other_load_band(
         repair_score=repair_score,
         other_underconstrained=other_underconstrained,
@@ -74,7 +87,14 @@ def build_o02_intersubjective_allostasis(
         self_side_caution_required=diagnostics.self_side_caution_required,
     )
     self_other_constraint_conflict = bool(
-        diagnostics.self_side_caution_required and diagnostics.impatience_or_compression_request
+        (
+            diagnostics.self_side_caution_required
+            and diagnostics.impatience_or_compression_request
+        )
+        or (
+            strong_disagreement_guard_applied
+            and diagnostics.impatience_or_compression_request
+        )
     )
     interaction_mode = _select_interaction_mode(
         repair_pressure=repair_pressure,
@@ -83,6 +103,17 @@ def build_o02_intersubjective_allostasis(
         precision_request=diagnostics.precision_request,
         impatience_or_compression_request=diagnostics.impatience_or_compression_request,
         c05_revalidation_required=c05_revalidation_required,
+        c04_idle_or_safe_mode=c04_idle_or_safe_mode,
+        s05_shape_modulation_applied=s05_shape_modulation_applied,
+        strong_disagreement_guard_applied=strong_disagreement_guard_applied,
+    )
+    interaction_mode, prior_mode_carry_applied = _apply_prior_mode_carry(
+        prior_state=prior_state,
+        interaction_mode=interaction_mode,
+        repair_pressure=repair_pressure,
+        other_underconstrained=other_underconstrained,
+        c05_revalidation_required=c05_revalidation_required,
+        s05_shape_modulation_applied=s05_shape_modulation_applied,
     )
     detail_budget, pace_budget = _mode_budgets(interaction_mode)
     clarification_threshold = _clarification_threshold(interaction_mode, repair_pressure)
@@ -93,6 +124,8 @@ def build_o02_intersubjective_allostasis(
             other_underconstrained
             or c05_revalidation_required
             or diagnostics.self_side_caution_required
+            or strong_disagreement_guard_applied
+            or s05_shape_modulation_applied
         )
         else "bounded_directness"
     )
@@ -112,7 +145,7 @@ def build_o02_intersubjective_allostasis(
         O02BoundaryProtectionStatus.CONFLICTED
         if self_other_constraint_conflict
         else O02BoundaryProtectionStatus.PRESERVED
-        if diagnostics.self_side_caution_required
+        if diagnostics.self_side_caution_required or strong_disagreement_guard_applied
         else O02BoundaryProtectionStatus.NOT_REQUIRED
     )
     levers = _select_levers(
@@ -120,6 +153,7 @@ def build_o02_intersubjective_allostasis(
         repair_pressure=repair_pressure,
         diagnostics=diagnostics,
         self_other_constraint_conflict=self_other_constraint_conflict,
+        strong_disagreement_guard_applied=strong_disagreement_guard_applied,
         uncertainty_notice_policy=uncertainty_notice_policy,
     )
 
@@ -162,6 +196,9 @@ def build_o02_intersubjective_allostasis(
         no_safe_regulation_claim=no_safe_regulation_claim,
         other_load_underconstrained=other_underconstrained,
         self_other_constraint_conflict=self_other_constraint_conflict,
+        s05_shape_modulation_applied=s05_shape_modulation_applied,
+        prior_mode_carry_applied=prior_mode_carry_applied,
+        strong_disagreement_guard_applied=strong_disagreement_guard_applied,
         source_lineage=source_lineage_full,
         last_update_provenance="o02.intersubjective_allostasis.policy",
     )
@@ -191,9 +228,9 @@ def build_o02_intersubjective_allostasis(
     reason = (
         "o02 produced bounded intersubjective regulation posture from o01 quality, self-side caution and repair diagnostics"
     )
-    if prior_state is not None and _prior_repair_lineage_relevant(prior_state=prior_state, state=state):
+    if prior_state is not None and prior_mode_carry_applied:
         reason = (
-            f"{reason}; prior repair posture persisted under continued repair pressure"
+            f"{reason}; prior o02 posture carried in bounded mode under continued compatibility"
         )
     return O02IntersubjectiveAllostasisResult(
         state=state,
@@ -233,6 +270,9 @@ def _build_disabled_result(
         no_safe_regulation_claim=True,
         other_load_underconstrained=True,
         self_other_constraint_conflict=False,
+        s05_shape_modulation_applied=False,
+        prior_mode_carry_applied=False,
+        strong_disagreement_guard_applied=False,
         source_lineage=source_lineage,
         last_update_provenance="o02.intersubjective_allostasis.disabled",
     )
@@ -374,13 +414,22 @@ def _select_interaction_mode(
     precision_request: bool,
     impatience_or_compression_request: bool,
     c05_revalidation_required: bool,
+    c04_idle_or_safe_mode: bool,
+    s05_shape_modulation_applied: bool,
+    strong_disagreement_guard_applied: bool,
 ) -> O02InteractionMode:
     if self_other_constraint_conflict:
+        return O02InteractionMode.BOUNDARY_PROTECTIVE_MODE
+    if strong_disagreement_guard_applied and impatience_or_compression_request:
         return O02InteractionMode.BOUNDARY_PROTECTIVE_MODE
     if other_underconstrained:
         return O02InteractionMode.CONSERVATIVE_MODE_ONLY
     if repair_pressure is O02RepairPressureBand.HIGH:
         return O02InteractionMode.REPAIR_HEAVY
+    if s05_shape_modulation_applied and (
+        c04_idle_or_safe_mode or repair_pressure in {O02RepairPressureBand.MEDIUM, O02RepairPressureBand.HIGH}
+    ):
+        return O02InteractionMode.CONSERVATIVE_MODE_ONLY
     if precision_request and not impatience_or_compression_request:
         return O02InteractionMode.HIGH_PRECISION_MODE
     if impatience_or_compression_request:
@@ -439,6 +488,7 @@ def _select_levers(
     repair_pressure: O02RepairPressureBand,
     diagnostics: O02InteractionDiagnosticsInput,
     self_other_constraint_conflict: bool,
+    strong_disagreement_guard_applied: bool,
     uncertainty_notice_policy: str,
 ) -> tuple[O02RegulationLeverPreference, ...]:
     levers: list[O02RegulationLeverPreference] = []
@@ -461,20 +511,71 @@ def _select_levers(
     if uncertainty_notice_policy == "preserve_explicit_uncertainty":
         levers.append(O02RegulationLeverPreference.PRESERVE_EXPLICIT_UNCERTAINTY)
         levers.append(O02RegulationLeverPreference.POSTPONE_STRONG_COMMIT)
-    if self_other_constraint_conflict or diagnostics.self_side_caution_required:
+    if (
+        self_other_constraint_conflict
+        or diagnostics.self_side_caution_required
+        or strong_disagreement_guard_applied
+    ):
         levers.append(O02RegulationLeverPreference.PRESERVE_BOUNDARY)
     if repair_pressure is O02RepairPressureBand.LOW and mode is O02InteractionMode.LOW_FRICTION_MODE:
         levers.append(O02RegulationLeverPreference.KEEP_DIRECTNESS)
     return tuple(dict.fromkeys(levers))
 
 
-def _prior_repair_lineage_relevant(
-    *,
-    prior_state: O02IntersubjectiveAllostasisState,
-    state: O02IntersubjectiveAllostasisState,
-) -> bool:
-    return bool(
-        prior_state.interaction_mode is O02InteractionMode.REPAIR_HEAVY
-        and state.interaction_mode in {O02InteractionMode.REPAIR_HEAVY, O02InteractionMode.CONSERVATIVE_MODE_ONLY}
-        and state.repair_pressure in {O02RepairPressureBand.MEDIUM, O02RepairPressureBand.HIGH}
+def _s05_shape_modulation_applied(result: S05MultiCauseAttributionResult) -> bool:
+    route = result.telemetry.downstream_route_class
+    high_residual = bool(
+        result.state.residual_class is S05ResidualClass.HIGH
+        or result.state.unexplained_residual >= 0.45
     )
+    if route in {
+        S05DownstreamRouteClass.OBSERVATION_ARTIFACT_HEAVY,
+        S05DownstreamRouteClass.HIGH_RESIDUAL_UNDERDETERMINED,
+    }:
+        return True
+    if route is S05DownstreamRouteClass.WORLD_HEAVY:
+        return bool(high_residual and result.state.contamination_present)
+    return bool(
+        result.state.contamination_present
+        and result.state.underdetermined_split
+        and high_residual
+    )
+
+
+def _c04_idle_or_safe_mode(mode_claim: str) -> bool:
+    normalized = str(mode_claim or "").strip().lower()
+    return normalized in {"hold_safe_idle", "idle", "safe_idle"}
+
+
+def _apply_prior_mode_carry(
+    *,
+    prior_state: O02IntersubjectiveAllostasisState | None,
+    interaction_mode: O02InteractionMode,
+    repair_pressure: O02RepairPressureBand,
+    other_underconstrained: bool,
+    c05_revalidation_required: bool,
+    s05_shape_modulation_applied: bool,
+) -> tuple[O02InteractionMode, bool]:
+    if prior_state is None:
+        return interaction_mode, False
+    if (
+        prior_state.interaction_mode is O02InteractionMode.REPAIR_HEAVY
+        and interaction_mode in {
+            O02InteractionMode.LOW_FRICTION_MODE,
+            O02InteractionMode.HIGH_PRECISION_MODE,
+            O02InteractionMode.COMPRESSED_TASK_MODE,
+            O02InteractionMode.CONSERVATIVE_MODE_ONLY,
+        }
+        and repair_pressure is O02RepairPressureBand.MEDIUM
+        and not other_underconstrained
+        and not c05_revalidation_required
+    ):
+        return O02InteractionMode.REPAIR_HEAVY, True
+    if (
+        prior_state.interaction_mode is O02InteractionMode.CONSERVATIVE_MODE_ONLY
+        and interaction_mode is O02InteractionMode.LOW_FRICTION_MODE
+        and other_underconstrained
+        and repair_pressure in {O02RepairPressureBand.MEDIUM, O02RepairPressureBand.HIGH}
+    ):
+        return O02InteractionMode.CONSERVATIVE_MODE_ONLY, True
+    return interaction_mode, False

@@ -4,6 +4,7 @@ import pytest
 
 from substrate.o02_intersubjective_allostasis import (
     O02BoundaryProtectionStatus,
+    O02InteractionDiagnosticsInput,
     O02InteractionMode,
     O02OtherModelRelianceStatus,
     O02RegulationLeverPreference,
@@ -14,6 +15,7 @@ from tests.substrate.o02_intersubjective_allostasis_testkit import (
     build_o02_harness_case,
     harness_cases,
 )
+from tests.substrate.s05_multi_cause_attribution_factorization_testkit import S05HarnessConfig
 
 
 def test_harness_has_required_coverage() -> None:
@@ -109,6 +111,76 @@ def test_metamorphic_self_side_caution_changes_boundary_posture() -> None:
     caution = build_o02_harness_case(caution_case)
     assert base.state.boundary_protection_status != caution.state.boundary_protection_status
     assert base.state.interaction_mode != caution.state.interaction_mode
+
+
+def test_s05_shape_branch_modulates_o02_posture_under_matched_o01_context() -> None:
+    base = build_o02_harness_case(
+        O02HarnessCase(
+            case_id="s05-shape-base",
+            tick_index=1,
+            o01_signals=harness_cases()["clean_grounded"].o01_signals,
+            interaction_diagnostics=O02InteractionDiagnosticsInput(
+                recent_misunderstanding_count=1,
+            ),
+            s05_config=S05HarnessConfig(
+                case_id="o02-s05-shape-base",
+                tick_index=1,
+                world_perturbation=True,
+                observation_noise=0.2,
+                latent_unmodeled_disturbance=0.0,
+            ),
+        )
+    )
+    shaped = build_o02_harness_case(
+        O02HarnessCase(
+            case_id="s05-shape-shaped",
+            tick_index=1,
+            o01_signals=harness_cases()["clean_grounded"].o01_signals,
+            interaction_diagnostics=O02InteractionDiagnosticsInput(
+                recent_misunderstanding_count=1,
+            ),
+            s05_config=S05HarnessConfig(
+                case_id="o02-s05-shape-shaped",
+                tick_index=1,
+                world_perturbation=False,
+                observation_noise=0.85,
+                latent_unmodeled_disturbance=0.7,
+            ),
+        )
+    )
+    assert base.state.s05_shape_modulation_applied is False
+    assert shaped.state.s05_shape_modulation_applied is True
+    assert base.state.uncertainty_notice_policy != shaped.state.uncertainty_notice_policy
+    assert shaped.state.uncertainty_notice_policy == "preserve_explicit_uncertainty"
+
+
+def test_strong_disagreement_risk_activates_boundary_guard_under_smoothing_pressure() -> None:
+    baseline = build_o02_harness_case(
+        O02HarnessCase(
+            case_id="disagreement-baseline",
+            tick_index=1,
+            o01_signals=harness_cases()["clean_grounded"].o01_signals,
+            interaction_diagnostics=O02InteractionDiagnosticsInput(
+                impatience_or_compression_request=True,
+            ),
+        )
+    )
+    guarded = build_o02_harness_case(
+        O02HarnessCase(
+            case_id="disagreement-guarded",
+            tick_index=1,
+            o01_signals=harness_cases()["clean_grounded"].o01_signals,
+            interaction_diagnostics=O02InteractionDiagnosticsInput(
+                impatience_or_compression_request=True,
+                strong_disagreement_risk=True,
+            ),
+        )
+    )
+    assert baseline.state.strong_disagreement_guard_applied is False
+    assert guarded.state.strong_disagreement_guard_applied is True
+    assert guarded.state.boundary_protection_status is O02BoundaryProtectionStatus.CONFLICTED
+    assert O02RegulationLeverPreference.PRESERVE_BOUNDARY in guarded.state.lever_preferences
+    assert O02RegulationLeverPreference.PRESERVE_EXPLICIT_UNCERTAINTY in guarded.state.lever_preferences
 
 
 @pytest.mark.parametrize(

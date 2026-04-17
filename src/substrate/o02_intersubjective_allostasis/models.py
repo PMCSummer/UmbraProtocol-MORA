@@ -87,6 +87,9 @@ class O02IntersubjectiveAllostasisState:
     no_safe_regulation_claim: bool
     other_load_underconstrained: bool
     self_other_constraint_conflict: bool
+    s05_shape_modulation_applied: bool
+    prior_mode_carry_applied: bool
+    strong_disagreement_guard_applied: bool
     source_lineage: tuple[str, ...]
     last_update_provenance: str
 

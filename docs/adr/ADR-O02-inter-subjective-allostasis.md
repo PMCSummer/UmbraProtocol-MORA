@@ -12,7 +12,8 @@ This first slice provides:
 - explicit typed regulation state (`interaction_mode`, load bands, repair pressure, budgets, lever preferences, boundary status, reliance status);
 - bounded forecasting of interactional repair/clarification pressure from typed diagnostics;
 - conservative fallback when other-model basis is underconstrained;
-- explicit guard against politeness-only collapse when uncertainty/boundary signals require explicit caution.
+- explicit guard against politeness-only collapse when uncertainty/boundary signals require explicit caution;
+- bounded prior-mode carry/revision so repeated repair conditions can persist one step without becoming sticky memory policy.
 
 ## Inputs
 O02 consumes only bounded typed inputs:
@@ -37,7 +38,8 @@ RT01 now has two bounded O02 effects:
 - explicit require-path enforcement:
   - `require_o02_repair_sensitive_consumer`
   - `require_o02_boundary_preserving_consumer`
-- narrow default-path detours when O02 shape indicates unresolved repair pressure or underconstrained other-model basis.
+- narrow default-path detours when O02 shape indicates unresolved repair pressure or underconstrained other-model basis;
+- one typed-semantic gate branch that reads O02 shape fields directly (`s05_shape_modulation_applied`, `strong_disagreement_guard_applied`) instead of checkpoint token-only routing.
 
 Checkpoint `required_action` carries O02 shape markers used by downstream gate restrictions.
 

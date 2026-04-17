@@ -1,7 +1,10 @@
 from __future__ import annotations
 
+from dataclasses import replace
+
 from substrate.o01_other_entity_model import O01EntitySignal
 from substrate.o02_intersubjective_allostasis import O02InteractionDiagnosticsInput
+from substrate.subject_tick.policy import evaluate_subject_tick_downstream_gate
 from substrate.subject_tick import SubjectTickContext, SubjectTickOutcome, SubjectTickRestrictionCode
 from tests.substrate.subject_tick_testkit import build_subject_tick
 
@@ -244,3 +247,110 @@ def test_subject_tick_o02_politeness_collapse_guard_is_visible_downstream() -> N
         in restrictions
     )
     assert SubjectTickRestrictionCode.O02_POLITENESS_ONLY_COLLAPSE_FORBIDDEN in restrictions
+
+
+def test_subject_tick_politeness_baseline_does_not_match_disagreement_guard_path() -> None:
+    baseline = _result(
+        "rt-o02-politeness-baseline",
+        context=SubjectTickContext(
+            o01_entity_signals=_grounded_user_signals(),
+            o02_interaction_diagnostics=O02InteractionDiagnosticsInput(
+                impatience_or_compression_request=True,
+            ),
+        ),
+    )
+    guarded = _result(
+        "rt-o02-politeness-guarded",
+        context=SubjectTickContext(
+            o01_entity_signals=_grounded_user_signals(),
+            o02_interaction_diagnostics=O02InteractionDiagnosticsInput(
+                impatience_or_compression_request=True,
+                strong_disagreement_risk=True,
+            ),
+        ),
+    )
+    baseline_checkpoint = next(
+        item
+        for item in baseline.state.execution_checkpoints
+        if item.checkpoint_id == "rt01.o02_intersubjective_allostasis_checkpoint"
+    )
+    guarded_checkpoint = next(
+        item
+        for item in guarded.state.execution_checkpoints
+        if item.checkpoint_id == "rt01.o02_intersubjective_allostasis_checkpoint"
+    )
+    assert baseline.state.o02_strong_disagreement_guard_applied is False
+    assert guarded.state.o02_strong_disagreement_guard_applied is True
+    assert baseline.state.o02_interaction_mode != guarded.state.o02_interaction_mode
+    assert baseline_checkpoint.status.value == "allowed"
+    assert guarded_checkpoint.status.value == "enforced_detour"
+
+
+def test_subject_tick_o02_prior_state_carry_and_revision_is_bounded() -> None:
+    tick1 = _result(
+        "rt-o02-carry-1",
+        context=SubjectTickContext(
+            o01_entity_signals=_grounded_user_signals(),
+            o02_interaction_diagnostics=O02InteractionDiagnosticsInput(
+                recent_corrections_count=2,
+                recent_misunderstanding_count=2,
+            ),
+        ),
+    )
+    tick2 = _result(
+        "rt-o02-carry-2",
+        context=SubjectTickContext(
+            prior_o02_state=tick1.o02_result.state,
+            o01_entity_signals=_grounded_user_signals(),
+            o02_interaction_diagnostics=O02InteractionDiagnosticsInput(
+                recent_misunderstanding_count=2,
+            ),
+        ),
+    )
+    tick3 = _result(
+        "rt-o02-carry-3",
+        context=SubjectTickContext(
+            prior_o02_state=tick2.o02_result.state,
+            o01_entity_signals=_grounded_user_signals(),
+            o02_interaction_diagnostics=O02InteractionDiagnosticsInput(),
+        ),
+    )
+    assert tick1.state.o02_interaction_mode == "repair_heavy"
+    assert tick2.state.o02_prior_mode_carry_applied is True
+    assert tick2.state.o02_interaction_mode == "repair_heavy"
+    assert tick3.state.o02_prior_mode_carry_applied is False
+    assert tick3.state.o02_interaction_mode != "repair_heavy"
+
+
+def test_subject_tick_policy_reads_typed_o02_semantics_not_only_checkpoint_tokens() -> None:
+    baseline = _result(
+        "rt-o02-typed-policy-branch",
+        context=SubjectTickContext(
+            o01_entity_signals=_grounded_user_signals(),
+            o02_interaction_diagnostics=O02InteractionDiagnosticsInput(),
+        ),
+    )
+    o02_checkpoint = next(
+        item
+        for item in baseline.state.execution_checkpoints
+        if item.checkpoint_id == "rt01.o02_intersubjective_allostasis_checkpoint"
+    )
+    assert "require_o02_repair_sensitive_consumer" not in o02_checkpoint.required_action
+    plain_state = replace(
+        baseline.state,
+        o02_s05_shape_modulation_applied=False,
+    )
+    semantic_state = replace(
+        baseline.state,
+        o02_s05_shape_modulation_applied=True,
+    )
+    plain_gate = evaluate_subject_tick_downstream_gate(plain_state)
+    semantic_gate = evaluate_subject_tick_downstream_gate(semantic_state)
+    assert (
+        SubjectTickRestrictionCode.O02_REPAIR_SENSITIVE_CONSUMER_REQUIRED
+        not in set(plain_gate.restrictions)
+    )
+    assert (
+        SubjectTickRestrictionCode.O02_REPAIR_SENSITIVE_CONSUMER_REQUIRED
+        in set(semantic_gate.restrictions)
+    )

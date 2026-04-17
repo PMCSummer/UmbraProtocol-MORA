@@ -675,6 +675,22 @@ def evaluate_subject_tick_downstream_gate(
             restrictions.append(
                 SubjectTickRestrictionCode.O02_POLITENESS_ONLY_COLLAPSE_FORBIDDEN
             )
+    if state.o02_s05_shape_modulation_applied:
+        restrictions.append(
+            SubjectTickRestrictionCode.O02_REPAIR_SENSITIVE_CONSUMER_REQUIRED
+        )
+        if (
+            state.final_execution_outcome == SubjectTickOutcome.CONTINUE
+            and usability == SubjectTickUsabilityClass.USABLE_BOUNDED
+        ):
+            usability = SubjectTickUsabilityClass.DEGRADED_BOUNDED
+            reason = (
+                "o02 typed s05-shape modulation requires bounded repair-sensitive caution before unrestricted continuation"
+            )
+    if state.o02_strong_disagreement_guard_applied:
+        restrictions.append(
+            SubjectTickRestrictionCode.O02_POLITENESS_ONLY_COLLAPSE_FORBIDDEN
+        )
     if o02_checkpoint is not None and o02_checkpoint.status.value != "allowed":
         restrictions.append(SubjectTickRestrictionCode.DOWNSTREAM_AUTHORITY_DEGRADED)
         if state.final_execution_outcome == SubjectTickOutcome.CONTINUE:

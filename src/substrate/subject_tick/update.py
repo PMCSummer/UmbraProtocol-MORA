@@ -3803,6 +3803,13 @@ def execute_subject_tick(
         ),
         source_lineage=tuple(dict.fromkeys((*lineage, *stream.state.source_lineage))),
         last_update_provenance="subject_tick.runtime_contour_from_r_to_c05",
+        o02_interaction_mode=o02_result.state.interaction_mode.value,
+        o02_boundary_protection_status=o02_result.state.boundary_protection_status.value,
+        o02_other_model_reliance_status=o02_result.state.other_model_reliance_status.value,
+        o02_no_safe_regulation_claim=o02_result.state.no_safe_regulation_claim,
+        o02_s05_shape_modulation_applied=o02_result.state.s05_shape_modulation_applied,
+        o02_prior_mode_carry_applied=o02_result.state.prior_mode_carry_applied,
+        o02_strong_disagreement_guard_applied=o02_result.state.strong_disagreement_guard_applied,
     )
     gate = evaluate_subject_tick_downstream_gate(state)
     telemetry = build_subject_tick_telemetry(
