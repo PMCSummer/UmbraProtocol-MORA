@@ -168,6 +168,11 @@ from substrate.o01_other_entity_model import (
     build_o01_other_entity_model,
     derive_o01_other_entity_model_consumer_view,
 )
+from substrate.o02_intersubjective_allostasis import (
+    O02InteractionDiagnosticsInput,
+    build_o02_intersubjective_allostasis,
+    derive_o02_intersubjective_allostasis_consumer_view,
+)
 from substrate.s01_efference_copy import (
     S01EfferenceCopyState,
     build_s01_efference_copy,
@@ -200,6 +205,7 @@ ATTEMPTED_SUBJECT_TICK_PATHS: tuple[str, ...] = (
     "subject_tick.evaluate_t03_hypothesis_competition",
     "subject_tick.evaluate_t04_attention_schema",
     "subject_tick.evaluate_o01_other_entity_model",
+    "subject_tick.evaluate_o02_intersubjective_allostasis",
     "subject_tick.world_seam_enforcement",
     "subject_tick.resolve_bounded_runtime_outcome",
     "subject_tick.downstream_gate",
@@ -2871,6 +2877,8 @@ def execute_subject_tick(
     trace_emit_active("o01_other_entity_model", "enter", o01_enter_values)
     o01_checkpoint_status = SubjectTickCheckpointStatus.ALLOWED
     o01_checkpoint_reason = o01_result.gate.reason
+    o01_default_competing_clarification = False
+    o01_default_overlay_clarification = False
     if not context.disable_o01_enforcement:
         if (
             context.require_o01_entity_individuation_consumer
@@ -2897,6 +2905,37 @@ def execute_subject_tick(
             )
             if active_execution_mode != "halt_execution":
                 active_execution_mode = "revalidate_scope"
+        if (
+            not context.require_o01_entity_individuation_consumer
+            and not context.require_o01_clarification_ready_consumer
+            and o01_result.state.competing_entity_models
+            and halt_reason is None
+            and not revalidation_needed
+        ):
+            revalidation_needed = True
+            o01_default_competing_clarification = True
+            o01_checkpoint_status = SubjectTickCheckpointStatus.ENFORCED_DETOUR
+            o01_checkpoint_reason = (
+                "o01 default contour requires clarification when competing entity models remain unresolved"
+            )
+            if active_execution_mode != "halt_execution":
+                active_execution_mode = "revalidate_scope"
+        if (
+            not context.require_o01_entity_individuation_consumer
+            and not context.require_o01_clarification_ready_consumer
+            and "belief_overlay_underconstrained" in o01_result.gate.restrictions
+            and o01_result.state.current_user_entity_id is not None
+            and halt_reason is None
+            and not revalidation_needed
+        ):
+            revalidation_needed = True
+            o01_default_overlay_clarification = True
+            o01_checkpoint_status = SubjectTickCheckpointStatus.ENFORCED_DETOUR
+            o01_checkpoint_reason = (
+                "o01 default contour requires clarification when belief/ignorance overlay stays underconstrained"
+            )
+            if active_execution_mode != "halt_execution":
+                active_execution_mode = "revalidate_scope"
     else:
         o01_checkpoint_status = SubjectTickCheckpointStatus.ENFORCED_DETOUR
         o01_checkpoint_reason = "o01 other-entity model enforcement disabled in ablation context"
@@ -2909,6 +2948,10 @@ def execute_subject_tick(
         o01_required_actions.append("o01_projection_guard_triggered")
     if o01_result.state.competing_entity_models:
         o01_required_actions.append("o01_competing_entity_models")
+    if o01_default_competing_clarification:
+        o01_required_actions.append("default_o01_competing_entity_clarification")
+    if o01_default_overlay_clarification:
+        o01_required_actions.append("default_o01_belief_overlay_clarification")
     if not o01_required_actions:
         o01_required_actions.append("o01_optional")
     o01_trace_values = {
@@ -2940,6 +2983,169 @@ def execute_subject_tick(
             required_action=";".join(dict.fromkeys(o01_required_actions)),
             applied_action=active_execution_mode,
             reason=o01_checkpoint_reason,
+        )
+    )
+
+    o02_diagnostics = context.o02_interaction_diagnostics
+    if o02_diagnostics is None:
+        o02_diagnostics = O02InteractionDiagnosticsInput()
+    o02_result = build_o02_intersubjective_allostasis(
+        tick_id=tick_id,
+        tick_index=tick_index,
+        o01_result=o01_result,
+        s05_result=s05_result,
+        c04_selected_mode=mode_arbitration.state.active_mode.value,
+        c05_revalidation_required=_c05_revalidation_required(
+            temporal_validity, c05_validity_action
+        ),
+        regulation_pressure_level=viability.state.pressure_level,
+        interaction_diagnostics=o02_diagnostics,
+        prior_state=context.prior_o02_state,
+        source_lineage=lineage,
+        allostasis_enabled=not context.disable_o02_enforcement,
+    )
+    o02_view = derive_o02_intersubjective_allostasis_consumer_view(o02_result)
+    o02_enter_values = {
+        "interaction_mode": o02_result.telemetry.interaction_mode.value,
+        "predicted_other_load": o02_result.telemetry.predicted_other_load.value,
+        "predicted_self_load": o02_result.telemetry.predicted_self_load.value,
+        "repair_pressure": o02_result.telemetry.repair_pressure.value,
+        "other_model_reliance_status": o02_result.telemetry.other_model_reliance_status.value,
+        "boundary_protection_status": o02_result.telemetry.boundary_protection_status.value,
+        "no_safe_regulation_claim": o02_result.telemetry.no_safe_regulation_claim,
+        "other_load_underconstrained": o02_result.state.other_load_underconstrained,
+        "self_other_constraint_conflict": o02_result.state.self_other_constraint_conflict,
+        "downstream_consumer_ready": o02_result.telemetry.downstream_consumer_ready,
+    }
+    trace_emit_active("o02_intersubjective_allostasis", "enter", o02_enter_values)
+    o02_checkpoint_status = SubjectTickCheckpointStatus.ALLOWED
+    o02_checkpoint_reason = o02_result.gate.reason
+    o02_default_repair_clarification_detour = False
+    o02_default_conservative_detour = False
+    if not context.disable_o02_enforcement:
+        if (
+            context.require_o02_repair_sensitive_consumer
+            and not o02_view.repair_sensitive_consumer_ready
+            and halt_reason is None
+        ):
+            revalidation_needed = True
+            o02_checkpoint_status = SubjectTickCheckpointStatus.ENFORCED_DETOUR
+            o02_checkpoint_reason = (
+                "o02 repair-sensitive consumer requested but repair posture remains underconstrained"
+            )
+            if active_execution_mode != "halt_execution":
+                active_execution_mode = "revalidate_scope"
+        if (
+            context.require_o02_boundary_preserving_consumer
+            and not o02_view.boundary_preserving_consumer_ready
+            and halt_reason is None
+        ):
+            revalidation_needed = True
+            o02_checkpoint_status = SubjectTickCheckpointStatus.ENFORCED_DETOUR
+            o02_checkpoint_reason = (
+                "o02 boundary-preserving consumer requested but self/other boundary posture is conflicted"
+            )
+            if active_execution_mode != "halt_execution":
+                active_execution_mode = "revalidate_scope"
+        if (
+            not context.require_o02_repair_sensitive_consumer
+            and not context.require_o02_boundary_preserving_consumer
+            and o02_view.repair_sensitive_detour_recommended
+            and o02_view.clarification_required
+            and halt_reason is None
+            and not revalidation_needed
+        ):
+            revalidation_needed = True
+            o02_default_repair_clarification_detour = True
+            o02_checkpoint_status = SubjectTickCheckpointStatus.ENFORCED_DETOUR
+            o02_checkpoint_reason = (
+                "o02 default contour requires repair-sensitive clarification before continuation"
+            )
+            if active_execution_mode != "halt_execution":
+                active_execution_mode = "revalidate_scope"
+        if (
+            not context.require_o02_repair_sensitive_consumer
+            and not context.require_o02_boundary_preserving_consumer
+            and o02_view.conservative_mode_only
+            and (
+                o02_result.state.other_load_underconstrained
+                or o02_result.state.no_safe_regulation_claim
+            )
+            and o02_result.state.repair_pressure.value in {"medium", "high"}
+            and halt_reason is None
+        ):
+            revalidation_needed = True
+            o02_default_conservative_detour = True
+            o02_checkpoint_status = SubjectTickCheckpointStatus.ENFORCED_DETOUR
+            o02_checkpoint_reason = (
+                "o02 default contour requires conservative clarification when other-model basis is underconstrained"
+            )
+            if active_execution_mode != "halt_execution":
+                active_execution_mode = "revalidate_scope"
+        if (
+            o02_view.boundary_preservation_required
+            and not o02_view.boundary_preserving_consumer_ready
+            and halt_reason is None
+            and not revalidation_needed
+        ):
+            repair_needed = True
+            o02_checkpoint_status = SubjectTickCheckpointStatus.ENFORCED_DETOUR
+            o02_checkpoint_reason = (
+                "o02 boundary-protection conflict requires repair before continuation"
+            )
+            if active_execution_mode not in {"halt_execution", "revalidate_scope"}:
+                active_execution_mode = "repair_runtime_path"
+    else:
+        o02_checkpoint_status = SubjectTickCheckpointStatus.ENFORCED_DETOUR
+        o02_checkpoint_reason = (
+            "o02 intersubjective allostasis enforcement disabled in ablation context"
+        )
+    o02_required_actions: list[str] = []
+    if context.require_o02_repair_sensitive_consumer:
+        o02_required_actions.append("require_o02_repair_sensitive_consumer")
+    if context.require_o02_boundary_preserving_consumer:
+        o02_required_actions.append("require_o02_boundary_preserving_consumer")
+    if o02_default_repair_clarification_detour:
+        o02_required_actions.append("default_o02_repair_sensitive_clarification_detour")
+    if o02_default_conservative_detour:
+        o02_required_actions.append("default_o02_conservative_clarification_detour")
+    if o02_result.state.other_load_underconstrained:
+        o02_required_actions.append("other_load_underconstrained")
+    if o02_result.state.self_other_constraint_conflict:
+        o02_required_actions.append("self_other_constraint_conflict")
+    if o02_view.do_not_collapse_to_politeness:
+        o02_required_actions.append("o02_politeness_only_collapse_forbidden")
+    if not o02_required_actions:
+        o02_required_actions.append("o02_optional")
+    o02_trace_values = {
+        "interaction_mode": o02_result.telemetry.interaction_mode.value,
+        "predicted_other_load": o02_result.telemetry.predicted_other_load.value,
+        "predicted_self_load": o02_result.telemetry.predicted_self_load.value,
+        "repair_pressure": o02_result.telemetry.repair_pressure.value,
+        "other_model_reliance_status": o02_result.telemetry.other_model_reliance_status.value,
+        "boundary_protection_status": o02_result.telemetry.boundary_protection_status.value,
+        "no_safe_regulation_claim": o02_result.telemetry.no_safe_regulation_claim,
+        "other_load_underconstrained": o02_result.state.other_load_underconstrained,
+        "self_other_constraint_conflict": o02_result.state.self_other_constraint_conflict,
+        "downstream_consumer_ready": o02_result.telemetry.downstream_consumer_ready,
+    }
+    trace_emit_active("o02_intersubjective_allostasis", "decision", o02_trace_values)
+    if o02_checkpoint_status != SubjectTickCheckpointStatus.ALLOWED:
+        trace_emit_active(
+            "o02_intersubjective_allostasis",
+            "blocked",
+            o02_trace_values,
+            note=o02_checkpoint_reason,
+        )
+    trace_emit_active("o02_intersubjective_allostasis", "exit", o02_trace_values)
+    checkpoints.append(
+        SubjectTickCheckpointResult(
+            checkpoint_id="rt01.o02_intersubjective_allostasis_checkpoint",
+            source_contract="o02_intersubjective_allostasis.regulation_state",
+            status=o02_checkpoint_status,
+            required_action=";".join(dict.fromkeys(o02_required_actions)),
+            applied_action=active_execution_mode,
+            reason=o02_checkpoint_reason,
         )
     )
 
@@ -3604,7 +3810,7 @@ def execute_subject_tick(
         attempted_paths=ATTEMPTED_SUBJECT_TICK_PATHS,
         downstream_gate=gate,
         causal_basis=(
-            "bounded runtime execution spine enforces roadmap authority roles for C04/C05, consumes world-entry, s01 efference-copy, s02 prediction-boundary seam, s03 ownership-weighted learning, s04 interoceptive self-binding, s05 multi-cause attribution, s-minimal, a-line, m-minimal, n-minimal, t01 semantic-field, t02 relation-binding, t03 hypothesis-competition, t04 attention-schema, and o01 other-entity model gates, and keeps D01 observability-only over fixed R->C order"
+            "bounded runtime execution spine enforces roadmap authority roles for C04/C05, consumes world-entry, s01 efference-copy, s02 prediction-boundary seam, s03 ownership-weighted learning, s04 interoceptive self-binding, s05 multi-cause attribution, s-minimal, a-line, m-minimal, n-minimal, t01 semantic-field, t02 relation-binding, t03 hypothesis-competition, t04 attention-schema, o01 other-entity modeling, and o02 intersubjective allostasis gates, and keeps D01 observability-only over fixed R->C order"
         ),
     )
     abstain = final_outcome in {SubjectTickOutcome.REPAIR, SubjectTickOutcome.REVALIDATE}
@@ -3693,6 +3899,7 @@ def execute_subject_tick(
         s04_result=s04_result,
         s05_result=s05_result,
         o01_result=o01_result,
+        o02_result=o02_result,
         t01_result=t01_result,
         t02_result=t02_result,
         t03_result=t03_result,

@@ -39,6 +39,8 @@ RT01 checkpoint gating now has explicit O01 consumer requirements:
 
 When requested and unmet, RT01 applies detour/revalidation instead of silently continuing.
 
+Additionally, default RT01 contour now applies a narrow clarification detour when O01 shape indicates unresolved competing referents or underconstrained belief/ignorance overlay for a current-user model. This remains bounded to clarification/revalidation, not broad social-policy takeover.
+
 ## Authority Boundary
 O01 does not claim:
 - full theory-of-mind;
@@ -55,5 +57,5 @@ This ADR does **not** claim:
 
 ## Current Limitations / Open Falsifiers
 - Consumer effect is narrow and RT01-local; no broad downstream ecosystem yet.
-- Default path keeps bounded O01 checkpoint optional unless explicit consumer requirements are requested.
+- Default path still keeps O01 optional in most ordinary cases; only narrow ambiguity/overlay triggers enforce clarification.
 - Signal authority model is intentionally compact and local to O01 first slice.

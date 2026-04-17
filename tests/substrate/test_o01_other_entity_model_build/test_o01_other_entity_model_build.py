@@ -1,8 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import replace
-
-from substrate.o01_other_entity_model import O01UpdateEventKind
+from substrate.o01_other_entity_model import O01EntitySignal, O01UpdateEventKind
 from tests.substrate.o01_other_entity_model_testkit import (
     O01HarnessCase,
     build_o01,
@@ -109,11 +107,19 @@ def test_knowledge_boundary_revision_from_unknown_to_known_is_supported() -> Non
 
 
 def test_baseline_recent_summary_shortcut_differs_from_o01_revision_behavior() -> None:
-    corrected = build_o01_harness_case(harness_sequences()["stale_memory_contradiction"])
-    naive_recent_summary = {"stable_claims": ("prefers_json",)}
-    user = _current_user(corrected)
-    assert naive_recent_summary["stable_claims"] != user.stable_claims
-    assert corrected.state.no_safe_state_claim in {True, False}
+    case = harness_sequences()["revision_correction"]
+    full = build_o01_harness_case(case)
+    summary_like = build_o01(
+        case_id="summary_like_revision_blind",
+        tick_index=case.tick_index,
+        signals=tuple(
+            signal for signal in case.signals if signal.relation_class.strip().lower() == "stable_claim"
+        ),
+    )
+    full_user = _current_user(full)
+    summary_user = _current_user(summary_like)
+    assert "prefers_detailed_answers" not in full_user.stable_claims
+    assert "prefers_detailed_answers" in summary_user.stable_claims
 
 
 def test_adversarial_quoted_third_party_contamination_does_not_override_user() -> None:
@@ -124,20 +130,81 @@ def test_adversarial_quoted_third_party_contamination_does_not_override_user() -
 
 
 def test_metamorphic_removing_entity_individuation_exposes_conflation_risk() -> None:
-    result = build_o01_harness_case(harness_sequences()["third_party_quoted"])
-    conflated = replace(
-        result.state,
-        third_party_entity_ids=(),
-        competing_entity_models=(),
+    case = harness_sequences()["third_party_quoted"]
+    trusted = build_o01_harness_case(case)
+    mislabelled_quoted = build_o01(
+        case_id="mislabelled_quoted_current_user_direct",
+        tick_index=case.tick_index,
+        signals=tuple(
+            O01EntitySignal(
+                signal_id=signal.signal_id,
+                entity_id_hint=signal.entity_id_hint,
+                referent_label=signal.referent_label,
+                source_authority=(
+                    "current_user_direct"
+                    if signal.source_authority == "quoted_third_party"
+                    else signal.source_authority
+                ),
+                relation_class=signal.relation_class,
+                claim_value=signal.claim_value,
+                confidence=signal.confidence,
+                grounded=signal.grounded,
+                quoted=signal.quoted,
+                turn_index=signal.turn_index,
+                provenance=signal.provenance,
+                target_claim=signal.target_claim,
+            )
+            for signal in case.signals
+        ),
     )
-    assert len(result.state.third_party_entity_ids) > len(conflated.third_party_entity_ids)
+    trusted_user = _current_user(trusted)
+    guarded_user = _current_user(mislabelled_quoted)
+    assert "prefers_verbose" not in trusted_user.stable_claims
+    assert "prefers_verbose" not in guarded_user.stable_claims
+    assert mislabelled_quoted.state.projection_guard_triggered is False
+    assert "authority_guard_triggered" in mislabelled_quoted.gate.restrictions
 
 
 def test_metamorphic_removing_stable_temporary_split_degrades_model_honesty() -> None:
-    result = build_o01_harness_case(harness_sequences()["temporary_request_one_off"])
-    user = _current_user(result)
-    flattened = tuple(dict.fromkeys((*user.stable_claims, *user.temporary_state_hypotheses)))
-    assert user.stable_claims != flattened
+    one_turn_duplicate = build_o01(
+        case_id="single_turn_duplicate",
+        tick_index=1,
+        signals=(
+            O01EntitySignal(
+                signal_id="dup1",
+                entity_id_hint=None,
+                referent_label="user",
+                source_authority="current_user_direct",
+                relation_class="stable_claim",
+                claim_value="prefers_concise_answers",
+                confidence=0.8,
+                grounded=True,
+                quoted=False,
+                turn_index=1,
+                provenance="tests.o01.dup.1",
+                target_claim=None,
+            ),
+            O01EntitySignal(
+                signal_id="dup2",
+                entity_id_hint=None,
+                referent_label="user",
+                source_authority="current_user_direct",
+                relation_class="stable_claim",
+                claim_value="prefers_concise_answers",
+                confidence=0.8,
+                grounded=True,
+                quoted=False,
+                turn_index=1,
+                provenance="tests.o01.dup.2",
+                target_claim=None,
+            ),
+        ),
+    )
+    cross_turn_repeat = build_o01_harness_case(harness_sequences()["stable_preference_repeated"])
+    one_turn_user = _current_user(one_turn_duplicate)
+    repeated_user = _current_user(cross_turn_repeat)
+    assert "prefers_concise_answers" not in one_turn_user.stable_claims
+    assert "prefers_concise_answers" in repeated_user.stable_claims
 
 
 def test_ablation_disabled_model_produces_no_safe_fallback() -> None:

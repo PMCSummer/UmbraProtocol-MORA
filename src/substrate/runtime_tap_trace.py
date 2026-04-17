@@ -149,6 +149,18 @@ MODULE_ALLOWED_FIELDS: dict[str, tuple[str, ...]] = {
         "no_safe_state_claim",
         "downstream_consumer_ready",
     ),
+    "o02_intersubjective_allostasis": (
+        "interaction_mode",
+        "predicted_other_load",
+        "predicted_self_load",
+        "repair_pressure",
+        "other_model_reliance_status",
+        "boundary_protection_status",
+        "no_safe_regulation_claim",
+        "other_load_underconstrained",
+        "self_other_constraint_conflict",
+        "downstream_consumer_ready",
+    ),
     "s_minimal_contour": (
         "minimal_self_status",
         "minimal_self_ready",

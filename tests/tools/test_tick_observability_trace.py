@@ -38,6 +38,7 @@ HOSTED_CONTOUR_SEGMENTS = (
     "s04_interoceptive_self_binding",
     "s05_multi_cause_attribution_factorization",
     "o01_other_entity_model",
+    "o02_intersubjective_allostasis",
     "s_minimal_contour",
     "a_line_normalization",
     "m_minimal",
@@ -117,6 +118,18 @@ HOSTED_CONTOUR_FIELDS: dict[str, set[str]] = {
         "knowledge_boundary_known_count",
         "projection_guard_triggered",
         "no_safe_state_claim",
+        "downstream_consumer_ready",
+    },
+    "o02_intersubjective_allostasis": {
+        "interaction_mode",
+        "predicted_other_load",
+        "predicted_self_load",
+        "repair_pressure",
+        "other_model_reliance_status",
+        "boundary_protection_status",
+        "no_safe_regulation_claim",
+        "other_load_underconstrained",
+        "self_other_constraint_conflict",
         "downstream_consumer_ready",
     },
     "s_minimal_contour": {
@@ -587,6 +600,9 @@ def test_hosted_contour_segments_follow_real_runtime_order(tmp_path: Path) -> No
     )
     assert _first_order(events, "t04_attention_schema") < _first_order(events, "o01_other_entity_model")
     assert _first_order(events, "o01_other_entity_model") < _first_order(
+        events, "o02_intersubjective_allostasis"
+    )
+    assert _first_order(events, "o02_intersubjective_allostasis") < _first_order(
         events, "bounded_outcome_resolution"
     )
     assert _first_order(events, "s_minimal_contour") < _first_order(events, "a_line_normalization")
@@ -647,6 +663,7 @@ def test_representative_modules_have_runtime_steps(tmp_path: Path) -> None:
         "t02_relation_binding",
         "t03_hypothesis_competition",
         "o01_other_entity_model",
+        "o02_intersubjective_allostasis",
         "downstream_obedience",
         "subject_tick",
     ):

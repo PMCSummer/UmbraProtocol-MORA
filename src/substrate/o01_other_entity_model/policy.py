@@ -24,6 +24,7 @@ _ALLOWED_AUTHORITIES = {
     "referenced_other",
     "quoted_third_party",
 }
+_CURRENT_USER_REFERENT_LABELS = {"", "user", "current_user"}
 
 
 def build_o01_other_entity_model(
@@ -44,6 +45,7 @@ def build_o01_other_entity_model(
 
     filtered: list[O01EntitySignal] = []
     projection_guard_triggered = False
+    authority_guard_triggered = False
     for raw in signals:
         if not isinstance(raw, O01EntitySignal):
             continue
@@ -51,6 +53,14 @@ def build_o01_other_entity_model(
         if authority.startswith("self_"):
             projection_guard_triggered = True
             continue
+        if authority == "current_user_direct":
+            referent = str(raw.referent_label or "").strip().lower()
+            if raw.quoted:
+                authority_guard_triggered = True
+                continue
+            if referent not in _CURRENT_USER_REFERENT_LABELS:
+                authority_guard_triggered = True
+                continue
         if authority not in _ALLOWED_AUTHORITIES or not raw.grounded:
             continue
         filtered.append(raw)
@@ -128,10 +138,15 @@ def build_o01_other_entity_model(
     temporary_only_not_stable = stable_claim_count == 0 and temporary_hypothesis_count > 0
     knowledge_boundary_unknown = knowledge_boundary_known_count == 0
     entity_not_individuated = current_user_entity_id is None
+    belief_overlay_underconstrained = _belief_overlay_underconstrained(
+        entities=tuple(entities),
+        current_user_entity_id=current_user_entity_id,
+    )
     perspective_underconstrained = bool(
         entity_not_individuated
         or temporary_only_not_stable
         or knowledge_boundary_unknown
+        or belief_overlay_underconstrained
         or not filtered
     )
     no_safe_state_claim = bool(stable_claim_count == 0 and not current_user_entity_id)
@@ -147,8 +162,12 @@ def build_o01_other_entity_model(
         restrictions.append("temporary_only_not_stable")
     if knowledge_boundary_unknown:
         restrictions.append("knowledge_boundary_unknown")
+    if belief_overlay_underconstrained:
+        restrictions.append("belief_overlay_underconstrained")
     if projection_guard_triggered:
         restrictions.append("projection_guard_triggered")
+    if authority_guard_triggered:
+        restrictions.append("authority_guard_triggered")
     if competing_entity_models:
         restrictions.append("competing_entity_models")
 
@@ -345,6 +364,7 @@ def _build_entity_state(
     revision_events: list[O01EntityRevisionEvent] = []
     correction_targets: set[str] = set()
     contradiction_count = 0
+    stable_claim_turns: dict[str, set[int]] = defaultdict(set)
 
     confidences: list[float] = []
     for signal in signals:
@@ -356,6 +376,7 @@ def _build_entity_state(
         relation = signal.relation_class.strip().lower()
         if relation == "stable_claim":
             claims_by_value[value] += 1
+            stable_claim_turns[value].add(int(signal.turn_index))
         elif relation in {"temporary_state", "state_hypothesis"}:
             temporary_counter[value] += 1
         elif relation in {"goal_hint", "probable_goal"}:
@@ -379,7 +400,8 @@ def _build_entity_state(
     stable_claims: list[str] = []
     temporary_state_hypotheses: list[str] = []
     for claim, count in claims_by_value.items():
-        if count >= 2 and claim not in correction_targets:
+        has_multi_turn_repetition = len(stable_claim_turns.get(claim, set())) >= 2
+        if count >= 2 and has_multi_turn_repetition and claim not in correction_targets:
             stable_claims.append(claim)
         else:
             temporary_state_hypotheses.append(claim)
@@ -538,6 +560,24 @@ def _build_minimal_other_entity(*, entity_id: str, reason: str) -> O01EntityStat
         ),
         provenance="o01.other_entity_model.minimal_stub",
     )
+
+
+def _belief_overlay_underconstrained(
+    *,
+    entities: tuple[O01EntityState, ...],
+    current_user_entity_id: str | None,
+) -> bool:
+    if not current_user_entity_id:
+        return False
+    for entity in entities:
+        if entity.entity_id != current_user_entity_id:
+            continue
+        if (
+            entity.belief_overlay.ignorance_candidates
+            and entity.belief_overlay.belief_attribution_uncertainty >= 0.8
+        ):
+            return True
+    return False
 
 
 def _invert_claim(claim: str) -> str:

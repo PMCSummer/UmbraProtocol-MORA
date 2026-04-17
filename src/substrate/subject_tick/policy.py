@@ -65,6 +65,7 @@ def evaluate_subject_tick_downstream_gate(
         SubjectTickRestrictionCode.S04_INTEROCEPTIVE_SELF_BINDING_CONTRACT_MUST_BE_READ,
         SubjectTickRestrictionCode.S05_MULTI_CAUSE_ATTRIBUTION_CONTRACT_MUST_BE_READ,
         SubjectTickRestrictionCode.O01_OTHER_ENTITY_MODEL_CONTRACT_MUST_BE_READ,
+        SubjectTickRestrictionCode.O02_INTERSUBJECTIVE_ALLOSTASIS_CONTRACT_MUST_BE_READ,
     ]
     usability = SubjectTickUsabilityClass.USABLE_BOUNDED
     accepted = True
@@ -628,6 +629,14 @@ def evaluate_subject_tick_downstream_gate(
             restrictions.append(
                 SubjectTickRestrictionCode.O01_CLARIFICATION_READY_CONSUMER_REQUIRED
             )
+        if "default_o01_competing_entity_clarification" in o01_checkpoint.required_action:
+            restrictions.append(
+                SubjectTickRestrictionCode.O01_CLARIFICATION_READY_CONSUMER_REQUIRED
+            )
+        if "default_o01_belief_overlay_clarification" in o01_checkpoint.required_action:
+            restrictions.append(
+                SubjectTickRestrictionCode.O01_CLARIFICATION_READY_CONSUMER_REQUIRED
+            )
         if "o01_projection_guard_triggered" in o01_checkpoint.required_action:
             restrictions.append(SubjectTickRestrictionCode.O01_PROJECTION_GUARD_REQUIRED)
     if o01_checkpoint is not None and o01_checkpoint.status.value != "allowed":
@@ -636,6 +645,44 @@ def evaluate_subject_tick_downstream_gate(
             accepted = False
             usability = SubjectTickUsabilityClass.BLOCKED
             reason = "o01 other-entity model checkpoint requires detour before downstream continuation"
+
+    o02_checkpoint = next(
+        (
+            checkpoint
+            for checkpoint in state.execution_checkpoints
+            if checkpoint.checkpoint_id == "rt01.o02_intersubjective_allostasis_checkpoint"
+        ),
+        None,
+    )
+    if o02_checkpoint is not None:
+        if "require_o02_repair_sensitive_consumer" in o02_checkpoint.required_action:
+            restrictions.append(
+                SubjectTickRestrictionCode.O02_REPAIR_SENSITIVE_CONSUMER_REQUIRED
+            )
+        if "require_o02_boundary_preserving_consumer" in o02_checkpoint.required_action:
+            restrictions.append(
+                SubjectTickRestrictionCode.O02_BOUNDARY_PRESERVING_CONSUMER_REQUIRED
+            )
+        if "default_o02_repair_sensitive_clarification_detour" in o02_checkpoint.required_action:
+            restrictions.append(
+                SubjectTickRestrictionCode.O02_REPAIR_SENSITIVE_CONSUMER_REQUIRED
+            )
+        if "default_o02_conservative_clarification_detour" in o02_checkpoint.required_action:
+            restrictions.append(
+                SubjectTickRestrictionCode.O02_REPAIR_SENSITIVE_CONSUMER_REQUIRED
+            )
+        if "o02_politeness_only_collapse_forbidden" in o02_checkpoint.required_action:
+            restrictions.append(
+                SubjectTickRestrictionCode.O02_POLITENESS_ONLY_COLLAPSE_FORBIDDEN
+            )
+    if o02_checkpoint is not None and o02_checkpoint.status.value != "allowed":
+        restrictions.append(SubjectTickRestrictionCode.DOWNSTREAM_AUTHORITY_DEGRADED)
+        if state.final_execution_outcome == SubjectTickOutcome.CONTINUE:
+            accepted = False
+            usability = SubjectTickUsabilityClass.BLOCKED
+            reason = (
+                "o02 intersubjective allostasis checkpoint requires detour before downstream continuation"
+            )
 
     return SubjectTickGateDecision(
         accepted=accepted,

@@ -12,6 +12,11 @@ if TYPE_CHECKING:
         O01OtherEntityModelResult,
         O01OtherEntityModelState,
     )
+    from substrate.o02_intersubjective_allostasis import (
+        O02IntersubjectiveAllostasisResult,
+        O02IntersubjectiveAllostasisState,
+        O02InteractionDiagnosticsInput,
+    )
     from substrate.s03_ownership_weighted_learning import (
         S03OwnershipWeightedLearningResult,
         S03OwnershipWeightedLearningState,
@@ -188,6 +193,18 @@ class SubjectTickRestrictionCode(StrEnum):
         "o01_clarification_ready_consumer_required"
     )
     O01_PROJECTION_GUARD_REQUIRED = "o01_projection_guard_required"
+    O02_INTERSUBJECTIVE_ALLOSTASIS_CONTRACT_MUST_BE_READ = (
+        "o02_intersubjective_allostasis_contract_must_be_read"
+    )
+    O02_REPAIR_SENSITIVE_CONSUMER_REQUIRED = (
+        "o02_repair_sensitive_consumer_required"
+    )
+    O02_BOUNDARY_PRESERVING_CONSUMER_REQUIRED = (
+        "o02_boundary_preserving_consumer_required"
+    )
+    O02_POLITENESS_ONLY_COLLAPSE_FORBIDDEN = (
+        "o02_politeness_only_collapse_forbidden"
+    )
     DOWNSTREAM_AUTHORITY_DEGRADED = "downstream_authority_degraded"
 
 
@@ -257,6 +274,7 @@ class SubjectTickContext:
     prior_s04_state: S04InteroceptiveSelfBindingState | None = None
     prior_s05_state: S05MultiCauseAttributionState | None = None
     prior_o01_state: O01OtherEntityModelState | None = None
+    prior_o02_state: O02IntersubjectiveAllostasisState | None = None
     dependency_trigger_hits: tuple[str, ...] = ()
     context_shift_markers: tuple[str, ...] = ()
     contradicted_source_refs: tuple[str, ...] = ()
@@ -334,7 +352,11 @@ class SubjectTickContext:
     require_o01_entity_individuation_consumer: bool = False
     require_o01_clarification_ready_consumer: bool = False
     disable_o01_enforcement: bool = False
+    require_o02_repair_sensitive_consumer: bool = False
+    require_o02_boundary_preserving_consumer: bool = False
+    disable_o02_enforcement: bool = False
     o01_entity_signals: tuple[O01EntitySignal, ...] = ()
+    o02_interaction_diagnostics: O02InteractionDiagnosticsInput | None = None
     source_lineage: tuple[str, ...] = ()
 
 
@@ -1098,6 +1120,7 @@ class SubjectTickResult:
     s04_result: S04InteroceptiveSelfBindingResult
     s05_result: S05MultiCauseAttributionResult
     o01_result: O01OtherEntityModelResult
+    o02_result: O02IntersubjectiveAllostasisResult
     t01_result: T01ActiveFieldResult
     t02_result: T02ConstrainedSceneResult
     t03_result: T03CompetitionResult

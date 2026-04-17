@@ -167,6 +167,7 @@ def test_runtime_topology_bundle_and_graph_are_materialized() -> None:
         "T03",
         "T04",
         "O01",
+        "O02",
         "RT01",
     )
     assert "rt01.epistemic_admission_checkpoint" in graph.mandatory_checkpoint_ids
@@ -188,6 +189,7 @@ def test_runtime_topology_bundle_and_graph_are_materialized() -> None:
     assert "rt01.t03_hypothesis_competition_checkpoint" in graph.mandatory_checkpoint_ids
     assert "rt01.t04_attention_schema_checkpoint" in graph.mandatory_checkpoint_ids
     assert "rt01.o01_other_entity_model_checkpoint" in graph.mandatory_checkpoint_ids
+    assert "rt01.o02_intersubjective_allostasis_checkpoint" in graph.mandatory_checkpoint_ids
     assert "epistemics.grounded_unit" in graph.source_of_truth_surfaces
     assert "epistemics.downstream_allowance" in graph.source_of_truth_surfaces
     assert "world_adapter.state" in graph.source_of_truth_surfaces
@@ -239,6 +241,11 @@ def test_runtime_topology_bundle_and_graph_are_materialized() -> None:
     assert "t04_attention_schema.focus_targets" in graph.source_of_truth_surfaces
     assert "o01_other_entity_model.entities" in graph.source_of_truth_surfaces
     assert "o01_other_entity_model.entity_individuation" in graph.source_of_truth_surfaces
+    assert "o02_intersubjective_allostasis.regulation_state" in graph.source_of_truth_surfaces
+    assert (
+        "o02_intersubjective_allostasis.boundary_protection_status"
+        in graph.source_of_truth_surfaces
+    )
 
 
 def test_dispatch_happy_path_runs_lawful_production_contour() -> None:
@@ -1248,6 +1255,149 @@ def test_dispatch_o01_clarification_requirement_is_load_bearing() -> None:
     )
     assert checkpoint.status.value == "enforced_detour"
     assert "require_o01_clarification_ready_consumer" in checkpoint.required_action
+
+
+def test_dispatch_o01_default_competing_models_shape_is_load_bearing_without_explicit_require() -> None:
+    baseline = dispatch_runtime_tick(
+        RuntimeDispatchRequest(
+            tick_input=_tick_input("runtime-topology-o01-default-baseline"),
+            route_class=RuntimeRouteClass.PRODUCTION_CONTOUR,
+        )
+    )
+    competing = dispatch_runtime_tick(
+        RuntimeDispatchRequest(
+            tick_input=_tick_input("runtime-topology-o01-default-competing"),
+            context=SubjectTickContext(
+                o01_entity_signals=(
+                    O01EntitySignal(
+                        signal_id="topology-o01-default-competing-1",
+                        entity_id_hint="referenced_other:manager_v1",
+                        referent_label="manager",
+                        source_authority="referenced_other",
+                        relation_class="goal_hint",
+                        claim_value="needs_report",
+                        confidence=0.82,
+                        grounded=True,
+                        quoted=False,
+                        turn_index=1,
+                        provenance="tests.runtime_topology.o01.default_competing.1",
+                    ),
+                    O01EntitySignal(
+                        signal_id="topology-o01-default-competing-2",
+                        entity_id_hint="referenced_other:manager_v2",
+                        referent_label="manager",
+                        source_authority="referenced_other",
+                        relation_class="goal_hint",
+                        claim_value="needs_report",
+                        confidence=0.79,
+                        grounded=True,
+                        quoted=False,
+                        turn_index=2,
+                        provenance="tests.runtime_topology.o01.default_competing.2",
+                    ),
+                )
+            ),
+            route_class=RuntimeRouteClass.PRODUCTION_CONTOUR,
+        )
+    )
+    assert baseline.subject_tick_result is not None
+    assert competing.subject_tick_result is not None
+    baseline_checkpoint = next(
+        checkpoint
+        for checkpoint in baseline.subject_tick_result.state.execution_checkpoints
+        if checkpoint.checkpoint_id == "rt01.o01_other_entity_model_checkpoint"
+    )
+    competing_checkpoint = next(
+        checkpoint
+        for checkpoint in competing.subject_tick_result.state.execution_checkpoints
+        if checkpoint.checkpoint_id == "rt01.o01_other_entity_model_checkpoint"
+    )
+    assert baseline_checkpoint.status.value == "allowed"
+    assert competing_checkpoint.status.value == "enforced_detour"
+    assert "default_o01_competing_entity_clarification" in competing_checkpoint.required_action
+    assert competing.subject_tick_result.state.final_execution_outcome in {
+        SubjectTickOutcome.REVALIDATE,
+        SubjectTickOutcome.REPAIR,
+        SubjectTickOutcome.HALT,
+    }
+
+
+def test_dispatch_o01_overlay_uncertainty_has_narrow_default_effect_without_explicit_require() -> None:
+    stable = dispatch_runtime_tick(
+        RuntimeDispatchRequest(
+            tick_input=_tick_input("runtime-topology-o01-overlay-stable"),
+            context=SubjectTickContext(
+                o01_entity_signals=(
+                    O01EntitySignal(
+                        signal_id="topology-o01-overlay-stable-1",
+                        entity_id_hint=None,
+                        referent_label="user",
+                        source_authority="current_user_direct",
+                        relation_class="stable_claim",
+                        claim_value="prefers_concise",
+                        confidence=0.82,
+                        grounded=True,
+                        quoted=False,
+                        turn_index=1,
+                        provenance="tests.runtime_topology.o01.overlay.stable.1",
+                    ),
+                    O01EntitySignal(
+                        signal_id="topology-o01-overlay-stable-2",
+                        entity_id_hint=None,
+                        referent_label="user",
+                        source_authority="current_user_direct",
+                        relation_class="stable_claim",
+                        claim_value="prefers_concise",
+                        confidence=0.8,
+                        grounded=True,
+                        quoted=False,
+                        turn_index=2,
+                        provenance="tests.runtime_topology.o01.overlay.stable.2",
+                    ),
+                )
+            ),
+            route_class=RuntimeRouteClass.PRODUCTION_CONTOUR,
+        )
+    )
+    ignorance = dispatch_runtime_tick(
+        RuntimeDispatchRequest(
+            tick_input=_tick_input("runtime-topology-o01-overlay-ignorance"),
+            context=SubjectTickContext(
+                o01_entity_signals=(
+                    O01EntitySignal(
+                        signal_id="topology-o01-overlay-ignorance-1",
+                        entity_id_hint=None,
+                        referent_label="user",
+                        source_authority="current_user_direct",
+                        relation_class="ignorance",
+                        claim_value="does_not_know_api_rate_limit",
+                        confidence=0.83,
+                        grounded=True,
+                        quoted=False,
+                        turn_index=1,
+                        provenance="tests.runtime_topology.o01.overlay.ignorance.1",
+                    ),
+                )
+            ),
+            route_class=RuntimeRouteClass.PRODUCTION_CONTOUR,
+        )
+    )
+    assert stable.subject_tick_result is not None
+    assert ignorance.subject_tick_result is not None
+    stable_checkpoint = next(
+        checkpoint
+        for checkpoint in stable.subject_tick_result.state.execution_checkpoints
+        if checkpoint.checkpoint_id == "rt01.o01_other_entity_model_checkpoint"
+    )
+    ignorance_checkpoint = next(
+        checkpoint
+        for checkpoint in ignorance.subject_tick_result.state.execution_checkpoints
+        if checkpoint.checkpoint_id == "rt01.o01_other_entity_model_checkpoint"
+    )
+    assert stable_checkpoint.status.value == "allowed"
+    assert ignorance_checkpoint.status.value == "enforced_detour"
+    assert "default_o01_belief_overlay_clarification" in ignorance_checkpoint.required_action
+    assert ignorance.subject_tick_result.o01_result.gate.clarification_ready is False
 
 
 def test_dispatch_s01_comparison_consumer_requirement_is_load_bearing() -> None:
