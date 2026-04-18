@@ -110,6 +110,11 @@ def _event(
     dependency_surface_present: bool = False,
     sanction_power_present: bool = False,
     access_withdrawal_present: bool = False,
+    consent_marker: bool = False,
+    repair_attempt_marker: bool = False,
+    commitment_break_marker: bool = False,
+    exclusion_marker: bool = False,
+    escalation_shift_marker: bool = False,
     legitimacy_hint_status: O04LegitimacyHintStatus = O04LegitimacyHintStatus.LEGITIMACY_UNKNOWN,
 ) -> O04InteractionEventInput:
     return O04InteractionEventInput(
@@ -122,6 +127,11 @@ def _event(
         dependency_surface_present=dependency_surface_present,
         sanction_power_present=sanction_power_present,
         access_withdrawal_present=access_withdrawal_present,
+        consent_marker=consent_marker,
+        repair_attempt_marker=repair_attempt_marker,
+        commitment_break_marker=commitment_break_marker,
+        exclusion_marker=exclusion_marker,
+        escalation_shift_marker=escalation_shift_marker,
         legitimacy_hint_status=legitimacy_hint_status,
         provenance=f"tests.o04.integration:{event_id}",
     )
@@ -379,3 +389,238 @@ def test_typed_o04_semantics_not_only_checkpoint_token_drive_policy() -> None:
         SubjectTickRestrictionCode.O04_RUPTURE_TRACKING_REQUIRED
         in rupture_restrictions
     )
+
+
+def test_legitimacy_supported_vs_absent_changes_downstream_consequence() -> None:
+    absent = _result(
+        "rt-o04-legitimacy-absent",
+        context=SubjectTickContext(
+            o01_entity_signals=_grounded_user_signals(),
+            o03_candidate_strategy=_transparent_o03_candidate("rt-o04-legitimacy-absent"),
+            p01_project_signals=(_project_signal("rt-o04-legitimacy-absent"),),
+            o04_interaction_events=(
+                _event(
+                    event_id="legit-absent-1",
+                    blocked_option_present=True,
+                    threatened_loss_present=True,
+                    dependency_surface_present=True,
+                    sanction_power_present=False,
+                    legitimacy_hint_status=O04LegitimacyHintStatus.LEGITIMACY_ABSENT,
+                ),
+            ),
+        ),
+    )
+    supported = _result(
+        "rt-o04-legitimacy-supported",
+        context=SubjectTickContext(
+            o01_entity_signals=_grounded_user_signals(),
+            o03_candidate_strategy=_transparent_o03_candidate("rt-o04-legitimacy-supported"),
+            p01_project_signals=(_project_signal("rt-o04-legitimacy-supported"),),
+            o04_interaction_events=(
+                _event(
+                    event_id="legit-supported-1",
+                    blocked_option_present=True,
+                    threatened_loss_present=True,
+                    dependency_surface_present=True,
+                    sanction_power_present=False,
+                    legitimacy_hint_status=O04LegitimacyHintStatus.LEGITIMACY_SUPPORTED,
+                ),
+            ),
+        ),
+    )
+    absent_checkpoint = next(
+        item
+        for item in absent.state.execution_checkpoints
+        if item.checkpoint_id == "rt01.o04_rupture_hostility_coercion_checkpoint"
+    )
+    supported_checkpoint = next(
+        item
+        for item in supported.state.execution_checkpoints
+        if item.checkpoint_id == "rt01.o04_rupture_hostility_coercion_checkpoint"
+    )
+    assert absent_checkpoint.status.value == "enforced_detour"
+    assert supported_checkpoint.status.value == "allowed"
+    assert "default_o04_coercive_structure_detour" in absent_checkpoint.required_action
+    assert "default_o04_coercive_structure_detour" not in supported_checkpoint.required_action
+    assert absent.state.final_execution_outcome == SubjectTickOutcome.REPAIR
+    assert supported.state.final_execution_outcome == SubjectTickOutcome.CONTINUE
+
+
+def test_prior_o04_state_bounded_rupture_carry_and_revision() -> None:
+    tick1 = _result(
+        "rt-o04-prior-chain-1",
+        context=SubjectTickContext(
+            o01_entity_signals=_grounded_user_signals(),
+            o03_candidate_strategy=_transparent_o03_candidate("rt-o04-prior-chain-1"),
+            p01_project_signals=(_project_signal("rt-o04-prior-chain-1"),),
+            o04_interaction_events=(
+                _event(
+                    event_id="chain-1a",
+                    access_withdrawal_present=True,
+                    blocked_option_present=True,
+                    threatened_loss_present=True,
+                    dependency_surface_present=True,
+                ),
+                _event(
+                    event_id="chain-1b",
+                    access_withdrawal_present=True,
+                    blocked_option_present=True,
+                    threatened_loss_present=True,
+                    dependency_surface_present=True,
+                    exclusion_marker=True,
+                ),
+            ),
+        ),
+    )
+    tick2 = _result(
+        "rt-o04-prior-chain-2",
+        context=SubjectTickContext(
+            prior_o04_state=tick1.o04_result.state,
+            o01_entity_signals=_grounded_user_signals(),
+            o03_candidate_strategy=_transparent_o03_candidate("rt-o04-prior-chain-2"),
+            p01_project_signals=(_project_signal("rt-o04-prior-chain-2"),),
+            o04_interaction_events=(
+                _event(
+                    event_id="chain-2a",
+                    access_withdrawal_present=True,
+                    blocked_option_present=False,
+                    threatened_loss_present=False,
+                    dependency_surface_present=False,
+                ),
+            ),
+        ),
+    )
+    tick3 = _result(
+        "rt-o04-prior-chain-3",
+        context=SubjectTickContext(
+            prior_o04_state=tick2.o04_result.state,
+            o01_entity_signals=_grounded_user_signals(),
+            o03_candidate_strategy=_transparent_o03_candidate("rt-o04-prior-chain-3"),
+            p01_project_signals=(_project_signal("rt-o04-prior-chain-3"),),
+            o04_interaction_events=(
+                _event(
+                    event_id="chain-3a",
+                    repair_attempt_marker=True,
+                    consent_marker=True,
+                ),
+            ),
+        ),
+    )
+    tick4 = _result(
+        "rt-o04-prior-chain-4",
+        context=SubjectTickContext(
+            prior_o04_state=tick3.o04_result.state,
+            o01_entity_signals=_grounded_user_signals(),
+            o03_candidate_strategy=_transparent_o03_candidate("rt-o04-prior-chain-4"),
+            p01_project_signals=(_project_signal("rt-o04-prior-chain-4"),),
+            o04_interaction_events=(
+                _event(event_id="chain-4a"),
+            ),
+        ),
+    )
+    assert tick1.o04_result.state.rupture_status.value == "rupture_risk_only"
+    assert tick2.o04_result.state.rupture_status.value == "rupture_risk_only"
+    assert "prior_rupture_carry_forward" in tick2.o04_result.state.uncertainty_markers
+    assert tick3.o04_result.state.rupture_status.value == "deescalated_but_not_closed"
+    assert "prior_rupture_repair_downgrade" in tick3.o04_result.state.uncertainty_markers
+    assert tick4.o04_result.state.rupture_status.value == "no_rupture_basis"
+    assert "prior_rupture_not_sticky" in tick4.o04_result.state.uncertainty_markers
+
+
+def test_same_checkpoint_status_different_typed_o04_shape_changes_restriction() -> None:
+    absent = _result(
+        "rt-o04-shape-absent",
+        context=SubjectTickContext(
+            o01_entity_signals=_grounded_user_signals(),
+            o03_candidate_strategy=_transparent_o03_candidate("rt-o04-shape-absent"),
+            p01_project_signals=(_project_signal("rt-o04-shape-absent"),),
+            o04_interaction_events=(
+                _event(
+                    event_id="shape-absent-1",
+                    blocked_option_present=True,
+                    threatened_loss_present=True,
+                    dependency_surface_present=True,
+                    sanction_power_present=True,
+                    legitimacy_hint_status=O04LegitimacyHintStatus.LEGITIMACY_ABSENT,
+                ),
+            ),
+        ),
+    )
+    supported = _result(
+        "rt-o04-shape-supported",
+        context=SubjectTickContext(
+            o01_entity_signals=_grounded_user_signals(),
+            o03_candidate_strategy=_transparent_o03_candidate("rt-o04-shape-supported"),
+            p01_project_signals=(_project_signal("rt-o04-shape-supported"),),
+            o04_interaction_events=(
+                _event(
+                    event_id="shape-supported-1",
+                    blocked_option_present=True,
+                    threatened_loss_present=True,
+                    dependency_surface_present=True,
+                    sanction_power_present=True,
+                    legitimacy_hint_status=O04LegitimacyHintStatus.LEGITIMACY_SUPPORTED,
+                ),
+            ),
+        ),
+    )
+    absent_checkpoint = next(
+        item
+        for item in absent.state.execution_checkpoints
+        if item.checkpoint_id == "rt01.o04_rupture_hostility_coercion_checkpoint"
+    )
+    supported_checkpoint = next(
+        item
+        for item in supported.state.execution_checkpoints
+        if item.checkpoint_id == "rt01.o04_rupture_hostility_coercion_checkpoint"
+    )
+    absent_restrictions = set(absent.downstream_gate.restrictions)
+    supported_restrictions = set(supported.downstream_gate.restrictions)
+    assert absent_checkpoint.status.value == "enforced_detour"
+    assert supported_checkpoint.status.value == "enforced_detour"
+    assert (
+        SubjectTickRestrictionCode.O04_PROTECTIVE_HANDOFF_CONSUMER_REQUIRED
+        in absent_restrictions
+    )
+    assert (
+        SubjectTickRestrictionCode.O04_PROTECTIVE_HANDOFF_CONSUMER_REQUIRED
+        not in supported_restrictions
+    )
+    assert (
+        SubjectTickRestrictionCode.O04_DYNAMIC_CONTRACT_CONSUMER_REQUIRED
+        in supported_restrictions
+    )
+
+
+def test_mutual_harshness_with_one_sided_leverage_preserves_asymmetry() -> None:
+    result = _result(
+        "rt-o04-asymmetry-preserved",
+        context=SubjectTickContext(
+            o01_entity_signals=_grounded_user_signals(),
+            o03_candidate_strategy=_transparent_o03_candidate("rt-o04-asymmetry-preserved"),
+            p01_project_signals=(_project_signal("rt-o04-asymmetry-preserved"),),
+            o04_interaction_events=(
+                _event(
+                    event_id="asym-1",
+                    actor_ref="agent_a",
+                    target_ref="agent_b",
+                    speech_act_kind="harsh_statement",
+                    blocked_option_present=True,
+                    threatened_loss_present=True,
+                    dependency_surface_present=True,
+                    sanction_power_present=True,
+                ),
+                _event(
+                    event_id="asym-2",
+                    actor_ref="agent_b",
+                    target_ref="agent_a",
+                    speech_act_kind="harsh_statement",
+                ),
+            ),
+        ),
+    )
+    assert result.o04_result.telemetry.directionality_kind.value in {
+        "mutual",
+        "asymmetric_mutual",
+    }
+    assert len(result.o04_result.state.coercion_candidates) > 0

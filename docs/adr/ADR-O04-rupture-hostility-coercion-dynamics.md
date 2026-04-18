@@ -13,8 +13,9 @@ This first slice provides:
 - explicit typed O04 dynamic state (`dynamic_type`, `directional_links`, leverage surface, legitimacy hint, rupture status, uncertainty flags);
 - bounded structural classification from typed interaction events (not tone-only shortcuts);
 - directionality/asymmetry-sensitive coercive-pressure gating under blocked-option/threat/dependency structure;
-- legitimacy-sensitive ambiguity preservation for high-pressure but underconstrained legitimacy cases;
+- legitimacy-sensitive differentiation for matched pressure structure (`legitimacy_supported` can downgrade to bounded enforcement/hard-bargaining branch when sanction structure is absent);
 - narrow rupture tracking from repeated withdrawal / exclusion / commitment-break patterns with repair counterevidence handling;
+- bounded prior-state rupture carry/revision for short RT01 chains (carry-forward under continued withdrawal, downgrade under repair evidence, non-sticky reset on thin single-step basis);
 - explicit require-path and narrow default-path checkpoint detours.
 
 ## Inputs
@@ -44,6 +45,7 @@ RT01 now has bounded O04 effects:
   - rupture-risk pattern,
   - legitimacy/directionality ambiguity-preserving handling;
 - downstream gate restrictions consume typed O04 semantics (directionality/coercion/rupture fields), not only checkpoint token presence.
+- one additional typed-semantic downstream branch differentiates legitimacy-absent/contested coercive pressure from legitimacy-supported pressure even when checkpoint status class matches.
 
 ## Authority Boundary
 O04 does not claim:
@@ -63,4 +65,4 @@ This ADR does **not** claim:
 - O04 remains RT01-local with a narrow consumer/gating surface.
 - Input event bundle is frontier-hosted and intentionally compact.
 - Rupture tracking is short-horizon and pattern-bounded, not long-horizon social memory.
-- Legitimacy differentiation is hint-based and conservative; unresolved legitimacy remains ambiguity-preserving fallback.
+- Legitimacy differentiation remains hint-based/coarse; unresolved legitimacy still defaults to ambiguity-preserving fallback.

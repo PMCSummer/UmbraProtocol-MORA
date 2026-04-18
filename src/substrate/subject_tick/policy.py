@@ -916,6 +916,26 @@ def evaluate_subject_tick_downstream_gate(
         restrictions.append(SubjectTickRestrictionCode.O04_TONE_ONLY_SHORTCUT_FORBIDDEN)
     if (
         state.o04_coercion_candidate_count > 0
+        and state.o04_directionality_kind != "directionality_ambiguous"
+        and not state.o04_no_safe_dynamic_claim
+    ):
+        if state.o04_legitimacy_hint_status in {"legitimacy_absent", "legitimacy_contested"}:
+            restrictions.append(
+                SubjectTickRestrictionCode.O04_PROTECTIVE_HANDOFF_CONSUMER_REQUIRED
+            )
+            if (
+                state.final_execution_outcome == SubjectTickOutcome.CONTINUE
+                and usability == SubjectTickUsabilityClass.USABLE_BOUNDED
+            ):
+                usability = SubjectTickUsabilityClass.DEGRADED_BOUNDED
+                restrictions.append(SubjectTickRestrictionCode.DOWNSTREAM_AUTHORITY_DEGRADED)
+                reason = (
+                    "o04 typed legitimacy-pressure semantics require protective handoff before unrestricted continuation"
+                )
+        elif state.o04_legitimacy_hint_status == "legitimacy_supported":
+            restrictions.append(SubjectTickRestrictionCode.O04_DYNAMIC_CONTRACT_CONSUMER_REQUIRED)
+    if (
+        state.o04_coercion_candidate_count > 0
         and state.o04_directionality_kind == "directionality_ambiguous"
     ):
         restrictions.append(

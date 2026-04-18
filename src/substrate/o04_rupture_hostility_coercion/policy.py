@@ -29,6 +29,7 @@ def build_o04_rupture_hostility_coercion(
     p01_result: P01ProjectFormationResult | None,
     history_depth_band: str,
     source_lineage: tuple[str, ...],
+    prior_state: O04DynamicModel | None = None,
     modeling_enabled: bool = True,
 ) -> O04DynamicResult:
     if not modeling_enabled:
@@ -158,6 +159,14 @@ def build_o04_rupture_hostility_coercion(
         escalation_count=escalation_count,
         history_depth_band=history_depth_band,
     )
+    rupture_status, rupture_carry_markers = _apply_prior_rupture_carry(
+        prior_state=prior_state,
+        current_status=rupture_status,
+        repeated_withdrawal_count=repeated_withdrawal_count,
+        repair_attempt_count=repair_attempt_count,
+        history_depth_band=history_depth_band,
+    )
+    uncertainty_markers.extend(rupture_carry_markers)
     dominant = _dominant_dynamic_type(
         links=tuple(links),
         rupture_status=rupture_status,
@@ -208,6 +217,7 @@ def build_o04_rupture_hostility_coercion(
                     f"dominant_dynamic_type:{dominant.value}",
                     f"directionality:{directionality_kind.value}",
                     f"rupture_status:{rupture_status.value}",
+                    f"prior_carry_applied:{'yes' if rupture_carry_markers else 'no'}",
                     f"coercion_candidates:{len(coercion_candidates)}",
                     f"hostility_candidates:{len(hostility_candidates)}",
                     "o04_structural_basis_only",
@@ -486,6 +496,13 @@ def _classify_event_dynamic_type(
         and event.threatened_loss_present
         and (event.dependency_surface_present or event.resource_control_present or event.sanction_power_present)
     ):
+        if (
+            event.legitimacy_hint_status is O04LegitimacyHintStatus.LEGITIMACY_SUPPORTED
+            and not event.sanction_power_present
+        ):
+            if event.refusal_marker:
+                return O04DynamicType.BOUNDARY_ENFORCEMENT_BOUNDED
+            return O04DynamicType.HARD_BARGAINING
         if event.refusal_marker:
             return O04DynamicType.FORCED_COMPLIANCE_CANDIDATE
         return O04DynamicType.COERCIVE_PRESSURE_CANDIDATE
@@ -585,6 +602,51 @@ def _rupture_status(
     if repair_attempt_count >= 1 and escalation_count == 0:
         return O04RuptureStatus.DEESCALATED_BUT_NOT_CLOSED
     return O04RuptureStatus.NO_RUPTURE_BASIS
+
+
+def _apply_prior_rupture_carry(
+    *,
+    prior_state: O04DynamicModel | None,
+    current_status: O04RuptureStatus,
+    repeated_withdrawal_count: int,
+    repair_attempt_count: int,
+    history_depth_band: str,
+) -> tuple[O04RuptureStatus, tuple[str, ...]]:
+    if not isinstance(prior_state, O04DynamicModel):
+        return current_status, ()
+
+    prior_status = prior_state.rupture_status
+    if prior_status not in {
+        O04RuptureStatus.RUPTURE_RISK_ONLY,
+        O04RuptureStatus.RUPTURE_ACTIVE_CANDIDATE,
+        O04RuptureStatus.DEESCALATED_BUT_NOT_CLOSED,
+    }:
+        return current_status, ()
+
+    # Bounded carry: persist rupture-risk one step under continued withdrawal signals.
+    if (
+        current_status is O04RuptureStatus.NO_RUPTURE_BASIS
+        and repeated_withdrawal_count >= 1
+        and repair_attempt_count == 0
+    ):
+        return O04RuptureStatus.RUPTURE_RISK_ONLY, ("prior_rupture_carry_forward",)
+
+    # Bounded downgrade: prior rupture-risk/active can soften under fresh repair evidence.
+    if (
+        prior_status in {
+            O04RuptureStatus.RUPTURE_RISK_ONLY,
+            O04RuptureStatus.RUPTURE_ACTIVE_CANDIDATE,
+        }
+        and repair_attempt_count >= 1
+        and repeated_withdrawal_count == 0
+    ):
+        return O04RuptureStatus.DEESCALATED_BUT_NOT_CLOSED, ("prior_rupture_repair_downgrade",)
+
+    # No sticky carry on thin single-step evidence: reset to current recompute.
+    if current_status is O04RuptureStatus.NO_RUPTURE_BASIS and history_depth_band == "single":
+        return current_status, ("prior_rupture_not_sticky",)
+
+    return current_status, ()
 
 
 def _dominant_dynamic_type(

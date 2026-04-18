@@ -3563,6 +3563,7 @@ def execute_subject_tick(
         p01_result=p01_result,
         history_depth_band=o04_history_depth_band,
         source_lineage=lineage,
+        prior_state=context.prior_o04_state,
         modeling_enabled=not context.disable_o04_enforcement,
     )
     o04_view = derive_o04_dynamic_consumer_view(o04_result)
