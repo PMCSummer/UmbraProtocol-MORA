@@ -187,6 +187,11 @@ from substrate.p01_project_formation import (
     build_p01_project_formation,
     derive_p01_project_formation_consumer_view,
 )
+from substrate.o04_rupture_hostility_coercion import (
+    O04InteractionEventInput,
+    build_o04_rupture_hostility_coercion,
+    derive_o04_dynamic_consumer_view,
+)
 from substrate.s01_efference_copy import (
     S01EfferenceCopyState,
     build_s01_efference_copy,
@@ -222,6 +227,7 @@ ATTEMPTED_SUBJECT_TICK_PATHS: tuple[str, ...] = (
     "subject_tick.evaluate_o02_intersubjective_allostasis",
     "subject_tick.evaluate_o03_strategy_class_evaluation",
     "subject_tick.evaluate_p01_project_formation",
+    "subject_tick.evaluate_o04_rupture_hostility_coercion",
     "subject_tick.world_seam_enforcement",
     "subject_tick.resolve_bounded_runtime_outcome",
     "subject_tick.downstream_gate",
@@ -3541,6 +3547,209 @@ def execute_subject_tick(
         )
     )
 
+    o04_events = tuple(
+        event
+        for event in context.o04_interaction_events
+        if isinstance(event, O04InteractionEventInput)
+    )
+    o04_history_depth_band = (
+        "deep" if len(o04_events) >= 4 else "medium" if len(o04_events) >= 2 else "single"
+    )
+    o04_result = build_o04_rupture_hostility_coercion(
+        tick_id=tick_id,
+        tick_index=tick_index,
+        interaction_events=o04_events,
+        o03_result=o03_result,
+        p01_result=p01_result,
+        history_depth_band=o04_history_depth_band,
+        source_lineage=lineage,
+        modeling_enabled=not context.disable_o04_enforcement,
+    )
+    o04_view = derive_o04_dynamic_consumer_view(o04_result)
+    o04_enter_values = {
+        "dynamic_type": o04_result.telemetry.dynamic_type.value,
+        "rupture_status": o04_result.telemetry.rupture_status.value,
+        "severity_band": o04_result.telemetry.severity_band.value,
+        "certainty_band": o04_result.telemetry.certainty_band.value,
+        "directionality_kind": o04_result.telemetry.directionality_kind.value,
+        "leverage_surface": o04_result.telemetry.leverage_surface.value,
+        "legitimacy_hint_status": o04_result.telemetry.legitimacy_hint_status.value,
+        "coercion_candidate_count": o04_result.telemetry.coercion_candidate_count,
+        "hostility_candidate_count": o04_result.telemetry.hostility_candidate_count,
+        "no_safe_dynamic_claim": o04_result.telemetry.no_safe_dynamic_claim,
+        "dependency_model_underconstrained": (
+            o04_result.state.dependency_model_underconstrained
+        ),
+        "downstream_consumer_ready": o04_result.telemetry.downstream_consumer_ready,
+    }
+    trace_emit_active("o04_rupture_hostility_coercion", "enter", o04_enter_values)
+    o04_checkpoint_status = SubjectTickCheckpointStatus.ALLOWED
+    o04_checkpoint_reason = o04_result.gate.reason
+    o04_default_coercive_structure_detour = False
+    o04_default_rupture_risk_detour = False
+    o04_default_legitimacy_ambiguity_detour = False
+    if not context.disable_o04_enforcement:
+        if (
+            context.require_o04_dynamic_contract_consumer
+            and not o04_view.dynamic_contract_consumer_ready
+            and halt_reason is None
+        ):
+            revalidation_needed = True
+            o04_checkpoint_status = SubjectTickCheckpointStatus.ENFORCED_DETOUR
+            o04_checkpoint_reason = (
+                "o04 dynamic-contract consumer requested but structural dynamic basis is not ready"
+            )
+            if active_execution_mode != "halt_execution":
+                active_execution_mode = "revalidate_scope"
+        if (
+            context.require_o04_directionality_consumer
+            and not o04_view.directionality_consumer_ready
+            and halt_reason is None
+        ):
+            revalidation_needed = True
+            o04_checkpoint_status = SubjectTickCheckpointStatus.ENFORCED_DETOUR
+            o04_checkpoint_reason = (
+                "o04 directionality consumer requested but actor-target structure remains ambiguous"
+            )
+            if active_execution_mode != "halt_execution":
+                active_execution_mode = "revalidate_scope"
+        if (
+            context.require_o04_protective_handoff_consumer
+            and not o04_view.protective_handoff_consumer_ready
+            and halt_reason is None
+        ):
+            revalidation_needed = True
+            o04_checkpoint_status = SubjectTickCheckpointStatus.ENFORCED_DETOUR
+            o04_checkpoint_reason = (
+                "o04 protective handoff consumer requested but coercive/rupture dynamic handoff is not ready"
+            )
+            if active_execution_mode != "halt_execution":
+                active_execution_mode = "revalidate_scope"
+        if (
+            not context.require_o04_dynamic_contract_consumer
+            and not context.require_o04_directionality_consumer
+            and not context.require_o04_protective_handoff_consumer
+            and bool(o04_events)
+            and o04_view.coercive_structure_candidate
+            and not o04_view.no_strong_dynamic_claim
+            and o04_view.directionality_consumer_ready
+            and halt_reason is None
+            and not repair_needed
+        ):
+            repair_needed = True
+            o04_default_coercive_structure_detour = True
+            o04_checkpoint_status = SubjectTickCheckpointStatus.ENFORCED_DETOUR
+            o04_checkpoint_reason = (
+                "o04 default contour requires structural coercive-pressure detour before continuation"
+            )
+            if active_execution_mode not in {"halt_execution", "revalidate_scope"}:
+                active_execution_mode = "repair_runtime_path"
+        if (
+            not context.require_o04_dynamic_contract_consumer
+            and not context.require_o04_directionality_consumer
+            and not context.require_o04_protective_handoff_consumer
+            and bool(o04_events)
+            and o04_view.rupture_risk_or_active
+            and halt_reason is None
+            and not revalidation_needed
+        ):
+            revalidation_needed = True
+            o04_default_rupture_risk_detour = True
+            o04_checkpoint_status = SubjectTickCheckpointStatus.ENFORCED_DETOUR
+            o04_checkpoint_reason = (
+                "o04 default contour requires rupture-risk revalidation before continuation"
+            )
+            if active_execution_mode != "halt_execution":
+                active_execution_mode = "revalidate_scope"
+        if (
+            not context.require_o04_dynamic_contract_consumer
+            and not context.require_o04_directionality_consumer
+            and not context.require_o04_protective_handoff_consumer
+            and bool(o04_events)
+            and o04_view.ambiguity_preserving_required
+            and o04_view.coercive_structure_candidate
+            and halt_reason is None
+            and not revalidation_needed
+            and not repair_needed
+        ):
+            revalidation_needed = True
+            o04_default_legitimacy_ambiguity_detour = True
+            o04_checkpoint_status = SubjectTickCheckpointStatus.ENFORCED_DETOUR
+            o04_checkpoint_reason = (
+                "o04 default contour preserves ambiguity when legitimacy/directionality is underconstrained"
+            )
+            if active_execution_mode != "halt_execution":
+                active_execution_mode = "revalidate_scope"
+    else:
+        o04_checkpoint_status = SubjectTickCheckpointStatus.ENFORCED_DETOUR
+        o04_checkpoint_reason = (
+            "o04 rupture/hostility/coercion enforcement disabled in ablation context"
+        )
+    o04_required_actions: list[str] = []
+    if context.require_o04_dynamic_contract_consumer:
+        o04_required_actions.append("require_o04_dynamic_contract_consumer")
+    if context.require_o04_directionality_consumer:
+        o04_required_actions.append("require_o04_directionality_consumer")
+    if context.require_o04_protective_handoff_consumer:
+        o04_required_actions.append("require_o04_protective_handoff_consumer")
+    if o04_default_coercive_structure_detour:
+        o04_required_actions.append("default_o04_coercive_structure_detour")
+    if o04_default_rupture_risk_detour:
+        o04_required_actions.append("default_o04_rupture_risk_detour")
+    if o04_default_legitimacy_ambiguity_detour:
+        o04_required_actions.append("default_o04_legitimacy_ambiguity_detour")
+    if o04_view.coercive_structure_candidate:
+        o04_required_actions.append("coercive_structure_candidate")
+    if o04_view.rupture_risk_or_active:
+        o04_required_actions.append("rupture_risk_active")
+    if o04_result.state.legitimacy_boundary_underconstrained:
+        o04_required_actions.append("legitimacy_underconstrained")
+    if not o04_view.directionality_consumer_ready:
+        o04_required_actions.append("directionality_ambiguous")
+    if o04_result.state.tone_shortcut_forbidden_applied:
+        o04_required_actions.append("tone_shortcut_forbidden_applied")
+    if o04_result.state.no_safe_dynamic_claim:
+        o04_required_actions.append("no_safe_dynamic_claim")
+    if o04_result.state.dependency_model_underconstrained:
+        o04_required_actions.append("dependency_model_underconstrained")
+    if not o04_required_actions:
+        o04_required_actions.append("o04_optional")
+    o04_trace_values = {
+        "dynamic_type": o04_result.telemetry.dynamic_type.value,
+        "rupture_status": o04_result.telemetry.rupture_status.value,
+        "severity_band": o04_result.telemetry.severity_band.value,
+        "certainty_band": o04_result.telemetry.certainty_band.value,
+        "directionality_kind": o04_result.telemetry.directionality_kind.value,
+        "leverage_surface": o04_result.telemetry.leverage_surface.value,
+        "legitimacy_hint_status": o04_result.telemetry.legitimacy_hint_status.value,
+        "coercion_candidate_count": o04_result.telemetry.coercion_candidate_count,
+        "hostility_candidate_count": o04_result.telemetry.hostility_candidate_count,
+        "no_safe_dynamic_claim": o04_result.telemetry.no_safe_dynamic_claim,
+        "dependency_model_underconstrained": (
+            o04_result.state.dependency_model_underconstrained
+        ),
+        "downstream_consumer_ready": o04_result.telemetry.downstream_consumer_ready,
+    }
+    trace_emit_active("o04_rupture_hostility_coercion", "decision", o04_trace_values)
+    if o04_checkpoint_status != SubjectTickCheckpointStatus.ALLOWED:
+        trace_emit_active(
+            "o04_rupture_hostility_coercion",
+            "blocked",
+            o04_trace_values,
+            note=o04_checkpoint_reason,
+        )
+    trace_emit_active("o04_rupture_hostility_coercion", "exit", o04_trace_values)
+    checkpoints.append(
+        SubjectTickCheckpointResult(
+            checkpoint_id="rt01.o04_rupture_hostility_coercion_checkpoint",
+            source_contract="o04_rupture_hostility_coercion.dynamic_model",
+            status=o04_checkpoint_status,
+            required_action=";".join(dict.fromkeys(o04_required_actions)),
+            applied_action=active_execution_mode,
+            reason=o04_checkpoint_reason,
+        )
+    )
+
     if halt_reason is not None:
         final_outcome = SubjectTickOutcome.HALT
         execution_stance = SubjectTickExecutionStance.HALT_PATH
@@ -4228,6 +4437,25 @@ def execute_subject_tick(
         p01_stale_active_project_detected=p01_result.state.stale_active_project_detected,
         p01_project_handoff_ready=p01_result.gate.project_handoff_consumer_ready,
         p01_bypass_resistance_status=p01_result.state.bypass_resistance_status,
+        o04_dynamic_type=o04_result.telemetry.dynamic_type.value,
+        o04_rupture_status=o04_result.state.rupture_status.value,
+        o04_severity_band=o04_result.telemetry.severity_band.value,
+        o04_certainty_band=o04_result.telemetry.certainty_band.value,
+        o04_directionality_kind=o04_result.telemetry.directionality_kind.value,
+        o04_leverage_surface=o04_result.telemetry.leverage_surface.value,
+        o04_legitimacy_hint_status=o04_result.telemetry.legitimacy_hint_status.value,
+        o04_coercion_candidate_count=len(o04_result.state.coercion_candidates),
+        o04_hostility_candidate_count=len(o04_result.state.hostility_candidates),
+        o04_no_safe_dynamic_claim=o04_result.state.no_safe_dynamic_claim,
+        o04_dependency_model_underconstrained=(
+            o04_result.state.dependency_model_underconstrained
+        ),
+        o04_tone_shortcut_forbidden_applied=o04_result.state.tone_shortcut_forbidden_applied,
+        o04_dynamic_contract_ready=o04_result.gate.dynamic_contract_consumer_ready,
+        o04_directionality_consumer_ready=o04_result.gate.directionality_consumer_ready,
+        o04_protective_handoff_consumer_ready=(
+            o04_result.gate.protective_handoff_consumer_ready
+        ),
     )
     gate = evaluate_subject_tick_downstream_gate(state)
     telemetry = build_subject_tick_telemetry(
@@ -4235,7 +4463,7 @@ def execute_subject_tick(
         attempted_paths=ATTEMPTED_SUBJECT_TICK_PATHS,
         downstream_gate=gate,
         causal_basis=(
-            "bounded runtime execution spine enforces roadmap authority roles for C04/C05, consumes world-entry, s01 efference-copy, s02 prediction-boundary seam, s03 ownership-weighted learning, s04 interoceptive self-binding, s05 multi-cause attribution, s-minimal, a-line, m-minimal, n-minimal, t01 semantic-field, t02 relation-binding, t03 hypothesis-competition, t04 attention-schema, o01 other-entity modeling, o02 intersubjective allostasis, o03 strategy-class evaluation, and p01 authority-bounded project-formation gates, and keeps D01 observability-only over fixed R->C order"
+            "bounded runtime execution spine enforces roadmap authority roles for C04/C05, consumes world-entry, s01 efference-copy, s02 prediction-boundary seam, s03 ownership-weighted learning, s04 interoceptive self-binding, s05 multi-cause attribution, s-minimal, a-line, m-minimal, n-minimal, t01 semantic-field, t02 relation-binding, t03 hypothesis-competition, t04 attention-schema, o01 other-entity modeling, o02 intersubjective allostasis, o03 strategy-class evaluation, p01 authority-bounded project-formation, and o04 rupture/hostility/coercion dynamics gates, and keeps D01 observability-only over fixed R->C order"
         ),
     )
     abstain = final_outcome in {SubjectTickOutcome.REPAIR, SubjectTickOutcome.REVALIDATE}
@@ -4327,6 +4555,7 @@ def execute_subject_tick(
         o02_result=o02_result,
         o03_result=o03_result,
         p01_result=p01_result,
+        o04_result=o04_result,
         t01_result=t01_result,
         t02_result=t02_result,
         t03_result=t03_result,

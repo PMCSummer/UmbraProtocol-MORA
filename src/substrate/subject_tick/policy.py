@@ -68,6 +68,7 @@ def evaluate_subject_tick_downstream_gate(
         SubjectTickRestrictionCode.O02_INTERSUBJECTIVE_ALLOSTASIS_CONTRACT_MUST_BE_READ,
         SubjectTickRestrictionCode.O03_STRATEGY_CLASS_EVALUATION_CONTRACT_MUST_BE_READ,
         SubjectTickRestrictionCode.P01_PROJECT_FORMATION_CONTRACT_MUST_BE_READ,
+        SubjectTickRestrictionCode.O04_DYNAMIC_CONTRACT_MUST_BE_READ,
     ]
     usability = SubjectTickUsabilityClass.USABLE_BOUNDED
     accepted = True
@@ -872,6 +873,83 @@ def evaluate_subject_tick_downstream_gate(
         accepted = False
         usability = SubjectTickUsabilityClass.BLOCKED
         reason = "p01 no-safe-formation state blocks project handoff continuation until grounding/arbitration constraints are resolved"
+
+    o04_checkpoint = next(
+        (
+            checkpoint
+            for checkpoint in state.execution_checkpoints
+            if checkpoint.checkpoint_id == "rt01.o04_rupture_hostility_coercion_checkpoint"
+        ),
+        None,
+    )
+    if o04_checkpoint is not None:
+        if "require_o04_dynamic_contract_consumer" in o04_checkpoint.required_action:
+            restrictions.append(
+                SubjectTickRestrictionCode.O04_DYNAMIC_CONTRACT_CONSUMER_REQUIRED
+            )
+        if "require_o04_directionality_consumer" in o04_checkpoint.required_action:
+            restrictions.append(
+                SubjectTickRestrictionCode.O04_DIRECTIONALITY_CONSUMER_REQUIRED
+            )
+        if "require_o04_protective_handoff_consumer" in o04_checkpoint.required_action:
+            restrictions.append(
+                SubjectTickRestrictionCode.O04_PROTECTIVE_HANDOFF_CONSUMER_REQUIRED
+            )
+        if "default_o04_coercive_structure_detour" in o04_checkpoint.required_action:
+            restrictions.append(
+                SubjectTickRestrictionCode.O04_STRONG_COERCION_CLAIM_REQUIRES_STRUCTURE
+            )
+        if "default_o04_rupture_risk_detour" in o04_checkpoint.required_action:
+            restrictions.append(SubjectTickRestrictionCode.O04_RUPTURE_TRACKING_REQUIRED)
+        if "default_o04_legitimacy_ambiguity_detour" in o04_checkpoint.required_action:
+            restrictions.append(
+                SubjectTickRestrictionCode.O04_DIRECTIONALITY_REQUIRED_FOR_STRONG_PRESSURE_CLAIM
+            )
+        if "tone_shortcut_forbidden_applied" in o04_checkpoint.required_action:
+            restrictions.append(SubjectTickRestrictionCode.O04_TONE_ONLY_SHORTCUT_FORBIDDEN)
+        if "directionality_ambiguous" in o04_checkpoint.required_action:
+            restrictions.append(
+                SubjectTickRestrictionCode.O04_DIRECTIONALITY_REQUIRED_FOR_STRONG_PRESSURE_CLAIM
+            )
+
+    if state.o04_tone_shortcut_forbidden_applied:
+        restrictions.append(SubjectTickRestrictionCode.O04_TONE_ONLY_SHORTCUT_FORBIDDEN)
+    if (
+        state.o04_coercion_candidate_count > 0
+        and state.o04_directionality_kind == "directionality_ambiguous"
+    ):
+        restrictions.append(
+            SubjectTickRestrictionCode.O04_DIRECTIONALITY_REQUIRED_FOR_STRONG_PRESSURE_CLAIM
+        )
+        restrictions.append(SubjectTickRestrictionCode.DOWNSTREAM_AUTHORITY_DEGRADED)
+        if state.final_execution_outcome == SubjectTickOutcome.CONTINUE:
+            accepted = False
+            usability = SubjectTickUsabilityClass.BLOCKED
+            reason = "o04 coercive-pressure claim requires non-ambiguous directionality before continuation"
+    if state.o04_coercion_candidate_count > 0:
+        restrictions.append(
+            SubjectTickRestrictionCode.O04_STRONG_COERCION_CLAIM_REQUIRES_STRUCTURE
+        )
+    if state.o04_rupture_status in {
+        "rupture_risk_only",
+        "rupture_active_candidate",
+        "deescalated_but_not_closed",
+    }:
+        restrictions.append(SubjectTickRestrictionCode.O04_RUPTURE_TRACKING_REQUIRED)
+        if (
+            state.final_execution_outcome == SubjectTickOutcome.CONTINUE
+            and usability == SubjectTickUsabilityClass.USABLE_BOUNDED
+        ):
+            usability = SubjectTickUsabilityClass.DEGRADED_BOUNDED
+            reason = "o04 rupture-tracking surface requires bounded caution before unrestricted continuation"
+    if o04_checkpoint is not None and o04_checkpoint.status.value != "allowed":
+        restrictions.append(SubjectTickRestrictionCode.DOWNSTREAM_AUTHORITY_DEGRADED)
+        if state.final_execution_outcome == SubjectTickOutcome.CONTINUE:
+            accepted = False
+            usability = SubjectTickUsabilityClass.BLOCKED
+            reason = (
+                "o04 rupture/hostility/coercion checkpoint requires detour before downstream continuation"
+            )
 
     return SubjectTickGateDecision(
         accepted=accepted,

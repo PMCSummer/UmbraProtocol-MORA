@@ -21,6 +21,11 @@ if TYPE_CHECKING:
         O03CandidateStrategyInput,
         O03StrategyEvaluationResult,
     )
+    from substrate.o04_rupture_hostility_coercion import (
+        O04DynamicModel,
+        O04DynamicResult,
+        O04InteractionEventInput,
+    )
     from substrate.p01_project_formation import (
         P01IntentionStackState,
         P01ProjectFormationResult,
@@ -249,6 +254,20 @@ class SubjectTickRestrictionCode(StrEnum):
         "p01_prompt_local_substitution_forbidden"
     )
     P01_STALE_ACTIVE_PROJECT_FORBIDDEN = "p01_stale_active_project_forbidden"
+    O04_DYNAMIC_CONTRACT_MUST_BE_READ = "o04_dynamic_contract_must_be_read"
+    O04_DYNAMIC_CONTRACT_CONSUMER_REQUIRED = "o04_dynamic_contract_consumer_required"
+    O04_DIRECTIONALITY_CONSUMER_REQUIRED = "o04_directionality_consumer_required"
+    O04_PROTECTIVE_HANDOFF_CONSUMER_REQUIRED = (
+        "o04_protective_handoff_consumer_required"
+    )
+    O04_STRONG_COERCION_CLAIM_REQUIRES_STRUCTURE = (
+        "o04_strong_coercion_claim_requires_structure"
+    )
+    O04_TONE_ONLY_SHORTCUT_FORBIDDEN = "o04_tone_only_shortcut_forbidden"
+    O04_DIRECTIONALITY_REQUIRED_FOR_STRONG_PRESSURE_CLAIM = (
+        "o04_directionality_required_for_strong_pressure_claim"
+    )
+    O04_RUPTURE_TRACKING_REQUIRED = "o04_rupture_tracking_required"
     DOWNSTREAM_AUTHORITY_DEGRADED = "downstream_authority_degraded"
 
 
@@ -319,6 +338,7 @@ class SubjectTickContext:
     prior_s05_state: S05MultiCauseAttributionState | None = None
     prior_o01_state: O01OtherEntityModelState | None = None
     prior_o02_state: O02IntersubjectiveAllostasisState | None = None
+    prior_o04_state: O04DynamicModel | None = None
     prior_p01_state: P01IntentionStackState | None = None
     dependency_trigger_hits: tuple[str, ...] = ()
     context_shift_markers: tuple[str, ...] = ()
@@ -408,10 +428,15 @@ class SubjectTickContext:
     require_p01_authority_bound_consumer: bool = False
     require_p01_project_handoff_consumer: bool = False
     disable_p01_enforcement: bool = False
+    require_o04_dynamic_contract_consumer: bool = False
+    require_o04_directionality_consumer: bool = False
+    require_o04_protective_handoff_consumer: bool = False
+    disable_o04_enforcement: bool = False
     o01_entity_signals: tuple[O01EntitySignal, ...] = ()
     o02_interaction_diagnostics: O02InteractionDiagnosticsInput | None = None
     o03_candidate_strategy: O03CandidateStrategyInput | None = None
     p01_project_signals: tuple[P01ProjectSignalInput, ...] = ()
+    o04_interaction_events: tuple[O04InteractionEventInput, ...] = ()
     source_lineage: tuple[str, ...] = ()
 
 
@@ -863,6 +888,21 @@ class SubjectTickState:
     p01_stale_active_project_detected: bool = False
     p01_project_handoff_ready: bool = False
     p01_bypass_resistance_status: str = "p01_not_available"
+    o04_dynamic_type: str = "ambiguous_pressure"
+    o04_rupture_status: str = "no_rupture_basis"
+    o04_severity_band: str = "low"
+    o04_certainty_band: str = "weak"
+    o04_directionality_kind: str = "directionality_ambiguous"
+    o04_leverage_surface: str = "none_detected"
+    o04_legitimacy_hint_status: str = "legitimacy_unknown"
+    o04_coercion_candidate_count: int = 0
+    o04_hostility_candidate_count: int = 0
+    o04_no_safe_dynamic_claim: bool = True
+    o04_dependency_model_underconstrained: bool = True
+    o04_tone_shortcut_forbidden_applied: bool = False
+    o04_dynamic_contract_ready: bool = False
+    o04_directionality_consumer_ready: bool = False
+    o04_protective_handoff_consumer_ready: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -1207,6 +1247,7 @@ class SubjectTickResult:
     o02_result: O02IntersubjectiveAllostasisResult
     o03_result: O03StrategyEvaluationResult
     p01_result: P01ProjectFormationResult
+    o04_result: O04DynamicResult
     t01_result: T01ActiveFieldResult
     t02_result: T02ConstrainedSceneResult
     t03_result: T03CompetitionResult

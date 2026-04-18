@@ -41,6 +41,7 @@ HOSTED_CONTOUR_SEGMENTS = (
     "o02_intersubjective_allostasis",
     "o03_strategy_class_evaluation",
     "p01_project_formation",
+    "o04_rupture_hostility_coercion",
     "s_minimal_contour",
     "a_line_normalization",
     "m_minimal",
@@ -154,6 +155,20 @@ HOSTED_CONTOUR_FIELDS: dict[str, set[str]] = {
         "no_safe_project_formation",
         "project_handoff_ready",
         "prompt_local_capture_risk",
+        "downstream_consumer_ready",
+    },
+    "o04_rupture_hostility_coercion": {
+        "dynamic_type",
+        "rupture_status",
+        "severity_band",
+        "certainty_band",
+        "directionality_kind",
+        "leverage_surface",
+        "legitimacy_hint_status",
+        "coercion_candidate_count",
+        "hostility_candidate_count",
+        "no_safe_dynamic_claim",
+        "dependency_model_underconstrained",
         "downstream_consumer_ready",
     },
     "s_minimal_contour": {
@@ -633,6 +648,9 @@ def test_hosted_contour_segments_follow_real_runtime_order(tmp_path: Path) -> No
         events, "p01_project_formation"
     )
     assert _first_order(events, "p01_project_formation") < _first_order(
+        events, "o04_rupture_hostility_coercion"
+    )
+    assert _first_order(events, "o04_rupture_hostility_coercion") < _first_order(
         events, "bounded_outcome_resolution"
     )
     assert _first_order(events, "s_minimal_contour") < _first_order(events, "a_line_normalization")
@@ -696,6 +714,7 @@ def test_representative_modules_have_runtime_steps(tmp_path: Path) -> None:
         "o02_intersubjective_allostasis",
         "o03_strategy_class_evaluation",
         "p01_project_formation",
+        "o04_rupture_hostility_coercion",
         "downstream_obedience",
         "subject_tick",
     ):
