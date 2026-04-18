@@ -40,6 +40,7 @@ HOSTED_CONTOUR_SEGMENTS = (
     "o01_other_entity_model",
     "o02_intersubjective_allostasis",
     "o03_strategy_class_evaluation",
+    "p01_project_formation",
     "s_minimal_contour",
     "a_line_normalization",
     "m_minimal",
@@ -141,6 +142,18 @@ HOSTED_CONTOUR_FIELDS: dict[str, set[str]] = {
         "entropy_burden_band",
         "no_safe_classification",
         "strategy_underconstrained",
+        "downstream_consumer_ready",
+    },
+    "p01_project_formation": {
+        "active_project_count",
+        "candidate_project_count",
+        "suspended_project_count",
+        "arbitration_count",
+        "conflicting_authority",
+        "blocked_pending_grounding",
+        "no_safe_project_formation",
+        "project_handoff_ready",
+        "prompt_local_capture_risk",
         "downstream_consumer_ready",
     },
     "s_minimal_contour": {
@@ -617,6 +630,9 @@ def test_hosted_contour_segments_follow_real_runtime_order(tmp_path: Path) -> No
         events, "o03_strategy_class_evaluation"
     )
     assert _first_order(events, "o03_strategy_class_evaluation") < _first_order(
+        events, "p01_project_formation"
+    )
+    assert _first_order(events, "p01_project_formation") < _first_order(
         events, "bounded_outcome_resolution"
     )
     assert _first_order(events, "s_minimal_contour") < _first_order(events, "a_line_normalization")
@@ -679,6 +695,7 @@ def test_representative_modules_have_runtime_steps(tmp_path: Path) -> None:
         "o01_other_entity_model",
         "o02_intersubjective_allostasis",
         "o03_strategy_class_evaluation",
+        "p01_project_formation",
         "downstream_obedience",
         "subject_tick",
     ):

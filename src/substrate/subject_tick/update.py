@@ -182,6 +182,11 @@ from substrate.o03_strategy_class_evaluation import (
     build_o03_strategy_class_evaluation,
     derive_o03_strategy_consumer_view,
 )
+from substrate.p01_project_formation import (
+    P01ProjectSignalInput,
+    build_p01_project_formation,
+    derive_p01_project_formation_consumer_view,
+)
 from substrate.s01_efference_copy import (
     S01EfferenceCopyState,
     build_s01_efference_copy,
@@ -216,6 +221,7 @@ ATTEMPTED_SUBJECT_TICK_PATHS: tuple[str, ...] = (
     "subject_tick.evaluate_o01_other_entity_model",
     "subject_tick.evaluate_o02_intersubjective_allostasis",
     "subject_tick.evaluate_o03_strategy_class_evaluation",
+    "subject_tick.evaluate_p01_project_formation",
     "subject_tick.world_seam_enforcement",
     "subject_tick.resolve_bounded_runtime_outcome",
     "subject_tick.downstream_gate",
@@ -3348,6 +3354,173 @@ def execute_subject_tick(
         )
     )
 
+    p01_signals = tuple(
+        signal
+        for signal in context.p01_project_signals
+        if isinstance(signal, P01ProjectSignalInput)
+    )
+    p01_result = build_p01_project_formation(
+        tick_id=tick_id,
+        tick_index=tick_index,
+        signals=p01_signals,
+        prior_state=context.prior_p01_state,
+        o03_result=o03_result,
+        source_lineage=lineage,
+        formation_enabled=not context.disable_p01_enforcement,
+    )
+    p01_view = derive_p01_project_formation_consumer_view(p01_result)
+    p01_enter_values = {
+        "active_project_count": len(p01_result.state.active_projects),
+        "candidate_project_count": len(p01_result.state.candidate_projects),
+        "suspended_project_count": len(p01_result.state.suspended_projects),
+        "arbitration_count": len(p01_result.state.arbitration_records),
+        "conflicting_authority": p01_result.state.conflicting_authority,
+        "blocked_pending_grounding": p01_result.state.blocked_pending_grounding,
+        "no_safe_project_formation": p01_result.state.no_safe_project_formation,
+        "project_handoff_ready": p01_result.gate.project_handoff_consumer_ready,
+        "prompt_local_capture_risk": p01_result.state.prompt_local_capture_risk,
+        "downstream_consumer_ready": p01_result.telemetry.downstream_consumer_ready,
+    }
+    trace_emit_active("p01_project_formation", "enter", p01_enter_values)
+    p01_checkpoint_status = SubjectTickCheckpointStatus.ALLOWED
+    p01_checkpoint_reason = p01_result.gate.reason
+    p01_default_missing_precondition_detour = False
+    p01_default_conflict_arbitration_detour = False
+    if not context.disable_p01_enforcement:
+        if (
+            context.require_p01_intention_stack_consumer
+            and not p01_view.intention_stack_consumer_ready
+            and halt_reason is None
+        ):
+            revalidation_needed = True
+            p01_checkpoint_status = SubjectTickCheckpointStatus.ENFORCED_DETOUR
+            p01_checkpoint_reason = (
+                "p01 intention-stack consumer requested but stack is not lawfully consumable"
+            )
+            if active_execution_mode != "halt_execution":
+                active_execution_mode = "revalidate_scope"
+        if (
+            context.require_p01_authority_bound_consumer
+            and not p01_view.authority_bound_consumer_ready
+            and halt_reason is None
+        ):
+            revalidation_needed = True
+            p01_checkpoint_status = SubjectTickCheckpointStatus.ENFORCED_DETOUR
+            p01_checkpoint_reason = (
+                "p01 authority-bound consumer requested but authority conflict/prompt-local capture risk remains unresolved"
+            )
+            if active_execution_mode != "halt_execution":
+                active_execution_mode = "revalidate_scope"
+        if (
+            context.require_p01_project_handoff_consumer
+            and not p01_view.project_handoff_consumer_ready
+            and halt_reason is None
+        ):
+            revalidation_needed = True
+            p01_checkpoint_status = SubjectTickCheckpointStatus.ENFORCED_DETOUR
+            p01_checkpoint_reason = (
+                "p01 project handoff consumer requested but no authority-bounded active project is ready"
+            )
+            if active_execution_mode != "halt_execution":
+                active_execution_mode = "revalidate_scope"
+        if (
+            not context.require_p01_intention_stack_consumer
+            and not context.require_p01_authority_bound_consumer
+            and not context.require_p01_project_handoff_consumer
+            and bool(p01_signals)
+            and p01_result.state.blocked_pending_grounding
+            and halt_reason is None
+            and not revalidation_needed
+        ):
+            revalidation_needed = True
+            p01_default_missing_precondition_detour = True
+            p01_checkpoint_status = SubjectTickCheckpointStatus.ENFORCED_DETOUR
+            p01_checkpoint_reason = (
+                "p01 default contour requires grounding/precondition resolution before activating blocked project candidate"
+            )
+            if active_execution_mode != "halt_execution":
+                active_execution_mode = "revalidate_scope"
+        if (
+            not context.require_p01_intention_stack_consumer
+            and not context.require_p01_authority_bound_consumer
+            and not context.require_p01_project_handoff_consumer
+            and bool(p01_signals)
+            and p01_view.requires_conflict_arbitration
+            and halt_reason is None
+            and not revalidation_needed
+        ):
+            revalidation_needed = True
+            p01_default_conflict_arbitration_detour = True
+            p01_checkpoint_status = SubjectTickCheckpointStatus.ENFORCED_DETOUR
+            p01_checkpoint_reason = (
+                "p01 default contour requires explicit authority arbitration before continuing with conflicting project signals"
+            )
+            if active_execution_mode != "halt_execution":
+                active_execution_mode = "revalidate_scope"
+    else:
+        p01_checkpoint_status = SubjectTickCheckpointStatus.ENFORCED_DETOUR
+        p01_checkpoint_reason = (
+            "p01 project formation enforcement disabled in ablation context"
+        )
+
+    p01_required_actions: list[str] = []
+    if context.require_p01_intention_stack_consumer:
+        p01_required_actions.append("require_p01_intention_stack_consumer")
+    if context.require_p01_authority_bound_consumer:
+        p01_required_actions.append("require_p01_authority_bound_consumer")
+    if context.require_p01_project_handoff_consumer:
+        p01_required_actions.append("require_p01_project_handoff_consumer")
+    if p01_default_missing_precondition_detour:
+        p01_required_actions.append("default_p01_missing_precondition_detour")
+    if p01_default_conflict_arbitration_detour:
+        p01_required_actions.append("default_p01_conflict_arbitration_detour")
+    if p01_result.state.no_safe_project_formation:
+        p01_required_actions.append("no_safe_project_formation")
+    if p01_result.state.candidate_only_without_activation_basis:
+        p01_required_actions.append("candidate_only_without_activation_basis")
+    if p01_result.state.conflicting_authority:
+        p01_required_actions.append("conflicting_authority")
+    if p01_result.state.blocked_pending_grounding:
+        p01_required_actions.append("blocked_pending_grounding")
+    if p01_result.state.prompt_local_capture_risk:
+        p01_required_actions.append("prompt_local_capture_risk")
+    if p01_result.state.stale_active_project_detected:
+        p01_required_actions.append("stale_active_project_detected")
+    if not p01_required_actions:
+        p01_required_actions.append("p01_optional")
+
+    p01_trace_values = {
+        "active_project_count": len(p01_result.state.active_projects),
+        "candidate_project_count": len(p01_result.state.candidate_projects),
+        "suspended_project_count": len(p01_result.state.suspended_projects),
+        "arbitration_count": len(p01_result.state.arbitration_records),
+        "conflicting_authority": p01_result.state.conflicting_authority,
+        "blocked_pending_grounding": p01_result.state.blocked_pending_grounding,
+        "no_safe_project_formation": p01_result.state.no_safe_project_formation,
+        "project_handoff_ready": p01_result.gate.project_handoff_consumer_ready,
+        "prompt_local_capture_risk": p01_result.state.prompt_local_capture_risk,
+        "downstream_consumer_ready": p01_result.telemetry.downstream_consumer_ready,
+    }
+    trace_emit_active("p01_project_formation", "decision", p01_trace_values)
+    if p01_checkpoint_status != SubjectTickCheckpointStatus.ALLOWED:
+        trace_emit_active(
+            "p01_project_formation",
+            "blocked",
+            p01_trace_values,
+            note=p01_checkpoint_reason,
+        )
+    trace_emit_active("p01_project_formation", "exit", p01_trace_values)
+    checkpoints.append(
+        SubjectTickCheckpointResult(
+            checkpoint_id="rt01.p01_project_formation_checkpoint",
+            source_contract="p01_project_formation.intention_stack_state",
+            status=p01_checkpoint_status,
+            required_action=";".join(dict.fromkeys(p01_required_actions)),
+            applied_action=active_execution_mode,
+            reason=p01_checkpoint_reason,
+        )
+    )
+
     if halt_reason is not None:
         final_outcome = SubjectTickOutcome.HALT
         execution_stance = SubjectTickExecutionStance.HALT_PATH
@@ -4020,6 +4193,21 @@ def execute_subject_tick(
             o03_result.state.concealed_state_divergence_required
         ),
         o03_high_local_gain_but_high_entropy=o03_result.state.high_local_gain_but_high_entropy,
+        p01_active_project_count=len(p01_result.state.active_projects),
+        p01_candidate_project_count=len(p01_result.state.candidate_projects),
+        p01_suspended_project_count=len(p01_result.state.suspended_projects),
+        p01_rejected_project_count=len(p01_result.state.rejected_candidates),
+        p01_arbitration_count=len(p01_result.state.arbitration_records),
+        p01_no_safe_project_formation=p01_result.state.no_safe_project_formation,
+        p01_conflicting_authority=p01_result.state.conflicting_authority,
+        p01_blocked_pending_grounding=p01_result.state.blocked_pending_grounding,
+        p01_candidate_only_without_activation_basis=(
+            p01_result.state.candidate_only_without_activation_basis
+        ),
+        p01_prompt_local_capture_risk=p01_result.state.prompt_local_capture_risk,
+        p01_stale_active_project_detected=p01_result.state.stale_active_project_detected,
+        p01_project_handoff_ready=p01_result.gate.project_handoff_consumer_ready,
+        p01_bypass_resistance_status=p01_result.state.bypass_resistance_status,
     )
     gate = evaluate_subject_tick_downstream_gate(state)
     telemetry = build_subject_tick_telemetry(
@@ -4027,7 +4215,7 @@ def execute_subject_tick(
         attempted_paths=ATTEMPTED_SUBJECT_TICK_PATHS,
         downstream_gate=gate,
         causal_basis=(
-            "bounded runtime execution spine enforces roadmap authority roles for C04/C05, consumes world-entry, s01 efference-copy, s02 prediction-boundary seam, s03 ownership-weighted learning, s04 interoceptive self-binding, s05 multi-cause attribution, s-minimal, a-line, m-minimal, n-minimal, t01 semantic-field, t02 relation-binding, t03 hypothesis-competition, t04 attention-schema, o01 other-entity modeling, o02 intersubjective allostasis, and o03 strategy-class evaluation gates, and keeps D01 observability-only over fixed R->C order"
+            "bounded runtime execution spine enforces roadmap authority roles for C04/C05, consumes world-entry, s01 efference-copy, s02 prediction-boundary seam, s03 ownership-weighted learning, s04 interoceptive self-binding, s05 multi-cause attribution, s-minimal, a-line, m-minimal, n-minimal, t01 semantic-field, t02 relation-binding, t03 hypothesis-competition, t04 attention-schema, o01 other-entity modeling, o02 intersubjective allostasis, o03 strategy-class evaluation, and p01 authority-bounded project-formation gates, and keeps D01 observability-only over fixed R->C order"
         ),
     )
     abstain = final_outcome in {SubjectTickOutcome.REPAIR, SubjectTickOutcome.REVALIDATE}
@@ -4118,6 +4306,7 @@ def execute_subject_tick(
         o01_result=o01_result,
         o02_result=o02_result,
         o03_result=o03_result,
+        p01_result=p01_result,
         t01_result=t01_result,
         t02_result=t02_result,
         t03_result=t03_result,

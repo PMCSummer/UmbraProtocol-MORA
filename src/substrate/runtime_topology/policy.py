@@ -38,6 +38,7 @@ def build_minimal_runtime_tick_graph() -> RuntimeTickGraph:
             "O01",
             "O02",
             "O03",
+            "P01",
             "RT01",
         ),
         nodes=(
@@ -293,6 +294,19 @@ def build_minimal_runtime_tick_graph() -> RuntimeTickGraph:
                 checkpoint_ids=("rt01.o03_strategy_class_evaluation_checkpoint",),
             ),
             RuntimeContourNode(
+                node_id="node.p01_project_formation",
+                phase_id="P01",
+                authority_role="project_formation_intention_stack_contract",
+                computational_role="authority_bounded_project_stack_builder",
+                surfaces=(
+                    "p01_project_formation.intention_stack_state",
+                    "p01_project_formation.authority_admissibility",
+                    "p01_project_formation.conflict_arbitration",
+                    "p01_project_formation.project_identity_dedup",
+                ),
+                checkpoint_ids=("rt01.p01_project_formation_checkpoint",),
+            ),
+            RuntimeContourNode(
                 node_id="node.rt01",
                 phase_id="RT01",
                 authority_role="gating",
@@ -317,6 +331,7 @@ def build_minimal_runtime_tick_graph() -> RuntimeTickGraph:
                     "rt01.o01_other_entity_model_checkpoint",
                     "rt01.o02_intersubjective_allostasis_checkpoint",
                     "rt01.o03_strategy_class_evaluation_checkpoint",
+                    "rt01.p01_project_formation_checkpoint",
                     "rt01.outcome_resolution_checkpoint",
                 ),
                 checkpoint_ids=(
@@ -339,6 +354,7 @@ def build_minimal_runtime_tick_graph() -> RuntimeTickGraph:
                     "rt01.o01_other_entity_model_checkpoint",
                     "rt01.o02_intersubjective_allostasis_checkpoint",
                     "rt01.o03_strategy_class_evaluation_checkpoint",
+                    "rt01.p01_project_formation_checkpoint",
                     "rt01.outcome_resolution_checkpoint",
                 ),
             ),
@@ -409,7 +425,11 @@ def build_minimal_runtime_tick_graph() -> RuntimeTickGraph:
             RuntimeContourEdge(source_phase="R04", target_phase="O03", relation="gates"),
             RuntimeContourEdge(source_phase="C04", target_phase="O03", relation="arbitrates"),
             RuntimeContourEdge(source_phase="C05", target_phase="O03", relation="requests_revalidation"),
-            RuntimeContourEdge(source_phase="O03", target_phase="RT01", relation="requires"),
+            RuntimeContourEdge(source_phase="O03", target_phase="P01", relation="requires"),
+            RuntimeContourEdge(source_phase="O01", target_phase="P01", relation="modulates"),
+            RuntimeContourEdge(source_phase="C04", target_phase="P01", relation="arbitrates"),
+            RuntimeContourEdge(source_phase="C05", target_phase="P01", relation="requests_revalidation"),
+            RuntimeContourEdge(source_phase="P01", target_phase="RT01", relation="requires"),
             RuntimeContourEdge(source_phase="RT01", target_phase="F01", relation="persists_via_f01"),
         ),
         mandatory_checkpoint_ids=(
@@ -436,6 +456,7 @@ def build_minimal_runtime_tick_graph() -> RuntimeTickGraph:
             "rt01.o01_other_entity_model_checkpoint",
             "rt01.o02_intersubjective_allostasis_checkpoint",
             "rt01.o03_strategy_class_evaluation_checkpoint",
+            "rt01.p01_project_formation_checkpoint",
             "rt01.outcome_resolution_checkpoint",
         ),
         source_of_truth_surfaces=(
@@ -474,6 +495,8 @@ def build_minimal_runtime_tick_graph() -> RuntimeTickGraph:
             "o02_intersubjective_allostasis.boundary_protection_status",
             "o03_strategy_class_evaluation.strategy_state",
             "o03_strategy_class_evaluation.hidden_divergence_band",
+            "p01_project_formation.intention_stack_state",
+            "p01_project_formation.authority_admissibility",
         ),
         reason="minimal production runtime graph for bounded RT01 contour wiring",
     )
@@ -516,6 +539,7 @@ def build_minimal_runtime_topology_bundle() -> RuntimeTopologyBundle:
             "o01_other_entity_model_contract",
             "o02_intersubjective_allostasis_contract",
             "o03_strategy_class_evaluation_contract",
+            "p01_project_formation_contract",
         ),
         f01_transition_route="subject_tick.persist_subject_tick_result_via_f01",
         tick_graph=tick_graph,
@@ -685,6 +709,7 @@ def _context_has_ablation_flags(context: SubjectTickContext | None) -> bool:
         or context.disable_o01_enforcement
         or context.disable_o02_enforcement
         or context.disable_o03_enforcement
+        or context.disable_p01_enforcement
         or context.disable_t01_unresolved_slot_maintenance
         or context.disable_t01_field_enforcement
         or (

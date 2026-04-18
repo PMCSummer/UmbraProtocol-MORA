@@ -171,6 +171,18 @@ MODULE_ALLOWED_FIELDS: dict[str, tuple[str, ...]] = {
         "strategy_underconstrained",
         "downstream_consumer_ready",
     ),
+    "p01_project_formation": (
+        "active_project_count",
+        "candidate_project_count",
+        "suspended_project_count",
+        "arbitration_count",
+        "conflicting_authority",
+        "blocked_pending_grounding",
+        "no_safe_project_formation",
+        "project_handoff_ready",
+        "prompt_local_capture_risk",
+        "downstream_consumer_ready",
+    ),
     "s_minimal_contour": (
         "minimal_self_status",
         "minimal_self_ready",

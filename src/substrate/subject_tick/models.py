@@ -21,6 +21,11 @@ if TYPE_CHECKING:
         O03CandidateStrategyInput,
         O03StrategyEvaluationResult,
     )
+    from substrate.p01_project_formation import (
+        P01IntentionStackState,
+        P01ProjectFormationResult,
+        P01ProjectSignalInput,
+    )
     from substrate.s03_ownership_weighted_learning import (
         S03OwnershipWeightedLearningResult,
         S03OwnershipWeightedLearningState,
@@ -227,6 +232,23 @@ class SubjectTickRestrictionCode(StrEnum):
         "o03_exploitative_candidate_block_required"
     )
     O03_POLITENESS_EQUIVALENCE_FORBIDDEN = "o03_politeness_equivalence_forbidden"
+    P01_PROJECT_FORMATION_CONTRACT_MUST_BE_READ = (
+        "p01_project_formation_contract_must_be_read"
+    )
+    P01_INTENTION_STACK_CONSUMER_REQUIRED = (
+        "p01_intention_stack_consumer_required"
+    )
+    P01_AUTHORITY_BOUND_FORMATION_REQUIRED = (
+        "p01_authority_bound_formation_required"
+    )
+    P01_PROJECT_HANDOFF_CONSUMER_REQUIRED = (
+        "p01_project_handoff_consumer_required"
+    )
+    P01_CONFLICT_ARBITRATION_REQUIRED = "p01_conflict_arbitration_required"
+    P01_PROMPT_LOCAL_SUBSTITUTION_FORBIDDEN = (
+        "p01_prompt_local_substitution_forbidden"
+    )
+    P01_STALE_ACTIVE_PROJECT_FORBIDDEN = "p01_stale_active_project_forbidden"
     DOWNSTREAM_AUTHORITY_DEGRADED = "downstream_authority_degraded"
 
 
@@ -297,6 +319,7 @@ class SubjectTickContext:
     prior_s05_state: S05MultiCauseAttributionState | None = None
     prior_o01_state: O01OtherEntityModelState | None = None
     prior_o02_state: O02IntersubjectiveAllostasisState | None = None
+    prior_p01_state: P01IntentionStackState | None = None
     dependency_trigger_hits: tuple[str, ...] = ()
     context_shift_markers: tuple[str, ...] = ()
     contradicted_source_refs: tuple[str, ...] = ()
@@ -381,9 +404,14 @@ class SubjectTickContext:
     require_o03_cooperative_selection_consumer: bool = False
     require_o03_transparency_preserving_consumer: bool = False
     disable_o03_enforcement: bool = False
+    require_p01_intention_stack_consumer: bool = False
+    require_p01_authority_bound_consumer: bool = False
+    require_p01_project_handoff_consumer: bool = False
+    disable_p01_enforcement: bool = False
     o01_entity_signals: tuple[O01EntitySignal, ...] = ()
     o02_interaction_diagnostics: O02InteractionDiagnosticsInput | None = None
     o03_candidate_strategy: O03CandidateStrategyInput | None = None
+    p01_project_signals: tuple[P01ProjectSignalInput, ...] = ()
     source_lineage: tuple[str, ...] = ()
 
 
@@ -822,6 +850,19 @@ class SubjectTickState:
     o03_strategy_underconstrained: bool = True
     o03_concealed_state_divergence_required: bool = False
     o03_high_local_gain_but_high_entropy: bool = False
+    p01_active_project_count: int = 0
+    p01_candidate_project_count: int = 0
+    p01_suspended_project_count: int = 0
+    p01_rejected_project_count: int = 0
+    p01_arbitration_count: int = 0
+    p01_no_safe_project_formation: bool = True
+    p01_conflicting_authority: bool = False
+    p01_blocked_pending_grounding: bool = False
+    p01_candidate_only_without_activation_basis: bool = True
+    p01_prompt_local_capture_risk: bool = False
+    p01_stale_active_project_detected: bool = False
+    p01_project_handoff_ready: bool = False
+    p01_bypass_resistance_status: str = "p01_not_available"
 
 
 @dataclass(frozen=True, slots=True)
@@ -1165,6 +1206,7 @@ class SubjectTickResult:
     o01_result: O01OtherEntityModelResult
     o02_result: O02IntersubjectiveAllostasisResult
     o03_result: O03StrategyEvaluationResult
+    p01_result: P01ProjectFormationResult
     t01_result: T01ActiveFieldResult
     t02_result: T02ConstrainedSceneResult
     t03_result: T03CompetitionResult

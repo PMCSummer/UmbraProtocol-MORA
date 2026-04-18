@@ -67,6 +67,7 @@ def evaluate_subject_tick_downstream_gate(
         SubjectTickRestrictionCode.O01_OTHER_ENTITY_MODEL_CONTRACT_MUST_BE_READ,
         SubjectTickRestrictionCode.O02_INTERSUBJECTIVE_ALLOSTASIS_CONTRACT_MUST_BE_READ,
         SubjectTickRestrictionCode.O03_STRATEGY_CLASS_EVALUATION_CONTRACT_MUST_BE_READ,
+        SubjectTickRestrictionCode.P01_PROJECT_FORMATION_CONTRACT_MUST_BE_READ,
     ]
     usability = SubjectTickUsabilityClass.USABLE_BOUNDED
     accepted = True
@@ -782,6 +783,91 @@ def evaluate_subject_tick_downstream_gate(
             reason = (
                 "o03 strategy class checkpoint requires detour before downstream continuation"
             )
+
+    p01_checkpoint = next(
+        (
+            checkpoint
+            for checkpoint in state.execution_checkpoints
+            if checkpoint.checkpoint_id == "rt01.p01_project_formation_checkpoint"
+        ),
+        None,
+    )
+    if p01_checkpoint is not None:
+        if "require_p01_intention_stack_consumer" in p01_checkpoint.required_action:
+            restrictions.append(
+                SubjectTickRestrictionCode.P01_INTENTION_STACK_CONSUMER_REQUIRED
+            )
+        if "require_p01_authority_bound_consumer" in p01_checkpoint.required_action:
+            restrictions.append(
+                SubjectTickRestrictionCode.P01_AUTHORITY_BOUND_FORMATION_REQUIRED
+            )
+        if "require_p01_project_handoff_consumer" in p01_checkpoint.required_action:
+            restrictions.append(
+                SubjectTickRestrictionCode.P01_PROJECT_HANDOFF_CONSUMER_REQUIRED
+            )
+        if "default_p01_missing_precondition_detour" in p01_checkpoint.required_action:
+            restrictions.append(
+                SubjectTickRestrictionCode.P01_PROJECT_HANDOFF_CONSUMER_REQUIRED
+            )
+        if "default_p01_conflict_arbitration_detour" in p01_checkpoint.required_action:
+            restrictions.append(
+                SubjectTickRestrictionCode.P01_CONFLICT_ARBITRATION_REQUIRED
+            )
+        if "prompt_local_capture_risk" in p01_checkpoint.required_action:
+            restrictions.append(
+                SubjectTickRestrictionCode.P01_PROMPT_LOCAL_SUBSTITUTION_FORBIDDEN
+            )
+        if "stale_active_project_detected" in p01_checkpoint.required_action:
+            restrictions.append(
+                SubjectTickRestrictionCode.P01_STALE_ACTIVE_PROJECT_FORBIDDEN
+            )
+
+    p01_surface_present = bool(
+        state.p01_active_project_count
+        + state.p01_candidate_project_count
+        + state.p01_suspended_project_count
+        + state.p01_rejected_project_count
+    )
+    if state.p01_prompt_local_capture_risk and p01_surface_present:
+        restrictions.append(
+            SubjectTickRestrictionCode.P01_PROMPT_LOCAL_SUBSTITUTION_FORBIDDEN
+        )
+        restrictions.append(SubjectTickRestrictionCode.DOWNSTREAM_AUTHORITY_DEGRADED)
+        if state.final_execution_outcome == SubjectTickOutcome.CONTINUE:
+            accepted = False
+            usability = SubjectTickUsabilityClass.BLOCKED
+            reason = "p01 prompt-local substitution guard triggered; authority-bounded project continuation is blocked"
+    if state.p01_conflicting_authority and p01_surface_present:
+        restrictions.append(SubjectTickRestrictionCode.P01_CONFLICT_ARBITRATION_REQUIRED)
+        if (
+            state.final_execution_outcome == SubjectTickOutcome.CONTINUE
+            and state.p01_arbitration_count == 0
+        ):
+            accepted = False
+            usability = SubjectTickUsabilityClass.BLOCKED
+            restrictions.append(SubjectTickRestrictionCode.DOWNSTREAM_AUTHORITY_DEGRADED)
+            reason = "p01 conflicting authority requires explicit arbitration record before continuation"
+    if state.p01_stale_active_project_detected and p01_surface_present:
+        restrictions.append(SubjectTickRestrictionCode.P01_STALE_ACTIVE_PROJECT_FORBIDDEN)
+        if (
+            state.final_execution_outcome == SubjectTickOutcome.CONTINUE
+            and state.p01_active_project_count > 0
+        ):
+            accepted = False
+            usability = SubjectTickUsabilityClass.BLOCKED
+            restrictions.append(SubjectTickRestrictionCode.DOWNSTREAM_AUTHORITY_DEGRADED)
+            reason = "p01 stale active project detected; continuation requires termination/review handling"
+    if (
+        state.p01_no_safe_project_formation
+        and p01_surface_present
+        and not state.p01_project_handoff_ready
+        and state.final_execution_outcome == SubjectTickOutcome.CONTINUE
+    ):
+        restrictions.append(SubjectTickRestrictionCode.P01_PROJECT_HANDOFF_CONSUMER_REQUIRED)
+        restrictions.append(SubjectTickRestrictionCode.DOWNSTREAM_AUTHORITY_DEGRADED)
+        accepted = False
+        usability = SubjectTickUsabilityClass.BLOCKED
+        reason = "p01 no-safe-formation state blocks project handoff continuation until grounding/arbitration constraints are resolved"
 
     return SubjectTickGateDecision(
         accepted=accepted,
