@@ -109,6 +109,35 @@ def test_conflicting_projects_require_explicit_arbitration() -> None:
         assert result.state.no_safe_project_formation is True
 
 
+def test_conflict_fallback_without_conflict_group_id() -> None:
+    result = build_p01_harness_case(
+        P01HarnessCase(
+            case_id="implicit-conflict-fallback",
+            tick_index=1,
+            signals=(
+                p01_signal(
+                    signal_id="implicit-a",
+                    authority=P01AuthoritySourceKind.EXPLICIT_USER_DIRECTIVE,
+                    target="prepare nightly reviewer run",
+                    signal_kind="directive",
+                ),
+                p01_signal(
+                    signal_id="implicit-b",
+                    authority=P01AuthoritySourceKind.LOW_AUTHORITY_SUGGESTION,
+                    target="prepare nightly reviewer run",
+                    signal_kind="suggestion",
+                ),
+            ),
+        )
+    )
+    assert result.state.conflicting_authority is True
+    assert len(result.state.arbitration_records) >= 1
+    assert any(
+        record.outcome.value in {"reject_weaker_source", "no_safe_resolution"}
+        for record in result.state.arbitration_records
+    )
+
+
 def test_stale_project_does_not_persist_after_termination_conditions() -> None:
     seed = build_p01_harness_case(harness_cases()["user_directive"])
     prior_project_id = seed.state.active_projects[0].project_id
@@ -131,10 +160,44 @@ def test_stale_project_does_not_persist_after_termination_conditions() -> None:
     assert all(
         entry.project_id != prior_project_id for entry in terminated.state.active_projects
     )
+    assert terminated.state.stale_active_project_detected is True
     assert any(
         entry.current_status is P01ProjectStatus.TERMINATED
         for entry in terminated.state.rejected_candidates
     )
+
+
+def test_structurally_distinct_targets_do_not_false_merge() -> None:
+    result = build_p01_harness_case(
+        P01HarnessCase(
+            case_id="structural-no-false-merge",
+            tick_index=1,
+            signals=(
+                p01_signal(
+                    signal_id="merge-a",
+                    authority=P01AuthoritySourceKind.EXPLICIT_USER_DIRECTIVE,
+                    target="prepare nightly reviewer run",
+                    signal_kind="directive",
+                ),
+                p01_signal(
+                    signal_id="merge-b",
+                    authority=P01AuthoritySourceKind.STANDING_OBLIGATION,
+                    target="prepare nightly reviewer run",
+                    signal_kind="obligation",
+                    persistent_obligation_marker=True,
+                ),
+            ),
+        )
+    )
+    all_entries = (
+        *result.state.active_projects,
+        *result.state.candidate_projects,
+        *result.state.suspended_projects,
+        *result.state.rejected_candidates,
+    )
+    assert len(all_entries) >= 2
+    assert len({entry.project_id for entry in all_entries}) >= 2
+    assert len({entry.project_identity_key for entry in all_entries}) >= 2
 
 
 def test_same_target_different_blocker_status_changes_project_status() -> None:
@@ -204,4 +267,3 @@ def test_real_consumer_view_exposes_authority_and_grounding_constraints() -> Non
     assert view.project_handoff_consumer_ready is False
     assert view.has_candidate_projects is False
     assert view.has_active_projects is False
-

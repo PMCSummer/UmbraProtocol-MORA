@@ -167,11 +167,7 @@ def test_dispatch_p01_default_missing_precondition_detour_is_load_bearing() -> N
     assert baseline_checkpoint.status.value == "allowed"
     assert blocked_checkpoint.status.value == "enforced_detour"
     assert "default_p01_missing_precondition_detour" in blocked_checkpoint.required_action
-    assert blocked.subject_tick_result.state.final_execution_outcome in {
-        SubjectTickOutcome.REVALIDATE,
-        SubjectTickOutcome.REPAIR,
-        SubjectTickOutcome.HALT,
-    }
+    assert blocked.subject_tick_result.state.final_execution_outcome == SubjectTickOutcome.REVALIDATE
 
 
 def test_dispatch_p01_explicit_require_paths_are_load_bearing() -> None:
@@ -205,4 +201,3 @@ def test_dispatch_p01_explicit_require_paths_are_load_bearing() -> None:
     assert "require_p01_intention_stack_consumer" in checkpoint.required_action
     assert "require_p01_authority_bound_consumer" in checkpoint.required_action
     assert "require_p01_project_handoff_consumer" in checkpoint.required_action
-

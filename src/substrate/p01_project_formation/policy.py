@@ -67,6 +67,9 @@ def build_p01_project_formation(
     prior_entries = _prior_entries(prior_state)
     prior_by_id = {entry.project_id: entry for entry in prior_entries}
     prior_by_identity = {entry.project_identity_key: entry for entry in prior_entries}
+    prior_active_ids = {
+        entry.project_id for entry in prior_entries if entry.current_status is P01ProjectStatus.ACTIVE
+    }
 
     active_projects: list[P01ProjectEntry] = []
     candidate_projects: list[P01ProjectEntry] = []
@@ -97,8 +100,15 @@ def build_p01_project_formation(
         grounded_context_underconstrained = True
 
     entries_by_conflict: dict[str, list[P01ProjectEntry]] = {}
+    implicit_entries_by_base: dict[str, list[P01ProjectEntry]] = {}
+    explicit_conflict_project_ids: set[str] = set()
     for index, signal in enumerate(typed_signals):
-        identity_key = _normalize_identity_key(signal.target_summary)
+        base_identity_key = _normalize_identity_key_base(signal.target_summary)
+        identity_key = _normalize_identity_key(
+            signal.target_summary,
+            signal_kind=signal.signal_kind,
+            authority_source_kind=signal.authority_source_kind,
+        )
         prior_match = _resolve_prior_match(
             signal=signal,
             prior_by_id=prior_by_id,
@@ -144,6 +154,25 @@ def build_p01_project_formation(
             and status is P01ProjectStatus.CANDIDATE_ONLY
         ):
             prompt_local_capture_risk = True
+        if (
+            prior_match is not None
+            and prior_match.current_status is P01ProjectStatus.ACTIVE
+            and (
+                signal.completion_evidence_present
+                or signal.policy_disallow_marker
+                or not signal.temporal_validity_marker
+                or signal.missing_precondition_marker
+                or signal.clarification_block_marker
+                or status
+                in {
+                    P01ProjectStatus.TERMINATED,
+                    P01ProjectStatus.REJECTED,
+                    P01ProjectStatus.BLOCKED_BY_MISSING_PRECONDITION,
+                    P01ProjectStatus.SUSPENDED,
+                }
+            )
+        ):
+            stale_active_project_detected = True
 
         entry = P01ProjectEntry(
             project_id=project_id,
@@ -168,8 +197,10 @@ def build_p01_project_formation(
             carryover_basis=carryover_basis,
             stale_risk_marker=stale_risk_marker,
         )
+        implicit_entries_by_base.setdefault(base_identity_key, []).append(entry)
         if signal.conflict_group_id:
             entries_by_conflict.setdefault(signal.conflict_group_id, []).append(entry)
+            explicit_conflict_project_ids.add(entry.project_id)
 
         if status is P01ProjectStatus.ACTIVE:
             active_projects.append(entry)
@@ -185,11 +216,22 @@ def build_p01_project_formation(
         }:
             rejected_candidates.append(entry)
 
-    _ingest_prior_carryover(
+    if _inject_implicit_conflict_groups(
+        entries_by_conflict=entries_by_conflict,
+        implicit_entries_by_base=implicit_entries_by_base,
+        explicit_conflict_project_ids=explicit_conflict_project_ids,
+        tick_id=tick_id,
+    ):
+        conflicting_authority = True
+
+    stale_active_project_detected = bool(
+        _ingest_prior_carryover(
         prior_entries=prior_entries,
         emitted_ids={entry.project_id for entry in (*active_projects, *candidate_projects, *suspended_projects, *rejected_candidates)},
         active_projects=active_projects,
         suspended_projects=suspended_projects,
+    )
+        or stale_active_project_detected
     )
 
     for conflict_group_id, entries in entries_by_conflict.items():
@@ -229,6 +271,8 @@ def build_p01_project_formation(
 
         weaker = tuple(item for item in sorted_entries[1:])
         _reject_weaker_conflicts(weaker, active_projects, rejected_candidates)
+        if any(item.project_id in prior_active_ids for item in weaker):
+            stale_active_project_detected = True
         arbitration_records.append(
             P01ArbitrationRecord(
                 arbitration_id=f"p01-arb:{tick_id}:{conflict_group_id}",
@@ -573,10 +617,31 @@ def _resolve_prior_match(
         entry = prior_by_id.get(signal.continuation_of_prior_project_id)
         if entry is not None:
             return entry
-    return prior_by_identity.get(_normalize_identity_key(signal.target_summary))
+    key = _normalize_identity_key(
+        signal.target_summary,
+        signal_kind=signal.signal_kind,
+        authority_source_kind=signal.authority_source_kind,
+    )
+    entry = prior_by_identity.get(key)
+    if entry is not None:
+        return entry
+    # Backward-compatible fallback for legacy stacks emitted before identity refinement.
+    return prior_by_identity.get(_normalize_identity_key_base(signal.target_summary))
 
 
-def _normalize_identity_key(text: str) -> str:
+def _normalize_identity_key(
+    text: str,
+    *,
+    signal_kind: str,
+    authority_source_kind: P01AuthoritySourceKind,
+) -> str:
+    base = _normalize_identity_key_base(text)
+    kind_token = _normalize_identity_token(signal_kind)
+    authority_bucket = _identity_authority_bucket(authority_source_kind)
+    return f"{base}|kind:{kind_token}|auth:{authority_bucket}"
+
+
+def _normalize_identity_key_base(text: str) -> str:
     normalized = " ".join(str(text or "").strip().lower().split())
     if not normalized:
         return "project:unspecified"
@@ -587,13 +652,31 @@ def _normalize_identity_key(text: str) -> str:
     return token[:72]
 
 
+def _normalize_identity_token(value: str) -> str:
+    token = " ".join(str(value or "").strip().lower().split())
+    token = "".join(ch for ch in token if ch.isalnum() or ch in {"_", "-"}).strip()
+    return token or "unspecified"
+
+
+def _identity_authority_bucket(authority: P01AuthoritySourceKind) -> str:
+    weight = _AUTHORITY_WEIGHT[authority]
+    if weight >= 4:
+        return "high"
+    if weight >= 2:
+        return "medium"
+    if weight == 1:
+        return "low"
+    return "none"
+
+
 def _ingest_prior_carryover(
     *,
     prior_entries: tuple[P01ProjectEntry, ...],
     emitted_ids: set[str],
     active_projects: list[P01ProjectEntry],
     suspended_projects: list[P01ProjectEntry],
-) -> None:
+) -> bool:
+    stale_detected = False
     for entry in prior_entries:
         if entry.project_id in emitted_ids:
             continue
@@ -627,6 +710,77 @@ def _ingest_prior_carryover(
                     stale_risk_marker=entry.stale_risk_marker,
                 )
             )
+            if entry.current_status is P01ProjectStatus.ACTIVE:
+                stale_detected = True
+    return stale_detected
+
+
+def _inject_implicit_conflict_groups(
+    *,
+    entries_by_conflict: dict[str, list[P01ProjectEntry]],
+    implicit_entries_by_base: dict[str, list[P01ProjectEntry]],
+    explicit_conflict_project_ids: set[str],
+    tick_id: str,
+) -> bool:
+    injected = False
+    for base_key, entries in implicit_entries_by_base.items():
+        if len(entries) <= 1:
+            continue
+        candidates = [
+            entry for entry in entries if entry.project_id not in explicit_conflict_project_ids
+        ]
+        if len(candidates) <= 1:
+            continue
+        if not _requires_implicit_conflict_arbitration(candidates):
+            continue
+        group_id = f"implicit:{tick_id}:{base_key[:32]}"
+        existing_ids = {entry.project_id for entry in entries_by_conflict.get(group_id, ())}
+        merged = list(entries_by_conflict.get(group_id, ()))
+        for entry in candidates:
+            if entry.project_id not in existing_ids:
+                merged.append(entry)
+        entries_by_conflict[group_id] = merged
+        injected = True
+    return injected
+
+
+def _requires_implicit_conflict_arbitration(entries: list[P01ProjectEntry]) -> bool:
+    authority_weights = {
+        _AUTHORITY_WEIGHT[entry.source_of_authority] for entry in entries
+    }
+    statuses = {entry.current_status for entry in entries}
+    has_active = P01ProjectStatus.ACTIVE in statuses
+    has_non_active = bool(
+        statuses
+        & {
+            P01ProjectStatus.CANDIDATE_ONLY,
+            P01ProjectStatus.SUSPENDED,
+            P01ProjectStatus.BLOCKED_BY_MISSING_PRECONDITION,
+            P01ProjectStatus.REJECTED,
+            P01ProjectStatus.CONFLICTED,
+            P01ProjectStatus.TERMINATED,
+        }
+    )
+    if len(authority_weights) > 1 and has_active and has_non_active:
+        return True
+    priority_weights = {_PRIORITY_WEIGHT[entry.priority_class] for entry in entries}
+    if len(priority_weights) > 1 and len(statuses) > 1:
+        return True
+    has_rejected_scope = bool(
+        {
+            entry.admissibility_verdict
+            for entry in entries
+            if entry.admissibility_verdict is P01AdmissibilityVerdict.REJECTED_AS_OUT_OF_SCOPE
+        }
+    )
+    has_admitted = bool(
+        {
+            entry.admissibility_verdict
+            for entry in entries
+            if entry.admissibility_verdict is P01AdmissibilityVerdict.ADMITTED
+        }
+    )
+    return has_rejected_scope and has_admitted
 
 
 def _mark_conflicted(
@@ -695,4 +849,3 @@ def _reject_weaker_conflicts(
                 stale_risk_marker=entry.stale_risk_marker,
             )
         )
-

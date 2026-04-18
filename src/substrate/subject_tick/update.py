@@ -3386,6 +3386,7 @@ def execute_subject_tick(
     p01_checkpoint_reason = p01_result.gate.reason
     p01_default_missing_precondition_detour = False
     p01_default_conflict_arbitration_detour = False
+    p01_default_stale_project_detour = False
     if not context.disable_p01_enforcement:
         if (
             context.require_p01_intention_stack_consumer
@@ -3457,6 +3458,23 @@ def execute_subject_tick(
             )
             if active_execution_mode != "halt_execution":
                 active_execution_mode = "revalidate_scope"
+        if (
+            not context.require_p01_intention_stack_consumer
+            and not context.require_p01_authority_bound_consumer
+            and not context.require_p01_project_handoff_consumer
+            and bool(p01_signals)
+            and p01_result.state.stale_active_project_detected
+            and halt_reason is None
+            and not revalidation_needed
+        ):
+            revalidation_needed = True
+            p01_default_stale_project_detour = True
+            p01_checkpoint_status = SubjectTickCheckpointStatus.ENFORCED_DETOUR
+            p01_checkpoint_reason = (
+                "p01 default contour requires stale-project termination/review handling before continuation"
+            )
+            if active_execution_mode != "halt_execution":
+                active_execution_mode = "revalidate_scope"
     else:
         p01_checkpoint_status = SubjectTickCheckpointStatus.ENFORCED_DETOUR
         p01_checkpoint_reason = (
@@ -3474,6 +3492,8 @@ def execute_subject_tick(
         p01_required_actions.append("default_p01_missing_precondition_detour")
     if p01_default_conflict_arbitration_detour:
         p01_required_actions.append("default_p01_conflict_arbitration_detour")
+    if p01_default_stale_project_detour:
+        p01_required_actions.append("default_p01_stale_project_detour")
     if p01_result.state.no_safe_project_formation:
         p01_required_actions.append("no_safe_project_formation")
     if p01_result.state.candidate_only_without_activation_basis:

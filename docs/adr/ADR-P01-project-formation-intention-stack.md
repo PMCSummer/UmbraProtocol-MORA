@@ -11,9 +11,11 @@ Introduce `p01_project_formation` as a distinct RT01 segment placed after `O03` 
 This first slice provides:
 - explicit typed intention-stack state (`active/candidate/suspended/rejected`, arbitration records, authority and grounding flags);
 - authority-sensitive candidate-to-project formation from typed signal inputs;
-- identity/dedup handling for restated targets and bounded carryover from prior stack;
+- identity/dedup handling for restated targets and bounded carryover from prior stack, with a narrow structural key refinement (`target + signal kind + authority band`) to reduce false merges;
 - explicit conflict arbitration records (`reject_weaker_source` / `no_safe_resolution`) instead of silent winner selection;
+- narrow implicit conflict fallback when explicit `conflict_group_id` is absent but authority/status incompatibility on the same target base is present;
 - stale/termination handling for completion/policy-disallow paths;
+- stale active-project detection that can force bounded detour before project handoff continuation;
 - narrow require-path and default-path RT01 consequences via `rt01.p01_project_formation_checkpoint`.
 
 ## Inputs
@@ -61,4 +63,5 @@ This ADR does **not** claim:
 - P01 remains RT01-local with a narrow consumer/gating surface.
 - Input signals are frontier-hosted and intentionally compact.
 - Carryover is bounded and short-horizon; no broad persistence policy is introduced.
+- Implicit conflict fallback is intentionally coarse and target-base scoped; it is not a planner-grade incompatibility solver.
 - Empty admissible intersections still resolve conservatively (candidate/blocked/no-safe) without rich relaxation planning.

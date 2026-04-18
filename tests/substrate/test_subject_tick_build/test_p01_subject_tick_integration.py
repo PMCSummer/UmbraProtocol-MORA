@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from dataclasses import replace
-
 from substrate.o01_other_entity_model import O01EntitySignal
 from substrate.o03_strategy_class_evaluation import (
     O03CandidateMoveKind,
@@ -15,7 +13,6 @@ from substrate.subject_tick import (
     SubjectTickContext,
     SubjectTickOutcome,
     SubjectTickRestrictionCode,
-    evaluate_subject_tick_downstream_gate,
 )
 from tests.substrate.subject_tick_testkit import build_subject_tick
 
@@ -97,6 +94,9 @@ def _project_signal(
     grounded: bool = True,
     missing_precondition_marker: bool = False,
     blocker_present: bool = False,
+    temporal_validity_marker: bool = True,
+    completion_evidence_present: bool = False,
+    continuation_of_prior_project_id: str | None = None,
     conflict_group_id: str | None = None,
 ) -> P01ProjectSignalInput:
     return P01ProjectSignalInput(
@@ -107,6 +107,9 @@ def _project_signal(
         grounded_basis_present=grounded,
         missing_precondition_marker=missing_precondition_marker,
         blocker_present=blocker_present,
+        temporal_validity_marker=temporal_validity_marker,
+        completion_evidence_present=completion_evidence_present,
+        continuation_of_prior_project_id=continuation_of_prior_project_id,
         conflict_group_id=conflict_group_id,
         provenance=f"tests.p01.integration:{signal_id}",
     )
@@ -204,11 +207,7 @@ def test_subject_tick_default_path_missing_precondition_detour_is_load_bearing()
     assert baseline_checkpoint.status.value == "allowed"
     assert blocked_checkpoint.status.value == "enforced_detour"
     assert "default_p01_missing_precondition_detour" in blocked_checkpoint.required_action
-    assert blocked.state.final_execution_outcome in {
-        SubjectTickOutcome.REVALIDATE,
-        SubjectTickOutcome.REPAIR,
-        SubjectTickOutcome.HALT,
-    }
+    assert blocked.state.final_execution_outcome == SubjectTickOutcome.REVALIDATE
 
 
 def test_subject_tick_default_conflict_arbitration_detour_is_load_bearing() -> None:
@@ -240,11 +239,7 @@ def test_subject_tick_default_conflict_arbitration_detour_is_load_bearing() -> N
     )
     assert checkpoint.status.value == "enforced_detour"
     assert "default_p01_conflict_arbitration_detour" in checkpoint.required_action
-    assert result.state.final_execution_outcome in {
-        SubjectTickOutcome.REVALIDATE,
-        SubjectTickOutcome.REPAIR,
-        SubjectTickOutcome.HALT,
-    }
+    assert result.state.final_execution_outcome == SubjectTickOutcome.REVALIDATE
 
 
 def test_subject_tick_explicit_p01_require_paths_are_load_bearing() -> None:
@@ -274,6 +269,7 @@ def test_subject_tick_explicit_p01_require_paths_are_load_bearing() -> None:
     assert "require_p01_intention_stack_consumer" in checkpoint.required_action
     assert "require_p01_authority_bound_consumer" in checkpoint.required_action
     assert "require_p01_project_handoff_consumer" in checkpoint.required_action
+    assert result.state.final_execution_outcome == SubjectTickOutcome.REVALIDATE
 
 
 def test_subject_tick_p01_positive_require_path_can_continue_lawfully() -> None:
@@ -324,33 +320,94 @@ def test_no_project_signals_no_default_p01_detour() -> None:
     assert "default_p01_conflict_arbitration_detour" not in checkpoint.required_action
 
 
-def test_typed_p01_semantics_not_only_checkpoint_tokens_drive_policy() -> None:
-    result = _result(
-        "rt-p01-typed-policy",
+def test_typed_p01_semantics_not_only_checkpoint_token_drive_policy_natural_flow() -> None:
+    no_surface = _result(
+        "rt-p01-natural-token-no-surface",
         context=SubjectTickContext(
             o01_entity_signals=_grounded_user_signals(),
-            o03_candidate_strategy=_transparent_o03_candidate("rt-p01-typed-policy"),
+            o03_candidate_strategy=_transparent_o03_candidate(
+                "rt-p01-natural-token-no-surface"
+            ),
+        ),
+    )
+    suspended_surface = _result(
+        "rt-p01-natural-token-surface",
+        context=SubjectTickContext(
+            o01_entity_signals=_grounded_user_signals(),
+            o03_candidate_strategy=_transparent_o03_candidate(
+                "rt-p01-natural-token-surface"
+            ),
             p01_project_signals=(
                 _project_signal(
-                    signal_id="p01-policy-1",
-                    authority=P01AuthoritySourceKind.LOW_AUTHORITY_SUGGESTION,
-                    target="switch to unrelated polishing task",
+                    signal_id="p01-natural-token-1",
+                    authority=P01AuthoritySourceKind.EXPLICIT_USER_DIRECTIVE,
+                    target="prepare nightly reviewer run",
+                    temporal_validity_marker=False,
                 ),
             ),
         ),
     )
-    sanitized_checkpoints = tuple(
-        replace(checkpoint, required_action="p01_optional")
-        if checkpoint.checkpoint_id == "rt01.p01_project_formation_checkpoint"
-        else checkpoint
-        for checkpoint in result.state.execution_checkpoints
+    no_surface_checkpoint = next(
+        item
+        for item in no_surface.state.execution_checkpoints
+        if item.checkpoint_id == "rt01.p01_project_formation_checkpoint"
     )
-    semantic_state = replace(result.state, execution_checkpoints=sanitized_checkpoints)
-    gate = evaluate_subject_tick_downstream_gate(semantic_state)
-    restrictions = set(gate.restrictions)
+    suspended_surface_checkpoint = next(
+        item
+        for item in suspended_surface.state.execution_checkpoints
+        if item.checkpoint_id == "rt01.p01_project_formation_checkpoint"
+    )
+    assert no_surface_checkpoint.required_action == "no_safe_project_formation"
+    assert suspended_surface_checkpoint.required_action == "no_safe_project_formation"
+    assert no_surface.state.final_execution_outcome == SubjectTickOutcome.CONTINUE
+    assert suspended_surface.state.final_execution_outcome == SubjectTickOutcome.CONTINUE
+    assert no_surface.downstream_gate.accepted is True
+    assert suspended_surface.downstream_gate.accepted is False
     assert (
-        SubjectTickRestrictionCode.P01_PROMPT_LOCAL_SUBSTITUTION_FORBIDDEN
-        in restrictions
+        SubjectTickRestrictionCode.P01_PROJECT_HANDOFF_CONSUMER_REQUIRED
+        in set(suspended_surface.downstream_gate.restrictions)
     )
-    assert SubjectTickRestrictionCode.P01_PROJECT_HANDOFF_CONSUMER_REQUIRED in restrictions
 
+
+def test_stale_active_project_detected_is_real_and_load_bearing() -> None:
+    seed = _result(
+        "rt-p01-stale-seed",
+        context=SubjectTickContext(
+            o01_entity_signals=_grounded_user_signals(),
+            o03_candidate_strategy=_transparent_o03_candidate("rt-p01-stale-seed"),
+            p01_project_signals=(
+                _project_signal(
+                    signal_id="p01-stale-seed-1",
+                    authority=P01AuthoritySourceKind.EXPLICIT_USER_DIRECTIVE,
+                    target="prepare nightly reviewer run",
+                ),
+            ),
+        ),
+    )
+    prior_project_id = seed.p01_result.state.active_projects[0].project_id
+    stale = _result(
+        "rt-p01-stale-follow-up",
+        context=SubjectTickContext(
+            prior_p01_state=seed.p01_result.state,
+            o01_entity_signals=_grounded_user_signals(),
+            o03_candidate_strategy=_transparent_o03_candidate("rt-p01-stale-follow-up"),
+            p01_project_signals=(
+                _project_signal(
+                    signal_id="p01-stale-follow-up-1",
+                    authority=P01AuthoritySourceKind.EXPLICIT_USER_DIRECTIVE,
+                    target="prepare nightly reviewer run",
+                    completion_evidence_present=True,
+                    continuation_of_prior_project_id=prior_project_id,
+                ),
+            ),
+        ),
+    )
+    checkpoint = next(
+        item
+        for item in stale.state.execution_checkpoints
+        if item.checkpoint_id == "rt01.p01_project_formation_checkpoint"
+    )
+    assert stale.p01_result.state.stale_active_project_detected is True
+    assert checkpoint.status.value == "enforced_detour"
+    assert "default_p01_stale_project_detour" in checkpoint.required_action
+    assert stale.state.final_execution_outcome == SubjectTickOutcome.REVALIDATE

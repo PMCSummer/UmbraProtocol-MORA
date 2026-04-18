@@ -813,6 +813,10 @@ def evaluate_subject_tick_downstream_gate(
             restrictions.append(
                 SubjectTickRestrictionCode.P01_CONFLICT_ARBITRATION_REQUIRED
             )
+        if "default_p01_stale_project_detour" in p01_checkpoint.required_action:
+            restrictions.append(
+                SubjectTickRestrictionCode.P01_STALE_ACTIVE_PROJECT_FORBIDDEN
+            )
         if "prompt_local_capture_risk" in p01_checkpoint.required_action:
             restrictions.append(
                 SubjectTickRestrictionCode.P01_PROMPT_LOCAL_SUBSTITUTION_FORBIDDEN
