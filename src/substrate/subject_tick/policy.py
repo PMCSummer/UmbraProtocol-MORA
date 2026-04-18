@@ -971,6 +971,80 @@ def evaluate_subject_tick_downstream_gate(
                 "o04 rupture/hostility/coercion checkpoint requires detour before downstream continuation"
             )
 
+    r05_checkpoint = next(
+        (
+            checkpoint
+            for checkpoint in state.execution_checkpoints
+            if checkpoint.checkpoint_id == "rt01.r05_protective_regulation_checkpoint"
+        ),
+        None,
+    )
+    if r05_checkpoint is not None:
+        restrictions.append(
+            SubjectTickRestrictionCode.R05_PROTECTIVE_REGULATION_CONTRACT_MUST_BE_READ
+        )
+        if "require_r05_protective_state_consumer" in r05_checkpoint.required_action:
+            restrictions.append(
+                SubjectTickRestrictionCode.R05_PROTECTIVE_STATE_CONSUMER_REQUIRED
+            )
+        if "require_r05_surface_inhibition_consumer" in r05_checkpoint.required_action:
+            restrictions.append(
+                SubjectTickRestrictionCode.R05_SURFACE_INHIBITION_CONSUMER_REQUIRED
+            )
+        if "require_r05_release_contract_consumer" in r05_checkpoint.required_action:
+            restrictions.append(
+                SubjectTickRestrictionCode.R05_RELEASE_CONTRACT_CONSUMER_REQUIRED
+            )
+        if "default_r05_protective_override_detour" in r05_checkpoint.required_action:
+            restrictions.append(SubjectTickRestrictionCode.R05_PROJECT_OVERRIDE_ACTIVE)
+        if "default_r05_surface_throttle_detour" in r05_checkpoint.required_action:
+            restrictions.append(SubjectTickRestrictionCode.R05_SURFACE_THROTTLE_REQUIRED)
+        if "default_r05_release_recheck_detour" in r05_checkpoint.required_action:
+            restrictions.append(SubjectTickRestrictionCode.R05_RELEASE_RECHECK_REQUIRED)
+
+    if state.r05_insufficient_basis_for_override:
+        restrictions.append(SubjectTickRestrictionCode.R05_INSUFFICIENT_BASIS_FOR_OVERRIDE)
+    if state.r05_regulation_conflict:
+        restrictions.append(SubjectTickRestrictionCode.R05_REGULATION_CONFLICT)
+        if state.final_execution_outcome == SubjectTickOutcome.CONTINUE:
+            usability = SubjectTickUsabilityClass.DEGRADED_BOUNDED
+            reason = (
+                "r05 regulation conflict requires bounded caution and explicit recheck before unrestricted continuation"
+            )
+    if (
+        state.r05_protective_mode == "active_protective_mode"
+        and state.r05_project_override_active
+        and state.r05_release_pending
+    ):
+        restrictions.append(SubjectTickRestrictionCode.R05_PROJECT_OVERRIDE_ACTIVE)
+        restrictions.append(SubjectTickRestrictionCode.R05_RELEASE_RECHECK_REQUIRED)
+        restrictions.append(SubjectTickRestrictionCode.DOWNSTREAM_AUTHORITY_DEGRADED)
+        if state.final_execution_outcome == SubjectTickOutcome.CONTINUE:
+            accepted = False
+            usability = SubjectTickUsabilityClass.BLOCKED
+            reason = (
+                "r05 active protective override remains release-pending; continuation requires bounded detour"
+            )
+    elif (
+        state.r05_inhibited_surface_count > 0
+        and state.r05_protective_mode in {"degraded_operation_only", "recovery_in_progress"}
+    ):
+        restrictions.append(SubjectTickRestrictionCode.R05_SURFACE_THROTTLE_REQUIRED)
+        if (
+            state.final_execution_outcome == SubjectTickOutcome.CONTINUE
+            and usability == SubjectTickUsabilityClass.USABLE_BOUNDED
+        ):
+            usability = SubjectTickUsabilityClass.DEGRADED_BOUNDED
+            reason = "r05 surface-specific inhibition throttles continuation while preserving bounded operation"
+    if r05_checkpoint is not None and r05_checkpoint.status.value != "allowed":
+        restrictions.append(SubjectTickRestrictionCode.DOWNSTREAM_AUTHORITY_DEGRADED)
+        if state.final_execution_outcome == SubjectTickOutcome.CONTINUE:
+            accepted = False
+            usability = SubjectTickUsabilityClass.BLOCKED
+            reason = (
+                "r05 protective regulation checkpoint requires detour before downstream continuation"
+            )
+
     return SubjectTickGateDecision(
         accepted=accepted,
         usability_class=usability,

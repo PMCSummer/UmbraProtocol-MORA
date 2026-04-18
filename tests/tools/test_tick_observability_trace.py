@@ -42,6 +42,7 @@ HOSTED_CONTOUR_SEGMENTS = (
     "o03_strategy_class_evaluation",
     "p01_project_formation",
     "o04_rupture_hostility_coercion",
+    "r05_appraisal_sovereign_protective_regulation",
     "s_minimal_contour",
     "a_line_normalization",
     "m_minimal",
@@ -170,6 +171,18 @@ HOSTED_CONTOUR_FIELDS: dict[str, set[str]] = {
         "no_safe_dynamic_claim",
         "dependency_model_underconstrained",
         "downstream_consumer_ready",
+    },
+    "r05_appraisal_sovereign_protective_regulation": {
+        "protective_mode",
+        "authority_level",
+        "trigger_count",
+        "inhibited_surface_count",
+        "override_active",
+        "release_pending",
+        "regulation_conflict",
+        "insufficient_basis_for_override",
+        "downstream_consumer_ready",
+        "project_override_active",
     },
     "s_minimal_contour": {
         "minimal_self_status",
@@ -651,6 +664,9 @@ def test_hosted_contour_segments_follow_real_runtime_order(tmp_path: Path) -> No
         events, "o04_rupture_hostility_coercion"
     )
     assert _first_order(events, "o04_rupture_hostility_coercion") < _first_order(
+        events, "r05_appraisal_sovereign_protective_regulation"
+    )
+    assert _first_order(events, "r05_appraisal_sovereign_protective_regulation") < _first_order(
         events, "bounded_outcome_resolution"
     )
     assert _first_order(events, "s_minimal_contour") < _first_order(events, "a_line_normalization")
@@ -715,6 +731,7 @@ def test_representative_modules_have_runtime_steps(tmp_path: Path) -> None:
         "o03_strategy_class_evaluation",
         "p01_project_formation",
         "o04_rupture_hostility_coercion",
+        "r05_appraisal_sovereign_protective_regulation",
         "downstream_obedience",
         "subject_tick",
     ):

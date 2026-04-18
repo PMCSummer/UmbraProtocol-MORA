@@ -127,8 +127,10 @@ def _event(
 def test_runtime_topology_graph_includes_o04_node_order_and_checkpoint() -> None:
     graph = build_minimal_runtime_tick_graph()
     assert "O04" in graph.runtime_order
+    assert "R05" in graph.runtime_order
     assert graph.runtime_order.index("P01") < graph.runtime_order.index("O04")
-    assert graph.runtime_order.index("O04") < graph.runtime_order.index("RT01")
+    assert graph.runtime_order.index("O04") < graph.runtime_order.index("R05")
+    assert graph.runtime_order.index("R05") < graph.runtime_order.index("RT01")
     assert "rt01.o04_rupture_hostility_coercion_checkpoint" in graph.mandatory_checkpoint_ids
     assert "o04_rupture_hostility_coercion.dynamic_model" in graph.source_of_truth_surfaces
 

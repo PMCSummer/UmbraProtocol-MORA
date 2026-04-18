@@ -197,6 +197,18 @@ MODULE_ALLOWED_FIELDS: dict[str, tuple[str, ...]] = {
         "dependency_model_underconstrained",
         "downstream_consumer_ready",
     ),
+    "r05_appraisal_sovereign_protective_regulation": (
+        "protective_mode",
+        "authority_level",
+        "trigger_count",
+        "inhibited_surface_count",
+        "override_active",
+        "release_pending",
+        "regulation_conflict",
+        "insufficient_basis_for_override",
+        "downstream_consumer_ready",
+        "project_override_active",
+    ),
     "s_minimal_contour": (
         "minimal_self_status",
         "minimal_self_ready",

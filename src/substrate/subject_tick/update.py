@@ -192,6 +192,11 @@ from substrate.o04_rupture_hostility_coercion import (
     build_o04_rupture_hostility_coercion,
     derive_o04_dynamic_consumer_view,
 )
+from substrate.r05_appraisal_sovereign_protective_regulation import (
+    R05ProtectiveTriggerInput,
+    build_r05_appraisal_sovereign_protective_regulation,
+    derive_r05_protective_consumer_view,
+)
 from substrate.s01_efference_copy import (
     S01EfferenceCopyState,
     build_s01_efference_copy,
@@ -228,6 +233,7 @@ ATTEMPTED_SUBJECT_TICK_PATHS: tuple[str, ...] = (
     "subject_tick.evaluate_o03_strategy_class_evaluation",
     "subject_tick.evaluate_p01_project_formation",
     "subject_tick.evaluate_o04_rupture_hostility_coercion",
+    "subject_tick.evaluate_r05_appraisal_sovereign_protective_regulation",
     "subject_tick.world_seam_enforcement",
     "subject_tick.resolve_bounded_runtime_outcome",
     "subject_tick.downstream_gate",
@@ -3751,6 +3757,257 @@ def execute_subject_tick(
         )
     )
 
+    r05_trigger_inputs = tuple(
+        trigger
+        for trigger in context.r05_protective_triggers
+        if isinstance(trigger, R05ProtectiveTriggerInput)
+    )
+    if not r05_trigger_inputs and (
+        o04_view.coercive_structure_candidate
+        or o04_view.rupture_risk_or_active
+    ):
+        synthetic_structure_score = (
+            0.82
+            if o04_view.coercive_structure_candidate
+            else 0.62
+            if o04_view.rupture_risk_or_active
+            else 0.42
+        )
+        r05_trigger_inputs = (
+            R05ProtectiveTriggerInput(
+                trigger_id=f"{tick_id}:r05:o04-basis",
+                trigger_kind="o04_structural_basis",
+                threat_structure_score=synthetic_structure_score,
+                load_pressure_score=0.66 if o04_view.rupture_risk_or_active else 0.48,
+                o04_coercive_structure_present=o04_view.coercive_structure_candidate,
+                o04_rupture_risk_present=o04_view.rupture_risk_or_active,
+                o04_directionality_ambiguous=(
+                    o04_result.telemetry.directionality_kind.value == "directionality_ambiguous"
+                ),
+                o04_legitimacy_underconstrained=(
+                    o04_result.state.legitimacy_boundary_underconstrained
+                ),
+                p01_project_continuation_active=bool(
+                    len(p01_result.state.active_projects) > 0
+                ),
+                p01_blocked_or_conflicted=bool(
+                    p01_result.state.conflicting_authority
+                    or p01_result.state.blocked_pending_grounding
+                ),
+                g08_appraisal_significance_hint=context.g08_appraisal_significance_hint,
+                communication_surface_exposed=True,
+                project_continuation_requested=False,
+                escalation_route_available=o04_view.coercive_structure_candidate,
+                permission_hardening_available=True,
+                tone_only_discomfort=bool(
+                    o04_result.state.tone_shortcut_forbidden_applied
+                    and not o04_view.coercive_structure_candidate
+                ),
+                counterevidence_present=bool(
+                    len(o04_result.state.counterevidence_summary) > 0
+                ),
+                release_signal_present=bool(
+                    o04_result.state.rupture_status.value in {"repair_in_progress"}
+                ),
+                provenance="subject_tick.r05.synthetic_o04_basis",
+            ),
+        )
+
+    r05_result = build_r05_appraisal_sovereign_protective_regulation(
+        tick_id=tick_id,
+        tick_index=tick_index,
+        protective_triggers=r05_trigger_inputs,
+        o04_result=o04_result,
+        p01_result=p01_result,
+        source_lineage=lineage,
+        prior_state=context.prior_r05_state,
+        regulation_enabled=not context.disable_r05_enforcement,
+    )
+    r05_view = derive_r05_protective_consumer_view(r05_result)
+    r05_explicit_trigger_basis = bool(
+        r05_trigger_inputs
+        and any(
+            trigger.provenance != "subject_tick.r05.synthetic_o04_basis"
+            for trigger in r05_trigger_inputs
+        )
+    )
+    r05_enter_values = {
+        "protective_mode": r05_result.telemetry.protective_mode.value,
+        "authority_level": r05_result.telemetry.authority_level.value,
+        "trigger_count": r05_result.telemetry.trigger_count,
+        "inhibited_surface_count": r05_result.telemetry.inhibited_surface_count,
+        "override_active": r05_result.telemetry.override_active,
+        "release_pending": r05_result.telemetry.release_pending,
+        "regulation_conflict": r05_result.telemetry.regulation_conflict,
+        "insufficient_basis_for_override": (
+            r05_result.telemetry.insufficient_basis_for_override
+        ),
+        "downstream_consumer_ready": r05_result.telemetry.downstream_consumer_ready,
+        "project_override_active": r05_result.telemetry.project_override_active,
+    }
+    trace_emit_active(
+        "r05_appraisal_sovereign_protective_regulation",
+        "enter",
+        r05_enter_values,
+    )
+    r05_checkpoint_status = SubjectTickCheckpointStatus.ALLOWED
+    r05_checkpoint_reason = r05_result.gate.reason
+    r05_default_protective_override_detour = False
+    r05_default_surface_throttle_detour = False
+    r05_default_release_recheck_detour = False
+    if not context.disable_r05_enforcement:
+        if (
+            context.require_r05_protective_state_consumer
+            and not r05_view.protective_state_consumer_ready
+            and halt_reason is None
+        ):
+            revalidation_needed = True
+            r05_checkpoint_status = SubjectTickCheckpointStatus.ENFORCED_DETOUR
+            r05_checkpoint_reason = (
+                "r05 protective-state consumer requested but protective state readiness is not available"
+            )
+            if active_execution_mode != "halt_execution":
+                active_execution_mode = "revalidate_scope"
+        if (
+            context.require_r05_surface_inhibition_consumer
+            and not r05_view.surface_inhibition_consumer_ready
+            and halt_reason is None
+        ):
+            revalidation_needed = True
+            r05_checkpoint_status = SubjectTickCheckpointStatus.ENFORCED_DETOUR
+            r05_checkpoint_reason = (
+                "r05 surface-inhibition consumer requested but inhibited surface profile is unavailable"
+            )
+            if active_execution_mode != "halt_execution":
+                active_execution_mode = "revalidate_scope"
+        if (
+            context.require_r05_release_contract_consumer
+            and not r05_view.release_contract_consumer_ready
+            and halt_reason is None
+        ):
+            revalidation_needed = True
+            r05_checkpoint_status = SubjectTickCheckpointStatus.ENFORCED_DETOUR
+            r05_checkpoint_reason = (
+                "r05 release-contract consumer requested but release/hysteresis contract is unavailable"
+            )
+            if active_execution_mode != "halt_execution":
+                active_execution_mode = "revalidate_scope"
+
+        if (
+            r05_result.state.trigger_count > 0
+            and r05_view.protective_override_required
+            and r05_explicit_trigger_basis
+            and not context.require_r05_protective_state_consumer
+            and halt_reason is None
+        ):
+            repair_needed = True
+            r05_default_protective_override_detour = True
+            r05_checkpoint_status = SubjectTickCheckpointStatus.ENFORCED_DETOUR
+            r05_checkpoint_reason = (
+                "r05 active protective override detour enforced for bounded sovereign protection"
+            )
+            if active_execution_mode != "halt_execution":
+                active_execution_mode = "repair_runtime_path"
+        elif (
+            r05_result.state.trigger_count > 0
+            and r05_view.surface_throttle_required
+            and r05_explicit_trigger_basis
+            and not context.require_r05_surface_inhibition_consumer
+            and halt_reason is None
+        ):
+            repair_needed = True
+            r05_default_surface_throttle_detour = True
+            r05_checkpoint_status = SubjectTickCheckpointStatus.ENFORCED_DETOUR
+            r05_checkpoint_reason = (
+                "r05 surface throttle detour enforced from bounded protective basis"
+            )
+            if active_execution_mode != "halt_execution":
+                active_execution_mode = "repair_branch_access"
+        if (
+            r05_result.state.trigger_count > 0
+            and r05_view.release_recheck_required
+            and r05_explicit_trigger_basis
+            and not context.require_r05_release_contract_consumer
+            and halt_reason is None
+            and not r05_default_protective_override_detour
+        ):
+            revalidation_needed = True
+            r05_default_release_recheck_detour = True
+            r05_checkpoint_status = SubjectTickCheckpointStatus.ENFORCED_DETOUR
+            r05_checkpoint_reason = (
+                "r05 release recheck detour enforced until release conditions are satisfied"
+            )
+            if active_execution_mode != "halt_execution":
+                active_execution_mode = "revalidate_scope"
+    else:
+        r05_checkpoint_status = SubjectTickCheckpointStatus.ALLOWED
+        r05_checkpoint_reason = "r05 enforcement disabled in ablation context"
+
+    r05_required_actions: list[str] = []
+    if context.require_r05_protective_state_consumer:
+        r05_required_actions.append("require_r05_protective_state_consumer")
+    if context.require_r05_surface_inhibition_consumer:
+        r05_required_actions.append("require_r05_surface_inhibition_consumer")
+    if context.require_r05_release_contract_consumer:
+        r05_required_actions.append("require_r05_release_contract_consumer")
+    if r05_default_protective_override_detour:
+        r05_required_actions.append("default_r05_protective_override_detour")
+    if r05_default_surface_throttle_detour:
+        r05_required_actions.append("default_r05_surface_throttle_detour")
+    if r05_default_release_recheck_detour:
+        r05_required_actions.append("default_r05_release_recheck_detour")
+    if r05_result.state.project_override_active:
+        r05_required_actions.append("project_override_active")
+    if r05_result.state.release_pending:
+        r05_required_actions.append("release_pending")
+    if r05_result.state.regulation_conflict:
+        r05_required_actions.append("regulation_conflict")
+    if r05_result.state.insufficient_basis_for_override:
+        r05_required_actions.append("insufficient_basis_for_override")
+    if not r05_required_actions:
+        r05_required_actions.append("r05_optional")
+    r05_trace_values = {
+        "protective_mode": r05_result.telemetry.protective_mode.value,
+        "authority_level": r05_result.telemetry.authority_level.value,
+        "trigger_count": r05_result.telemetry.trigger_count,
+        "inhibited_surface_count": r05_result.telemetry.inhibited_surface_count,
+        "override_active": r05_result.telemetry.override_active,
+        "release_pending": r05_result.telemetry.release_pending,
+        "regulation_conflict": r05_result.telemetry.regulation_conflict,
+        "insufficient_basis_for_override": (
+            r05_result.telemetry.insufficient_basis_for_override
+        ),
+        "downstream_consumer_ready": r05_result.telemetry.downstream_consumer_ready,
+        "project_override_active": r05_result.telemetry.project_override_active,
+    }
+    trace_emit_active(
+        "r05_appraisal_sovereign_protective_regulation",
+        "decision",
+        r05_trace_values,
+    )
+    if r05_checkpoint_status != SubjectTickCheckpointStatus.ALLOWED:
+        trace_emit_active(
+            "r05_appraisal_sovereign_protective_regulation",
+            "blocked",
+            r05_trace_values,
+            note=r05_checkpoint_reason,
+        )
+    trace_emit_active(
+        "r05_appraisal_sovereign_protective_regulation",
+        "exit",
+        r05_trace_values,
+    )
+    checkpoints.append(
+        SubjectTickCheckpointResult(
+            checkpoint_id="rt01.r05_protective_regulation_checkpoint",
+            source_contract="r05_appraisal_sovereign_protective_regulation.protective_state",
+            status=r05_checkpoint_status,
+            required_action=";".join(dict.fromkeys(r05_required_actions)),
+            applied_action=active_execution_mode,
+            reason=r05_checkpoint_reason,
+        )
+    )
+
     if halt_reason is not None:
         final_outcome = SubjectTickOutcome.HALT
         execution_stance = SubjectTickExecutionStance.HALT_PATH
@@ -4457,6 +4714,25 @@ def execute_subject_tick(
         o04_protective_handoff_consumer_ready=(
             o04_result.gate.protective_handoff_consumer_ready
         ),
+        r05_protective_mode=r05_result.state.protective_mode.value,
+        r05_authority_level=r05_result.state.authority_level.value,
+        r05_trigger_count=r05_result.state.trigger_count,
+        r05_inhibited_surface_count=len(r05_result.state.inhibited_surfaces),
+        r05_project_override_active=r05_result.state.project_override_active,
+        r05_release_pending=r05_result.state.release_pending,
+        r05_regulation_conflict=r05_result.state.regulation_conflict,
+        r05_insufficient_basis_for_override=(
+            r05_result.state.insufficient_basis_for_override
+        ),
+        r05_protective_state_consumer_ready=(
+            r05_result.gate.protective_state_consumer_ready
+        ),
+        r05_surface_inhibition_consumer_ready=(
+            r05_result.gate.surface_inhibition_consumer_ready
+        ),
+        r05_release_contract_consumer_ready=(
+            r05_result.gate.release_contract_consumer_ready
+        ),
     )
     gate = evaluate_subject_tick_downstream_gate(state)
     telemetry = build_subject_tick_telemetry(
@@ -4464,7 +4740,7 @@ def execute_subject_tick(
         attempted_paths=ATTEMPTED_SUBJECT_TICK_PATHS,
         downstream_gate=gate,
         causal_basis=(
-            "bounded runtime execution spine enforces roadmap authority roles for C04/C05, consumes world-entry, s01 efference-copy, s02 prediction-boundary seam, s03 ownership-weighted learning, s04 interoceptive self-binding, s05 multi-cause attribution, s-minimal, a-line, m-minimal, n-minimal, t01 semantic-field, t02 relation-binding, t03 hypothesis-competition, t04 attention-schema, o01 other-entity modeling, o02 intersubjective allostasis, o03 strategy-class evaluation, p01 authority-bounded project-formation, and o04 rupture/hostility/coercion dynamics gates, and keeps D01 observability-only over fixed R->C order"
+            "bounded runtime execution spine enforces roadmap authority roles for C04/C05, consumes world-entry, s01 efference-copy, s02 prediction-boundary seam, s03 ownership-weighted learning, s04 interoceptive self-binding, s05 multi-cause attribution, s-minimal, a-line, m-minimal, n-minimal, t01 semantic-field, t02 relation-binding, t03 hypothesis-competition, t04 attention-schema, o01 other-entity modeling, o02 intersubjective allostasis, o03 strategy-class evaluation, p01 authority-bounded project-formation, o04 rupture/hostility/coercion dynamics, and r05 bounded protective regulation gates, and keeps D01 observability-only over fixed R->C order"
         ),
     )
     abstain = final_outcome in {SubjectTickOutcome.REPAIR, SubjectTickOutcome.REVALIDATE}
@@ -4557,6 +4833,7 @@ def execute_subject_tick(
         o03_result=o03_result,
         p01_result=p01_result,
         o04_result=o04_result,
+        r05_result=r05_result,
         t01_result=t01_result,
         t02_result=t02_result,
         t03_result=t03_result,
