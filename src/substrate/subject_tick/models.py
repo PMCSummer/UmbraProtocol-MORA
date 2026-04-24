@@ -31,6 +31,11 @@ if TYPE_CHECKING:
         R05ProtectiveResult,
         R05ProtectiveTriggerInput,
     )
+    from substrate.v01_normative_permission_commitment_licensing import (
+        V01CommunicativeActCandidate,
+        V01CommunicativeLicenseState,
+        V01LicenseResult,
+    )
     from substrate.p01_project_formation import (
         P01IntentionStackState,
         P01ProjectFormationResult,
@@ -290,6 +295,15 @@ class SubjectTickRestrictionCode(StrEnum):
     R05_RELEASE_RECHECK_REQUIRED = "r05_release_recheck_required"
     R05_INSUFFICIENT_BASIS_FOR_OVERRIDE = "r05_insufficient_basis_for_override"
     R05_REGULATION_CONFLICT = "r05_regulation_conflict"
+    V01_LICENSE_CONTRACT_MUST_BE_READ = "v01_license_contract_must_be_read"
+    V01_LICENSE_CONSUMER_REQUIRED = "v01_license_consumer_required"
+    V01_COMMITMENT_DELTA_CONSUMER_REQUIRED = "v01_commitment_delta_consumer_required"
+    V01_QUALIFIER_BINDING_CONSUMER_REQUIRED = "v01_qualifier_binding_consumer_required"
+    V01_UNLICENSED_ACT_DETOUR_REQUIRED = "v01_unlicensed_act_detour_required"
+    V01_QUALIFICATION_REQUIRED = "v01_qualification_required"
+    V01_COMMITMENT_DENIED = "v01_commitment_denied"
+    V01_PROTECTIVE_DEFER_REQUIRED = "v01_protective_defer_required"
+    V01_INSUFFICIENT_LICENSE_BASIS = "v01_insufficient_license_basis"
     DOWNSTREAM_AUTHORITY_DEGRADED = "downstream_authority_degraded"
 
 
@@ -362,6 +376,7 @@ class SubjectTickContext:
     prior_o02_state: O02IntersubjectiveAllostasisState | None = None
     prior_o04_state: O04DynamicModel | None = None
     prior_r05_state: R05ProtectiveRegulationState | None = None
+    prior_v01_state: V01CommunicativeLicenseState | None = None
     prior_p01_state: P01IntentionStackState | None = None
     dependency_trigger_hits: tuple[str, ...] = ()
     context_shift_markers: tuple[str, ...] = ()
@@ -459,12 +474,17 @@ class SubjectTickContext:
     require_r05_surface_inhibition_consumer: bool = False
     require_r05_release_contract_consumer: bool = False
     disable_r05_enforcement: bool = False
+    require_v01_license_consumer: bool = False
+    require_v01_commitment_delta_consumer: bool = False
+    require_v01_qualifier_binding_consumer: bool = False
+    disable_v01_enforcement: bool = False
     o01_entity_signals: tuple[O01EntitySignal, ...] = ()
     o02_interaction_diagnostics: O02InteractionDiagnosticsInput | None = None
     o03_candidate_strategy: O03CandidateStrategyInput | None = None
     p01_project_signals: tuple[P01ProjectSignalInput, ...] = ()
     o04_interaction_events: tuple[O04InteractionEventInput, ...] = ()
     r05_protective_triggers: tuple[R05ProtectiveTriggerInput, ...] = ()
+    v01_act_candidates: tuple[V01CommunicativeActCandidate, ...] = ()
     g08_appraisal_significance_hint: float | None = None
     source_lineage: tuple[str, ...] = ()
 
@@ -943,6 +963,20 @@ class SubjectTickState:
     r05_protective_state_consumer_ready: bool = False
     r05_surface_inhibition_consumer_ready: bool = False
     r05_release_contract_consumer_ready: bool = False
+    v01_candidate_act_count: int = 0
+    v01_licensed_act_count: int = 0
+    v01_denied_act_count: int = 0
+    v01_conditional_act_count: int = 0
+    v01_commitment_delta_count: int = 0
+    v01_mandatory_qualifier_count: int = 0
+    v01_mandatory_qualifier_ids: tuple[str, ...] = ()
+    v01_protective_defer_required: bool = False
+    v01_insufficient_license_basis: bool = True
+    v01_promise_like_act_denied: bool = False
+    v01_alternative_narrowed_act_available: bool = False
+    v01_license_consumer_ready: bool = False
+    v01_commitment_delta_consumer_ready: bool = False
+    v01_qualifier_binding_consumer_ready: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -1289,6 +1323,7 @@ class SubjectTickResult:
     p01_result: P01ProjectFormationResult
     o04_result: O04DynamicResult
     r05_result: R05ProtectiveResult
+    v01_result: V01LicenseResult
     t01_result: T01ActiveFieldResult
     t02_result: T02ConstrainedSceneResult
     t03_result: T03CompetitionResult

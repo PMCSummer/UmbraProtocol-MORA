@@ -197,6 +197,11 @@ from substrate.r05_appraisal_sovereign_protective_regulation import (
     build_r05_appraisal_sovereign_protective_regulation,
     derive_r05_protective_consumer_view,
 )
+from substrate.v01_normative_permission_commitment_licensing import (
+    V01CommunicativeActCandidate,
+    build_v01_normative_permission_commitment_licensing,
+    derive_v01_license_consumer_view,
+)
 from substrate.s01_efference_copy import (
     S01EfferenceCopyState,
     build_s01_efference_copy,
@@ -234,6 +239,7 @@ ATTEMPTED_SUBJECT_TICK_PATHS: tuple[str, ...] = (
     "subject_tick.evaluate_p01_project_formation",
     "subject_tick.evaluate_o04_rupture_hostility_coercion",
     "subject_tick.evaluate_r05_appraisal_sovereign_protective_regulation",
+    "subject_tick.evaluate_v01_normative_permission_commitment_licensing",
     "subject_tick.world_seam_enforcement",
     "subject_tick.resolve_bounded_runtime_outcome",
     "subject_tick.downstream_gate",
@@ -4008,6 +4014,200 @@ def execute_subject_tick(
         )
     )
 
+    v01_candidates = tuple(
+        candidate
+        for candidate in context.v01_act_candidates
+        if isinstance(candidate, V01CommunicativeActCandidate)
+    )
+    v01_explicit_candidate_basis = bool(v01_candidates)
+    v01_result = build_v01_normative_permission_commitment_licensing(
+        tick_id=tick_id,
+        tick_index=tick_index,
+        act_candidates=v01_candidates,
+        r05_result=r05_result,
+        source_lineage=lineage,
+        prior_state=context.prior_v01_state,
+        licensing_enabled=not context.disable_v01_enforcement,
+    )
+    v01_view = derive_v01_license_consumer_view(v01_result)
+    v01_enter_values = {
+        "candidate_act_count": v01_result.telemetry.candidate_act_count,
+        "licensed_act_count": v01_result.telemetry.licensed_act_count,
+        "denied_act_count": v01_result.telemetry.denied_act_count,
+        "conditional_act_count": v01_result.telemetry.conditional_act_count,
+        "commitment_delta_count": v01_result.telemetry.commitment_delta_count,
+        "mandatory_qualifier_count": v01_result.telemetry.mandatory_qualifier_count,
+        "protective_defer_required": v01_result.telemetry.protective_defer_required,
+        "insufficient_license_basis": v01_result.telemetry.insufficient_license_basis,
+        "downstream_consumer_ready": v01_result.telemetry.downstream_consumer_ready,
+        "promise_like_act_denied": v01_result.telemetry.promise_like_act_denied,
+        "alternative_narrowed_act_available": (
+            v01_result.telemetry.alternative_narrowed_act_available
+        ),
+    }
+    trace_emit_active(
+        "v01_normative_permission_commitment_licensing",
+        "enter",
+        v01_enter_values,
+    )
+    v01_checkpoint_status = SubjectTickCheckpointStatus.ALLOWED
+    v01_checkpoint_reason = v01_result.gate.reason
+    v01_default_unlicensed_act_detour = False
+    v01_default_qualification_required_detour = False
+    v01_default_commitment_denied_detour = False
+    if not context.disable_v01_enforcement:
+        if (
+            context.require_v01_license_consumer
+            and not v01_view.license_consumer_ready
+            and halt_reason is None
+        ):
+            revalidation_needed = True
+            v01_checkpoint_status = SubjectTickCheckpointStatus.ENFORCED_DETOUR
+            v01_checkpoint_reason = (
+                "v01 license consumer requested but act-level license state is not ready"
+            )
+            if active_execution_mode != "halt_execution":
+                active_execution_mode = "revalidate_scope"
+        if (
+            context.require_v01_commitment_delta_consumer
+            and not v01_view.commitment_delta_consumer_ready
+            and halt_reason is None
+        ):
+            revalidation_needed = True
+            v01_checkpoint_status = SubjectTickCheckpointStatus.ENFORCED_DETOUR
+            v01_checkpoint_reason = (
+                "v01 commitment-delta consumer requested but explicit commitment surface is not ready"
+            )
+            if active_execution_mode != "halt_execution":
+                active_execution_mode = "revalidate_scope"
+        if (
+            context.require_v01_qualifier_binding_consumer
+            and not v01_view.qualifier_binding_consumer_ready
+            and halt_reason is None
+        ):
+            revalidation_needed = True
+            v01_checkpoint_status = SubjectTickCheckpointStatus.ENFORCED_DETOUR
+            v01_checkpoint_reason = (
+                "v01 qualifier-binding consumer requested but mandatory qualifier surface is not ready"
+            )
+            if active_execution_mode != "halt_execution":
+                active_execution_mode = "revalidate_scope"
+
+        if (
+            v01_explicit_candidate_basis
+            and v01_view.unlicensed_act_present
+            and not v01_view.alternative_narrowed_act_available
+            and not context.require_v01_license_consumer
+            and halt_reason is None
+        ):
+            repair_needed = True
+            v01_default_unlicensed_act_detour = True
+            v01_checkpoint_status = SubjectTickCheckpointStatus.ENFORCED_DETOUR
+            v01_checkpoint_reason = (
+                "v01 default contour blocks unlicensed act without narrowed alternative"
+            )
+            if active_execution_mode != "halt_execution":
+                active_execution_mode = "repair_runtime_path"
+        if (
+            v01_explicit_candidate_basis
+            and v01_view.qualification_required
+            and not context.require_v01_qualifier_binding_consumer
+            and halt_reason is None
+        ):
+            revalidation_needed = True
+            v01_default_qualification_required_detour = True
+            v01_checkpoint_status = SubjectTickCheckpointStatus.ENFORCED_DETOUR
+            v01_checkpoint_reason = (
+                "v01 default contour requires mandatory qualifier binding before continuation"
+            )
+            if active_execution_mode != "halt_execution":
+                active_execution_mode = "revalidate_scope"
+        if (
+            v01_explicit_candidate_basis
+            and v01_view.commitment_denied
+            and not context.require_v01_commitment_delta_consumer
+            and halt_reason is None
+        ):
+            repair_needed = True
+            v01_default_commitment_denied_detour = True
+            v01_checkpoint_status = SubjectTickCheckpointStatus.ENFORCED_DETOUR
+            v01_checkpoint_reason = (
+                "v01 default contour denies promise-like commitment and requires narrowed continuation"
+            )
+            if active_execution_mode != "halt_execution":
+                active_execution_mode = "repair_runtime_path"
+    else:
+        v01_checkpoint_status = SubjectTickCheckpointStatus.ALLOWED
+        v01_checkpoint_reason = "v01 enforcement disabled in ablation context"
+
+    v01_required_actions: list[str] = []
+    if context.require_v01_license_consumer:
+        v01_required_actions.append("require_v01_license_consumer")
+    if context.require_v01_commitment_delta_consumer:
+        v01_required_actions.append("require_v01_commitment_delta_consumer")
+    if context.require_v01_qualifier_binding_consumer:
+        v01_required_actions.append("require_v01_qualifier_binding_consumer")
+    if v01_default_unlicensed_act_detour:
+        v01_required_actions.append("default_v01_unlicensed_act_detour")
+    if v01_default_qualification_required_detour:
+        v01_required_actions.append("default_v01_qualification_required_detour")
+    if v01_default_commitment_denied_detour:
+        v01_required_actions.append("default_v01_commitment_denied_detour")
+    if v01_explicit_candidate_basis and v01_result.state.qualification_required:
+        v01_required_actions.append("qualification_required")
+    if v01_explicit_candidate_basis and v01_result.state.protective_defer_required:
+        v01_required_actions.append("protective_defer_required")
+    if v01_explicit_candidate_basis and v01_result.state.promise_like_act_denied:
+        v01_required_actions.append("promise_like_act_denied")
+    if v01_explicit_candidate_basis and v01_result.state.insufficient_license_basis:
+        v01_required_actions.append("insufficient_license_basis")
+    if v01_explicit_candidate_basis and v01_result.state.alternative_narrowed_act_available:
+        v01_required_actions.append("alternative_narrowed_act_available")
+    if not v01_required_actions:
+        v01_required_actions.append("v01_optional")
+    v01_trace_values = {
+        "candidate_act_count": v01_result.telemetry.candidate_act_count,
+        "licensed_act_count": v01_result.telemetry.licensed_act_count,
+        "denied_act_count": v01_result.telemetry.denied_act_count,
+        "conditional_act_count": v01_result.telemetry.conditional_act_count,
+        "commitment_delta_count": v01_result.telemetry.commitment_delta_count,
+        "mandatory_qualifier_count": v01_result.telemetry.mandatory_qualifier_count,
+        "protective_defer_required": v01_result.telemetry.protective_defer_required,
+        "insufficient_license_basis": v01_result.telemetry.insufficient_license_basis,
+        "downstream_consumer_ready": v01_result.telemetry.downstream_consumer_ready,
+        "promise_like_act_denied": v01_result.telemetry.promise_like_act_denied,
+        "alternative_narrowed_act_available": (
+            v01_result.telemetry.alternative_narrowed_act_available
+        ),
+    }
+    trace_emit_active(
+        "v01_normative_permission_commitment_licensing",
+        "decision",
+        v01_trace_values,
+    )
+    if v01_checkpoint_status != SubjectTickCheckpointStatus.ALLOWED:
+        trace_emit_active(
+            "v01_normative_permission_commitment_licensing",
+            "blocked",
+            v01_trace_values,
+            note=v01_checkpoint_reason,
+        )
+    trace_emit_active(
+        "v01_normative_permission_commitment_licensing",
+        "exit",
+        v01_trace_values,
+    )
+    checkpoints.append(
+        SubjectTickCheckpointResult(
+            checkpoint_id="rt01.v01_normative_permission_commitment_licensing_checkpoint",
+            source_contract="v01_normative_permission_commitment_licensing.communicative_license_state",
+            status=v01_checkpoint_status,
+            required_action=";".join(dict.fromkeys(v01_required_actions)),
+            applied_action=active_execution_mode,
+            reason=v01_checkpoint_reason,
+        )
+    )
+
     if halt_reason is not None:
         final_outcome = SubjectTickOutcome.HALT
         execution_stance = SubjectTickExecutionStance.HALT_PATH
@@ -4733,6 +4933,26 @@ def execute_subject_tick(
         r05_release_contract_consumer_ready=(
             r05_result.gate.release_contract_consumer_ready
         ),
+        v01_candidate_act_count=v01_result.state.candidate_act_count,
+        v01_licensed_act_count=v01_result.state.licensed_act_count,
+        v01_denied_act_count=v01_result.state.denied_act_count,
+        v01_conditional_act_count=v01_result.state.conditional_act_count,
+        v01_commitment_delta_count=v01_result.state.commitment_delta_count,
+        v01_mandatory_qualifier_count=v01_result.state.mandatory_qualifier_count,
+        v01_mandatory_qualifier_ids=v01_result.state.mandatory_qualifiers,
+        v01_protective_defer_required=v01_result.state.protective_defer_required,
+        v01_insufficient_license_basis=v01_result.state.insufficient_license_basis,
+        v01_promise_like_act_denied=v01_result.state.promise_like_act_denied,
+        v01_alternative_narrowed_act_available=(
+            v01_result.state.alternative_narrowed_act_available
+        ),
+        v01_license_consumer_ready=v01_result.gate.license_consumer_ready,
+        v01_commitment_delta_consumer_ready=(
+            v01_result.gate.commitment_delta_consumer_ready
+        ),
+        v01_qualifier_binding_consumer_ready=(
+            v01_result.gate.qualifier_binding_consumer_ready
+        ),
     )
     gate = evaluate_subject_tick_downstream_gate(state)
     telemetry = build_subject_tick_telemetry(
@@ -4740,7 +4960,7 @@ def execute_subject_tick(
         attempted_paths=ATTEMPTED_SUBJECT_TICK_PATHS,
         downstream_gate=gate,
         causal_basis=(
-            "bounded runtime execution spine enforces roadmap authority roles for C04/C05, consumes world-entry, s01 efference-copy, s02 prediction-boundary seam, s03 ownership-weighted learning, s04 interoceptive self-binding, s05 multi-cause attribution, s-minimal, a-line, m-minimal, n-minimal, t01 semantic-field, t02 relation-binding, t03 hypothesis-competition, t04 attention-schema, o01 other-entity modeling, o02 intersubjective allostasis, o03 strategy-class evaluation, p01 authority-bounded project-formation, o04 rupture/hostility/coercion dynamics, and r05 bounded protective regulation gates, and keeps D01 observability-only over fixed R->C order"
+            "bounded runtime execution spine enforces roadmap authority roles for C04/C05, consumes world-entry, s01 efference-copy, s02 prediction-boundary seam, s03 ownership-weighted learning, s04 interoceptive self-binding, s05 multi-cause attribution, s-minimal, a-line, m-minimal, n-minimal, t01 semantic-field, t02 relation-binding, t03 hypothesis-competition, t04 attention-schema, o01 other-entity modeling, o02 intersubjective allostasis, o03 strategy-class evaluation, p01 authority-bounded project-formation, o04 rupture/hostility/coercion dynamics, r05 bounded protective regulation gates, and v01 act-level normative licensing/commitment guards, and keeps D01 observability-only over fixed R->C order"
         ),
     )
     abstain = final_outcome in {SubjectTickOutcome.REPAIR, SubjectTickOutcome.REVALIDATE}
@@ -4834,6 +5054,7 @@ def execute_subject_tick(
         p01_result=p01_result,
         o04_result=o04_result,
         r05_result=r05_result,
+        v01_result=v01_result,
         t01_result=t01_result,
         t02_result=t02_result,
         t03_result=t03_result,

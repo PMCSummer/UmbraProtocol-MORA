@@ -43,6 +43,7 @@ HOSTED_CONTOUR_SEGMENTS = (
     "p01_project_formation",
     "o04_rupture_hostility_coercion",
     "r05_appraisal_sovereign_protective_regulation",
+    "v01_normative_permission_commitment_licensing",
     "s_minimal_contour",
     "a_line_normalization",
     "m_minimal",
@@ -183,6 +184,19 @@ HOSTED_CONTOUR_FIELDS: dict[str, set[str]] = {
         "insufficient_basis_for_override",
         "downstream_consumer_ready",
         "project_override_active",
+    },
+    "v01_normative_permission_commitment_licensing": {
+        "candidate_act_count",
+        "licensed_act_count",
+        "denied_act_count",
+        "conditional_act_count",
+        "commitment_delta_count",
+        "mandatory_qualifier_count",
+        "protective_defer_required",
+        "insufficient_license_basis",
+        "downstream_consumer_ready",
+        "promise_like_act_denied",
+        "alternative_narrowed_act_available",
     },
     "s_minimal_contour": {
         "minimal_self_status",
@@ -667,6 +681,9 @@ def test_hosted_contour_segments_follow_real_runtime_order(tmp_path: Path) -> No
         events, "r05_appraisal_sovereign_protective_regulation"
     )
     assert _first_order(events, "r05_appraisal_sovereign_protective_regulation") < _first_order(
+        events, "v01_normative_permission_commitment_licensing"
+    )
+    assert _first_order(events, "v01_normative_permission_commitment_licensing") < _first_order(
         events, "bounded_outcome_resolution"
     )
     assert _first_order(events, "s_minimal_contour") < _first_order(events, "a_line_normalization")
@@ -732,6 +749,7 @@ def test_representative_modules_have_runtime_steps(tmp_path: Path) -> None:
         "p01_project_formation",
         "o04_rupture_hostility_coercion",
         "r05_appraisal_sovereign_protective_regulation",
+        "v01_normative_permission_commitment_licensing",
         "downstream_obedience",
         "subject_tick",
     ):

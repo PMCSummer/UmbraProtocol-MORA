@@ -172,6 +172,7 @@ def test_runtime_topology_bundle_and_graph_are_materialized() -> None:
         "P01",
         "O04",
         "R05",
+        "V01",
         "RT01",
     )
     assert "rt01.epistemic_admission_checkpoint" in graph.mandatory_checkpoint_ids
@@ -198,6 +199,7 @@ def test_runtime_topology_bundle_and_graph_are_materialized() -> None:
     assert "rt01.p01_project_formation_checkpoint" in graph.mandatory_checkpoint_ids
     assert "rt01.o04_rupture_hostility_coercion_checkpoint" in graph.mandatory_checkpoint_ids
     assert "rt01.r05_protective_regulation_checkpoint" in graph.mandatory_checkpoint_ids
+    assert "rt01.v01_normative_permission_commitment_licensing_checkpoint" in graph.mandatory_checkpoint_ids
     assert "epistemics.grounded_unit" in graph.source_of_truth_surfaces
     assert "epistemics.downstream_allowance" in graph.source_of_truth_surfaces
     assert "world_adapter.state" in graph.source_of_truth_surfaces
@@ -266,6 +268,14 @@ def test_runtime_topology_bundle_and_graph_are_materialized() -> None:
     )
     assert (
         "r05_appraisal_sovereign_protective_regulation.inhibited_surfaces"
+        in graph.source_of_truth_surfaces
+    )
+    assert (
+        "v01_normative_permission_commitment_licensing.communicative_license_state"
+        in graph.source_of_truth_surfaces
+    )
+    assert (
+        "v01_normative_permission_commitment_licensing.commitment_deltas"
         in graph.source_of_truth_surfaces
     )
 

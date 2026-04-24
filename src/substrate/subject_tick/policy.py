@@ -69,6 +69,7 @@ def evaluate_subject_tick_downstream_gate(
         SubjectTickRestrictionCode.O03_STRATEGY_CLASS_EVALUATION_CONTRACT_MUST_BE_READ,
         SubjectTickRestrictionCode.P01_PROJECT_FORMATION_CONTRACT_MUST_BE_READ,
         SubjectTickRestrictionCode.O04_DYNAMIC_CONTRACT_MUST_BE_READ,
+        SubjectTickRestrictionCode.V01_LICENSE_CONTRACT_MUST_BE_READ,
     ]
     usability = SubjectTickUsabilityClass.USABLE_BOUNDED
     accepted = True
@@ -1043,6 +1044,144 @@ def evaluate_subject_tick_downstream_gate(
             usability = SubjectTickUsabilityClass.BLOCKED
             reason = (
                 "r05 protective regulation checkpoint requires detour before downstream continuation"
+            )
+
+    v01_checkpoint = next(
+        (
+            checkpoint
+            for checkpoint in state.execution_checkpoints
+            if checkpoint.checkpoint_id
+            == "rt01.v01_normative_permission_commitment_licensing_checkpoint"
+        ),
+        None,
+    )
+    if v01_checkpoint is not None:
+        if "require_v01_license_consumer" in v01_checkpoint.required_action:
+            restrictions.append(SubjectTickRestrictionCode.V01_LICENSE_CONSUMER_REQUIRED)
+        if "require_v01_commitment_delta_consumer" in v01_checkpoint.required_action:
+            restrictions.append(
+                SubjectTickRestrictionCode.V01_COMMITMENT_DELTA_CONSUMER_REQUIRED
+            )
+        if "require_v01_qualifier_binding_consumer" in v01_checkpoint.required_action:
+            restrictions.append(
+                SubjectTickRestrictionCode.V01_QUALIFIER_BINDING_CONSUMER_REQUIRED
+            )
+        if "default_v01_unlicensed_act_detour" in v01_checkpoint.required_action:
+            restrictions.append(
+                SubjectTickRestrictionCode.V01_UNLICENSED_ACT_DETOUR_REQUIRED
+            )
+        if "default_v01_qualification_required_detour" in v01_checkpoint.required_action:
+            restrictions.append(SubjectTickRestrictionCode.V01_QUALIFICATION_REQUIRED)
+        if "default_v01_commitment_denied_detour" in v01_checkpoint.required_action:
+            restrictions.append(SubjectTickRestrictionCode.V01_COMMITMENT_DENIED)
+        if "protective_defer_required" in v01_checkpoint.required_action:
+            restrictions.append(SubjectTickRestrictionCode.V01_PROTECTIVE_DEFER_REQUIRED)
+
+    v01_basis_present = bool(state.v01_candidate_act_count > 0)
+    v01_allowed_qualifier_ids = {
+        "preserve_explicit_uncertainty",
+        "qualified_assertion_required",
+        "advice_basis_disclosure_required",
+        "bounded_commitment_scope",
+        "request_scope_clarification_required",
+    }
+    v01_qualifier_ids = set(state.v01_mandatory_qualifier_ids)
+    if v01_basis_present and state.v01_denied_act_count > 0:
+        restrictions.append(SubjectTickRestrictionCode.V01_UNLICENSED_ACT_DETOUR_REQUIRED)
+    if (
+        v01_basis_present
+        and state.v01_insufficient_license_basis
+    ):
+        restrictions.append(SubjectTickRestrictionCode.V01_INSUFFICIENT_LICENSE_BASIS)
+        if state.final_execution_outcome == SubjectTickOutcome.CONTINUE:
+            accepted = False
+            usability = SubjectTickUsabilityClass.BLOCKED
+            restrictions.append(SubjectTickRestrictionCode.DOWNSTREAM_AUTHORITY_DEGRADED)
+            reason = "v01 insufficient licensing basis blocks continuation under act-level licensing pressure"
+    if (
+        v01_basis_present
+        and state.v01_conditional_act_count > 0
+        and state.v01_mandatory_qualifier_count > 0
+    ):
+        restrictions.append(SubjectTickRestrictionCode.V01_QUALIFICATION_REQUIRED)
+        if (
+            state.final_execution_outcome == SubjectTickOutcome.CONTINUE
+            and usability == SubjectTickUsabilityClass.USABLE_BOUNDED
+        ):
+            usability = SubjectTickUsabilityClass.DEGRADED_BOUNDED
+            reason = "v01 conditional license requires mandatory qualifier binding before unrestricted continuation"
+    if (
+        v01_basis_present
+        and state.v01_conditional_act_count > 0
+        and state.v01_mandatory_qualifier_count > 0
+    ):
+        if len(v01_qualifier_ids) != state.v01_mandatory_qualifier_count:
+            restrictions.append(SubjectTickRestrictionCode.V01_QUALIFIER_BINDING_CONSUMER_REQUIRED)
+            restrictions.append(SubjectTickRestrictionCode.DOWNSTREAM_AUTHORITY_DEGRADED)
+            if state.final_execution_outcome == SubjectTickOutcome.CONTINUE:
+                accepted = False
+                usability = SubjectTickUsabilityClass.BLOCKED
+                reason = "v01 mandatory qualifier identity/count mismatch blocks continuation"
+        elif not v01_qualifier_ids.issubset(v01_allowed_qualifier_ids):
+            restrictions.append(SubjectTickRestrictionCode.V01_QUALIFIER_BINDING_CONSUMER_REQUIRED)
+            restrictions.append(SubjectTickRestrictionCode.DOWNSTREAM_AUTHORITY_DEGRADED)
+            if state.final_execution_outcome == SubjectTickOutcome.CONTINUE:
+                accepted = False
+                usability = SubjectTickUsabilityClass.BLOCKED
+                reason = "v01 qualifier identity substitution detected; bounded continuation denied"
+    if v01_basis_present and state.v01_promise_like_act_denied:
+        restrictions.append(SubjectTickRestrictionCode.V01_COMMITMENT_DENIED)
+        if (
+            state.final_execution_outcome == SubjectTickOutcome.CONTINUE
+            and not state.v01_alternative_narrowed_act_available
+        ):
+            accepted = False
+            usability = SubjectTickUsabilityClass.BLOCKED
+            restrictions.append(SubjectTickRestrictionCode.DOWNSTREAM_AUTHORITY_DEGRADED)
+            reason = "v01 promise-like commitment denied without narrowed licensed alternative"
+        elif (
+            state.final_execution_outcome == SubjectTickOutcome.CONTINUE
+            and usability == SubjectTickUsabilityClass.USABLE_BOUNDED
+        ):
+            usability = SubjectTickUsabilityClass.DEGRADED_BOUNDED
+            reason = "v01 commitment-denied path requires narrowed licensed act continuation"
+    if v01_basis_present and state.v01_protective_defer_required:
+        restrictions.append(SubjectTickRestrictionCode.V01_PROTECTIVE_DEFER_REQUIRED)
+    if (
+        v01_basis_present
+        and state.v01_commitment_delta_count > 0
+        and not state.v01_promise_like_act_denied
+        and state.final_execution_outcome == SubjectTickOutcome.CONTINUE
+    ):
+        restrictions.append(SubjectTickRestrictionCode.V01_COMMITMENT_DELTA_CONSUMER_REQUIRED)
+        if usability == SubjectTickUsabilityClass.USABLE_BOUNDED:
+            usability = SubjectTickUsabilityClass.DEGRADED_BOUNDED
+            reason = (
+                "v01 commitment-creating license path requires bounded commitment-delta handoff before unrestricted continuation"
+            )
+    if (
+        v01_basis_present
+        and not state.v01_license_consumer_ready
+        and state.final_execution_outcome == SubjectTickOutcome.CONTINUE
+    ):
+        accepted = False
+        usability = SubjectTickUsabilityClass.BLOCKED
+        restrictions.append(SubjectTickRestrictionCode.V01_LICENSE_CONSUMER_REQUIRED)
+        restrictions.append(SubjectTickRestrictionCode.DOWNSTREAM_AUTHORITY_DEGRADED)
+        reason = "v01 candidate basis present but license consumer surface is not ready"
+    if (
+        v01_basis_present
+        and state.v01_conditional_act_count > 0
+        and not state.v01_qualifier_binding_consumer_ready
+    ):
+        restrictions.append(SubjectTickRestrictionCode.V01_QUALIFIER_BINDING_CONSUMER_REQUIRED)
+    if v01_checkpoint is not None and v01_checkpoint.status.value != "allowed":
+        restrictions.append(SubjectTickRestrictionCode.DOWNSTREAM_AUTHORITY_DEGRADED)
+        if state.final_execution_outcome == SubjectTickOutcome.CONTINUE:
+            accepted = False
+            usability = SubjectTickUsabilityClass.BLOCKED
+            reason = (
+                "v01 normative permission/commitment checkpoint requires detour before downstream continuation"
             )
 
     return SubjectTickGateDecision(
