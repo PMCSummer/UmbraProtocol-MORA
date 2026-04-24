@@ -70,6 +70,7 @@ def evaluate_subject_tick_downstream_gate(
         SubjectTickRestrictionCode.P01_PROJECT_FORMATION_CONTRACT_MUST_BE_READ,
         SubjectTickRestrictionCode.O04_DYNAMIC_CONTRACT_MUST_BE_READ,
         SubjectTickRestrictionCode.V01_LICENSE_CONTRACT_MUST_BE_READ,
+        SubjectTickRestrictionCode.V02_PLAN_CONTRACT_MUST_BE_READ,
     ]
     usability = SubjectTickUsabilityClass.USABLE_BOUNDED
     accepted = True
@@ -1182,6 +1183,153 @@ def evaluate_subject_tick_downstream_gate(
             usability = SubjectTickUsabilityClass.BLOCKED
             reason = (
                 "v01 normative permission/commitment checkpoint requires detour before downstream continuation"
+            )
+
+    v02_checkpoint = next(
+        (
+            checkpoint
+            for checkpoint in state.execution_checkpoints
+            if checkpoint.checkpoint_id == "rt01.v02_utterance_plan_checkpoint"
+        ),
+        None,
+    )
+    if v02_checkpoint is not None:
+        if "require_v02_plan_consumer" in v02_checkpoint.required_action:
+            restrictions.append(SubjectTickRestrictionCode.V02_PLAN_CONSUMER_REQUIRED)
+        if "require_v02_ordering_consumer" in v02_checkpoint.required_action:
+            restrictions.append(SubjectTickRestrictionCode.V02_ORDERING_CONSUMER_REQUIRED)
+        if "require_v02_realization_contract_consumer" in v02_checkpoint.required_action:
+            restrictions.append(
+                SubjectTickRestrictionCode.V02_REALIZATION_CONTRACT_CONSUMER_REQUIRED
+            )
+        if "default_v02_partial_plan_detour" in v02_checkpoint.required_action:
+            restrictions.append(SubjectTickRestrictionCode.V02_PARTIAL_PLAN_DETOUR_REQUIRED)
+        if "default_v02_clarification_first_detour" in v02_checkpoint.required_action:
+            restrictions.append(
+                SubjectTickRestrictionCode.V02_CLARIFICATION_FIRST_DETOUR_REQUIRED
+            )
+        if (
+            "default_v02_protective_boundary_first_detour"
+            in v02_checkpoint.required_action
+        ):
+            restrictions.append(
+                SubjectTickRestrictionCode.V02_PROTECTIVE_BOUNDARY_FIRST_DETOUR_REQUIRED
+            )
+
+    v02_basis_present = bool(state.v02_segment_count > 0)
+    v02_expected_qualifier_ids = tuple(dict.fromkeys(state.v01_mandatory_qualifier_ids))
+    v02_attached_qualifier_ids = tuple(dict.fromkeys(state.v02_mandatory_qualifier_ids))
+    if v02_basis_present and state.v02_blocked_expansion_count > 0:
+        restrictions.append(SubjectTickRestrictionCode.V02_BLOCKED_EXPANSIONS_MUST_BE_RESPECTED)
+    if v02_basis_present and state.v02_protected_omission_count > 0:
+        restrictions.append(SubjectTickRestrictionCode.V02_PROTECTED_OMISSIONS_MUST_BE_RESPECTED)
+    if v02_basis_present and state.v02_mandatory_qualifier_attachment_count > 0:
+        restrictions.append(SubjectTickRestrictionCode.V02_ORDERING_CONSUMER_REQUIRED)
+        qualifier_identity_mismatch = bool(
+            not v02_attached_qualifier_ids
+            or (
+                v02_expected_qualifier_ids
+                and v02_attached_qualifier_ids != v02_expected_qualifier_ids
+            )
+        )
+        if qualifier_identity_mismatch:
+            restrictions.append(
+                SubjectTickRestrictionCode.V02_QUALIFIER_IDENTITY_BINDING_REQUIRED
+            )
+            restrictions.append(SubjectTickRestrictionCode.DOWNSTREAM_AUTHORITY_DEGRADED)
+            if state.final_execution_outcome == SubjectTickOutcome.CONTINUE:
+                accepted = False
+                usability = SubjectTickUsabilityClass.BLOCKED
+                reason = (
+                    "v02 mandatory qualifier identity binding mismatch detected for typed utterance-plan bridge"
+                )
+        elif (
+            state.final_execution_outcome == SubjectTickOutcome.CONTINUE
+            and usability == SubjectTickUsabilityClass.USABLE_BOUNDED
+        ):
+            usability = SubjectTickUsabilityClass.DEGRADED_BOUNDED
+            reason = "v02 mandatory qualifier attachment requires ordering-aware downstream consumption"
+    if v02_basis_present and state.v02_unresolved_branching:
+        restrictions.append(SubjectTickRestrictionCode.V02_UNRESOLVED_BRANCHING_REQUIRES_REVIEW)
+    if v02_basis_present and state.v02_partial_plan_only:
+        restrictions.append(SubjectTickRestrictionCode.V02_PARTIAL_PLAN_DETOUR_REQUIRED)
+        if state.final_execution_outcome == SubjectTickOutcome.CONTINUE:
+            accepted = False
+            usability = SubjectTickUsabilityClass.BLOCKED
+            restrictions.append(SubjectTickRestrictionCode.DOWNSTREAM_AUTHORITY_DEGRADED)
+            reason = "v02 partial-plan-only state blocks unrestricted continuation"
+    if v02_basis_present and state.v02_clarification_first_required:
+        restrictions.append(SubjectTickRestrictionCode.V02_CLARIFICATION_FIRST_DETOUR_REQUIRED)
+        if (
+            state.final_execution_outcome == SubjectTickOutcome.CONTINUE
+            and usability == SubjectTickUsabilityClass.USABLE_BOUNDED
+        ):
+            usability = SubjectTickUsabilityClass.DEGRADED_BOUNDED
+            reason = "v02 clarification-first plan requires bounded detour before continuation"
+    if v02_basis_present and state.v02_protective_boundary_first:
+        restrictions.append(
+            SubjectTickRestrictionCode.V02_PROTECTIVE_BOUNDARY_FIRST_DETOUR_REQUIRED
+        )
+        if (
+            state.final_execution_outcome == SubjectTickOutcome.CONTINUE
+            and usability == SubjectTickUsabilityClass.USABLE_BOUNDED
+        ):
+            usability = SubjectTickUsabilityClass.DEGRADED_BOUNDED
+            reason = "v02 protective-boundary-first plan requires bounded downstream handling"
+    if (
+        v02_basis_present
+        and state.v02_segment_count > 1
+        and state.v02_ordering_edge_count <= 0
+        and not state.v02_partial_plan_only
+    ):
+        restrictions.append(SubjectTickRestrictionCode.V02_ORDERING_CONSUMER_REQUIRED)
+        restrictions.append(SubjectTickRestrictionCode.DOWNSTREAM_AUTHORITY_DEGRADED)
+        if state.final_execution_outcome == SubjectTickOutcome.CONTINUE:
+            accepted = False
+            usability = SubjectTickUsabilityClass.BLOCKED
+            reason = "v02 segment ordering graph mismatch detected for multi-segment plan"
+    if (
+        v02_basis_present
+        and state.v02_plan_consumer_ready
+        and state.v02_discourse_history_sensitive
+        and state.v02_segment_count > 1
+        and state.v02_ordering_edge_count > 0
+        and state.final_execution_outcome == SubjectTickOutcome.CONTINUE
+    ):
+        restrictions.append(SubjectTickRestrictionCode.V02_ORDERING_CONSUMER_REQUIRED)
+        if usability == SubjectTickUsabilityClass.USABLE_BOUNDED:
+            usability = SubjectTickUsabilityClass.DEGRADED_BOUNDED
+            reason = (
+                "v02 discourse-history-sensitive plan requires ordering-consumer acknowledgement before unrestricted continuation"
+            )
+    if (
+        v02_basis_present
+        and not state.v02_plan_consumer_ready
+        and state.final_execution_outcome == SubjectTickOutcome.CONTINUE
+    ):
+        restrictions.append(SubjectTickRestrictionCode.V02_PLAN_CONSUMER_REQUIRED)
+        restrictions.append(SubjectTickRestrictionCode.DOWNSTREAM_AUTHORITY_DEGRADED)
+        accepted = False
+        usability = SubjectTickUsabilityClass.BLOCKED
+        reason = "v02 plan basis present but downstream plan consumer is not ready"
+    if (
+        v02_basis_present
+        and not state.v02_realization_contract_consumer_ready
+        and state.final_execution_outcome == SubjectTickOutcome.CONTINUE
+    ):
+        restrictions.append(
+            SubjectTickRestrictionCode.V02_REALIZATION_CONTRACT_CONSUMER_REQUIRED
+        )
+        if usability == SubjectTickUsabilityClass.USABLE_BOUNDED:
+            usability = SubjectTickUsabilityClass.DEGRADED_BOUNDED
+            reason = "v02 realization contract is not ready for unrestricted continuation"
+    if v02_checkpoint is not None and v02_checkpoint.status.value != "allowed":
+        restrictions.append(SubjectTickRestrictionCode.DOWNSTREAM_AUTHORITY_DEGRADED)
+        if state.final_execution_outcome == SubjectTickOutcome.CONTINUE:
+            accepted = False
+            usability = SubjectTickUsabilityClass.BLOCKED
+            reason = (
+                "v02 communicative-intent/utterance-plan checkpoint requires detour before downstream continuation"
             )
 
     return SubjectTickGateDecision(

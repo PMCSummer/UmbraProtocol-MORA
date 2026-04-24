@@ -36,6 +36,11 @@ if TYPE_CHECKING:
         V01CommunicativeLicenseState,
         V01LicenseResult,
     )
+    from substrate.v02_communicative_intent_utterance_plan_bridge import (
+        V02UtterancePlanInput,
+        V02UtterancePlanResult,
+        V02UtterancePlanState,
+    )
     from substrate.p01_project_formation import (
         P01IntentionStackState,
         P01ProjectFormationResult,
@@ -304,6 +309,21 @@ class SubjectTickRestrictionCode(StrEnum):
     V01_COMMITMENT_DENIED = "v01_commitment_denied"
     V01_PROTECTIVE_DEFER_REQUIRED = "v01_protective_defer_required"
     V01_INSUFFICIENT_LICENSE_BASIS = "v01_insufficient_license_basis"
+    V02_PLAN_CONTRACT_MUST_BE_READ = "v02_plan_contract_must_be_read"
+    V02_PLAN_CONSUMER_REQUIRED = "v02_plan_consumer_required"
+    V02_ORDERING_CONSUMER_REQUIRED = "v02_ordering_consumer_required"
+    V02_REALIZATION_CONTRACT_CONSUMER_REQUIRED = (
+        "v02_realization_contract_consumer_required"
+    )
+    V02_PARTIAL_PLAN_DETOUR_REQUIRED = "v02_partial_plan_detour_required"
+    V02_CLARIFICATION_FIRST_DETOUR_REQUIRED = "v02_clarification_first_detour_required"
+    V02_PROTECTIVE_BOUNDARY_FIRST_DETOUR_REQUIRED = (
+        "v02_protective_boundary_first_detour_required"
+    )
+    V02_UNRESOLVED_BRANCHING_REQUIRES_REVIEW = "v02_unresolved_branching_requires_review"
+    V02_BLOCKED_EXPANSIONS_MUST_BE_RESPECTED = "v02_blocked_expansions_must_be_respected"
+    V02_PROTECTED_OMISSIONS_MUST_BE_RESPECTED = "v02_protected_omissions_must_be_respected"
+    V02_QUALIFIER_IDENTITY_BINDING_REQUIRED = "v02_qualifier_identity_binding_required"
     DOWNSTREAM_AUTHORITY_DEGRADED = "downstream_authority_degraded"
 
 
@@ -377,6 +397,7 @@ class SubjectTickContext:
     prior_o04_state: O04DynamicModel | None = None
     prior_r05_state: R05ProtectiveRegulationState | None = None
     prior_v01_state: V01CommunicativeLicenseState | None = None
+    prior_v02_state: V02UtterancePlanState | None = None
     prior_p01_state: P01IntentionStackState | None = None
     dependency_trigger_hits: tuple[str, ...] = ()
     context_shift_markers: tuple[str, ...] = ()
@@ -478,6 +499,10 @@ class SubjectTickContext:
     require_v01_commitment_delta_consumer: bool = False
     require_v01_qualifier_binding_consumer: bool = False
     disable_v01_enforcement: bool = False
+    require_v02_plan_consumer: bool = False
+    require_v02_ordering_consumer: bool = False
+    require_v02_realization_contract_consumer: bool = False
+    disable_v02_enforcement: bool = False
     o01_entity_signals: tuple[O01EntitySignal, ...] = ()
     o02_interaction_diagnostics: O02InteractionDiagnosticsInput | None = None
     o03_candidate_strategy: O03CandidateStrategyInput | None = None
@@ -485,6 +510,7 @@ class SubjectTickContext:
     o04_interaction_events: tuple[O04InteractionEventInput, ...] = ()
     r05_protective_triggers: tuple[R05ProtectiveTriggerInput, ...] = ()
     v01_act_candidates: tuple[V01CommunicativeActCandidate, ...] = ()
+    v02_plan_input: V02UtterancePlanInput | None = None
     g08_appraisal_significance_hint: float | None = None
     source_lineage: tuple[str, ...] = ()
 
@@ -977,6 +1003,25 @@ class SubjectTickState:
     v01_license_consumer_ready: bool = False
     v01_commitment_delta_consumer_ready: bool = False
     v01_qualifier_binding_consumer_ready: bool = False
+    v02_plan_status: str = "insufficient_plan_basis"
+    v02_segment_count: int = 0
+    v02_branch_count: int = 0
+    v02_ordering_edge_count: int = 0
+    v02_mandatory_qualifier_attachment_count: int = 0
+    v02_mandatory_qualifier_ids: tuple[str, ...] = ()
+    v02_blocked_expansion_count: int = 0
+    v02_protected_omission_count: int = 0
+    v02_clarification_first_required: bool = False
+    v02_refusal_dominant: bool = False
+    v02_protective_boundary_first: bool = False
+    v02_partial_plan_only: bool = False
+    v02_unresolved_branching: bool = False
+    v02_discourse_history_sensitive: bool = False
+    v02_plan_consumer_ready: bool = False
+    v02_ordering_consumer_ready: bool = False
+    v02_realization_contract_consumer_ready: bool = False
+    v02_downstream_consumer_ready: bool = False
+    v02_segment_ids: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -1324,6 +1369,7 @@ class SubjectTickResult:
     o04_result: O04DynamicResult
     r05_result: R05ProtectiveResult
     v01_result: V01LicenseResult
+    v02_result: V02UtterancePlanResult
     t01_result: T01ActiveFieldResult
     t02_result: T02ConstrainedSceneResult
     t03_result: T03CompetitionResult

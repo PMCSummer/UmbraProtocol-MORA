@@ -202,6 +202,11 @@ from substrate.v01_normative_permission_commitment_licensing import (
     build_v01_normative_permission_commitment_licensing,
     derive_v01_license_consumer_view,
 )
+from substrate.v02_communicative_intent_utterance_plan_bridge import (
+    V02UtterancePlanInput,
+    build_v02_communicative_intent_utterance_plan_bridge,
+    derive_v02_utterance_plan_consumer_view,
+)
 from substrate.s01_efference_copy import (
     S01EfferenceCopyState,
     build_s01_efference_copy,
@@ -240,6 +245,7 @@ ATTEMPTED_SUBJECT_TICK_PATHS: tuple[str, ...] = (
     "subject_tick.evaluate_o04_rupture_hostility_coercion",
     "subject_tick.evaluate_r05_appraisal_sovereign_protective_regulation",
     "subject_tick.evaluate_v01_normative_permission_commitment_licensing",
+    "subject_tick.evaluate_v02_communicative_intent_utterance_plan_bridge",
     "subject_tick.world_seam_enforcement",
     "subject_tick.resolve_bounded_runtime_outcome",
     "subject_tick.downstream_gate",
@@ -4208,6 +4214,217 @@ def execute_subject_tick(
         )
     )
 
+    v02_plan_input = (
+        context.v02_plan_input
+        if isinstance(context.v02_plan_input, V02UtterancePlanInput)
+        else None
+    )
+    if v02_plan_input is None and context.prior_v02_state is not None:
+        v02_plan_input = V02UtterancePlanInput(
+            input_id=f"{tick_id}:v02:prior-carry",
+            prior_unresolved_question=context.prior_v02_state.clarification_first_required,
+            prior_refusal_present=context.prior_v02_state.refusal_dominant,
+            prior_commitment_carry_present=bool(
+                context.prior_v02_state.mandatory_qualifier_attachment_count > 0
+            ),
+            prior_repair_required=context.prior_v02_state.partial_plan_only,
+            provenance="subject_tick.v02.prior_carry_input",
+        )
+    v02_explicit_basis = bool(v01_explicit_candidate_basis or v02_plan_input is not None)
+    v02_result = build_v02_communicative_intent_utterance_plan_bridge(
+        tick_id=tick_id,
+        tick_index=tick_index,
+        v01_result=v01_result,
+        r05_result=r05_result,
+        o04_result=o04_result,
+        p01_result=p01_result,
+        plan_input=v02_plan_input,
+        source_lineage=lineage,
+        prior_state=context.prior_v02_state,
+        planning_enabled=not context.disable_v02_enforcement,
+    )
+    v02_view = derive_v02_utterance_plan_consumer_view(v02_result)
+    v02_enter_values = {
+        "plan_status": v02_result.telemetry.plan_status.value,
+        "segment_count": v02_result.telemetry.segment_count,
+        "branch_count": v02_result.telemetry.branch_count,
+        "ordering_edge_count": v02_result.telemetry.ordering_edge_count,
+        "mandatory_qualifier_attachment_count": (
+            v02_result.telemetry.mandatory_qualifier_attachment_count
+        ),
+        "blocked_expansion_count": v02_result.telemetry.blocked_expansion_count,
+        "protected_omission_count": v02_result.telemetry.protected_omission_count,
+        "clarification_first_required": v02_result.telemetry.clarification_first_required,
+        "refusal_dominant": v02_result.telemetry.refusal_dominant,
+        "protective_boundary_first": v02_result.telemetry.protective_boundary_first,
+        "partial_plan_only": v02_result.telemetry.partial_plan_only,
+        "unresolved_branching": v02_result.telemetry.unresolved_branching,
+        "downstream_consumer_ready": v02_result.telemetry.downstream_consumer_ready,
+    }
+    trace_emit_active(
+        "v02_communicative_intent_utterance_plan_bridge",
+        "enter",
+        v02_enter_values,
+    )
+    v02_checkpoint_status = SubjectTickCheckpointStatus.ALLOWED
+    v02_checkpoint_reason = v02_result.gate.reason
+    v02_default_partial_plan_detour = False
+    v02_default_clarification_first_detour = False
+    v02_default_protective_boundary_first_detour = False
+    if not context.disable_v02_enforcement:
+        if (
+            context.require_v02_plan_consumer
+            and not v02_view.plan_consumer_ready
+            and halt_reason is None
+        ):
+            revalidation_needed = True
+            v02_checkpoint_status = SubjectTickCheckpointStatus.ENFORCED_DETOUR
+            v02_checkpoint_reason = (
+                "v02 plan consumer requested but typed utterance-plan state is not ready"
+            )
+            if active_execution_mode != "halt_execution":
+                active_execution_mode = "revalidate_scope"
+        if (
+            context.require_v02_ordering_consumer
+            and not v02_view.ordering_consumer_ready
+            and halt_reason is None
+        ):
+            revalidation_needed = True
+            v02_checkpoint_status = SubjectTickCheckpointStatus.ENFORCED_DETOUR
+            v02_checkpoint_reason = (
+                "v02 ordering consumer requested but segment ordering graph is not ready"
+            )
+            if active_execution_mode != "halt_execution":
+                active_execution_mode = "revalidate_scope"
+        if (
+            context.require_v02_realization_contract_consumer
+            and not v02_view.realization_contract_consumer_ready
+            and halt_reason is None
+        ):
+            revalidation_needed = True
+            v02_checkpoint_status = SubjectTickCheckpointStatus.ENFORCED_DETOUR
+            v02_checkpoint_reason = (
+                "v02 realization-contract consumer requested but bounded realization contract is not ready"
+            )
+            if active_execution_mode != "halt_execution":
+                active_execution_mode = "revalidate_scope"
+        if (
+            v02_explicit_basis
+            and v02_view.partial_plan_only
+            and not context.require_v02_plan_consumer
+            and halt_reason is None
+        ):
+            repair_needed = True
+            v02_default_partial_plan_detour = True
+            v02_checkpoint_status = SubjectTickCheckpointStatus.ENFORCED_DETOUR
+            v02_checkpoint_reason = (
+                "v02 default contour detected partial-plan-only bridge and requires bounded repair continuation"
+            )
+            if active_execution_mode != "halt_execution":
+                active_execution_mode = "repair_runtime_path"
+        elif (
+            v02_explicit_basis
+            and v02_view.clarification_first_required
+            and not context.require_v02_ordering_consumer
+            and halt_reason is None
+        ):
+            revalidation_needed = True
+            v02_default_clarification_first_detour = True
+            v02_checkpoint_status = SubjectTickCheckpointStatus.ENFORCED_DETOUR
+            v02_checkpoint_reason = (
+                "v02 default contour requires clarification-first plan ordering before continuation"
+            )
+            if active_execution_mode != "halt_execution":
+                active_execution_mode = "revalidate_scope"
+        if (
+            v02_explicit_basis
+            and v02_view.protective_boundary_first
+            and not context.require_v02_realization_contract_consumer
+            and halt_reason is None
+            and not v02_default_partial_plan_detour
+        ):
+            repair_needed = True
+            v02_default_protective_boundary_first_detour = True
+            v02_checkpoint_status = SubjectTickCheckpointStatus.ENFORCED_DETOUR
+            v02_checkpoint_reason = (
+                "v02 default contour requires protective-boundary-first plan structure before unrestricted continuation"
+            )
+            if active_execution_mode != "halt_execution":
+                active_execution_mode = "repair_branch_access"
+    else:
+        v02_checkpoint_status = SubjectTickCheckpointStatus.ALLOWED
+        v02_checkpoint_reason = "v02 enforcement disabled in ablation context"
+
+    v02_required_actions: list[str] = []
+    if context.require_v02_plan_consumer:
+        v02_required_actions.append("require_v02_plan_consumer")
+    if context.require_v02_ordering_consumer:
+        v02_required_actions.append("require_v02_ordering_consumer")
+    if context.require_v02_realization_contract_consumer:
+        v02_required_actions.append("require_v02_realization_contract_consumer")
+    if v02_default_partial_plan_detour:
+        v02_required_actions.append("default_v02_partial_plan_detour")
+    if v02_default_clarification_first_detour:
+        v02_required_actions.append("default_v02_clarification_first_detour")
+    if v02_default_protective_boundary_first_detour:
+        v02_required_actions.append("default_v02_protective_boundary_first_detour")
+    if v02_explicit_basis and v02_result.state.partial_plan_only:
+        v02_required_actions.append("partial_plan_only")
+    if v02_explicit_basis and v02_result.state.clarification_first_required:
+        v02_required_actions.append("clarification_first_required")
+    if v02_explicit_basis and v02_result.state.refusal_dominant:
+        v02_required_actions.append("refusal_dominant")
+    if v02_explicit_basis and v02_result.state.protective_boundary_first:
+        v02_required_actions.append("protective_boundary_first")
+    if v02_explicit_basis and v02_result.state.unresolved_branching:
+        v02_required_actions.append("unresolved_branching")
+    if not v02_required_actions:
+        v02_required_actions.append("v02_optional")
+    v02_trace_values = {
+        "plan_status": v02_result.telemetry.plan_status.value,
+        "segment_count": v02_result.telemetry.segment_count,
+        "branch_count": v02_result.telemetry.branch_count,
+        "ordering_edge_count": v02_result.telemetry.ordering_edge_count,
+        "mandatory_qualifier_attachment_count": (
+            v02_result.telemetry.mandatory_qualifier_attachment_count
+        ),
+        "blocked_expansion_count": v02_result.telemetry.blocked_expansion_count,
+        "protected_omission_count": v02_result.telemetry.protected_omission_count,
+        "clarification_first_required": v02_result.telemetry.clarification_first_required,
+        "refusal_dominant": v02_result.telemetry.refusal_dominant,
+        "protective_boundary_first": v02_result.telemetry.protective_boundary_first,
+        "partial_plan_only": v02_result.telemetry.partial_plan_only,
+        "unresolved_branching": v02_result.telemetry.unresolved_branching,
+        "downstream_consumer_ready": v02_result.telemetry.downstream_consumer_ready,
+    }
+    trace_emit_active(
+        "v02_communicative_intent_utterance_plan_bridge",
+        "decision",
+        v02_trace_values,
+    )
+    if v02_checkpoint_status != SubjectTickCheckpointStatus.ALLOWED:
+        trace_emit_active(
+            "v02_communicative_intent_utterance_plan_bridge",
+            "blocked",
+            v02_trace_values,
+            note=v02_checkpoint_reason,
+        )
+    trace_emit_active(
+        "v02_communicative_intent_utterance_plan_bridge",
+        "exit",
+        v02_trace_values,
+    )
+    checkpoints.append(
+        SubjectTickCheckpointResult(
+            checkpoint_id="rt01.v02_utterance_plan_checkpoint",
+            source_contract="v02_communicative_intent_utterance_plan_bridge.utterance_plan_state",
+            status=v02_checkpoint_status,
+            required_action=";".join(dict.fromkeys(v02_required_actions)),
+            applied_action=active_execution_mode,
+            reason=v02_checkpoint_reason,
+        )
+    )
+
     if halt_reason is not None:
         final_outcome = SubjectTickOutcome.HALT
         execution_stance = SubjectTickExecutionStance.HALT_PATH
@@ -4953,6 +5170,29 @@ def execute_subject_tick(
         v01_qualifier_binding_consumer_ready=(
             v01_result.gate.qualifier_binding_consumer_ready
         ),
+        v02_plan_status=v02_result.state.plan_status.value,
+        v02_segment_count=v02_result.state.segment_count,
+        v02_branch_count=v02_result.state.branch_count,
+        v02_ordering_edge_count=v02_result.state.ordering_edge_count,
+        v02_mandatory_qualifier_attachment_count=(
+            v02_result.state.mandatory_qualifier_attachment_count
+        ),
+        v02_mandatory_qualifier_ids=v02_result.state.mandatory_qualifier_ids,
+        v02_blocked_expansion_count=v02_result.state.blocked_expansion_count,
+        v02_protected_omission_count=v02_result.state.protected_omission_count,
+        v02_clarification_first_required=v02_result.state.clarification_first_required,
+        v02_refusal_dominant=v02_result.state.refusal_dominant,
+        v02_protective_boundary_first=v02_result.state.protective_boundary_first,
+        v02_partial_plan_only=v02_result.state.partial_plan_only,
+        v02_unresolved_branching=v02_result.state.unresolved_branching,
+        v02_discourse_history_sensitive=v02_result.state.discourse_history_sensitive,
+        v02_plan_consumer_ready=v02_result.gate.plan_consumer_ready,
+        v02_ordering_consumer_ready=v02_result.gate.ordering_consumer_ready,
+        v02_realization_contract_consumer_ready=(
+            v02_result.gate.realization_contract_consumer_ready
+        ),
+        v02_downstream_consumer_ready=v02_result.state.downstream_consumer_ready,
+        v02_segment_ids=v02_result.state.segment_ids,
     )
     gate = evaluate_subject_tick_downstream_gate(state)
     telemetry = build_subject_tick_telemetry(
@@ -4960,7 +5200,7 @@ def execute_subject_tick(
         attempted_paths=ATTEMPTED_SUBJECT_TICK_PATHS,
         downstream_gate=gate,
         causal_basis=(
-            "bounded runtime execution spine enforces roadmap authority roles for C04/C05, consumes world-entry, s01 efference-copy, s02 prediction-boundary seam, s03 ownership-weighted learning, s04 interoceptive self-binding, s05 multi-cause attribution, s-minimal, a-line, m-minimal, n-minimal, t01 semantic-field, t02 relation-binding, t03 hypothesis-competition, t04 attention-schema, o01 other-entity modeling, o02 intersubjective allostasis, o03 strategy-class evaluation, p01 authority-bounded project-formation, o04 rupture/hostility/coercion dynamics, r05 bounded protective regulation gates, and v01 act-level normative licensing/commitment guards, and keeps D01 observability-only over fixed R->C order"
+            "bounded runtime execution spine enforces roadmap authority roles for C04/C05, consumes world-entry, s01 efference-copy, s02 prediction-boundary seam, s03 ownership-weighted learning, s04 interoceptive self-binding, s05 multi-cause attribution, s-minimal, a-line, m-minimal, n-minimal, t01 semantic-field, t02 relation-binding, t03 hypothesis-competition, t04 attention-schema, o01 other-entity modeling, o02 intersubjective allostasis, o03 strategy-class evaluation, p01 authority-bounded project-formation, o04 rupture/hostility/coercion dynamics, r05 bounded protective regulation gates, v01 act-level normative licensing/commitment guards, and v02 typed utterance-plan bridge constraints, and keeps D01 observability-only over fixed R->C order"
         ),
     )
     abstain = final_outcome in {SubjectTickOutcome.REPAIR, SubjectTickOutcome.REVALIDATE}
@@ -5055,6 +5295,7 @@ def execute_subject_tick(
         o04_result=o04_result,
         r05_result=r05_result,
         v01_result=v01_result,
+        v02_result=v02_result,
         t01_result=t01_result,
         t02_result=t02_result,
         t03_result=t03_result,

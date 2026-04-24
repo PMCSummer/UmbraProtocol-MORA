@@ -19,6 +19,7 @@ from substrate.v01_normative_permission_commitment_licensing import (
     V01ActType,
     V01CommunicativeActCandidate,
 )
+from substrate.v02_communicative_intent_utterance_plan_bridge import V02UtterancePlanInput
 
 
 def _tick_input(case_id: str) -> SubjectTickInput:
@@ -49,7 +50,7 @@ def _signal(
         grounded=True,
         quoted=False,
         turn_index=turn_index,
-        provenance=f"tests.v01.runtime_topology:{signal_id}",
+        provenance=f"tests.v02.runtime_topology:{signal_id}",
         target_claim=None,
     )
 
@@ -57,19 +58,19 @@ def _signal(
 def _grounded_signals() -> tuple[O01EntitySignal, ...]:
     return (
         _signal(
-            signal_id="rt-v01-g1",
+            signal_id="rt-v02-g1",
             relation="stable_claim",
             claim="prefers_structured_lists",
             turn_index=1,
         ),
         _signal(
-            signal_id="rt-v01-g2",
+            signal_id="rt-v02-g2",
             relation="stable_claim",
             claim="prefers_structured_lists",
             turn_index=2,
         ),
         _signal(
-            signal_id="rt-v01-g3",
+            signal_id="rt-v02-g3",
             relation="knowledge_boundary",
             claim="knows_cli_basics",
             turn_index=3,
@@ -96,7 +97,7 @@ def _project_signal(case_id: str) -> P01ProjectSignalInput:
         authority_source_kind=P01AuthoritySourceKind.EXPLICIT_USER_DIRECTIVE,
         target_summary="stabilize bounded runtime response path",
         grounded_basis_present=True,
-        provenance=f"tests.v01.runtime_topology:{case_id}:project",
+        provenance=f"tests.v02.runtime_topology:{case_id}:project",
     )
 
 
@@ -106,18 +107,26 @@ def _candidate(
     act_type: V01ActType,
     evidence_strength: float,
     authority_basis_present: bool = True,
-    explicit_uncertainty_present: bool = False,
-    commitment_target_ref: str | None = None,
 ) -> V01CommunicativeActCandidate:
     return V01CommunicativeActCandidate(
         act_id=act_id,
         act_type=act_type,
-        proposition_ref="prop:v01-runtime-topology",
+        proposition_ref="prop:v02-runtime-topology",
         evidence_strength=evidence_strength,
         authority_basis_present=authority_basis_present,
-        explicit_uncertainty_present=explicit_uncertainty_present,
-        commitment_target_ref=commitment_target_ref,
-        provenance=f"tests.v01.runtime_topology:{act_id}",
+        provenance=f"tests.v02.runtime_topology:{act_id}",
+    )
+
+
+def _plan_input(
+    *,
+    input_id: str,
+    prior_unresolved_question: bool = False,
+) -> V02UtterancePlanInput:
+    return V02UtterancePlanInput(
+        input_id=input_id,
+        prior_unresolved_question=prior_unresolved_question,
+        provenance=f"tests.v02.runtime_topology:{input_id}",
     )
 
 
@@ -129,27 +138,27 @@ def _base_context(case_id: str) -> SubjectTickContext:
     )
 
 
-def test_runtime_topology_graph_includes_v01_order_and_checkpoint() -> None:
+def test_runtime_topology_graph_includes_v02_order_and_checkpoint() -> None:
     graph = build_minimal_runtime_tick_graph()
-    assert "V01" in graph.runtime_order
-    assert graph.runtime_order.index("R05") < graph.runtime_order.index("V01")
-    assert graph.runtime_order.index("V01") < graph.runtime_order.index("RT01")
-    assert "rt01.v01_normative_permission_commitment_licensing_checkpoint" in graph.mandatory_checkpoint_ids
+    assert "V02" in graph.runtime_order
+    assert graph.runtime_order.index("V01") < graph.runtime_order.index("V02")
+    assert graph.runtime_order.index("V02") < graph.runtime_order.index("RT01")
+    assert "rt01.v02_utterance_plan_checkpoint" in graph.mandatory_checkpoint_ids
     assert (
-        "v01_normative_permission_commitment_licensing.communicative_license_state"
+        "v02_communicative_intent_utterance_plan_bridge.utterance_plan_state"
         in graph.source_of_truth_surfaces
     )
 
 
-def test_dispatch_v01_require_paths_are_enforced() -> None:
+def test_dispatch_v02_require_paths_are_enforced() -> None:
     result = dispatch_runtime_tick(
         RuntimeDispatchRequest(
-            tick_input=_tick_input("runtime-topology-v01-require"),
+            tick_input=_tick_input("runtime-topology-v02-require"),
             context=replace(
-                _base_context("runtime-topology-v01-require"),
-                require_v01_license_consumer=True,
-                require_v01_commitment_delta_consumer=True,
-                require_v01_qualifier_binding_consumer=True,
+                _base_context("runtime-topology-v02-require"),
+                require_v02_plan_consumer=True,
+                require_v02_ordering_consumer=True,
+                require_v02_realization_contract_consumer=True,
                 v01_act_candidates=(),
             ),
             route_class=RuntimeRouteClass.PRODUCTION_CONTOUR,
@@ -159,21 +168,21 @@ def test_dispatch_v01_require_paths_are_enforced() -> None:
     checkpoint = next(
         item
         for item in result.subject_tick_result.state.execution_checkpoints
-        if item.checkpoint_id == "rt01.v01_normative_permission_commitment_licensing_checkpoint"
+        if item.checkpoint_id == "rt01.v02_utterance_plan_checkpoint"
     )
     assert checkpoint.status.value == "enforced_detour"
-    assert "require_v01_license_consumer" in checkpoint.required_action
-    assert "require_v01_commitment_delta_consumer" in checkpoint.required_action
-    assert "require_v01_qualifier_binding_consumer" in checkpoint.required_action
+    assert "require_v02_plan_consumer" in checkpoint.required_action
+    assert "require_v02_ordering_consumer" in checkpoint.required_action
+    assert "require_v02_realization_contract_consumer" in checkpoint.required_action
     assert result.subject_tick_result.state.final_execution_outcome == SubjectTickOutcome.REVALIDATE
 
 
-def test_dispatch_v01_default_commitment_denied_detour_is_strict() -> None:
+def test_dispatch_v02_default_clarification_detour_is_strict() -> None:
     baseline = dispatch_runtime_tick(
         RuntimeDispatchRequest(
-            tick_input=_tick_input("runtime-topology-v01-baseline"),
+            tick_input=_tick_input("runtime-topology-v02-baseline"),
             context=replace(
-                _base_context("runtime-topology-v01-baseline"),
+                _base_context("runtime-topology-v02-baseline"),
                 v01_act_candidates=(
                     _candidate(
                         act_id="assertion-baseline",
@@ -186,55 +195,53 @@ def test_dispatch_v01_default_commitment_denied_detour_is_strict() -> None:
             route_class=RuntimeRouteClass.PRODUCTION_CONTOUR,
         )
     )
-    denied_commitment = dispatch_runtime_tick(
+    clarification = dispatch_runtime_tick(
         RuntimeDispatchRequest(
-            tick_input=_tick_input("runtime-topology-v01-commitment-denied"),
+            tick_input=_tick_input("runtime-topology-v02-clarification"),
             context=replace(
-                _base_context("runtime-topology-v01-commitment-denied"),
+                _base_context("runtime-topology-v02-clarification"),
                 v01_act_candidates=(
                     _candidate(
-                        act_id="assertion-for-split",
+                        act_id="assertion-clarify",
                         act_type=V01ActType.ASSERTION,
                         evidence_strength=0.97,
                         authority_basis_present=True,
                     ),
-                    _candidate(
-                        act_id="promise-for-split",
-                        act_type=V01ActType.PROMISE,
-                        evidence_strength=0.62,
-                        authority_basis_present=True,
-                        commitment_target_ref="target:runtime",
-                    ),
+                ),
+                v02_plan_input=_plan_input(
+                    input_id="clarification-required",
+                    prior_unresolved_question=True,
                 ),
             ),
             route_class=RuntimeRouteClass.PRODUCTION_CONTOUR,
         )
     )
     assert baseline.subject_tick_result is not None
-    assert denied_commitment.subject_tick_result is not None
+    assert clarification.subject_tick_result is not None
     baseline_checkpoint = next(
         item
         for item in baseline.subject_tick_result.state.execution_checkpoints
-        if item.checkpoint_id == "rt01.v01_normative_permission_commitment_licensing_checkpoint"
+        if item.checkpoint_id == "rt01.v02_utterance_plan_checkpoint"
     )
-    denied_checkpoint = next(
+    clarification_checkpoint = next(
         item
-        for item in denied_commitment.subject_tick_result.state.execution_checkpoints
-        if item.checkpoint_id == "rt01.v01_normative_permission_commitment_licensing_checkpoint"
+        for item in clarification.subject_tick_result.state.execution_checkpoints
+        if item.checkpoint_id == "rt01.v02_utterance_plan_checkpoint"
     )
     assert baseline_checkpoint.status.value == "allowed"
-    assert denied_checkpoint.status.value == "enforced_detour"
-    assert "default_v01_commitment_denied_detour" in denied_checkpoint.required_action
-    assert denied_commitment.subject_tick_result.state.final_execution_outcome == SubjectTickOutcome.REVALIDATE
+    assert clarification_checkpoint.status.value == "enforced_detour"
+    assert "default_v02_clarification_first_detour" in clarification_checkpoint.required_action
+    assert clarification.subject_tick_result.state.final_execution_outcome == SubjectTickOutcome.REVALIDATE
 
 
-def test_dispatch_v01_no_candidate_no_default_friction() -> None:
+def test_dispatch_v02_no_candidate_no_default_friction() -> None:
     result = dispatch_runtime_tick(
         RuntimeDispatchRequest(
-            tick_input=_tick_input("runtime-topology-v01-no-candidate"),
+            tick_input=_tick_input("runtime-topology-v02-no-candidate"),
             context=replace(
-                _base_context("runtime-topology-v01-no-candidate"),
+                _base_context("runtime-topology-v02-no-candidate"),
                 v01_act_candidates=(),
+                v02_plan_input=None,
             ),
             route_class=RuntimeRouteClass.PRODUCTION_CONTOUR,
         )
@@ -243,8 +250,8 @@ def test_dispatch_v01_no_candidate_no_default_friction() -> None:
     checkpoint = next(
         item
         for item in result.subject_tick_result.state.execution_checkpoints
-        if item.checkpoint_id == "rt01.v01_normative_permission_commitment_licensing_checkpoint"
+        if item.checkpoint_id == "rt01.v02_utterance_plan_checkpoint"
     )
     assert checkpoint.status.value == "allowed"
-    assert checkpoint.required_action == "v01_optional"
+    assert checkpoint.required_action == "v02_optional"
     assert result.subject_tick_result.state.final_execution_outcome == SubjectTickOutcome.CONTINUE

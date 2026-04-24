@@ -42,6 +42,7 @@ def build_minimal_runtime_tick_graph() -> RuntimeTickGraph:
             "O04",
             "R05",
             "V01",
+            "V02",
             "RT01",
         ),
         nodes=(
@@ -351,6 +352,19 @@ def build_minimal_runtime_tick_graph() -> RuntimeTickGraph:
                 ),
             ),
             RuntimeContourNode(
+                node_id="node.v02_communicative_intent_utterance_plan_bridge",
+                phase_id="V02",
+                authority_role="communicative_intent_utterance_plan_bridge_contract",
+                computational_role="typed_utterance_plan_bridge",
+                surfaces=(
+                    "v02_communicative_intent_utterance_plan_bridge.utterance_plan_state",
+                    "v02_communicative_intent_utterance_plan_bridge.segment_graph",
+                    "v02_communicative_intent_utterance_plan_bridge.ordering_edges",
+                    "v02_communicative_intent_utterance_plan_bridge.protected_omissions",
+                ),
+                checkpoint_ids=("rt01.v02_utterance_plan_checkpoint",),
+            ),
+            RuntimeContourNode(
                 node_id="node.rt01",
                 phase_id="RT01",
                 authority_role="gating",
@@ -379,6 +393,7 @@ def build_minimal_runtime_tick_graph() -> RuntimeTickGraph:
                     "rt01.o04_rupture_hostility_coercion_checkpoint",
                     "rt01.r05_protective_regulation_checkpoint",
                     "rt01.v01_normative_permission_commitment_licensing_checkpoint",
+                    "rt01.v02_utterance_plan_checkpoint",
                     "rt01.outcome_resolution_checkpoint",
                 ),
                 checkpoint_ids=(
@@ -405,6 +420,7 @@ def build_minimal_runtime_tick_graph() -> RuntimeTickGraph:
                     "rt01.o04_rupture_hostility_coercion_checkpoint",
                     "rt01.r05_protective_regulation_checkpoint",
                     "rt01.v01_normative_permission_commitment_licensing_checkpoint",
+                    "rt01.v02_utterance_plan_checkpoint",
                     "rt01.outcome_resolution_checkpoint",
                 ),
             ),
@@ -487,7 +503,11 @@ def build_minimal_runtime_tick_graph() -> RuntimeTickGraph:
             RuntimeContourEdge(source_phase="R05", target_phase="V01", relation="requires"),
             RuntimeContourEdge(source_phase="O04", target_phase="V01", relation="modulates"),
             RuntimeContourEdge(source_phase="P01", target_phase="V01", relation="modulates"),
-            RuntimeContourEdge(source_phase="V01", target_phase="RT01", relation="requires"),
+            RuntimeContourEdge(source_phase="V01", target_phase="V02", relation="requires"),
+            RuntimeContourEdge(source_phase="R05", target_phase="V02", relation="modulates"),
+            RuntimeContourEdge(source_phase="O04", target_phase="V02", relation="modulates"),
+            RuntimeContourEdge(source_phase="P01", target_phase="V02", relation="modulates"),
+            RuntimeContourEdge(source_phase="V02", target_phase="RT01", relation="requires"),
             RuntimeContourEdge(source_phase="RT01", target_phase="F01", relation="persists_via_f01"),
         ),
         mandatory_checkpoint_ids=(
@@ -518,6 +538,7 @@ def build_minimal_runtime_tick_graph() -> RuntimeTickGraph:
             "rt01.o04_rupture_hostility_coercion_checkpoint",
             "rt01.r05_protective_regulation_checkpoint",
             "rt01.v01_normative_permission_commitment_licensing_checkpoint",
+            "rt01.v02_utterance_plan_checkpoint",
             "rt01.outcome_resolution_checkpoint",
         ),
         source_of_truth_surfaces=(
@@ -564,6 +585,8 @@ def build_minimal_runtime_tick_graph() -> RuntimeTickGraph:
             "r05_appraisal_sovereign_protective_regulation.inhibited_surfaces",
             "v01_normative_permission_commitment_licensing.communicative_license_state",
             "v01_normative_permission_commitment_licensing.commitment_deltas",
+            "v02_communicative_intent_utterance_plan_bridge.utterance_plan_state",
+            "v02_communicative_intent_utterance_plan_bridge.segment_graph",
         ),
         reason="minimal production runtime graph for bounded RT01 contour wiring",
     )
@@ -610,6 +633,7 @@ def build_minimal_runtime_topology_bundle() -> RuntimeTopologyBundle:
             "o04_rupture_hostility_coercion_contract",
             "r05_appraisal_sovereign_protective_regulation_contract",
             "v01_normative_permission_commitment_licensing_contract",
+            "v02_communicative_intent_utterance_plan_bridge_contract",
         ),
         f01_transition_route="subject_tick.persist_subject_tick_result_via_f01",
         tick_graph=tick_graph,
@@ -783,6 +807,7 @@ def _context_has_ablation_flags(context: SubjectTickContext | None) -> bool:
         or context.disable_o04_enforcement
         or context.disable_r05_enforcement
         or context.disable_v01_enforcement
+        or context.disable_v02_enforcement
         or context.disable_t01_unresolved_slot_maintenance
         or context.disable_t01_field_enforcement
         or (

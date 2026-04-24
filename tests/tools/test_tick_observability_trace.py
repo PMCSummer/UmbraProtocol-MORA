@@ -44,6 +44,7 @@ HOSTED_CONTOUR_SEGMENTS = (
     "o04_rupture_hostility_coercion",
     "r05_appraisal_sovereign_protective_regulation",
     "v01_normative_permission_commitment_licensing",
+    "v02_communicative_intent_utterance_plan_bridge",
     "s_minimal_contour",
     "a_line_normalization",
     "m_minimal",
@@ -197,6 +198,21 @@ HOSTED_CONTOUR_FIELDS: dict[str, set[str]] = {
         "downstream_consumer_ready",
         "promise_like_act_denied",
         "alternative_narrowed_act_available",
+    },
+    "v02_communicative_intent_utterance_plan_bridge": {
+        "plan_status",
+        "segment_count",
+        "branch_count",
+        "ordering_edge_count",
+        "mandatory_qualifier_attachment_count",
+        "blocked_expansion_count",
+        "protected_omission_count",
+        "clarification_first_required",
+        "refusal_dominant",
+        "protective_boundary_first",
+        "partial_plan_only",
+        "unresolved_branching",
+        "downstream_consumer_ready",
     },
     "s_minimal_contour": {
         "minimal_self_status",
@@ -684,6 +700,9 @@ def test_hosted_contour_segments_follow_real_runtime_order(tmp_path: Path) -> No
         events, "v01_normative_permission_commitment_licensing"
     )
     assert _first_order(events, "v01_normative_permission_commitment_licensing") < _first_order(
+        events, "v02_communicative_intent_utterance_plan_bridge"
+    )
+    assert _first_order(events, "v02_communicative_intent_utterance_plan_bridge") < _first_order(
         events, "bounded_outcome_resolution"
     )
     assert _first_order(events, "s_minimal_contour") < _first_order(events, "a_line_normalization")
@@ -750,6 +769,7 @@ def test_representative_modules_have_runtime_steps(tmp_path: Path) -> None:
         "o04_rupture_hostility_coercion",
         "r05_appraisal_sovereign_protective_regulation",
         "v01_normative_permission_commitment_licensing",
+        "v02_communicative_intent_utterance_plan_bridge",
         "downstream_obedience",
         "subject_tick",
     ):

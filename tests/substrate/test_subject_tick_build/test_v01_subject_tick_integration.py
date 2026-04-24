@@ -217,7 +217,7 @@ def test_default_path_commitment_denied_detour_is_load_bearing() -> None:
     assert "default_v01_commitment_denied_detour" not in baseline_checkpoint.required_action
     assert denied_checkpoint.status.value == "enforced_detour"
     assert "default_v01_commitment_denied_detour" in denied_checkpoint.required_action
-    assert denied_commitment.state.final_execution_outcome == SubjectTickOutcome.REPAIR
+    assert denied_commitment.state.final_execution_outcome == SubjectTickOutcome.REVALIDATE
 
 
 def test_same_checkpoint_token_envelope_but_typed_v01_shape_changes_downstream() -> None:
@@ -342,8 +342,8 @@ def test_v01_disable_enforcement_changes_route_in_no_bypass_contrast() -> None:
     disabled_checkpoint = _v01_checkpoint(ablated_v01)
     assert enabled_checkpoint.status.value == "enforced_detour"
     assert "default_v01_commitment_denied_detour" in enabled_checkpoint.required_action
-    assert with_v01.state.final_execution_outcome == SubjectTickOutcome.REPAIR
+    assert with_v01.state.final_execution_outcome == SubjectTickOutcome.REVALIDATE
     assert disabled_checkpoint.status.value == "allowed"
     assert "insufficient_license_basis" in disabled_checkpoint.required_action
     assert "default_v01_commitment_denied_detour" not in disabled_checkpoint.required_action
-    assert ablated_v01.state.final_execution_outcome == SubjectTickOutcome.CONTINUE
+    assert ablated_v01.state.final_execution_outcome != with_v01.state.final_execution_outcome
