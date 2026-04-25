@@ -45,6 +45,7 @@ HOSTED_CONTOUR_SEGMENTS = (
     "r05_appraisal_sovereign_protective_regulation",
     "v01_normative_permission_commitment_licensing",
     "v02_communicative_intent_utterance_plan_bridge",
+    "v03_surface_verbalization_causality_constrained_realization",
     "s_minimal_contour",
     "a_line_normalization",
     "m_minimal",
@@ -212,6 +213,20 @@ HOSTED_CONTOUR_FIELDS: dict[str, set[str]] = {
         "protective_boundary_first",
         "partial_plan_only",
         "unresolved_branching",
+        "downstream_consumer_ready",
+    },
+    "v03_surface_verbalization_causality_constrained_realization": {
+        "realization_status",
+        "segment_count",
+        "aligned_segment_count",
+        "hard_constraint_violation_count",
+        "qualifier_locality_failures",
+        "blocked_expansion_leak_detected",
+        "protected_omission_count",
+        "boundary_before_explanation_required",
+        "boundary_before_explanation_satisfied",
+        "partial_realization_only",
+        "replan_required",
         "downstream_consumer_ready",
     },
     "s_minimal_contour": {
@@ -703,6 +718,9 @@ def test_hosted_contour_segments_follow_real_runtime_order(tmp_path: Path) -> No
         events, "v02_communicative_intent_utterance_plan_bridge"
     )
     assert _first_order(events, "v02_communicative_intent_utterance_plan_bridge") < _first_order(
+        events, "v03_surface_verbalization_causality_constrained_realization"
+    )
+    assert _first_order(events, "v03_surface_verbalization_causality_constrained_realization") < _first_order(
         events, "bounded_outcome_resolution"
     )
     assert _first_order(events, "s_minimal_contour") < _first_order(events, "a_line_normalization")
@@ -770,6 +788,7 @@ def test_representative_modules_have_runtime_steps(tmp_path: Path) -> None:
         "r05_appraisal_sovereign_protective_regulation",
         "v01_normative_permission_commitment_licensing",
         "v02_communicative_intent_utterance_plan_bridge",
+        "v03_surface_verbalization_causality_constrained_realization",
         "downstream_obedience",
         "subject_tick",
     ):

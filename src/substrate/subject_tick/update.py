@@ -207,6 +207,11 @@ from substrate.v02_communicative_intent_utterance_plan_bridge import (
     build_v02_communicative_intent_utterance_plan_bridge,
     derive_v02_utterance_plan_consumer_view,
 )
+from substrate.v03_surface_verbalization_causality_constrained_realization import (
+    V03RealizationInput,
+    build_v03_surface_verbalization_causality_constrained_realization,
+    derive_v03_realization_consumer_view,
+)
 from substrate.s01_efference_copy import (
     S01EfferenceCopyState,
     build_s01_efference_copy,
@@ -246,6 +251,7 @@ ATTEMPTED_SUBJECT_TICK_PATHS: tuple[str, ...] = (
     "subject_tick.evaluate_r05_appraisal_sovereign_protective_regulation",
     "subject_tick.evaluate_v01_normative_permission_commitment_licensing",
     "subject_tick.evaluate_v02_communicative_intent_utterance_plan_bridge",
+    "subject_tick.evaluate_v03_surface_verbalization_causality_constrained_realization",
     "subject_tick.world_seam_enforcement",
     "subject_tick.resolve_bounded_runtime_outcome",
     "subject_tick.downstream_gate",
@@ -4425,6 +4431,220 @@ def execute_subject_tick(
         )
     )
 
+    v03_realization_input = (
+        context.v03_realization_input
+        if isinstance(context.v03_realization_input, V03RealizationInput)
+        else None
+    )
+    v03_explicit_basis = bool(
+        v02_explicit_basis and v02_result.state.segment_count > 0
+    )
+    v03_result = build_v03_surface_verbalization_causality_constrained_realization(
+        tick_id=tick_id,
+        tick_index=tick_index,
+        v02_result=v02_result,
+        v01_result=v01_result,
+        realization_input=v03_realization_input,
+        source_lineage=lineage,
+        realization_enabled=not context.disable_v03_enforcement,
+    )
+    v03_view = derive_v03_realization_consumer_view(v03_result)
+    v03_enter_values = {
+        "realization_status": v03_result.telemetry.realization_status.value,
+        "segment_count": v03_result.telemetry.segment_count,
+        "aligned_segment_count": v03_result.telemetry.aligned_segment_count,
+        "hard_constraint_violation_count": (
+            v03_result.telemetry.hard_constraint_violation_count
+        ),
+        "qualifier_locality_failures": v03_result.telemetry.qualifier_locality_failures,
+        "blocked_expansion_leak_detected": (
+            v03_result.telemetry.blocked_expansion_leak_detected
+        ),
+        "protected_omission_count": v03_result.telemetry.protected_omission_count,
+        "boundary_before_explanation_required": (
+            v03_result.telemetry.boundary_before_explanation_required
+        ),
+        "boundary_before_explanation_satisfied": (
+            v03_result.telemetry.boundary_before_explanation_satisfied
+        ),
+        "partial_realization_only": v03_result.telemetry.partial_realization_only,
+        "replan_required": v03_result.telemetry.replan_required,
+        "downstream_consumer_ready": v03_result.telemetry.downstream_consumer_ready,
+    }
+    trace_emit_active(
+        "v03_surface_verbalization_causality_constrained_realization",
+        "enter",
+        v03_enter_values,
+    )
+    v03_checkpoint_status = SubjectTickCheckpointStatus.ALLOWED
+    v03_checkpoint_reason = v03_result.gate.reason
+    v03_default_failure_detour = False
+    v03_default_alignment_violation_detour = False
+    v03_default_boundary_order_detour = False
+    if not context.disable_v03_enforcement:
+        if (
+            context.require_v03_realization_consumer
+            and not v03_view.realization_consumer_ready
+            and halt_reason is None
+        ):
+            revalidation_needed = True
+            v03_checkpoint_status = SubjectTickCheckpointStatus.ENFORCED_DETOUR
+            v03_checkpoint_reason = (
+                "v03 realization consumer requested but constrained realization artifact is not ready"
+            )
+            if active_execution_mode != "halt_execution":
+                active_execution_mode = "revalidate_scope"
+        if (
+            context.require_v03_alignment_consumer
+            and not v03_view.alignment_consumer_ready
+            and halt_reason is None
+        ):
+            repair_needed = True
+            v03_checkpoint_status = SubjectTickCheckpointStatus.ENFORCED_DETOUR
+            v03_checkpoint_reason = (
+                "v03 alignment consumer requested but segment-to-surface alignment is not ready"
+            )
+            if active_execution_mode != "halt_execution":
+                active_execution_mode = "repair_branch_access"
+        if (
+            context.require_v03_constraint_report_consumer
+            and not v03_view.constraint_report_consumer_ready
+            and halt_reason is None
+        ):
+            revalidation_needed = True
+            v03_checkpoint_status = SubjectTickCheckpointStatus.ENFORCED_DETOUR
+            v03_checkpoint_reason = (
+                "v03 constraint report consumer requested but hard-constraint report is not ready"
+            )
+            if active_execution_mode != "halt_execution":
+                active_execution_mode = "revalidate_scope"
+        if (
+            v03_explicit_basis
+            and v03_result.failure_state.failed
+            and not context.require_v03_realization_consumer
+            and halt_reason is None
+        ):
+            repair_needed = True
+            v03_default_failure_detour = True
+            v03_checkpoint_status = SubjectTickCheckpointStatus.ENFORCED_DETOUR
+            v03_checkpoint_reason = (
+                "v03 default contour detected constrained-realization failure and requires bounded repair detour"
+            )
+            if active_execution_mode != "halt_execution":
+                active_execution_mode = "repair_runtime_path"
+        elif (
+            v03_explicit_basis
+            and v03_result.constraint_report.hard_constraint_violation_count > 0
+            and not context.require_v03_alignment_consumer
+            and halt_reason is None
+        ):
+            revalidation_needed = True
+            v03_default_alignment_violation_detour = True
+            v03_checkpoint_status = SubjectTickCheckpointStatus.ENFORCED_DETOUR
+            v03_checkpoint_reason = (
+                "v03 default contour detected constrained-realization alignment violation and requires revalidation"
+            )
+            if active_execution_mode != "halt_execution":
+                active_execution_mode = "revalidate_scope"
+        if (
+            v03_explicit_basis
+            and v03_result.constraint_report.boundary_before_explanation_required
+            and not v03_result.constraint_report.boundary_before_explanation_satisfied
+            and not context.require_v03_constraint_report_consumer
+            and halt_reason is None
+            and not v03_default_failure_detour
+        ):
+            repair_needed = True
+            v03_default_boundary_order_detour = True
+            v03_checkpoint_status = SubjectTickCheckpointStatus.ENFORCED_DETOUR
+            v03_checkpoint_reason = (
+                "v03 default contour requires boundary-before-explanation ordering before unrestricted continuation"
+            )
+            if active_execution_mode != "halt_execution":
+                active_execution_mode = "repair_branch_access"
+    else:
+        v03_checkpoint_status = SubjectTickCheckpointStatus.ALLOWED
+        v03_checkpoint_reason = "v03 enforcement disabled in ablation context"
+
+    v03_required_actions: list[str] = []
+    if context.require_v03_realization_consumer:
+        v03_required_actions.append("require_v03_realization_consumer")
+    if context.require_v03_alignment_consumer:
+        v03_required_actions.append("require_v03_alignment_consumer")
+    if context.require_v03_constraint_report_consumer:
+        v03_required_actions.append("require_v03_constraint_report_consumer")
+    if v03_default_failure_detour:
+        v03_required_actions.append("default_v03_realization_failure_detour")
+    if v03_default_alignment_violation_detour:
+        v03_required_actions.append("default_v03_alignment_violation_detour")
+    if v03_default_boundary_order_detour:
+        v03_required_actions.append("default_v03_boundary_order_detour")
+    if (
+        v03_explicit_basis
+        and not context.disable_v03_enforcement
+        and v03_result.failure_state.partial_realization_only
+    ):
+        v03_required_actions.append("partial_realization_only")
+    if (
+        v03_explicit_basis
+        and not context.disable_v03_enforcement
+        and v03_result.failure_state.replan_required
+    ):
+        v03_required_actions.append("replan_required")
+    if not v03_required_actions:
+        v03_required_actions.append("v03_optional")
+    v03_trace_values = {
+        "realization_status": v03_result.telemetry.realization_status.value,
+        "segment_count": v03_result.telemetry.segment_count,
+        "aligned_segment_count": v03_result.telemetry.aligned_segment_count,
+        "hard_constraint_violation_count": (
+            v03_result.telemetry.hard_constraint_violation_count
+        ),
+        "qualifier_locality_failures": v03_result.telemetry.qualifier_locality_failures,
+        "blocked_expansion_leak_detected": (
+            v03_result.telemetry.blocked_expansion_leak_detected
+        ),
+        "protected_omission_count": v03_result.telemetry.protected_omission_count,
+        "boundary_before_explanation_required": (
+            v03_result.telemetry.boundary_before_explanation_required
+        ),
+        "boundary_before_explanation_satisfied": (
+            v03_result.telemetry.boundary_before_explanation_satisfied
+        ),
+        "partial_realization_only": v03_result.telemetry.partial_realization_only,
+        "replan_required": v03_result.telemetry.replan_required,
+        "downstream_consumer_ready": v03_result.telemetry.downstream_consumer_ready,
+    }
+    trace_emit_active(
+        "v03_surface_verbalization_causality_constrained_realization",
+        "decision",
+        v03_trace_values,
+    )
+    if v03_checkpoint_status != SubjectTickCheckpointStatus.ALLOWED:
+        trace_emit_active(
+            "v03_surface_verbalization_causality_constrained_realization",
+            "blocked",
+            v03_trace_values,
+            note=v03_checkpoint_reason,
+        )
+    trace_emit_active(
+        "v03_surface_verbalization_causality_constrained_realization",
+        "exit",
+        v03_trace_values,
+    )
+    checkpoints.append(
+        SubjectTickCheckpointResult(
+            checkpoint_id="rt01.v03_constrained_realization_checkpoint",
+            source_contract=(
+                "v03_surface_verbalization_causality_constrained_realization.constrained_realization_state"
+            ),
+            status=v03_checkpoint_status,
+            required_action=";".join(dict.fromkeys(v03_required_actions)),
+            applied_action=active_execution_mode,
+            reason=v03_checkpoint_reason,
+        )
+    )
+
     if halt_reason is not None:
         final_outcome = SubjectTickOutcome.HALT
         execution_stance = SubjectTickExecutionStance.HALT_PATH
@@ -5193,6 +5413,31 @@ def execute_subject_tick(
         ),
         v02_downstream_consumer_ready=v02_result.state.downstream_consumer_ready,
         v02_segment_ids=v02_result.state.segment_ids,
+        v03_realization_status=v03_result.realization_status.value,
+        v03_segment_count=v03_result.telemetry.segment_count,
+        v03_aligned_segment_count=v03_result.telemetry.aligned_segment_count,
+        v03_hard_constraint_violation_count=(
+            v03_result.constraint_report.hard_constraint_violation_count
+        ),
+        v03_qualifier_locality_failures=v03_result.constraint_report.qualifier_locality_failures,
+        v03_blocked_expansion_leak_detected=(
+            v03_result.constraint_report.blocked_expansion_leak_detected
+        ),
+        v03_protected_omission_count=v03_result.telemetry.protected_omission_count,
+        v03_boundary_before_explanation_required=(
+            v03_result.constraint_report.boundary_before_explanation_required
+        ),
+        v03_boundary_before_explanation_satisfied=(
+            v03_result.constraint_report.boundary_before_explanation_satisfied
+        ),
+        v03_partial_realization_only=v03_result.failure_state.partial_realization_only,
+        v03_replan_required=v03_result.failure_state.replan_required,
+        v03_realization_consumer_ready=v03_result.gate.realization_consumer_ready,
+        v03_alignment_consumer_ready=v03_result.gate.alignment_consumer_ready,
+        v03_constraint_report_consumer_ready=(
+            v03_result.gate.constraint_report_consumer_ready
+        ),
+        v03_downstream_consumer_ready=v03_result.telemetry.downstream_consumer_ready,
     )
     gate = evaluate_subject_tick_downstream_gate(state)
     telemetry = build_subject_tick_telemetry(
@@ -5200,7 +5445,7 @@ def execute_subject_tick(
         attempted_paths=ATTEMPTED_SUBJECT_TICK_PATHS,
         downstream_gate=gate,
         causal_basis=(
-            "bounded runtime execution spine enforces roadmap authority roles for C04/C05, consumes world-entry, s01 efference-copy, s02 prediction-boundary seam, s03 ownership-weighted learning, s04 interoceptive self-binding, s05 multi-cause attribution, s-minimal, a-line, m-minimal, n-minimal, t01 semantic-field, t02 relation-binding, t03 hypothesis-competition, t04 attention-schema, o01 other-entity modeling, o02 intersubjective allostasis, o03 strategy-class evaluation, p01 authority-bounded project-formation, o04 rupture/hostility/coercion dynamics, r05 bounded protective regulation gates, v01 act-level normative licensing/commitment guards, and v02 typed utterance-plan bridge constraints, and keeps D01 observability-only over fixed R->C order"
+            "bounded runtime execution spine enforces roadmap authority roles for C04/C05, consumes world-entry, s01 efference-copy, s02 prediction-boundary seam, s03 ownership-weighted learning, s04 interoceptive self-binding, s05 multi-cause attribution, s-minimal, a-line, m-minimal, n-minimal, t01 semantic-field, t02 relation-binding, t03 hypothesis-competition, t04 attention-schema, o01 other-entity modeling, o02 intersubjective allostasis, o03 strategy-class evaluation, p01 authority-bounded project-formation, o04 rupture/hostility/coercion dynamics, r05 bounded protective regulation gates, v01 act-level normative licensing/commitment guards, v02 typed utterance-plan bridge constraints, and v03 constrained realization alignment/report contract before bounded outcome resolution, and keeps D01 observability-only over fixed R->C order"
         ),
     )
     abstain = final_outcome in {SubjectTickOutcome.REPAIR, SubjectTickOutcome.REVALIDATE}
@@ -5296,6 +5541,7 @@ def execute_subject_tick(
         r05_result=r05_result,
         v01_result=v01_result,
         v02_result=v02_result,
+        v03_result=v03_result,
         t01_result=t01_result,
         t02_result=t02_result,
         t03_result=t03_result,

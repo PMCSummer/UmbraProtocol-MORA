@@ -41,6 +41,11 @@ if TYPE_CHECKING:
         V02UtterancePlanResult,
         V02UtterancePlanState,
     )
+    from substrate.v03_surface_verbalization_causality_constrained_realization import (
+        V03ConstrainedRealizationResult,
+        V03RealizationInput,
+        V03RealizedUtteranceArtifact,
+    )
     from substrate.p01_project_formation import (
         P01IntentionStackState,
         P01ProjectFormationResult,
@@ -324,6 +329,18 @@ class SubjectTickRestrictionCode(StrEnum):
     V02_BLOCKED_EXPANSIONS_MUST_BE_RESPECTED = "v02_blocked_expansions_must_be_respected"
     V02_PROTECTED_OMISSIONS_MUST_BE_RESPECTED = "v02_protected_omissions_must_be_respected"
     V02_QUALIFIER_IDENTITY_BINDING_REQUIRED = "v02_qualifier_identity_binding_required"
+    V03_CONSTRAINED_REALIZATION_CONTRACT_MUST_BE_READ = (
+        "v03_constrained_realization_contract_must_be_read"
+    )
+    V03_REALIZATION_CONSUMER_REQUIRED = "v03_realization_consumer_required"
+    V03_ALIGNMENT_CONSUMER_REQUIRED = "v03_alignment_consumer_required"
+    V03_CONSTRAINT_REPORT_CONSUMER_REQUIRED = "v03_constraint_report_consumer_required"
+    V03_REALIZATION_FAILURE_DETOUR_REQUIRED = "v03_realization_failure_detour_required"
+    V03_ALIGNMENT_VIOLATION_DETOUR_REQUIRED = "v03_alignment_violation_detour_required"
+    V03_BOUNDARY_ORDER_DETOUR_REQUIRED = "v03_boundary_order_detour_required"
+    V03_QUALIFIER_LOCALITY_REQUIRED = "v03_qualifier_locality_required"
+    V03_BLOCKED_EXPANSION_LEAK_FORBIDDEN = "v03_blocked_expansion_leak_forbidden"
+    V03_REPLAN_REQUIRED = "v03_replan_required"
     DOWNSTREAM_AUTHORITY_DEGRADED = "downstream_authority_degraded"
 
 
@@ -398,6 +415,7 @@ class SubjectTickContext:
     prior_r05_state: R05ProtectiveRegulationState | None = None
     prior_v01_state: V01CommunicativeLicenseState | None = None
     prior_v02_state: V02UtterancePlanState | None = None
+    prior_v03_artifact: V03RealizedUtteranceArtifact | None = None
     prior_p01_state: P01IntentionStackState | None = None
     dependency_trigger_hits: tuple[str, ...] = ()
     context_shift_markers: tuple[str, ...] = ()
@@ -503,6 +521,10 @@ class SubjectTickContext:
     require_v02_ordering_consumer: bool = False
     require_v02_realization_contract_consumer: bool = False
     disable_v02_enforcement: bool = False
+    require_v03_realization_consumer: bool = False
+    require_v03_alignment_consumer: bool = False
+    require_v03_constraint_report_consumer: bool = False
+    disable_v03_enforcement: bool = False
     o01_entity_signals: tuple[O01EntitySignal, ...] = ()
     o02_interaction_diagnostics: O02InteractionDiagnosticsInput | None = None
     o03_candidate_strategy: O03CandidateStrategyInput | None = None
@@ -511,6 +533,7 @@ class SubjectTickContext:
     r05_protective_triggers: tuple[R05ProtectiveTriggerInput, ...] = ()
     v01_act_candidates: tuple[V01CommunicativeActCandidate, ...] = ()
     v02_plan_input: V02UtterancePlanInput | None = None
+    v03_realization_input: V03RealizationInput | None = None
     g08_appraisal_significance_hint: float | None = None
     source_lineage: tuple[str, ...] = ()
 
@@ -1022,6 +1045,21 @@ class SubjectTickState:
     v02_realization_contract_consumer_ready: bool = False
     v02_downstream_consumer_ready: bool = False
     v02_segment_ids: tuple[str, ...] = ()
+    v03_realization_status: str = "insufficient_realization_basis"
+    v03_segment_count: int = 0
+    v03_aligned_segment_count: int = 0
+    v03_hard_constraint_violation_count: int = 0
+    v03_qualifier_locality_failures: int = 0
+    v03_blocked_expansion_leak_detected: bool = False
+    v03_protected_omission_count: int = 0
+    v03_boundary_before_explanation_required: bool = False
+    v03_boundary_before_explanation_satisfied: bool = False
+    v03_partial_realization_only: bool = False
+    v03_replan_required: bool = False
+    v03_realization_consumer_ready: bool = False
+    v03_alignment_consumer_ready: bool = False
+    v03_constraint_report_consumer_ready: bool = False
+    v03_downstream_consumer_ready: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -1370,6 +1408,7 @@ class SubjectTickResult:
     r05_result: R05ProtectiveResult
     v01_result: V01LicenseResult
     v02_result: V02UtterancePlanResult
+    v03_result: V03ConstrainedRealizationResult
     t01_result: T01ActiveFieldResult
     t02_result: T02ConstrainedSceneResult
     t03_result: T03CompetitionResult

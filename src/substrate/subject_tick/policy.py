@@ -71,6 +71,7 @@ def evaluate_subject_tick_downstream_gate(
         SubjectTickRestrictionCode.O04_DYNAMIC_CONTRACT_MUST_BE_READ,
         SubjectTickRestrictionCode.V01_LICENSE_CONTRACT_MUST_BE_READ,
         SubjectTickRestrictionCode.V02_PLAN_CONTRACT_MUST_BE_READ,
+        SubjectTickRestrictionCode.V03_CONSTRAINED_REALIZATION_CONTRACT_MUST_BE_READ,
     ]
     usability = SubjectTickUsabilityClass.USABLE_BOUNDED
     accepted = True
@@ -1152,10 +1153,12 @@ def evaluate_subject_tick_downstream_gate(
         v01_basis_present
         and state.v01_commitment_delta_count > 0
         and not state.v01_promise_like_act_denied
-        and state.final_execution_outcome == SubjectTickOutcome.CONTINUE
     ):
         restrictions.append(SubjectTickRestrictionCode.V01_COMMITMENT_DELTA_CONSUMER_REQUIRED)
-        if usability == SubjectTickUsabilityClass.USABLE_BOUNDED:
+        if (
+            state.final_execution_outcome == SubjectTickOutcome.CONTINUE
+            and usability == SubjectTickUsabilityClass.USABLE_BOUNDED
+        ):
             usability = SubjectTickUsabilityClass.DEGRADED_BOUNDED
             reason = (
                 "v01 commitment-creating license path requires bounded commitment-delta handoff before unrestricted continuation"
@@ -1330,6 +1333,127 @@ def evaluate_subject_tick_downstream_gate(
             usability = SubjectTickUsabilityClass.BLOCKED
             reason = (
                 "v02 communicative-intent/utterance-plan checkpoint requires detour before downstream continuation"
+            )
+
+    v03_checkpoint = next(
+        (
+            checkpoint
+            for checkpoint in state.execution_checkpoints
+            if checkpoint.checkpoint_id == "rt01.v03_constrained_realization_checkpoint"
+        ),
+        None,
+    )
+    if v03_checkpoint is not None:
+        if "require_v03_realization_consumer" in v03_checkpoint.required_action:
+            restrictions.append(SubjectTickRestrictionCode.V03_REALIZATION_CONSUMER_REQUIRED)
+        if "require_v03_alignment_consumer" in v03_checkpoint.required_action:
+            restrictions.append(SubjectTickRestrictionCode.V03_ALIGNMENT_CONSUMER_REQUIRED)
+        if "require_v03_constraint_report_consumer" in v03_checkpoint.required_action:
+            restrictions.append(
+                SubjectTickRestrictionCode.V03_CONSTRAINT_REPORT_CONSUMER_REQUIRED
+            )
+        if "default_v03_realization_failure_detour" in v03_checkpoint.required_action:
+            restrictions.append(
+                SubjectTickRestrictionCode.V03_REALIZATION_FAILURE_DETOUR_REQUIRED
+            )
+        if "default_v03_alignment_violation_detour" in v03_checkpoint.required_action:
+            restrictions.append(
+                SubjectTickRestrictionCode.V03_ALIGNMENT_VIOLATION_DETOUR_REQUIRED
+            )
+        if "default_v03_boundary_order_detour" in v03_checkpoint.required_action:
+            restrictions.append(SubjectTickRestrictionCode.V03_BOUNDARY_ORDER_DETOUR_REQUIRED)
+
+    v03_basis_present = bool(state.v03_segment_count > 0)
+    if v03_basis_present and state.v03_hard_constraint_violation_count > 0:
+        restrictions.append(SubjectTickRestrictionCode.V03_REALIZATION_FAILURE_DETOUR_REQUIRED)
+        restrictions.append(SubjectTickRestrictionCode.DOWNSTREAM_AUTHORITY_DEGRADED)
+        if state.final_execution_outcome == SubjectTickOutcome.CONTINUE:
+            accepted = False
+            usability = SubjectTickUsabilityClass.BLOCKED
+            reason = "v03 hard constrained-realization violations block unrestricted continuation"
+    if v03_basis_present and state.v03_qualifier_locality_failures > 0:
+        restrictions.append(SubjectTickRestrictionCode.V03_QUALIFIER_LOCALITY_REQUIRED)
+        restrictions.append(SubjectTickRestrictionCode.DOWNSTREAM_AUTHORITY_DEGRADED)
+        if state.final_execution_outcome == SubjectTickOutcome.CONTINUE:
+            accepted = False
+            usability = SubjectTickUsabilityClass.BLOCKED
+            reason = "v03 qualifier-locality failure blocks continuation until constrained realization is repaired"
+    if v03_basis_present and state.v03_blocked_expansion_leak_detected:
+        restrictions.append(SubjectTickRestrictionCode.V03_BLOCKED_EXPANSION_LEAK_FORBIDDEN)
+        restrictions.append(SubjectTickRestrictionCode.DOWNSTREAM_AUTHORITY_DEGRADED)
+        if state.final_execution_outcome == SubjectTickOutcome.CONTINUE:
+            accepted = False
+            usability = SubjectTickUsabilityClass.BLOCKED
+            reason = "v03 blocked-expansion leakage detected; continuation denied under constrained realization contract"
+    if (
+        v03_basis_present
+        and state.v03_boundary_before_explanation_required
+        and not state.v03_boundary_before_explanation_satisfied
+    ):
+        restrictions.append(SubjectTickRestrictionCode.V03_BOUNDARY_ORDER_DETOUR_REQUIRED)
+        restrictions.append(SubjectTickRestrictionCode.DOWNSTREAM_AUTHORITY_DEGRADED)
+        if state.final_execution_outcome == SubjectTickOutcome.CONTINUE:
+            accepted = False
+            usability = SubjectTickUsabilityClass.BLOCKED
+            reason = "v03 boundary-before-explanation ordering violation blocks unrestricted continuation"
+    if v03_basis_present and not state.v03_realization_consumer_ready:
+        restrictions.append(SubjectTickRestrictionCode.V03_REALIZATION_CONSUMER_REQUIRED)
+        restrictions.append(SubjectTickRestrictionCode.DOWNSTREAM_AUTHORITY_DEGRADED)
+        if state.final_execution_outcome == SubjectTickOutcome.CONTINUE:
+            accepted = False
+            usability = SubjectTickUsabilityClass.BLOCKED
+            reason = "v03 realization basis present but realization-consumer surface is not ready"
+    if (
+        v03_basis_present
+        and state.v03_boundary_before_explanation_required
+        and state.v03_boundary_before_explanation_satisfied
+        and state.v03_hard_constraint_violation_count <= 0
+        and state.v03_qualifier_locality_failures <= 0
+        and not state.v03_blocked_expansion_leak_detected
+        and state.final_execution_outcome == SubjectTickOutcome.CONTINUE
+        and usability == SubjectTickUsabilityClass.USABLE_BOUNDED
+    ):
+        restrictions.append(SubjectTickRestrictionCode.V03_BOUNDARY_ORDER_DETOUR_REQUIRED)
+        usability = SubjectTickUsabilityClass.DEGRADED_BOUNDED
+        reason = (
+            "v03 boundary-first constrained realization is satisfied but still requires bounded downstream handling"
+        )
+    if (
+        v03_basis_present
+        and state.v03_segment_count > 1
+        and state.v01_conditional_act_count > 0
+        and state.v03_hard_constraint_violation_count <= 0
+        and state.v03_qualifier_locality_failures <= 0
+        and state.v03_aligned_segment_count == state.v03_segment_count
+    ):
+        restrictions.append(SubjectTickRestrictionCode.V03_ALIGNMENT_CONSUMER_REQUIRED)
+        if (
+            state.final_execution_outcome == SubjectTickOutcome.CONTINUE
+            and usability == SubjectTickUsabilityClass.USABLE_BOUNDED
+        ):
+            usability = SubjectTickUsabilityClass.DEGRADED_BOUNDED
+            reason = (
+                "v03 multi-segment constrained realization requires explicit alignment consumer handling before unrestricted continuation"
+            )
+    if (
+        v03_basis_present
+        and state.v03_partial_realization_only
+        and state.v03_replan_required
+    ):
+        restrictions.append(SubjectTickRestrictionCode.V03_REPLAN_REQUIRED)
+        if (
+            state.final_execution_outcome == SubjectTickOutcome.CONTINUE
+            and usability == SubjectTickUsabilityClass.USABLE_BOUNDED
+        ):
+            usability = SubjectTickUsabilityClass.DEGRADED_BOUNDED
+            reason = "v03 partial constrained realization requires bounded replan handoff"
+    if v03_checkpoint is not None and v03_checkpoint.status.value != "allowed":
+        restrictions.append(SubjectTickRestrictionCode.DOWNSTREAM_AUTHORITY_DEGRADED)
+        if state.final_execution_outcome == SubjectTickOutcome.CONTINUE:
+            accepted = False
+            usability = SubjectTickUsabilityClass.BLOCKED
+            reason = (
+                "v03 constrained realization checkpoint requires detour before downstream continuation"
             )
 
     return SubjectTickGateDecision(
