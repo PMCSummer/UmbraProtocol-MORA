@@ -50,6 +50,10 @@ if TYPE_CHECKING:
         C06SurfacingInput,
         C06SurfacingResult,
     )
+    from substrate.p02_intervention_episode_layer_licensed_action_trace import (
+        P02InterventionEpisodeInput,
+        P02InterventionEpisodeResult,
+    )
     from substrate.p01_project_formation import (
         P01IntentionStackState,
         P01ProjectFormationResult,
@@ -362,6 +366,18 @@ class SubjectTickRestrictionCode(StrEnum):
     C06_CONFIDENCE_RESIDUE_PRESERVATION_REQUIRED = (
         "c06_confidence_residue_preservation_required"
     )
+    P02_INTERVENTION_EPISODE_CONTRACT_MUST_BE_READ = (
+        "p02_intervention_episode_contract_must_be_read"
+    )
+    P02_EPISODE_CONSUMER_REQUIRED = "p02_episode_consumer_required"
+    P02_BOUNDARY_CONSUMER_REQUIRED = "p02_boundary_consumer_required"
+    P02_VERIFICATION_CONSUMER_REQUIRED = "p02_verification_consumer_required"
+    P02_AWAITING_VERIFICATION_DETOUR_REQUIRED = (
+        "p02_awaiting_verification_detour_required"
+    )
+    P02_POSSIBLE_OVERRUN_DETOUR_REQUIRED = "p02_possible_overrun_detour_required"
+    P02_RESIDUE_FOLLOWUP_DETOUR_REQUIRED = "p02_residue_followup_detour_required"
+    P02_COMPLETION_INFLATION_FORBIDDEN = "p02_completion_inflation_forbidden"
     DOWNSTREAM_AUTHORITY_DEGRADED = "downstream_authority_degraded"
 
 
@@ -550,6 +566,10 @@ class SubjectTickContext:
     require_c06_suppression_report_consumer: bool = False
     require_c06_identity_merge_consumer: bool = False
     disable_c06_enforcement: bool = False
+    require_p02_episode_consumer: bool = False
+    require_p02_boundary_consumer: bool = False
+    require_p02_verification_consumer: bool = False
+    disable_p02_enforcement: bool = False
     o01_entity_signals: tuple[O01EntitySignal, ...] = ()
     o02_interaction_diagnostics: O02InteractionDiagnosticsInput | None = None
     o03_candidate_strategy: O03CandidateStrategyInput | None = None
@@ -560,6 +580,7 @@ class SubjectTickContext:
     v02_plan_input: V02UtterancePlanInput | None = None
     v03_realization_input: V03RealizationInput | None = None
     c06_surfacing_input: C06SurfacingInput | None = None
+    p02_episode_input: P02InterventionEpisodeInput | None = None
     g08_appraisal_significance_hint: float | None = None
     source_lineage: tuple[str, ...] = ()
 
@@ -1103,6 +1124,21 @@ class SubjectTickState:
     c06_suppression_report_consumer_ready: bool = False
     c06_identity_merge_consumer_ready: bool = False
     c06_downstream_consumer_ready: bool = False
+    p02_episode_status: str = "candidate_episode_only"
+    p02_episode_count: int = 0
+    p02_boundary_ambiguous: bool = False
+    p02_license_link_missing: bool = False
+    p02_overrun_detected: bool = False
+    p02_awaiting_verification: bool = False
+    p02_residue_count: int = 0
+    p02_completion_verified_count: int = 0
+    p02_blocked_episode_count: int = 0
+    p02_partial_episode_count: int = 0
+    p02_side_effect_count: int = 0
+    p02_episode_consumer_ready: bool = False
+    p02_boundary_consumer_ready: bool = False
+    p02_verification_consumer_ready: bool = False
+    p02_downstream_consumer_ready: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -1453,6 +1489,7 @@ class SubjectTickResult:
     v02_result: V02UtterancePlanResult
     v03_result: V03ConstrainedRealizationResult
     c06_result: C06SurfacingResult
+    p02_result: P02InterventionEpisodeResult
     t01_result: T01ActiveFieldResult
     t02_result: T02ConstrainedSceneResult
     t03_result: T03CompetitionResult

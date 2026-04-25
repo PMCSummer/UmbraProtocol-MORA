@@ -73,6 +73,7 @@ def evaluate_subject_tick_downstream_gate(
         SubjectTickRestrictionCode.V02_PLAN_CONTRACT_MUST_BE_READ,
         SubjectTickRestrictionCode.V03_CONSTRAINED_REALIZATION_CONTRACT_MUST_BE_READ,
         SubjectTickRestrictionCode.C06_SURFACING_CANDIDATES_CONTRACT_MUST_BE_READ,
+        SubjectTickRestrictionCode.P02_INTERVENTION_EPISODE_CONTRACT_MUST_BE_READ,
     ]
     usability = SubjectTickUsabilityClass.USABLE_BOUNDED
     accepted = True
@@ -1536,6 +1537,96 @@ def evaluate_subject_tick_downstream_gate(
             reason = (
                 "c06 surfaced-candidates checkpoint requires detour before downstream continuation"
             )
+
+    p02_checkpoint = next(
+        (
+            checkpoint
+            for checkpoint in state.execution_checkpoints
+            if checkpoint.checkpoint_id == "rt01.p02_intervention_episode_checkpoint"
+        ),
+        None,
+    )
+    if p02_checkpoint is not None:
+        if "require_p02_episode_consumer" in p02_checkpoint.required_action:
+            restrictions.append(SubjectTickRestrictionCode.P02_EPISODE_CONSUMER_REQUIRED)
+        if "require_p02_boundary_consumer" in p02_checkpoint.required_action:
+            restrictions.append(SubjectTickRestrictionCode.P02_BOUNDARY_CONSUMER_REQUIRED)
+        if "require_p02_verification_consumer" in p02_checkpoint.required_action:
+            restrictions.append(SubjectTickRestrictionCode.P02_VERIFICATION_CONSUMER_REQUIRED)
+        if "default_p02_awaiting_verification_detour" in p02_checkpoint.required_action:
+            restrictions.append(SubjectTickRestrictionCode.P02_AWAITING_VERIFICATION_DETOUR_REQUIRED)
+        if "default_p02_possible_overrun_detour" in p02_checkpoint.required_action:
+            restrictions.append(SubjectTickRestrictionCode.P02_POSSIBLE_OVERRUN_DETOUR_REQUIRED)
+        if "default_p02_residue_followup_detour" in p02_checkpoint.required_action:
+            restrictions.append(SubjectTickRestrictionCode.P02_RESIDUE_FOLLOWUP_DETOUR_REQUIRED)
+
+    p02_basis_present = bool(
+        state.p02_episode_count > 0
+        or state.p02_residue_count > 0
+        or state.p02_awaiting_verification
+    )
+    if p02_basis_present and state.p02_awaiting_verification:
+        restrictions.append(SubjectTickRestrictionCode.P02_AWAITING_VERIFICATION_DETOUR_REQUIRED)
+        restrictions.append(SubjectTickRestrictionCode.P02_COMPLETION_INFLATION_FORBIDDEN)
+        if (
+            state.p02_overrun_detected
+            and state.p02_license_link_missing
+            and state.final_execution_outcome == SubjectTickOutcome.CONTINUE
+        ):
+            restrictions.append(SubjectTickRestrictionCode.DOWNSTREAM_AUTHORITY_DEGRADED)
+            accepted = False
+            usability = SubjectTickUsabilityClass.BLOCKED
+            reason = "p02 detected licensed-action uncertainty with possible overrun and blocks optimistic completion"
+        elif (
+            state.final_execution_outcome == SubjectTickOutcome.CONTINUE
+            and usability == SubjectTickUsabilityClass.USABLE_BOUNDED
+        ):
+            usability = SubjectTickUsabilityClass.DEGRADED_BOUNDED
+            reason = "p02 awaiting verification keeps continuation bounded until outcome verification is resolved"
+    if p02_basis_present and state.p02_overrun_detected:
+        restrictions.append(SubjectTickRestrictionCode.P02_POSSIBLE_OVERRUN_DETOUR_REQUIRED)
+        if state.final_execution_outcome == SubjectTickOutcome.CONTINUE:
+            restrictions.append(SubjectTickRestrictionCode.DOWNSTREAM_AUTHORITY_DEGRADED)
+            accepted = False
+            usability = SubjectTickUsabilityClass.BLOCKED
+            reason = "p02 detected intervention overrun and requires strict bounded detour before continuation"
+    if p02_basis_present and state.p02_residue_count > 0:
+        restrictions.append(SubjectTickRestrictionCode.P02_RESIDUE_FOLLOWUP_DETOUR_REQUIRED)
+        if (
+            state.final_execution_outcome == SubjectTickOutcome.CONTINUE
+            and usability == SubjectTickUsabilityClass.USABLE_BOUNDED
+        ):
+            usability = SubjectTickUsabilityClass.DEGRADED_BOUNDED
+            reason = "p02 residue remains after intervention episode and requires bounded follow-up handoff"
+    if (
+        p02_basis_present
+        and state.p02_partial_episode_count > 0
+        and not state.p02_awaiting_verification
+        and not state.p02_overrun_detected
+    ):
+        restrictions.append(SubjectTickRestrictionCode.P02_EPISODE_CONSUMER_REQUIRED)
+        if (
+            state.final_execution_outcome == SubjectTickOutcome.CONTINUE
+            and usability == SubjectTickUsabilityClass.USABLE_BOUNDED
+        ):
+            usability = SubjectTickUsabilityClass.DEGRADED_BOUNDED
+            reason = "p02 partial intervention episode requires bounded continuation and explicit episode consumer handling"
+    if p02_basis_present and state.p02_boundary_ambiguous:
+        restrictions.append(SubjectTickRestrictionCode.P02_BOUNDARY_CONSUMER_REQUIRED)
+    if p02_basis_present and state.p02_license_link_missing:
+        restrictions.append(SubjectTickRestrictionCode.P02_EPISODE_CONSUMER_REQUIRED)
+    if p02_basis_present and not state.p02_verification_consumer_ready:
+        restrictions.append(SubjectTickRestrictionCode.P02_VERIFICATION_CONSUMER_REQUIRED)
+    if p02_basis_present and not state.p02_episode_consumer_ready:
+        restrictions.append(SubjectTickRestrictionCode.P02_EPISODE_CONSUMER_REQUIRED)
+    if p02_basis_present and not state.p02_boundary_consumer_ready:
+        restrictions.append(SubjectTickRestrictionCode.P02_BOUNDARY_CONSUMER_REQUIRED)
+    if p02_checkpoint is not None and p02_checkpoint.status.value != "allowed":
+        restrictions.append(SubjectTickRestrictionCode.DOWNSTREAM_AUTHORITY_DEGRADED)
+        if state.final_execution_outcome == SubjectTickOutcome.CONTINUE:
+            accepted = False
+            usability = SubjectTickUsabilityClass.BLOCKED
+            reason = "p02 intervention-episode checkpoint requires detour before downstream continuation"
 
     return SubjectTickGateDecision(
         accepted=accepted,

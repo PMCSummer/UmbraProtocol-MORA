@@ -217,6 +217,11 @@ from substrate.c06_surfacing_candidates import (
     build_c06_surfacing_candidates,
     derive_c06_surfacing_consumer_view,
 )
+from substrate.p02_intervention_episode_layer_licensed_action_trace import (
+    P02InterventionEpisodeInput,
+    build_p02_intervention_episode_layer_licensed_action_trace,
+    derive_p02_intervention_episode_consumer_view,
+)
 from substrate.s01_efference_copy import (
     S01EfferenceCopyState,
     build_s01_efference_copy,
@@ -258,6 +263,7 @@ ATTEMPTED_SUBJECT_TICK_PATHS: tuple[str, ...] = (
     "subject_tick.evaluate_v02_communicative_intent_utterance_plan_bridge",
     "subject_tick.evaluate_v03_surface_verbalization_causality_constrained_realization",
     "subject_tick.evaluate_c06_surfacing_candidates",
+    "subject_tick.evaluate_p02_intervention_episode",
     "subject_tick.world_seam_enforcement",
     "subject_tick.resolve_bounded_runtime_outcome",
     "subject_tick.downstream_gate",
@@ -4812,6 +4818,183 @@ def execute_subject_tick(
         )
     )
 
+    p02_episode_input = (
+        context.p02_episode_input
+        if isinstance(context.p02_episode_input, P02InterventionEpisodeInput)
+        else None
+    )
+    p02_explicit_basis = bool(
+        p02_episode_input is not None
+        and (
+            p02_episode_input.execution_events
+            or p02_episode_input.licensed_actions
+            or p02_episode_input.outcome_evidence
+        )
+    )
+    p02_result = build_p02_intervention_episode_layer_licensed_action_trace(
+        tick_id=tick_id,
+        tick_index=tick_index,
+        c06_result=c06_result,
+        v03_result=v03_result,
+        v02_result=v02_result,
+        v01_result=v01_result,
+        episode_input=p02_episode_input,
+        source_lineage=lineage,
+        episode_enabled=not context.disable_p02_enforcement,
+    )
+    p02_view = derive_p02_intervention_episode_consumer_view(p02_result)
+    p02_trace_values = {
+        "episode_count": p02_result.telemetry.episode_count,
+        "completed_as_licensed_count": p02_result.telemetry.completed_as_licensed_count,
+        "partial_episode_count": p02_result.telemetry.partial_episode_count,
+        "blocked_episode_count": p02_result.telemetry.blocked_episode_count,
+        "awaiting_verification_count": p02_result.telemetry.awaiting_verification_count,
+        "overrun_detected_count": p02_result.telemetry.overrun_detected_count,
+        "boundary_ambiguous_count": p02_result.telemetry.boundary_ambiguous_count,
+        "residue_count": p02_result.telemetry.residue_count,
+        "side_effect_count": p02_result.telemetry.side_effect_count,
+        "downstream_consumer_ready": p02_result.telemetry.downstream_consumer_ready,
+    }
+    trace_emit_active(
+        "p02_intervention_episode_layer_licensed_action_trace",
+        "enter",
+        p02_trace_values,
+    )
+    p02_checkpoint_status = SubjectTickCheckpointStatus.ALLOWED
+    p02_checkpoint_reason = p02_result.gate.reason
+    p02_default_awaiting_verification_detour = False
+    p02_default_possible_overrun_detour = False
+    p02_default_residue_followup_detour = False
+    if not context.disable_p02_enforcement:
+        if (
+            context.require_p02_episode_consumer
+            and not p02_view.episode_consumer_ready
+            and halt_reason is None
+        ):
+            revalidation_needed = True
+            p02_checkpoint_status = SubjectTickCheckpointStatus.ENFORCED_DETOUR
+            p02_checkpoint_reason = (
+                "p02 episode consumer requested but intervention episode set is not ready"
+            )
+            if active_execution_mode != "halt_execution":
+                active_execution_mode = "revalidate_scope"
+        if (
+            context.require_p02_boundary_consumer
+            and not p02_view.boundary_consumer_ready
+            and halt_reason is None
+        ):
+            revalidation_needed = True
+            p02_checkpoint_status = SubjectTickCheckpointStatus.ENFORCED_DETOUR
+            p02_checkpoint_reason = (
+                "p02 boundary consumer requested but episode boundary remains ambiguous"
+            )
+            if active_execution_mode != "halt_execution":
+                active_execution_mode = "revalidate_scope"
+        if (
+            context.require_p02_verification_consumer
+            and not p02_view.verification_consumer_ready
+            and halt_reason is None
+        ):
+            repair_needed = True
+            p02_checkpoint_status = SubjectTickCheckpointStatus.ENFORCED_DETOUR
+            p02_checkpoint_reason = (
+                "p02 verification consumer requested but outcome verification surface is not ready"
+            )
+            if active_execution_mode != "halt_execution":
+                active_execution_mode = "repair_runtime_path"
+        if (
+            p02_explicit_basis
+            and p02_result.metadata.awaiting_verification_count > 0
+            and not context.require_p02_verification_consumer
+            and halt_reason is None
+        ):
+            revalidation_needed = True
+            p02_default_awaiting_verification_detour = True
+            p02_checkpoint_status = SubjectTickCheckpointStatus.ENFORCED_DETOUR
+            p02_checkpoint_reason = (
+                "p02 default contour detected execution without verification closure and requires bounded revalidation"
+            )
+            if active_execution_mode != "halt_execution":
+                active_execution_mode = "revalidate_scope"
+        elif (
+            p02_explicit_basis
+            and p02_result.metadata.overrun_detected_count > 0
+            and not context.require_p02_boundary_consumer
+            and halt_reason is None
+        ):
+            revalidation_needed = True
+            p02_default_possible_overrun_detour = True
+            p02_checkpoint_status = SubjectTickCheckpointStatus.ENFORCED_DETOUR
+            p02_checkpoint_reason = (
+                "p02 default contour detected possible intervention overrun and requires bounded scope revalidation"
+            )
+            if active_execution_mode != "halt_execution":
+                active_execution_mode = "revalidate_scope"
+        if (
+            p02_explicit_basis
+            and p02_result.metadata.residue_count > 0
+            and not context.require_p02_episode_consumer
+            and halt_reason is None
+            and not p02_default_possible_overrun_detour
+        ):
+            repair_needed = True
+            p02_default_residue_followup_detour = True
+            p02_checkpoint_status = SubjectTickCheckpointStatus.ENFORCED_DETOUR
+            p02_checkpoint_reason = (
+                "p02 default contour preserved intervention residue and requires bounded follow-up handoff"
+            )
+            if active_execution_mode != "halt_execution":
+                active_execution_mode = "repair_runtime_path"
+    else:
+        p02_checkpoint_status = SubjectTickCheckpointStatus.ALLOWED
+        p02_checkpoint_reason = "p02 enforcement disabled in ablation context"
+
+    p02_required_actions: list[str] = []
+    if context.require_p02_episode_consumer:
+        p02_required_actions.append("require_p02_episode_consumer")
+    if context.require_p02_boundary_consumer:
+        p02_required_actions.append("require_p02_boundary_consumer")
+    if context.require_p02_verification_consumer:
+        p02_required_actions.append("require_p02_verification_consumer")
+    if p02_default_awaiting_verification_detour:
+        p02_required_actions.append("default_p02_awaiting_verification_detour")
+    if p02_default_possible_overrun_detour:
+        p02_required_actions.append("default_p02_possible_overrun_detour")
+    if p02_default_residue_followup_detour:
+        p02_required_actions.append("default_p02_residue_followup_detour")
+    if not p02_required_actions:
+        p02_required_actions.append("p02_optional")
+
+    trace_emit_active(
+        "p02_intervention_episode_layer_licensed_action_trace",
+        "decision",
+        p02_trace_values,
+    )
+    if p02_checkpoint_status != SubjectTickCheckpointStatus.ALLOWED:
+        trace_emit_active(
+            "p02_intervention_episode_layer_licensed_action_trace",
+            "blocked",
+            p02_trace_values,
+            note=p02_checkpoint_reason,
+        )
+    trace_emit_active(
+        "p02_intervention_episode_layer_licensed_action_trace",
+        "exit",
+        p02_trace_values,
+    )
+    checkpoints.append(
+        SubjectTickCheckpointResult(
+            checkpoint_id="rt01.p02_intervention_episode_checkpoint",
+            source_contract=(
+                "p02_intervention_episode_layer_licensed_action_trace.intervention_episode_set"
+            ),
+            status=p02_checkpoint_status,
+            required_action=";".join(dict.fromkeys(p02_required_actions)),
+            applied_action=active_execution_mode,
+            reason=p02_checkpoint_reason,
+        )
+    )
+
     if halt_reason is not None:
         final_outcome = SubjectTickOutcome.HALT
         execution_stance = SubjectTickExecutionStance.HALT_PATH
@@ -5632,6 +5815,25 @@ def execute_subject_tick(
         ),
         c06_identity_merge_consumer_ready=c06_result.gate.identity_merge_consumer_ready,
         c06_downstream_consumer_ready=c06_result.telemetry.downstream_consumer_ready,
+        p02_episode_status=(
+            p02_result.episodes[0].status.value
+            if p02_result.episodes
+            else "candidate_episode_only"
+        ),
+        p02_episode_count=p02_result.metadata.episode_count,
+        p02_boundary_ambiguous=p02_result.metadata.boundary_ambiguous_count > 0,
+        p02_license_link_missing=p02_result.metadata.license_link_missing_count > 0,
+        p02_overrun_detected=p02_result.metadata.overrun_detected_count > 0,
+        p02_awaiting_verification=p02_result.metadata.awaiting_verification_count > 0,
+        p02_residue_count=p02_result.metadata.residue_count,
+        p02_completion_verified_count=p02_result.metadata.completion_verified_count,
+        p02_blocked_episode_count=p02_result.metadata.blocked_episode_count,
+        p02_partial_episode_count=p02_result.metadata.partial_episode_count,
+        p02_side_effect_count=p02_result.metadata.side_effect_count,
+        p02_episode_consumer_ready=p02_result.gate.episode_consumer_ready,
+        p02_boundary_consumer_ready=p02_result.gate.boundary_consumer_ready,
+        p02_verification_consumer_ready=p02_result.gate.verification_consumer_ready,
+        p02_downstream_consumer_ready=p02_result.telemetry.downstream_consumer_ready,
     )
     gate = evaluate_subject_tick_downstream_gate(state)
     telemetry = build_subject_tick_telemetry(
@@ -5737,6 +5939,7 @@ def execute_subject_tick(
         v02_result=v02_result,
         v03_result=v03_result,
         c06_result=c06_result,
+        p02_result=p02_result,
         t01_result=t01_result,
         t02_result=t02_result,
         t03_result=t03_result,

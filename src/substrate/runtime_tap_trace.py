@@ -266,6 +266,18 @@ MODULE_ALLOWED_FIELDS: dict[str, tuple[str, ...]] = {
         "confidence_residue_preserved",
         "downstream_consumer_ready",
     ),
+    "p02_intervention_episode_layer_licensed_action_trace": (
+        "episode_count",
+        "completed_as_licensed_count",
+        "partial_episode_count",
+        "blocked_episode_count",
+        "awaiting_verification_count",
+        "overrun_detected_count",
+        "boundary_ambiguous_count",
+        "residue_count",
+        "side_effect_count",
+        "downstream_consumer_ready",
+    ),
     "s_minimal_contour": (
         "minimal_self_status",
         "minimal_self_ready",

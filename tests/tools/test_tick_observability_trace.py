@@ -47,6 +47,7 @@ HOSTED_CONTOUR_SEGMENTS = (
     "v02_communicative_intent_utterance_plan_bridge",
     "v03_surface_verbalization_causality_constrained_realization",
     "c06_surfacing_candidates",
+    "p02_intervention_episode_layer_licensed_action_trace",
     "s_minimal_contour",
     "a_line_normalization",
     "m_minimal",
@@ -243,6 +244,18 @@ HOSTED_CONTOUR_FIELDS: dict[str, set[str]] = {
         "published_frontier_requirement",
         "unresolved_ambiguity_preserved",
         "confidence_residue_preserved",
+        "downstream_consumer_ready",
+    },
+    "p02_intervention_episode_layer_licensed_action_trace": {
+        "episode_count",
+        "completed_as_licensed_count",
+        "partial_episode_count",
+        "blocked_episode_count",
+        "awaiting_verification_count",
+        "overrun_detected_count",
+        "boundary_ambiguous_count",
+        "residue_count",
+        "side_effect_count",
         "downstream_consumer_ready",
     },
     "s_minimal_contour": {
@@ -740,6 +753,9 @@ def test_hosted_contour_segments_follow_real_runtime_order(tmp_path: Path) -> No
         events, "c06_surfacing_candidates"
     )
     assert _first_order(events, "c06_surfacing_candidates") < _first_order(
+        events, "p02_intervention_episode_layer_licensed_action_trace"
+    )
+    assert _first_order(events, "p02_intervention_episode_layer_licensed_action_trace") < _first_order(
         events, "bounded_outcome_resolution"
     )
     assert _first_order(events, "s_minimal_contour") < _first_order(events, "a_line_normalization")
@@ -809,6 +825,7 @@ def test_representative_modules_have_runtime_steps(tmp_path: Path) -> None:
         "v02_communicative_intent_utterance_plan_bridge",
         "v03_surface_verbalization_causality_constrained_realization",
         "c06_surfacing_candidates",
+        "p02_intervention_episode_layer_licensed_action_trace",
         "downstream_obedience",
         "subject_tick",
     ):

@@ -45,6 +45,7 @@ def build_minimal_runtime_tick_graph() -> RuntimeTickGraph:
             "V02",
             "V03",
             "C06",
+            "P02",
             "RT01",
         ),
         nodes=(
@@ -393,6 +394,19 @@ def build_minimal_runtime_tick_graph() -> RuntimeTickGraph:
                 checkpoint_ids=("rt01.c06_surfacing_candidates_checkpoint",),
             ),
             RuntimeContourNode(
+                node_id="node.p02_intervention_episode_layer_licensed_action_trace",
+                phase_id="P02",
+                authority_role="intervention_episode_contract",
+                computational_role="licensed_action_episode_constructor",
+                surfaces=(
+                    "p02_intervention_episode_layer_licensed_action_trace.intervention_episode_set",
+                    "p02_intervention_episode_layer_licensed_action_trace.episode_boundary_report",
+                    "p02_intervention_episode_layer_licensed_action_trace.completion_verification_state",
+                    "p02_intervention_episode_layer_licensed_action_trace.residue_handoff",
+                ),
+                checkpoint_ids=("rt01.p02_intervention_episode_checkpoint",),
+            ),
+            RuntimeContourNode(
                 node_id="node.rt01",
                 phase_id="RT01",
                 authority_role="gating",
@@ -424,6 +438,7 @@ def build_minimal_runtime_tick_graph() -> RuntimeTickGraph:
                     "rt01.v02_utterance_plan_checkpoint",
                     "rt01.v03_constrained_realization_checkpoint",
                     "rt01.c06_surfacing_candidates_checkpoint",
+                    "rt01.p02_intervention_episode_checkpoint",
                     "rt01.outcome_resolution_checkpoint",
                 ),
                 checkpoint_ids=(
@@ -453,6 +468,7 @@ def build_minimal_runtime_tick_graph() -> RuntimeTickGraph:
                     "rt01.v02_utterance_plan_checkpoint",
                     "rt01.v03_constrained_realization_checkpoint",
                     "rt01.c06_surfacing_candidates_checkpoint",
+                    "rt01.p02_intervention_episode_checkpoint",
                     "rt01.outcome_resolution_checkpoint",
                 ),
             ),
@@ -545,7 +561,10 @@ def build_minimal_runtime_tick_graph() -> RuntimeTickGraph:
             RuntimeContourEdge(source_phase="P01", target_phase="C06", relation="modulates"),
             RuntimeContourEdge(source_phase="O04", target_phase="C06", relation="modulates"),
             RuntimeContourEdge(source_phase="R05", target_phase="C06", relation="modulates"),
-            RuntimeContourEdge(source_phase="C06", target_phase="RT01", relation="requires"),
+            RuntimeContourEdge(source_phase="C06", target_phase="P02", relation="requires"),
+            RuntimeContourEdge(source_phase="V03", target_phase="P02", relation="modulates"),
+            RuntimeContourEdge(source_phase="V01", target_phase="P02", relation="modulates"),
+            RuntimeContourEdge(source_phase="P02", target_phase="RT01", relation="requires"),
             RuntimeContourEdge(source_phase="RT01", target_phase="F01", relation="persists_via_f01"),
         ),
         mandatory_checkpoint_ids=(
@@ -579,6 +598,7 @@ def build_minimal_runtime_tick_graph() -> RuntimeTickGraph:
             "rt01.v02_utterance_plan_checkpoint",
             "rt01.v03_constrained_realization_checkpoint",
             "rt01.c06_surfacing_candidates_checkpoint",
+            "rt01.p02_intervention_episode_checkpoint",
             "rt01.outcome_resolution_checkpoint",
         ),
         source_of_truth_surfaces=(
@@ -631,6 +651,8 @@ def build_minimal_runtime_tick_graph() -> RuntimeTickGraph:
             "v03_surface_verbalization_causality_constrained_realization.alignment_map",
             "c06_surfacing_candidates.surfaced_candidate_set",
             "c06_surfacing_candidates.suppression_report",
+            "p02_intervention_episode_layer_licensed_action_trace.intervention_episode_set",
+            "p02_intervention_episode_layer_licensed_action_trace.episode_boundary_report",
         ),
         reason="minimal production runtime graph for bounded RT01 contour wiring",
     )
@@ -680,6 +702,7 @@ def build_minimal_runtime_topology_bundle() -> RuntimeTopologyBundle:
             "v02_communicative_intent_utterance_plan_bridge_contract",
             "v03_surface_verbalization_causality_constrained_realization_contract",
             "c06_surfacing_candidates_contract",
+            "p02_intervention_episode_layer_licensed_action_trace_contract",
         ),
         f01_transition_route="subject_tick.persist_subject_tick_result_via_f01",
         tick_graph=tick_graph,
@@ -856,6 +879,7 @@ def _context_has_ablation_flags(context: SubjectTickContext | None) -> bool:
         or context.disable_v02_enforcement
         or context.disable_v03_enforcement
         or context.disable_c06_enforcement
+        or context.disable_p02_enforcement
         or context.disable_t01_unresolved_slot_maintenance
         or context.disable_t01_field_enforcement
         or (
