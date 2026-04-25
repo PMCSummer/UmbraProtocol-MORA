@@ -46,6 +46,10 @@ if TYPE_CHECKING:
         V03RealizationInput,
         V03RealizedUtteranceArtifact,
     )
+    from substrate.c06_surfacing_candidates import (
+        C06SurfacingInput,
+        C06SurfacingResult,
+    )
     from substrate.p01_project_formation import (
         P01IntentionStackState,
         P01ProjectFormationResult,
@@ -341,6 +345,23 @@ class SubjectTickRestrictionCode(StrEnum):
     V03_QUALIFIER_LOCALITY_REQUIRED = "v03_qualifier_locality_required"
     V03_BLOCKED_EXPANSION_LEAK_FORBIDDEN = "v03_blocked_expansion_leak_forbidden"
     V03_REPLAN_REQUIRED = "v03_replan_required"
+    C06_SURFACING_CANDIDATES_CONTRACT_MUST_BE_READ = (
+        "c06_surfacing_candidates_contract_must_be_read"
+    )
+    C06_CANDIDATE_SET_CONSUMER_REQUIRED = "c06_candidate_set_consumer_required"
+    C06_SUPPRESSION_REPORT_CONSUMER_REQUIRED = (
+        "c06_suppression_report_consumer_required"
+    )
+    C06_IDENTITY_MERGE_CONSUMER_REQUIRED = "c06_identity_merge_consumer_required"
+    C06_CANDIDATE_AMBIGUITY_DETOUR_REQUIRED = "c06_candidate_ambiguity_detour_required"
+    C06_COMMITMENT_CARRYOVER_DETOUR_REQUIRED = (
+        "c06_commitment_carryover_detour_required"
+    )
+    C06_PROTECTIVE_MONITOR_DETOUR_REQUIRED = "c06_protective_monitor_detour_required"
+    C06_FRONTIER_PUBLICATION_REQUIRED = "c06_frontier_publication_required"
+    C06_CONFIDENCE_RESIDUE_PRESERVATION_REQUIRED = (
+        "c06_confidence_residue_preservation_required"
+    )
     DOWNSTREAM_AUTHORITY_DEGRADED = "downstream_authority_degraded"
 
 
@@ -525,6 +546,10 @@ class SubjectTickContext:
     require_v03_alignment_consumer: bool = False
     require_v03_constraint_report_consumer: bool = False
     disable_v03_enforcement: bool = False
+    require_c06_candidate_set_consumer: bool = False
+    require_c06_suppression_report_consumer: bool = False
+    require_c06_identity_merge_consumer: bool = False
+    disable_c06_enforcement: bool = False
     o01_entity_signals: tuple[O01EntitySignal, ...] = ()
     o02_interaction_diagnostics: O02InteractionDiagnosticsInput | None = None
     o03_candidate_strategy: O03CandidateStrategyInput | None = None
@@ -534,6 +559,7 @@ class SubjectTickContext:
     v01_act_candidates: tuple[V01CommunicativeActCandidate, ...] = ()
     v02_plan_input: V02UtterancePlanInput | None = None
     v03_realization_input: V03RealizationInput | None = None
+    c06_surfacing_input: C06SurfacingInput | None = None
     g08_appraisal_significance_hint: float | None = None
     source_lineage: tuple[str, ...] = ()
 
@@ -1060,6 +1086,23 @@ class SubjectTickState:
     v03_alignment_consumer_ready: bool = False
     v03_constraint_report_consumer_ready: bool = False
     v03_downstream_consumer_ready: bool = False
+    c06_surfaced_candidate_count: int = 0
+    c06_suppressed_item_count: int = 0
+    c06_commitment_carryover_count: int = 0
+    c06_repair_obligation_count: int = 0
+    c06_protective_monitor_count: int = 0
+    c06_closure_candidate_count: int = 0
+    c06_ambiguous_candidate_count: int = 0
+    c06_duplicate_merge_count: int = 0
+    c06_false_merge_detected: bool = False
+    c06_published_frontier_requirement: bool = True
+    c06_published_frontier_requirement_satisfied: bool = True
+    c06_unresolved_ambiguity_preserved: bool = True
+    c06_confidence_residue_preserved: bool = True
+    c06_candidate_set_consumer_ready: bool = False
+    c06_suppression_report_consumer_ready: bool = False
+    c06_identity_merge_consumer_ready: bool = False
+    c06_downstream_consumer_ready: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -1409,6 +1452,7 @@ class SubjectTickResult:
     v01_result: V01LicenseResult
     v02_result: V02UtterancePlanResult
     v03_result: V03ConstrainedRealizationResult
+    c06_result: C06SurfacingResult
     t01_result: T01ActiveFieldResult
     t02_result: T02ConstrainedSceneResult
     t03_result: T03CompetitionResult

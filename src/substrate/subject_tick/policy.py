@@ -72,6 +72,7 @@ def evaluate_subject_tick_downstream_gate(
         SubjectTickRestrictionCode.V01_LICENSE_CONTRACT_MUST_BE_READ,
         SubjectTickRestrictionCode.V02_PLAN_CONTRACT_MUST_BE_READ,
         SubjectTickRestrictionCode.V03_CONSTRAINED_REALIZATION_CONTRACT_MUST_BE_READ,
+        SubjectTickRestrictionCode.C06_SURFACING_CANDIDATES_CONTRACT_MUST_BE_READ,
     ]
     usability = SubjectTickUsabilityClass.USABLE_BOUNDED
     accepted = True
@@ -1454,6 +1455,86 @@ def evaluate_subject_tick_downstream_gate(
             usability = SubjectTickUsabilityClass.BLOCKED
             reason = (
                 "v03 constrained realization checkpoint requires detour before downstream continuation"
+            )
+
+    c06_checkpoint = next(
+        (
+            checkpoint
+            for checkpoint in state.execution_checkpoints
+            if checkpoint.checkpoint_id == "rt01.c06_surfacing_candidates_checkpoint"
+        ),
+        None,
+    )
+    if c06_checkpoint is not None:
+        if "require_c06_candidate_set_consumer" in c06_checkpoint.required_action:
+            restrictions.append(SubjectTickRestrictionCode.C06_CANDIDATE_SET_CONSUMER_REQUIRED)
+        if "require_c06_suppression_report_consumer" in c06_checkpoint.required_action:
+            restrictions.append(SubjectTickRestrictionCode.C06_SUPPRESSION_REPORT_CONSUMER_REQUIRED)
+        if "require_c06_identity_merge_consumer" in c06_checkpoint.required_action:
+            restrictions.append(SubjectTickRestrictionCode.C06_IDENTITY_MERGE_CONSUMER_REQUIRED)
+        if "default_c06_candidate_ambiguity_detour" in c06_checkpoint.required_action:
+            restrictions.append(SubjectTickRestrictionCode.C06_CANDIDATE_AMBIGUITY_DETOUR_REQUIRED)
+        if "default_c06_commitment_carryover_detour" in c06_checkpoint.required_action:
+            restrictions.append(SubjectTickRestrictionCode.C06_COMMITMENT_CARRYOVER_DETOUR_REQUIRED)
+        if "default_c06_protective_monitor_detour" in c06_checkpoint.required_action:
+            restrictions.append(SubjectTickRestrictionCode.C06_PROTECTIVE_MONITOR_DETOUR_REQUIRED)
+
+    c06_basis_present = bool(
+        state.c06_surfaced_candidate_count > 0
+        or state.c06_suppressed_item_count > 0
+    )
+    if c06_basis_present and state.c06_ambiguous_candidate_count > 0:
+        restrictions.append(SubjectTickRestrictionCode.C06_CANDIDATE_AMBIGUITY_DETOUR_REQUIRED)
+        restrictions.append(SubjectTickRestrictionCode.DOWNSTREAM_AUTHORITY_DEGRADED)
+        if state.final_execution_outcome == SubjectTickOutcome.CONTINUE:
+            accepted = False
+            usability = SubjectTickUsabilityClass.BLOCKED
+            reason = "c06 surfaced ambiguous continuity candidates and requires bounded revalidation"
+    if c06_basis_present and state.c06_commitment_carryover_count > 0:
+        restrictions.append(SubjectTickRestrictionCode.C06_COMMITMENT_CARRYOVER_DETOUR_REQUIRED)
+        if (
+            state.c06_confidence_residue_preserved
+            and state.c06_published_frontier_requirement_satisfied
+            and state.final_execution_outcome == SubjectTickOutcome.CONTINUE
+            and usability == SubjectTickUsabilityClass.USABLE_BOUNDED
+        ):
+            usability = SubjectTickUsabilityClass.DEGRADED_BOUNDED
+            reason = (
+                "c06 surfaced commitment carryover with preserved confidence residue and requires bounded continuation handling"
+            )
+    if c06_basis_present and state.c06_protective_monitor_count > 0:
+        restrictions.append(SubjectTickRestrictionCode.C06_PROTECTIVE_MONITOR_DETOUR_REQUIRED)
+        if state.final_execution_outcome == SubjectTickOutcome.CONTINUE:
+            usability = SubjectTickUsabilityClass.DEGRADED_BOUNDED
+            reason = "c06 surfaced protective monitor continuity cue and requires protective-bounded continuation"
+    if c06_basis_present and not state.c06_published_frontier_requirement_satisfied:
+        restrictions.append(SubjectTickRestrictionCode.C06_FRONTIER_PUBLICATION_REQUIRED)
+        restrictions.append(SubjectTickRestrictionCode.DOWNSTREAM_AUTHORITY_DEGRADED)
+        if state.final_execution_outcome == SubjectTickOutcome.CONTINUE:
+            accepted = False
+            usability = SubjectTickUsabilityClass.BLOCKED
+            reason = "c06 frontier publication requirement was violated by surfaced candidates"
+    if c06_basis_present and not state.c06_confidence_residue_preserved:
+        restrictions.append(SubjectTickRestrictionCode.C06_CONFIDENCE_RESIDUE_PRESERVATION_REQUIRED)
+        if (
+            state.final_execution_outcome == SubjectTickOutcome.CONTINUE
+            and usability == SubjectTickUsabilityClass.USABLE_BOUNDED
+        ):
+            usability = SubjectTickUsabilityClass.DEGRADED_BOUNDED
+            reason = "c06 confidence residue was not preserved and requires bounded review handling"
+    if c06_basis_present and not state.c06_candidate_set_consumer_ready:
+        restrictions.append(SubjectTickRestrictionCode.C06_CANDIDATE_SET_CONSUMER_REQUIRED)
+    if c06_basis_present and not state.c06_suppression_report_consumer_ready:
+        restrictions.append(SubjectTickRestrictionCode.C06_SUPPRESSION_REPORT_CONSUMER_REQUIRED)
+    if c06_basis_present and not state.c06_identity_merge_consumer_ready:
+        restrictions.append(SubjectTickRestrictionCode.C06_IDENTITY_MERGE_CONSUMER_REQUIRED)
+    if c06_checkpoint is not None and c06_checkpoint.status.value != "allowed":
+        restrictions.append(SubjectTickRestrictionCode.DOWNSTREAM_AUTHORITY_DEGRADED)
+        if state.final_execution_outcome == SubjectTickOutcome.CONTINUE:
+            accepted = False
+            usability = SubjectTickUsabilityClass.BLOCKED
+            reason = (
+                "c06 surfaced-candidates checkpoint requires detour before downstream continuation"
             )
 
     return SubjectTickGateDecision(

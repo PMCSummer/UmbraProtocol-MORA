@@ -212,6 +212,11 @@ from substrate.v03_surface_verbalization_causality_constrained_realization impor
     build_v03_surface_verbalization_causality_constrained_realization,
     derive_v03_realization_consumer_view,
 )
+from substrate.c06_surfacing_candidates import (
+    C06SurfacingInput,
+    build_c06_surfacing_candidates,
+    derive_c06_surfacing_consumer_view,
+)
 from substrate.s01_efference_copy import (
     S01EfferenceCopyState,
     build_s01_efference_copy,
@@ -252,6 +257,7 @@ ATTEMPTED_SUBJECT_TICK_PATHS: tuple[str, ...] = (
     "subject_tick.evaluate_v01_normative_permission_commitment_licensing",
     "subject_tick.evaluate_v02_communicative_intent_utterance_plan_bridge",
     "subject_tick.evaluate_v03_surface_verbalization_causality_constrained_realization",
+    "subject_tick.evaluate_c06_surfacing_candidates",
     "subject_tick.world_seam_enforcement",
     "subject_tick.resolve_bounded_runtime_outcome",
     "subject_tick.downstream_gate",
@@ -4645,6 +4651,167 @@ def execute_subject_tick(
         )
     )
 
+    c06_surfacing_input = (
+        context.c06_surfacing_input
+        if isinstance(context.c06_surfacing_input, C06SurfacingInput)
+        else None
+    )
+    c06_explicit_basis = bool(v03_explicit_basis and v03_result.artifact.surface_text.strip())
+    c06_result = build_c06_surfacing_candidates(
+        tick_id=tick_id,
+        tick_index=tick_index,
+        v03_result=v03_result,
+        v02_result=v02_result,
+        v01_result=v01_result,
+        p01_result=p01_result,
+        o04_result=o04_result,
+        r05_result=r05_result,
+        surfacing_input=c06_surfacing_input,
+        source_lineage=lineage,
+        surfacing_enabled=not context.disable_c06_enforcement,
+    )
+    c06_view = derive_c06_surfacing_consumer_view(c06_result)
+    c06_trace_values = {
+        "surfaced_candidate_count": c06_result.telemetry.surfaced_candidate_count,
+        "suppressed_item_count": c06_result.telemetry.suppressed_item_count,
+        "commitment_carryover_count": c06_result.telemetry.commitment_carryover_count,
+        "repair_obligation_count": c06_result.telemetry.repair_obligation_count,
+        "protective_monitor_count": c06_result.telemetry.protective_monitor_count,
+        "closure_candidate_count": c06_result.telemetry.closure_candidate_count,
+        "ambiguous_candidate_count": c06_result.telemetry.ambiguous_candidate_count,
+        "duplicate_merge_count": c06_result.telemetry.duplicate_merge_count,
+        "false_merge_detected": c06_result.telemetry.false_merge_detected,
+        "published_frontier_requirement": c06_result.telemetry.published_frontier_requirement,
+        "unresolved_ambiguity_preserved": c06_result.telemetry.unresolved_ambiguity_preserved,
+        "confidence_residue_preserved": c06_result.telemetry.confidence_residue_preserved,
+        "downstream_consumer_ready": c06_result.telemetry.downstream_consumer_ready,
+    }
+    trace_emit_active("c06_surfacing_candidates", "enter", c06_trace_values)
+    c06_checkpoint_status = SubjectTickCheckpointStatus.ALLOWED
+    c06_checkpoint_reason = c06_result.gate.reason
+    c06_default_ambiguity_detour = False
+    c06_default_commitment_detour = False
+    c06_default_protective_detour = False
+    if not context.disable_c06_enforcement:
+        if (
+            context.require_c06_candidate_set_consumer
+            and not c06_view.candidate_set_consumer_ready
+            and halt_reason is None
+        ):
+            revalidation_needed = True
+            c06_checkpoint_status = SubjectTickCheckpointStatus.ENFORCED_DETOUR
+            c06_checkpoint_reason = (
+                "c06 candidate-set consumer requested but surfaced candidate set is not ready"
+            )
+            if active_execution_mode != "halt_execution":
+                active_execution_mode = "revalidate_scope"
+        if (
+            context.require_c06_suppression_report_consumer
+            and not c06_view.suppression_report_consumer_ready
+            and halt_reason is None
+        ):
+            repair_needed = True
+            c06_checkpoint_status = SubjectTickCheckpointStatus.ENFORCED_DETOUR
+            c06_checkpoint_reason = (
+                "c06 suppression-report consumer requested but suppression report is not ready"
+            )
+            if active_execution_mode != "halt_execution":
+                active_execution_mode = "repair_branch_access"
+        if (
+            context.require_c06_identity_merge_consumer
+            and not c06_view.identity_merge_consumer_ready
+            and halt_reason is None
+        ):
+            revalidation_needed = True
+            c06_checkpoint_status = SubjectTickCheckpointStatus.ENFORCED_DETOUR
+            c06_checkpoint_reason = (
+                "c06 identity-merge consumer requested but false-merge risk is still present"
+            )
+            if active_execution_mode != "halt_execution":
+                active_execution_mode = "revalidate_scope"
+        if (
+            c06_explicit_basis
+            and c06_result.candidate_set.metadata.ambiguous_candidate_count > 0
+            and not context.require_c06_candidate_set_consumer
+            and halt_reason is None
+        ):
+            revalidation_needed = True
+            c06_default_ambiguity_detour = True
+            c06_checkpoint_status = SubjectTickCheckpointStatus.ENFORCED_DETOUR
+            c06_checkpoint_reason = (
+                "c06 default contour detected ambiguous surfaced candidates and requires bounded revalidation"
+            )
+            if active_execution_mode != "halt_execution":
+                active_execution_mode = "revalidate_scope"
+        elif (
+            c06_explicit_basis
+            and c06_result.candidate_set.metadata.commitment_carryover_count > 0
+            and not context.require_c06_suppression_report_consumer
+            and halt_reason is None
+        ):
+            repair_needed = True
+            c06_default_commitment_detour = True
+            c06_checkpoint_status = SubjectTickCheckpointStatus.ENFORCED_DETOUR
+            c06_checkpoint_reason = (
+                "c06 default contour surfaced commitment carryover and requires bounded continuity repair handoff"
+            )
+            if active_execution_mode != "halt_execution":
+                active_execution_mode = "repair_runtime_path"
+        if (
+            c06_explicit_basis
+            and c06_result.candidate_set.metadata.protective_monitor_count > 0
+            and not context.require_c06_identity_merge_consumer
+            and halt_reason is None
+            and not c06_default_commitment_detour
+        ):
+            repair_needed = True
+            c06_default_protective_detour = True
+            c06_checkpoint_status = SubjectTickCheckpointStatus.ENFORCED_DETOUR
+            c06_checkpoint_reason = (
+                "c06 default contour surfaced protective monitor carryover and requires bounded protective detour"
+            )
+            if active_execution_mode != "halt_execution":
+                active_execution_mode = "repair_branch_access"
+    else:
+        c06_checkpoint_status = SubjectTickCheckpointStatus.ALLOWED
+        c06_checkpoint_reason = "c06 enforcement disabled in ablation context"
+
+    c06_required_actions: list[str] = []
+    if context.require_c06_candidate_set_consumer:
+        c06_required_actions.append("require_c06_candidate_set_consumer")
+    if context.require_c06_suppression_report_consumer:
+        c06_required_actions.append("require_c06_suppression_report_consumer")
+    if context.require_c06_identity_merge_consumer:
+        c06_required_actions.append("require_c06_identity_merge_consumer")
+    if c06_default_ambiguity_detour:
+        c06_required_actions.append("default_c06_candidate_ambiguity_detour")
+    if c06_default_commitment_detour:
+        c06_required_actions.append("default_c06_commitment_carryover_detour")
+    if c06_default_protective_detour:
+        c06_required_actions.append("default_c06_protective_monitor_detour")
+    if not c06_required_actions:
+        c06_required_actions.append("c06_optional")
+
+    trace_emit_active("c06_surfacing_candidates", "decision", c06_trace_values)
+    if c06_checkpoint_status != SubjectTickCheckpointStatus.ALLOWED:
+        trace_emit_active(
+            "c06_surfacing_candidates",
+            "blocked",
+            c06_trace_values,
+            note=c06_checkpoint_reason,
+        )
+    trace_emit_active("c06_surfacing_candidates", "exit", c06_trace_values)
+    checkpoints.append(
+        SubjectTickCheckpointResult(
+            checkpoint_id="rt01.c06_surfacing_candidates_checkpoint",
+            source_contract="c06_surfacing_candidates.surfaced_candidate_set",
+            status=c06_checkpoint_status,
+            required_action=";".join(dict.fromkeys(c06_required_actions)),
+            applied_action=active_execution_mode,
+            reason=c06_checkpoint_reason,
+        )
+    )
+
     if halt_reason is not None:
         final_outcome = SubjectTickOutcome.HALT
         execution_stance = SubjectTickExecutionStance.HALT_PATH
@@ -5438,6 +5605,33 @@ def execute_subject_tick(
             v03_result.gate.constraint_report_consumer_ready
         ),
         v03_downstream_consumer_ready=v03_result.telemetry.downstream_consumer_ready,
+        c06_surfaced_candidate_count=c06_result.telemetry.surfaced_candidate_count,
+        c06_suppressed_item_count=c06_result.telemetry.suppressed_item_count,
+        c06_commitment_carryover_count=c06_result.telemetry.commitment_carryover_count,
+        c06_repair_obligation_count=c06_result.telemetry.repair_obligation_count,
+        c06_protective_monitor_count=c06_result.telemetry.protective_monitor_count,
+        c06_closure_candidate_count=c06_result.telemetry.closure_candidate_count,
+        c06_ambiguous_candidate_count=c06_result.telemetry.ambiguous_candidate_count,
+        c06_duplicate_merge_count=c06_result.telemetry.duplicate_merge_count,
+        c06_false_merge_detected=c06_result.telemetry.false_merge_detected,
+        c06_published_frontier_requirement=(
+            c06_result.candidate_set.metadata.published_frontier_requirement
+        ),
+        c06_published_frontier_requirement_satisfied=(
+            c06_result.candidate_set.metadata.published_frontier_requirement_satisfied
+        ),
+        c06_unresolved_ambiguity_preserved=(
+            c06_result.candidate_set.metadata.unresolved_ambiguity_preserved
+        ),
+        c06_confidence_residue_preserved=(
+            c06_result.candidate_set.metadata.confidence_residue_preserved
+        ),
+        c06_candidate_set_consumer_ready=c06_result.gate.candidate_set_consumer_ready,
+        c06_suppression_report_consumer_ready=(
+            c06_result.gate.suppression_report_consumer_ready
+        ),
+        c06_identity_merge_consumer_ready=c06_result.gate.identity_merge_consumer_ready,
+        c06_downstream_consumer_ready=c06_result.telemetry.downstream_consumer_ready,
     )
     gate = evaluate_subject_tick_downstream_gate(state)
     telemetry = build_subject_tick_telemetry(
@@ -5445,7 +5639,7 @@ def execute_subject_tick(
         attempted_paths=ATTEMPTED_SUBJECT_TICK_PATHS,
         downstream_gate=gate,
         causal_basis=(
-            "bounded runtime execution spine enforces roadmap authority roles for C04/C05, consumes world-entry, s01 efference-copy, s02 prediction-boundary seam, s03 ownership-weighted learning, s04 interoceptive self-binding, s05 multi-cause attribution, s-minimal, a-line, m-minimal, n-minimal, t01 semantic-field, t02 relation-binding, t03 hypothesis-competition, t04 attention-schema, o01 other-entity modeling, o02 intersubjective allostasis, o03 strategy-class evaluation, p01 authority-bounded project-formation, o04 rupture/hostility/coercion dynamics, r05 bounded protective regulation gates, v01 act-level normative licensing/commitment guards, v02 typed utterance-plan bridge constraints, and v03 constrained realization alignment/report contract before bounded outcome resolution, and keeps D01 observability-only over fixed R->C order"
+            "bounded runtime execution spine enforces roadmap authority roles for C04/C05, consumes world-entry, s01 efference-copy, s02 prediction-boundary seam, s03 ownership-weighted learning, s04 interoceptive self-binding, s05 multi-cause attribution, s-minimal, a-line, m-minimal, n-minimal, t01 semantic-field, t02 relation-binding, t03 hypothesis-competition, t04 attention-schema, o01 other-entity modeling, o02 intersubjective allostasis, o03 strategy-class evaluation, p01 authority-bounded project-formation, o04 rupture/hostility/coercion dynamics, r05 bounded protective regulation gates, v01 act-level normative licensing/commitment guards, v02 typed utterance-plan bridge constraints, v03 constrained realization alignment/report contract, and c06 typed surfacing-candidates handoff before bounded outcome resolution, while keeping D01 observability-only over fixed R->C order"
         ),
     )
     abstain = final_outcome in {SubjectTickOutcome.REPAIR, SubjectTickOutcome.REVALIDATE}
@@ -5542,6 +5736,7 @@ def execute_subject_tick(
         v01_result=v01_result,
         v02_result=v02_result,
         v03_result=v03_result,
+        c06_result=c06_result,
         t01_result=t01_result,
         t02_result=t02_result,
         t03_result=t03_result,

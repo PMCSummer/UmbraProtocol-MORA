@@ -1,0 +1,58 @@
+from substrate.c06_surfacing_candidates.downstream_contract import (
+    C06SurfacingConsumerView,
+    C06SurfacingContractView,
+    derive_c06_surfacing_consumer_view,
+    derive_c06_surfacing_contract_view,
+    require_c06_candidate_set_consumer_ready,
+    require_c06_identity_merge_consumer_ready,
+    require_c06_suppression_report_consumer_ready,
+)
+from substrate.c06_surfacing_candidates.models import (
+    C06CandidateClass,
+    C06CandidateSetMetadata,
+    C06ContinuityHorizon,
+    C06ScopeMarker,
+    C06StrengthGrade,
+    C06SuppressedItem,
+    C06SuppressionReason,
+    C06SuppressionReport,
+    C06SurfacedCandidate,
+    C06SurfacedCandidateSet,
+    C06SurfacingGateDecision,
+    C06SurfacingInput,
+    C06SurfacingResult,
+    C06SurfacingStatus,
+    C06Telemetry,
+    C06UncertaintyState,
+)
+from substrate.c06_surfacing_candidates.policy import build_c06_surfacing_candidates
+from substrate.c06_surfacing_candidates.telemetry import c06_surfacing_candidates_snapshot
+
+__all__ = [
+    "C06CandidateClass",
+    "C06CandidateSetMetadata",
+    "C06ContinuityHorizon",
+    "C06ScopeMarker",
+    "C06StrengthGrade",
+    "C06SuppressedItem",
+    "C06SuppressionReason",
+    "C06SuppressionReport",
+    "C06SurfacedCandidate",
+    "C06SurfacedCandidateSet",
+    "C06SurfacingConsumerView",
+    "C06SurfacingContractView",
+    "C06SurfacingGateDecision",
+    "C06SurfacingInput",
+    "C06SurfacingResult",
+    "C06SurfacingStatus",
+    "C06Telemetry",
+    "C06UncertaintyState",
+    "build_c06_surfacing_candidates",
+    "c06_surfacing_candidates_snapshot",
+    "derive_c06_surfacing_consumer_view",
+    "derive_c06_surfacing_contract_view",
+    "require_c06_candidate_set_consumer_ready",
+    "require_c06_identity_merge_consumer_ready",
+    "require_c06_suppression_report_consumer_ready",
+]
+

@@ -46,6 +46,7 @@ HOSTED_CONTOUR_SEGMENTS = (
     "v01_normative_permission_commitment_licensing",
     "v02_communicative_intent_utterance_plan_bridge",
     "v03_surface_verbalization_causality_constrained_realization",
+    "c06_surfacing_candidates",
     "s_minimal_contour",
     "a_line_normalization",
     "m_minimal",
@@ -227,6 +228,21 @@ HOSTED_CONTOUR_FIELDS: dict[str, set[str]] = {
         "boundary_before_explanation_satisfied",
         "partial_realization_only",
         "replan_required",
+        "downstream_consumer_ready",
+    },
+    "c06_surfacing_candidates": {
+        "surfaced_candidate_count",
+        "suppressed_item_count",
+        "commitment_carryover_count",
+        "repair_obligation_count",
+        "protective_monitor_count",
+        "closure_candidate_count",
+        "ambiguous_candidate_count",
+        "duplicate_merge_count",
+        "false_merge_detected",
+        "published_frontier_requirement",
+        "unresolved_ambiguity_preserved",
+        "confidence_residue_preserved",
         "downstream_consumer_ready",
     },
     "s_minimal_contour": {
@@ -721,6 +737,9 @@ def test_hosted_contour_segments_follow_real_runtime_order(tmp_path: Path) -> No
         events, "v03_surface_verbalization_causality_constrained_realization"
     )
     assert _first_order(events, "v03_surface_verbalization_causality_constrained_realization") < _first_order(
+        events, "c06_surfacing_candidates"
+    )
+    assert _first_order(events, "c06_surfacing_candidates") < _first_order(
         events, "bounded_outcome_resolution"
     )
     assert _first_order(events, "s_minimal_contour") < _first_order(events, "a_line_normalization")
@@ -789,6 +808,7 @@ def test_representative_modules_have_runtime_steps(tmp_path: Path) -> None:
         "v01_normative_permission_commitment_licensing",
         "v02_communicative_intent_utterance_plan_bridge",
         "v03_surface_verbalization_causality_constrained_realization",
+        "c06_surfacing_candidates",
         "downstream_obedience",
         "subject_tick",
     ):

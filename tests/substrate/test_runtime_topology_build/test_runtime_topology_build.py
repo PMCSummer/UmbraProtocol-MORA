@@ -175,6 +175,7 @@ def test_runtime_topology_bundle_and_graph_are_materialized() -> None:
         "V01",
         "V02",
         "V03",
+        "C06",
         "RT01",
     )
     assert "rt01.epistemic_admission_checkpoint" in graph.mandatory_checkpoint_ids
@@ -204,6 +205,7 @@ def test_runtime_topology_bundle_and_graph_are_materialized() -> None:
     assert "rt01.v01_normative_permission_commitment_licensing_checkpoint" in graph.mandatory_checkpoint_ids
     assert "rt01.v02_utterance_plan_checkpoint" in graph.mandatory_checkpoint_ids
     assert "rt01.v03_constrained_realization_checkpoint" in graph.mandatory_checkpoint_ids
+    assert "rt01.c06_surfacing_candidates_checkpoint" in graph.mandatory_checkpoint_ids
     assert "epistemics.grounded_unit" in graph.source_of_truth_surfaces
     assert "epistemics.downstream_allowance" in graph.source_of_truth_surfaces
     assert "world_adapter.state" in graph.source_of_truth_surfaces
@@ -298,6 +300,8 @@ def test_runtime_topology_bundle_and_graph_are_materialized() -> None:
         "v03_surface_verbalization_causality_constrained_realization.alignment_map"
         in graph.source_of_truth_surfaces
     )
+    assert "c06_surfacing_candidates.surfaced_candidate_set" in graph.source_of_truth_surfaces
+    assert "c06_surfacing_candidates.suppression_report" in graph.source_of_truth_surfaces
 
 
 def test_dispatch_happy_path_runs_lawful_production_contour() -> None:
