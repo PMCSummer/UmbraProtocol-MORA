@@ -54,6 +54,14 @@ if TYPE_CHECKING:
         P02InterventionEpisodeInput,
         P02InterventionEpisodeResult,
     )
+    from substrate.p03_long_horizon_credit_assignment_intervention_learning import (
+        P03CreditAssignmentInput,
+        P03CreditAssignmentResult,
+    )
+    from substrate.p04_interpersonal_counterfactual_policy_simulation import (
+        P04SimulationInput,
+        P04SimulationResult,
+    )
     from substrate.p01_project_formation import (
         P01IntentionStackState,
         P01ProjectFormationResult,
@@ -378,6 +386,35 @@ class SubjectTickRestrictionCode(StrEnum):
     P02_POSSIBLE_OVERRUN_DETOUR_REQUIRED = "p02_possible_overrun_detour_required"
     P02_RESIDUE_FOLLOWUP_DETOUR_REQUIRED = "p02_residue_followup_detour_required"
     P02_COMPLETION_INFLATION_FORBIDDEN = "p02_completion_inflation_forbidden"
+    P03_CREDIT_ASSIGNMENT_CONTRACT_MUST_BE_READ = (
+        "p03_credit_assignment_contract_must_be_read"
+    )
+    P03_CREDIT_RECORD_CONSUMER_REQUIRED = "p03_credit_record_consumer_required"
+    P03_NO_UPDATE_CONSUMER_REQUIRED = "p03_no_update_consumer_required"
+    P03_UPDATE_RECOMMENDATION_CONSUMER_REQUIRED = (
+        "p03_update_recommendation_consumer_required"
+    )
+    P03_CONFOUNDED_ASSOCIATION_DETOUR_REQUIRED = (
+        "p03_confounded_association_detour_required"
+    )
+    P03_OUTCOME_WINDOW_OPEN_DETOUR_REQUIRED = "p03_outcome_window_open_detour_required"
+    P03_NEGATIVE_SIDE_EFFECT_DETOUR_REQUIRED = (
+        "p03_negative_side_effect_detour_required"
+    )
+    P03_RAW_OUTCOME_IMPRESSION_LEARNING_FORBIDDEN = (
+        "p03_raw_outcome_impression_learning_forbidden"
+    )
+    P04_COUNTERFACTUAL_SIMULATION_CONTRACT_MUST_BE_READ = (
+        "p04_counterfactual_simulation_contract_must_be_read"
+    )
+    P04_BRANCH_RECORD_CONSUMER_REQUIRED = "p04_branch_record_consumer_required"
+    P04_COMPARISON_CONSUMER_REQUIRED = "p04_comparison_consumer_required"
+    P04_EXCLUDED_POLICY_CONSUMER_REQUIRED = "p04_excluded_policy_consumer_required"
+    P04_UNSTABLE_REGION_DETOUR_REQUIRED = "p04_unstable_region_detour_required"
+    P04_NO_CLEAR_DOMINANCE_DETOUR_REQUIRED = "p04_no_clear_dominance_detour_required"
+    P04_EXCLUDED_POLICY_HAZARD_DETOUR_REQUIRED = (
+        "p04_excluded_policy_hazard_detour_required"
+    )
     DOWNSTREAM_AUTHORITY_DEGRADED = "downstream_authority_degraded"
 
 
@@ -570,6 +607,14 @@ class SubjectTickContext:
     require_p02_boundary_consumer: bool = False
     require_p02_verification_consumer: bool = False
     disable_p02_enforcement: bool = False
+    require_p03_credit_record_consumer: bool = False
+    require_p03_no_update_consumer: bool = False
+    require_p03_update_recommendation_consumer: bool = False
+    disable_p03_enforcement: bool = False
+    require_p04_branch_record_consumer: bool = False
+    require_p04_comparison_consumer: bool = False
+    require_p04_excluded_policy_consumer: bool = False
+    disable_p04_enforcement: bool = False
     o01_entity_signals: tuple[O01EntitySignal, ...] = ()
     o02_interaction_diagnostics: O02InteractionDiagnosticsInput | None = None
     o03_candidate_strategy: O03CandidateStrategyInput | None = None
@@ -581,6 +626,8 @@ class SubjectTickContext:
     v03_realization_input: V03RealizationInput | None = None
     c06_surfacing_input: C06SurfacingInput | None = None
     p02_episode_input: P02InterventionEpisodeInput | None = None
+    p03_credit_assignment_input: P03CreditAssignmentInput | None = None
+    p04_simulation_input: P04SimulationInput | None = None
     g08_appraisal_significance_hint: float | None = None
     source_lineage: tuple[str, ...] = ()
 
@@ -1139,6 +1186,36 @@ class SubjectTickState:
     p02_boundary_consumer_ready: bool = False
     p02_verification_consumer_ready: bool = False
     p02_downstream_consumer_ready: bool = False
+    p03_evaluated_episode_count: int = 0
+    p03_credit_record_count: int = 0
+    p03_no_update_count: int = 0
+    p03_positive_credit_count: int = 0
+    p03_negative_credit_count: int = 0
+    p03_mixed_credit_count: int = 0
+    p03_unresolved_credit_count: int = 0
+    p03_confounded_credit_count: int = 0
+    p03_guarded_update_count: int = 0
+    p03_side_effect_dominant_count: int = 0
+    p03_window_open_count: int = 0
+    p03_credit_record_consumer_ready: bool = False
+    p03_no_update_consumer_ready: bool = False
+    p03_update_recommendation_consumer_ready: bool = False
+    p03_downstream_consumer_ready: bool = False
+    p04_branch_count: int = 0
+    p04_selectable_branch_count: int = 0
+    p04_excluded_policy_count: int = 0
+    p04_unstable_region_count: int = 0
+    p04_no_clear_dominance_count: int = 0
+    p04_belief_conditioned_rollout: bool = False
+    p04_incomplete_information_support: bool = False
+    p04_false_belief_case_support: bool = False
+    p04_misread_case_support: bool = False
+    p04_knowledge_uncertainty_support: bool = False
+    p04_guardrail_exclusion_count: int = 0
+    p04_branch_record_consumer_ready: bool = False
+    p04_comparison_consumer_ready: bool = False
+    p04_excluded_policy_consumer_ready: bool = False
+    p04_downstream_consumer_ready: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -1490,6 +1567,8 @@ class SubjectTickResult:
     v03_result: V03ConstrainedRealizationResult
     c06_result: C06SurfacingResult
     p02_result: P02InterventionEpisodeResult
+    p03_result: P03CreditAssignmentResult
+    p04_result: P04SimulationResult
     t01_result: T01ActiveFieldResult
     t02_result: T02ConstrainedSceneResult
     t03_result: T03CompetitionResult

@@ -222,6 +222,16 @@ from substrate.p02_intervention_episode_layer_licensed_action_trace import (
     build_p02_intervention_episode_layer_licensed_action_trace,
     derive_p02_intervention_episode_consumer_view,
 )
+from substrate.p03_long_horizon_credit_assignment_intervention_learning import (
+    P03CreditAssignmentInput,
+    build_p03_long_horizon_credit_assignment_intervention_learning,
+    derive_p03_credit_assignment_consumer_view,
+)
+from substrate.p04_interpersonal_counterfactual_policy_simulation import (
+    P04SimulationInput,
+    build_p04_interpersonal_counterfactual_policy_simulation,
+    derive_p04_simulation_consumer_view,
+)
 from substrate.s01_efference_copy import (
     S01EfferenceCopyState,
     build_s01_efference_copy,
@@ -264,6 +274,8 @@ ATTEMPTED_SUBJECT_TICK_PATHS: tuple[str, ...] = (
     "subject_tick.evaluate_v03_surface_verbalization_causality_constrained_realization",
     "subject_tick.evaluate_c06_surfacing_candidates",
     "subject_tick.evaluate_p02_intervention_episode",
+    "subject_tick.evaluate_p03_credit_assignment",
+    "subject_tick.evaluate_p04_counterfactual_policy_simulation",
     "subject_tick.world_seam_enforcement",
     "subject_tick.resolve_bounded_runtime_outcome",
     "subject_tick.downstream_gate",
@@ -4995,6 +5007,356 @@ def execute_subject_tick(
         )
     )
 
+    p03_credit_assignment_input = (
+        context.p03_credit_assignment_input
+        if isinstance(context.p03_credit_assignment_input, P03CreditAssignmentInput)
+        else None
+    )
+    p03_explicit_basis = bool(
+        p03_credit_assignment_input is not None
+        and (
+            p03_credit_assignment_input.outcome_observations
+            or p03_credit_assignment_input.outcome_windows
+            or p03_credit_assignment_input.confounder_signals
+        )
+    )
+    p03_result = build_p03_long_horizon_credit_assignment_intervention_learning(
+        tick_id=tick_id,
+        tick_index=tick_index,
+        p02_result=p02_result,
+        c06_result=c06_result,
+        credit_assignment_input=p03_credit_assignment_input,
+        source_lineage=lineage,
+        credit_assignment_enabled=not context.disable_p03_enforcement,
+    )
+    p03_view = derive_p03_credit_assignment_consumer_view(p03_result)
+    p03_trace_values = {
+        "evaluated_episode_count": p03_result.telemetry.evaluated_episode_count,
+        "credit_record_count": p03_result.telemetry.credit_record_count,
+        "no_update_count": p03_result.telemetry.no_update_count,
+        "positive_credit_count": p03_result.telemetry.positive_credit_count,
+        "negative_credit_count": p03_result.telemetry.negative_credit_count,
+        "mixed_credit_count": p03_result.telemetry.mixed_credit_count,
+        "unresolved_credit_count": p03_result.telemetry.unresolved_credit_count,
+        "confounded_credit_count": p03_result.telemetry.confounded_credit_count,
+        "guarded_update_count": p03_result.telemetry.guarded_update_count,
+        "side_effect_dominant_count": p03_result.telemetry.side_effect_dominant_count,
+        "outcome_window_open_count": p03_result.telemetry.outcome_window_open_count,
+        "downstream_consumer_ready": p03_result.telemetry.downstream_consumer_ready,
+    }
+    trace_emit_active(
+        "p03_long_horizon_credit_assignment_intervention_learning",
+        "enter",
+        p03_trace_values,
+    )
+    p03_checkpoint_status = SubjectTickCheckpointStatus.ALLOWED
+    p03_checkpoint_reason = p03_result.gate.reason
+    p03_default_confounded_association_detour = False
+    p03_default_outcome_window_open_detour = False
+    p03_default_negative_side_effect_detour = False
+    if not context.disable_p03_enforcement:
+        if (
+            context.require_p03_credit_record_consumer
+            and not p03_view.credit_record_consumer_ready
+            and halt_reason is None
+        ):
+            revalidation_needed = True
+            p03_checkpoint_status = SubjectTickCheckpointStatus.ENFORCED_DETOUR
+            p03_checkpoint_reason = (
+                "p03 credit-record consumer requested but explicit credit records are not ready"
+            )
+            if active_execution_mode != "halt_execution":
+                active_execution_mode = "revalidate_scope"
+        if (
+            context.require_p03_no_update_consumer
+            and not p03_view.no_update_consumer_ready
+            and halt_reason is None
+        ):
+            revalidation_needed = True
+            p03_checkpoint_status = SubjectTickCheckpointStatus.ENFORCED_DETOUR
+            p03_checkpoint_reason = (
+                "p03 no-update consumer requested but explicit no-update records are not ready"
+            )
+            if active_execution_mode != "halt_execution":
+                active_execution_mode = "revalidate_scope"
+        if (
+            context.require_p03_update_recommendation_consumer
+            and not p03_view.update_recommendation_consumer_ready
+            and halt_reason is None
+        ):
+            repair_needed = True
+            p03_checkpoint_status = SubjectTickCheckpointStatus.ENFORCED_DETOUR
+            p03_checkpoint_reason = (
+                "p03 recommendation consumer requested but recommendation surface is not ready"
+            )
+            if active_execution_mode != "halt_execution":
+                active_execution_mode = "repair_runtime_path"
+        if (
+            p03_explicit_basis
+            and p03_result.telemetry.confounded_credit_count > 0
+            and not context.require_p03_credit_record_consumer
+            and halt_reason is None
+        ):
+            revalidation_needed = True
+            p03_default_confounded_association_detour = True
+            p03_checkpoint_status = SubjectTickCheckpointStatus.ENFORCED_DETOUR
+            p03_checkpoint_reason = (
+                "p03 default contour detected confounded attribution and requires bounded detour"
+            )
+            if active_execution_mode != "halt_execution":
+                active_execution_mode = "revalidate_scope"
+        if (
+            p03_explicit_basis
+            and p03_result.telemetry.outcome_window_open_count > 0
+            and not context.require_p03_no_update_consumer
+            and halt_reason is None
+        ):
+            revalidation_needed = True
+            p03_default_outcome_window_open_detour = True
+            p03_checkpoint_status = SubjectTickCheckpointStatus.ENFORCED_DETOUR
+            p03_checkpoint_reason = (
+                "p03 default contour detected open outcome window and requires bounded revalidation"
+            )
+            if active_execution_mode != "halt_execution":
+                active_execution_mode = "revalidate_scope"
+        if (
+            p03_explicit_basis
+            and p03_result.telemetry.side_effect_dominant_count > 0
+            and not context.require_p03_update_recommendation_consumer
+            and halt_reason is None
+            and not p03_default_confounded_association_detour
+        ):
+            repair_needed = True
+            p03_default_negative_side_effect_detour = True
+            p03_checkpoint_status = SubjectTickCheckpointStatus.ENFORCED_DETOUR
+            p03_checkpoint_reason = (
+                "p03 default contour retained dominant negative side-effect and requires bounded repair path"
+            )
+            if active_execution_mode != "halt_execution":
+                active_execution_mode = "repair_runtime_path"
+    else:
+        p03_checkpoint_status = SubjectTickCheckpointStatus.ALLOWED
+        p03_checkpoint_reason = "p03 enforcement disabled in ablation context"
+
+    p03_required_actions: list[str] = []
+    if context.require_p03_credit_record_consumer:
+        p03_required_actions.append("require_p03_credit_record_consumer")
+    if context.require_p03_no_update_consumer:
+        p03_required_actions.append("require_p03_no_update_consumer")
+    if context.require_p03_update_recommendation_consumer:
+        p03_required_actions.append("require_p03_update_recommendation_consumer")
+    if p03_default_confounded_association_detour:
+        p03_required_actions.append("default_p03_confounded_association_detour")
+    if p03_default_outcome_window_open_detour:
+        p03_required_actions.append("default_p03_outcome_window_open_detour")
+    if p03_default_negative_side_effect_detour:
+        p03_required_actions.append("default_p03_negative_side_effect_detour")
+    if not p03_required_actions:
+        p03_required_actions.append("p03_optional")
+
+    trace_emit_active(
+        "p03_long_horizon_credit_assignment_intervention_learning",
+        "decision",
+        p03_trace_values,
+    )
+    if p03_checkpoint_status != SubjectTickCheckpointStatus.ALLOWED:
+        trace_emit_active(
+            "p03_long_horizon_credit_assignment_intervention_learning",
+            "blocked",
+            p03_trace_values,
+            note=p03_checkpoint_reason,
+        )
+    trace_emit_active(
+        "p03_long_horizon_credit_assignment_intervention_learning",
+        "exit",
+        p03_trace_values,
+    )
+    checkpoints.append(
+        SubjectTickCheckpointResult(
+            checkpoint_id="rt01.p03_credit_assignment_checkpoint",
+            source_contract=(
+                "p03_long_horizon_credit_assignment_intervention_learning.credit_record_set"
+            ),
+            status=p03_checkpoint_status,
+            required_action=";".join(dict.fromkeys(p03_required_actions)),
+            applied_action=active_execution_mode,
+            reason=p03_checkpoint_reason,
+        )
+    )
+
+    p04_simulation_input = (
+        context.p04_simulation_input
+        if isinstance(context.p04_simulation_input, P04SimulationInput)
+        else None
+    )
+    p04_explicit_basis = bool(
+        p04_simulation_input is not None and p04_simulation_input.candidate_set.candidates
+    )
+    p04_result = build_p04_interpersonal_counterfactual_policy_simulation(
+        tick_id=tick_id,
+        tick_index=tick_index,
+        p02_result=p02_result,
+        p03_result=p03_result,
+        simulation_input=p04_simulation_input,
+        source_lineage=lineage,
+        simulation_enabled=not context.disable_p04_enforcement,
+    )
+    p04_view = derive_p04_simulation_consumer_view(p04_result)
+    p04_trace_values = {
+        "branch_count": p04_result.telemetry.branch_count,
+        "selectable_branch_count": p04_result.telemetry.selectable_branch_count,
+        "excluded_policy_count": p04_result.telemetry.excluded_policy_count,
+        "unstable_region_count": p04_result.telemetry.unstable_region_count,
+        "no_clear_dominance_count": p04_result.telemetry.no_clear_dominance_count,
+        "belief_conditioned_rollout": p04_result.telemetry.belief_conditioned_rollout,
+        "incomplete_information_support": p04_result.telemetry.incomplete_information_support,
+        "false_belief_case_support": p04_result.telemetry.false_belief_case_support,
+        "misread_case_support": p04_result.telemetry.misread_case_support,
+        "knowledge_uncertainty_support": p04_result.telemetry.knowledge_uncertainty_support,
+        "guardrail_exclusion_count": p04_result.telemetry.guardrail_exclusion_count,
+        "downstream_consumer_ready": p04_result.telemetry.downstream_consumer_ready,
+    }
+    trace_emit_active(
+        "p04_interpersonal_counterfactual_policy_simulation",
+        "enter",
+        p04_trace_values,
+    )
+    p04_checkpoint_status = SubjectTickCheckpointStatus.ALLOWED
+    p04_checkpoint_reason = p04_result.gate.reason
+    p04_default_unstable_region_detour = False
+    p04_default_no_clear_dominance_detour = False
+    p04_default_excluded_policy_hazard_detour = False
+    if not context.disable_p04_enforcement:
+        if (
+            context.require_p04_branch_record_consumer
+            and not p04_view.branch_record_consumer_ready
+            and halt_reason is None
+        ):
+            revalidation_needed = True
+            p04_checkpoint_status = SubjectTickCheckpointStatus.ENFORCED_DETOUR
+            p04_checkpoint_reason = (
+                "p04 branch-record consumer requested but explicit branch records are not ready"
+            )
+            if active_execution_mode != "halt_execution":
+                active_execution_mode = "revalidate_scope"
+        if (
+            context.require_p04_comparison_consumer
+            and not p04_view.comparison_consumer_ready
+            and halt_reason is None
+        ):
+            revalidation_needed = True
+            p04_checkpoint_status = SubjectTickCheckpointStatus.ENFORCED_DETOUR
+            p04_checkpoint_reason = (
+                "p04 comparison consumer requested but explicit comparison matrix is not ready"
+            )
+            if active_execution_mode != "halt_execution":
+                active_execution_mode = "revalidate_scope"
+        if (
+            context.require_p04_excluded_policy_consumer
+            and not p04_view.excluded_policy_consumer_ready
+            and halt_reason is None
+        ):
+            repair_needed = True
+            p04_checkpoint_status = SubjectTickCheckpointStatus.ENFORCED_DETOUR
+            p04_checkpoint_reason = (
+                "p04 excluded-policy consumer requested but explicit exclusion records are not ready"
+            )
+            if active_execution_mode != "halt_execution":
+                active_execution_mode = "repair_runtime_path"
+        if (
+            p04_explicit_basis
+            and p04_result.telemetry.unstable_region_count > 0
+            and not context.require_p04_comparison_consumer
+            and halt_reason is None
+        ):
+            revalidation_needed = True
+            p04_default_unstable_region_detour = True
+            p04_checkpoint_status = SubjectTickCheckpointStatus.ENFORCED_DETOUR
+            p04_checkpoint_reason = (
+                "p04 default contour detected unstable comparison region and requires bounded revalidation"
+            )
+            if active_execution_mode != "halt_execution":
+                active_execution_mode = "revalidate_scope"
+        if (
+            p04_explicit_basis
+            and p04_result.telemetry.no_clear_dominance_count > 0
+            and not context.require_p04_comparison_consumer
+            and halt_reason is None
+            and not p04_default_unstable_region_detour
+        ):
+            revalidation_needed = True
+            p04_default_no_clear_dominance_detour = True
+            p04_checkpoint_status = SubjectTickCheckpointStatus.ENFORCED_DETOUR
+            p04_checkpoint_reason = (
+                "p04 default contour detected no-clear-dominance comparison and requires bounded comparison-only detour"
+            )
+            if active_execution_mode != "halt_execution":
+                active_execution_mode = "revalidate_scope"
+        if (
+            p04_explicit_basis
+            and p04_result.telemetry.guardrail_exclusion_count > 0
+            and not context.require_p04_excluded_policy_consumer
+            and halt_reason is None
+            and not p04_default_unstable_region_detour
+        ):
+            repair_needed = True
+            p04_default_excluded_policy_hazard_detour = True
+            p04_checkpoint_status = SubjectTickCheckpointStatus.ENFORCED_DETOUR
+            p04_checkpoint_reason = (
+                "p04 default contour detected excluded policy hazards and requires guarded repair detour"
+            )
+            if active_execution_mode != "halt_execution":
+                active_execution_mode = "repair_runtime_path"
+    else:
+        p04_checkpoint_status = SubjectTickCheckpointStatus.ALLOWED
+        p04_checkpoint_reason = "p04 enforcement disabled in ablation context"
+
+    p04_required_actions: list[str] = []
+    if context.require_p04_branch_record_consumer:
+        p04_required_actions.append("require_p04_branch_record_consumer")
+    if context.require_p04_comparison_consumer:
+        p04_required_actions.append("require_p04_comparison_consumer")
+    if context.require_p04_excluded_policy_consumer:
+        p04_required_actions.append("require_p04_excluded_policy_consumer")
+    if p04_default_unstable_region_detour:
+        p04_required_actions.append("default_p04_unstable_region_detour")
+    if p04_default_no_clear_dominance_detour:
+        p04_required_actions.append("default_p04_no_clear_dominance_detour")
+    if p04_default_excluded_policy_hazard_detour:
+        p04_required_actions.append("default_p04_excluded_policy_hazard_detour")
+    if not p04_required_actions:
+        p04_required_actions.append("p04_optional")
+
+    trace_emit_active(
+        "p04_interpersonal_counterfactual_policy_simulation",
+        "decision",
+        p04_trace_values,
+    )
+    if p04_checkpoint_status != SubjectTickCheckpointStatus.ALLOWED:
+        trace_emit_active(
+            "p04_interpersonal_counterfactual_policy_simulation",
+            "blocked",
+            p04_trace_values,
+            note=p04_checkpoint_reason,
+        )
+    trace_emit_active(
+        "p04_interpersonal_counterfactual_policy_simulation",
+        "exit",
+        p04_trace_values,
+    )
+    checkpoints.append(
+        SubjectTickCheckpointResult(
+            checkpoint_id="rt01.p04_counterfactual_policy_simulation_checkpoint",
+            source_contract=(
+                "p04_interpersonal_counterfactual_policy_simulation.counterfactual_policy_simulation_set"
+            ),
+            status=p04_checkpoint_status,
+            required_action=";".join(dict.fromkeys(p04_required_actions)),
+            applied_action=active_execution_mode,
+            reason=p04_checkpoint_reason,
+        )
+    )
+
     if halt_reason is not None:
         final_outcome = SubjectTickOutcome.HALT
         execution_stance = SubjectTickExecutionStance.HALT_PATH
@@ -5834,6 +6196,42 @@ def execute_subject_tick(
         p02_boundary_consumer_ready=p02_result.gate.boundary_consumer_ready,
         p02_verification_consumer_ready=p02_result.gate.verification_consumer_ready,
         p02_downstream_consumer_ready=p02_result.telemetry.downstream_consumer_ready,
+        p03_evaluated_episode_count=p03_result.telemetry.evaluated_episode_count,
+        p03_credit_record_count=p03_result.telemetry.credit_record_count,
+        p03_no_update_count=p03_result.telemetry.no_update_count,
+        p03_positive_credit_count=p03_result.telemetry.positive_credit_count,
+        p03_negative_credit_count=p03_result.telemetry.negative_credit_count,
+        p03_mixed_credit_count=p03_result.telemetry.mixed_credit_count,
+        p03_unresolved_credit_count=p03_result.telemetry.unresolved_credit_count,
+        p03_confounded_credit_count=p03_result.telemetry.confounded_credit_count,
+        p03_guarded_update_count=p03_result.telemetry.guarded_update_count,
+        p03_side_effect_dominant_count=p03_result.telemetry.side_effect_dominant_count,
+        p03_window_open_count=p03_result.telemetry.outcome_window_open_count,
+        p03_credit_record_consumer_ready=p03_result.gate.credit_record_consumer_ready,
+        p03_no_update_consumer_ready=p03_result.gate.no_update_consumer_ready,
+        p03_update_recommendation_consumer_ready=(
+            p03_result.gate.update_recommendation_consumer_ready
+        ),
+        p03_downstream_consumer_ready=p03_result.telemetry.downstream_consumer_ready,
+        p04_branch_count=p04_result.telemetry.branch_count,
+        p04_selectable_branch_count=p04_result.telemetry.selectable_branch_count,
+        p04_excluded_policy_count=p04_result.telemetry.excluded_policy_count,
+        p04_unstable_region_count=p04_result.telemetry.unstable_region_count,
+        p04_no_clear_dominance_count=p04_result.telemetry.no_clear_dominance_count,
+        p04_belief_conditioned_rollout=p04_result.telemetry.belief_conditioned_rollout,
+        p04_incomplete_information_support=(
+            p04_result.telemetry.incomplete_information_support
+        ),
+        p04_false_belief_case_support=p04_result.telemetry.false_belief_case_support,
+        p04_misread_case_support=p04_result.telemetry.misread_case_support,
+        p04_knowledge_uncertainty_support=(
+            p04_result.telemetry.knowledge_uncertainty_support
+        ),
+        p04_guardrail_exclusion_count=p04_result.telemetry.guardrail_exclusion_count,
+        p04_branch_record_consumer_ready=p04_result.gate.branch_record_consumer_ready,
+        p04_comparison_consumer_ready=p04_result.gate.comparison_consumer_ready,
+        p04_excluded_policy_consumer_ready=p04_result.gate.excluded_policy_consumer_ready,
+        p04_downstream_consumer_ready=p04_result.telemetry.downstream_consumer_ready,
     )
     gate = evaluate_subject_tick_downstream_gate(state)
     telemetry = build_subject_tick_telemetry(
@@ -5841,7 +6239,7 @@ def execute_subject_tick(
         attempted_paths=ATTEMPTED_SUBJECT_TICK_PATHS,
         downstream_gate=gate,
         causal_basis=(
-            "bounded runtime execution spine enforces roadmap authority roles for C04/C05, consumes world-entry, s01 efference-copy, s02 prediction-boundary seam, s03 ownership-weighted learning, s04 interoceptive self-binding, s05 multi-cause attribution, s-minimal, a-line, m-minimal, n-minimal, t01 semantic-field, t02 relation-binding, t03 hypothesis-competition, t04 attention-schema, o01 other-entity modeling, o02 intersubjective allostasis, o03 strategy-class evaluation, p01 authority-bounded project-formation, o04 rupture/hostility/coercion dynamics, r05 bounded protective regulation gates, v01 act-level normative licensing/commitment guards, v02 typed utterance-plan bridge constraints, v03 constrained realization alignment/report contract, and c06 typed surfacing-candidates handoff before bounded outcome resolution, while keeping D01 observability-only over fixed R->C order"
+            "bounded runtime execution spine enforces roadmap authority roles for C04/C05, consumes world-entry, s01 efference-copy, s02 prediction-boundary seam, s03 ownership-weighted learning, s04 interoceptive self-binding, s05 multi-cause attribution, s-minimal, a-line, m-minimal, n-minimal, t01 semantic-field, t02 relation-binding, t03 hypothesis-competition, t04 attention-schema, o01 other-entity modeling, o02 intersubjective allostasis, o03 strategy-class evaluation, p01 authority-bounded project-formation, o04 rupture/hostility/coercion dynamics, r05 bounded protective regulation gates, v01 act-level normative licensing/commitment guards, v02 typed utterance-plan bridge constraints, v03 constrained realization alignment/report contract, c06 typed surfacing-candidates handoff, p02 typed intervention episodes, p03 typed long-horizon credit assignment, and p04 typed interpersonal counterfactual policy simulation before bounded outcome resolution, while keeping D01 observability-only over fixed R->C order"
         ),
     )
     abstain = final_outcome in {SubjectTickOutcome.REPAIR, SubjectTickOutcome.REVALIDATE}
@@ -5940,6 +6338,8 @@ def execute_subject_tick(
         v03_result=v03_result,
         c06_result=c06_result,
         p02_result=p02_result,
+        p03_result=p03_result,
+        p04_result=p04_result,
         t01_result=t01_result,
         t02_result=t02_result,
         t03_result=t03_result,

@@ -177,6 +177,8 @@ def test_runtime_topology_bundle_and_graph_are_materialized() -> None:
         "V03",
         "C06",
         "P02",
+        "P03",
+        "P04",
         "RT01",
     )
     assert "rt01.epistemic_admission_checkpoint" in graph.mandatory_checkpoint_ids
@@ -208,6 +210,8 @@ def test_runtime_topology_bundle_and_graph_are_materialized() -> None:
     assert "rt01.v03_constrained_realization_checkpoint" in graph.mandatory_checkpoint_ids
     assert "rt01.c06_surfacing_candidates_checkpoint" in graph.mandatory_checkpoint_ids
     assert "rt01.p02_intervention_episode_checkpoint" in graph.mandatory_checkpoint_ids
+    assert "rt01.p03_credit_assignment_checkpoint" in graph.mandatory_checkpoint_ids
+    assert "rt01.p04_counterfactual_policy_simulation_checkpoint" in graph.mandatory_checkpoint_ids
     assert "epistemics.grounded_unit" in graph.source_of_truth_surfaces
     assert "epistemics.downstream_allowance" in graph.source_of_truth_surfaces
     assert "world_adapter.state" in graph.source_of_truth_surfaces
@@ -310,6 +314,30 @@ def test_runtime_topology_bundle_and_graph_are_materialized() -> None:
     )
     assert (
         "p02_intervention_episode_layer_licensed_action_trace.episode_boundary_report"
+        in graph.source_of_truth_surfaces
+    )
+    assert (
+        "p03_long_horizon_credit_assignment_intervention_learning.credit_record_set"
+        in graph.source_of_truth_surfaces
+    )
+    assert (
+        "p03_long_horizon_credit_assignment_intervention_learning.no_update_record_set"
+        in graph.source_of_truth_surfaces
+    )
+    assert (
+        "p03_long_horizon_credit_assignment_intervention_learning.learning_recommendation_set"
+        in graph.source_of_truth_surfaces
+    )
+    assert (
+        "p04_interpersonal_counterfactual_policy_simulation.counterfactual_policy_simulation_set"
+        in graph.source_of_truth_surfaces
+    )
+    assert (
+        "p04_interpersonal_counterfactual_policy_simulation.comparison_matrix"
+        in graph.source_of_truth_surfaces
+    )
+    assert (
+        "p04_interpersonal_counterfactual_policy_simulation.excluded_policy_records"
         in graph.source_of_truth_surfaces
     )
 

@@ -74,6 +74,8 @@ def evaluate_subject_tick_downstream_gate(
         SubjectTickRestrictionCode.V03_CONSTRAINED_REALIZATION_CONTRACT_MUST_BE_READ,
         SubjectTickRestrictionCode.C06_SURFACING_CANDIDATES_CONTRACT_MUST_BE_READ,
         SubjectTickRestrictionCode.P02_INTERVENTION_EPISODE_CONTRACT_MUST_BE_READ,
+        SubjectTickRestrictionCode.P03_CREDIT_ASSIGNMENT_CONTRACT_MUST_BE_READ,
+        SubjectTickRestrictionCode.P04_COUNTERFACTUAL_SIMULATION_CONTRACT_MUST_BE_READ,
     ]
     usability = SubjectTickUsabilityClass.USABLE_BOUNDED
     accepted = True
@@ -1627,6 +1629,149 @@ def evaluate_subject_tick_downstream_gate(
             accepted = False
             usability = SubjectTickUsabilityClass.BLOCKED
             reason = "p02 intervention-episode checkpoint requires detour before downstream continuation"
+
+    p03_checkpoint = next(
+        (
+            checkpoint
+            for checkpoint in state.execution_checkpoints
+            if checkpoint.checkpoint_id == "rt01.p03_credit_assignment_checkpoint"
+        ),
+        None,
+    )
+    if p03_checkpoint is not None:
+        if "require_p03_credit_record_consumer" in p03_checkpoint.required_action:
+            restrictions.append(SubjectTickRestrictionCode.P03_CREDIT_RECORD_CONSUMER_REQUIRED)
+        if "require_p03_no_update_consumer" in p03_checkpoint.required_action:
+            restrictions.append(SubjectTickRestrictionCode.P03_NO_UPDATE_CONSUMER_REQUIRED)
+        if "require_p03_update_recommendation_consumer" in p03_checkpoint.required_action:
+            restrictions.append(
+                SubjectTickRestrictionCode.P03_UPDATE_RECOMMENDATION_CONSUMER_REQUIRED
+            )
+        if "default_p03_confounded_association_detour" in p03_checkpoint.required_action:
+            restrictions.append(
+                SubjectTickRestrictionCode.P03_CONFOUNDED_ASSOCIATION_DETOUR_REQUIRED
+            )
+        if "default_p03_outcome_window_open_detour" in p03_checkpoint.required_action:
+            restrictions.append(SubjectTickRestrictionCode.P03_OUTCOME_WINDOW_OPEN_DETOUR_REQUIRED)
+        if "default_p03_negative_side_effect_detour" in p03_checkpoint.required_action:
+            restrictions.append(SubjectTickRestrictionCode.P03_NEGATIVE_SIDE_EFFECT_DETOUR_REQUIRED)
+
+    p03_basis_present = bool(
+        state.p03_evaluated_episode_count > 0
+        or state.p03_credit_record_count > 0
+        or state.p03_no_update_count > 0
+        or state.p03_window_open_count > 0
+        or state.p03_confounded_credit_count > 0
+    )
+    if p03_basis_present:
+        restrictions.append(
+            SubjectTickRestrictionCode.P03_RAW_OUTCOME_IMPRESSION_LEARNING_FORBIDDEN
+        )
+    if p03_basis_present and state.p03_window_open_count > 0:
+        restrictions.append(SubjectTickRestrictionCode.P03_OUTCOME_WINDOW_OPEN_DETOUR_REQUIRED)
+        if (
+            state.final_execution_outcome == SubjectTickOutcome.CONTINUE
+            and usability == SubjectTickUsabilityClass.USABLE_BOUNDED
+        ):
+            usability = SubjectTickUsabilityClass.DEGRADED_BOUNDED
+            reason = "p03 outcome window remains open; continuation stays bounded with no-update discipline"
+    if p03_basis_present and state.p03_confounded_credit_count > 0:
+        restrictions.append(SubjectTickRestrictionCode.P03_CONFOUNDED_ASSOCIATION_DETOUR_REQUIRED)
+        restrictions.append(SubjectTickRestrictionCode.DOWNSTREAM_AUTHORITY_DEGRADED)
+        if state.final_execution_outcome == SubjectTickOutcome.CONTINUE:
+            accepted = False
+            usability = SubjectTickUsabilityClass.BLOCKED
+            reason = "p03 confounded association blocks confident downstream continuation"
+    if p03_basis_present and state.p03_side_effect_dominant_count > 0:
+        restrictions.append(SubjectTickRestrictionCode.P03_NEGATIVE_SIDE_EFFECT_DETOUR_REQUIRED)
+        if (
+            state.final_execution_outcome == SubjectTickOutcome.CONTINUE
+            and usability == SubjectTickUsabilityClass.USABLE_BOUNDED
+        ):
+            usability = SubjectTickUsabilityClass.DEGRADED_BOUNDED
+            reason = "p03 retained dominant negative side-effects and requires guarded continuation"
+    if p03_basis_present and state.p03_negative_credit_count > 0 and state.p03_guarded_update_count > 0:
+        restrictions.append(SubjectTickRestrictionCode.DOWNSTREAM_AUTHORITY_DEGRADED)
+        if state.final_execution_outcome == SubjectTickOutcome.CONTINUE:
+            accepted = False
+            usability = SubjectTickUsabilityClass.BLOCKED
+            reason = "p03 negative guarded recommendation blocks optimistic continuation"
+    if p03_basis_present and not state.p03_credit_record_consumer_ready:
+        restrictions.append(SubjectTickRestrictionCode.P03_CREDIT_RECORD_CONSUMER_REQUIRED)
+    if p03_basis_present and not state.p03_no_update_consumer_ready:
+        restrictions.append(SubjectTickRestrictionCode.P03_NO_UPDATE_CONSUMER_REQUIRED)
+    if p03_basis_present and not state.p03_update_recommendation_consumer_ready:
+        restrictions.append(SubjectTickRestrictionCode.P03_UPDATE_RECOMMENDATION_CONSUMER_REQUIRED)
+    if p03_basis_present and not state.p03_downstream_consumer_ready:
+        restrictions.append(SubjectTickRestrictionCode.DOWNSTREAM_AUTHORITY_DEGRADED)
+        if state.final_execution_outcome == SubjectTickOutcome.CONTINUE:
+            accepted = False
+            usability = SubjectTickUsabilityClass.BLOCKED
+            reason = "p03 produced no consumer-ready attribution surface for downstream learning path"
+
+    p04_checkpoint = next(
+        (
+            checkpoint
+            for checkpoint in state.execution_checkpoints
+            if checkpoint.checkpoint_id == "rt01.p04_counterfactual_policy_simulation_checkpoint"
+        ),
+        None,
+    )
+    if p04_checkpoint is not None:
+        if "require_p04_branch_record_consumer" in p04_checkpoint.required_action:
+            restrictions.append(SubjectTickRestrictionCode.P04_BRANCH_RECORD_CONSUMER_REQUIRED)
+        if "require_p04_comparison_consumer" in p04_checkpoint.required_action:
+            restrictions.append(SubjectTickRestrictionCode.P04_COMPARISON_CONSUMER_REQUIRED)
+        if "require_p04_excluded_policy_consumer" in p04_checkpoint.required_action:
+            restrictions.append(SubjectTickRestrictionCode.P04_EXCLUDED_POLICY_CONSUMER_REQUIRED)
+        if "default_p04_unstable_region_detour" in p04_checkpoint.required_action:
+            restrictions.append(SubjectTickRestrictionCode.P04_UNSTABLE_REGION_DETOUR_REQUIRED)
+        if "default_p04_no_clear_dominance_detour" in p04_checkpoint.required_action:
+            restrictions.append(SubjectTickRestrictionCode.P04_NO_CLEAR_DOMINANCE_DETOUR_REQUIRED)
+        if "default_p04_excluded_policy_hazard_detour" in p04_checkpoint.required_action:
+            restrictions.append(SubjectTickRestrictionCode.P04_EXCLUDED_POLICY_HAZARD_DETOUR_REQUIRED)
+
+    p04_basis_present = bool(
+        state.p04_branch_count > 0
+        or state.p04_excluded_policy_count > 0
+        or state.p04_unstable_region_count > 0
+        or state.p04_no_clear_dominance_count > 0
+    )
+    if p04_basis_present and state.p04_unstable_region_count > 0:
+        restrictions.append(SubjectTickRestrictionCode.P04_UNSTABLE_REGION_DETOUR_REQUIRED)
+        restrictions.append(SubjectTickRestrictionCode.DOWNSTREAM_AUTHORITY_DEGRADED)
+        if state.final_execution_outcome == SubjectTickOutcome.CONTINUE:
+            accepted = False
+            usability = SubjectTickUsabilityClass.BLOCKED
+            reason = "p04 unstable region blocks clear branch ranking and requires bounded comparison-only detour"
+    if p04_basis_present and state.p04_no_clear_dominance_count > 0:
+        restrictions.append(SubjectTickRestrictionCode.P04_NO_CLEAR_DOMINANCE_DETOUR_REQUIRED)
+        if (
+            state.final_execution_outcome == SubjectTickOutcome.CONTINUE
+            and usability == SubjectTickUsabilityClass.USABLE_BOUNDED
+        ):
+            usability = SubjectTickUsabilityClass.DEGRADED_BOUNDED
+            reason = "p04 found no clear branch dominance; continuation remains bounded and comparison-only"
+    if p04_basis_present and state.p04_guardrail_exclusion_count > 0:
+        restrictions.append(SubjectTickRestrictionCode.P04_EXCLUDED_POLICY_HAZARD_DETOUR_REQUIRED)
+        if (
+            state.final_execution_outcome == SubjectTickOutcome.CONTINUE
+            and usability == SubjectTickUsabilityClass.USABLE_BOUNDED
+        ):
+            usability = SubjectTickUsabilityClass.DEGRADED_BOUNDED
+            reason = "p04 excluded guardrail-violating policies and requires hazard-aware continuation"
+    if p04_basis_present and not state.p04_branch_record_consumer_ready:
+        restrictions.append(SubjectTickRestrictionCode.P04_BRANCH_RECORD_CONSUMER_REQUIRED)
+    if p04_basis_present and not state.p04_comparison_consumer_ready:
+        restrictions.append(SubjectTickRestrictionCode.P04_COMPARISON_CONSUMER_REQUIRED)
+    if p04_basis_present and state.p04_excluded_policy_count > 0 and not state.p04_excluded_policy_consumer_ready:
+        restrictions.append(SubjectTickRestrictionCode.P04_EXCLUDED_POLICY_CONSUMER_REQUIRED)
+    if p04_basis_present and not state.p04_downstream_consumer_ready:
+        restrictions.append(SubjectTickRestrictionCode.DOWNSTREAM_AUTHORITY_DEGRADED)
+        if state.final_execution_outcome == SubjectTickOutcome.CONTINUE:
+            accepted = False
+            usability = SubjectTickUsabilityClass.BLOCKED
+            reason = "p04 produced no consumer-ready simulation surface for downstream branch comparison"
 
     return SubjectTickGateDecision(
         accepted=accepted,

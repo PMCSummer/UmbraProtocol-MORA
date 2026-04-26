@@ -48,6 +48,8 @@ HOSTED_CONTOUR_SEGMENTS = (
     "v03_surface_verbalization_causality_constrained_realization",
     "c06_surfacing_candidates",
     "p02_intervention_episode_layer_licensed_action_trace",
+    "p03_long_horizon_credit_assignment_intervention_learning",
+    "p04_interpersonal_counterfactual_policy_simulation",
     "s_minimal_contour",
     "a_line_normalization",
     "m_minimal",
@@ -256,6 +258,34 @@ HOSTED_CONTOUR_FIELDS: dict[str, set[str]] = {
         "boundary_ambiguous_count",
         "residue_count",
         "side_effect_count",
+        "downstream_consumer_ready",
+    },
+    "p03_long_horizon_credit_assignment_intervention_learning": {
+        "evaluated_episode_count",
+        "credit_record_count",
+        "no_update_count",
+        "positive_credit_count",
+        "negative_credit_count",
+        "mixed_credit_count",
+        "unresolved_credit_count",
+        "confounded_credit_count",
+        "guarded_update_count",
+        "side_effect_dominant_count",
+        "outcome_window_open_count",
+        "downstream_consumer_ready",
+    },
+    "p04_interpersonal_counterfactual_policy_simulation": {
+        "branch_count",
+        "selectable_branch_count",
+        "excluded_policy_count",
+        "unstable_region_count",
+        "no_clear_dominance_count",
+        "belief_conditioned_rollout",
+        "incomplete_information_support",
+        "false_belief_case_support",
+        "misread_case_support",
+        "knowledge_uncertainty_support",
+        "guardrail_exclusion_count",
         "downstream_consumer_ready",
     },
     "s_minimal_contour": {
@@ -756,6 +786,12 @@ def test_hosted_contour_segments_follow_real_runtime_order(tmp_path: Path) -> No
         events, "p02_intervention_episode_layer_licensed_action_trace"
     )
     assert _first_order(events, "p02_intervention_episode_layer_licensed_action_trace") < _first_order(
+        events, "p03_long_horizon_credit_assignment_intervention_learning"
+    )
+    assert _first_order(events, "p03_long_horizon_credit_assignment_intervention_learning") < _first_order(
+        events, "p04_interpersonal_counterfactual_policy_simulation"
+    )
+    assert _first_order(events, "p04_interpersonal_counterfactual_policy_simulation") < _first_order(
         events, "bounded_outcome_resolution"
     )
     assert _first_order(events, "s_minimal_contour") < _first_order(events, "a_line_normalization")
@@ -826,6 +862,8 @@ def test_representative_modules_have_runtime_steps(tmp_path: Path) -> None:
         "v03_surface_verbalization_causality_constrained_realization",
         "c06_surfacing_candidates",
         "p02_intervention_episode_layer_licensed_action_trace",
+        "p03_long_horizon_credit_assignment_intervention_learning",
+        "p04_interpersonal_counterfactual_policy_simulation",
         "downstream_obedience",
         "subject_tick",
     ):
