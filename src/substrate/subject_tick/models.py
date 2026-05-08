@@ -74,6 +74,10 @@ if TYPE_CHECKING:
         A03InternalOperationCandidateSet,
         A03InternalToolAffordanceResult,
     )
+    from substrate.a04_external_affordance_binding import (
+        A04ExternalAffordanceBindingResult,
+        A04ExternalAffordanceCandidateSet,
+    )
     from substrate.p01_project_formation import (
         P01IntentionStackState,
         P01ProjectFormationResult,
@@ -486,6 +490,16 @@ class SubjectTickRestrictionCode(StrEnum):
     )
     A03_LEGACY_DIRECT_CALL_DETOUR_REQUIRED = "a03_legacy_direct_call_detour_required"
     A03_CANONICAL_TOOL_ID_COVERAGE_INCOMPLETE = "a03_canonical_tool_id_coverage_incomplete"
+    A04_EXTERNAL_AFFORDANCE_BINDING_CONTRACT_MUST_BE_READ = (
+        "a04_external_affordance_binding_contract_must_be_read"
+    )
+    A04_BINDING_PACKET_CONSUMER_REQUIRED = "a04_binding_packet_consumer_required"
+    A04_AUTHORITY_PATH_CONSUMER_REQUIRED = "a04_authority_path_consumer_required"
+    A04_BLOCKED_BINDING_DETOUR_REQUIRED = "a04_blocked_binding_detour_required"
+    A04_CONTESTED_BINDING_DETOUR_REQUIRED = "a04_contested_binding_detour_required"
+    A04_REVOKED_BINDING_DETOUR_REQUIRED = "a04_revoked_binding_detour_required"
+    A04_NO_AUTHORITY_PATH_DETOUR_REQUIRED = "a04_no_authority_path_detour_required"
+    A04_OBJECT_SCAFFOLD_ONLY_RESTRICTION = "a04_object_scaffold_only_restriction"
     DOWNSTREAM_AUTHORITY_DEGRADED = "downstream_authority_degraded"
 
 
@@ -701,6 +715,9 @@ class SubjectTickContext:
     require_a03_tool_gap_linkage_consumer: bool = False
     require_a03_no_legacy_direct_call_consumer: bool = False
     disable_a03_enforcement: bool = False
+    require_a04_binding_packet_consumer: bool = False
+    require_a04_authority_path_consumer: bool = False
+    disable_a04_enforcement: bool = False
     o01_entity_signals: tuple[O01EntitySignal, ...] = ()
     o02_interaction_diagnostics: O02InteractionDiagnosticsInput | None = None
     o03_candidate_strategy: O03CandidateStrategyInput | None = None
@@ -717,6 +734,7 @@ class SubjectTickContext:
     a01_raw_affordance_candidate_set: A01RawAffordanceCandidateSet | None = None
     a02_demand_set: A02DemandSet | None = None
     a03_operation_candidate_set: A03InternalOperationCandidateSet | None = None
+    a04_external_candidate_set: A04ExternalAffordanceCandidateSet | None = None
     g08_appraisal_significance_hint: float | None = None
     source_lineage: tuple[str, ...] = ()
 
@@ -1364,6 +1382,17 @@ class SubjectTickState:
     a03_tool_gap_linkage_consumer_ready: bool = False
     a03_no_legacy_direct_call_consumer_ready: bool = False
     a03_downstream_consumer_ready: bool = False
+    a04_candidate_count: int = 0
+    a04_explicit_basis_present: bool = False
+    a04_binding_count: int = 0
+    a04_contested_count: int = 0
+    a04_blocked_count: int = 0
+    a04_revoked_count: int = 0
+    a04_authority_missing_count: int = 0
+    a04_object_overclaim_blocked_count: int = 0
+    a04_binding_packet_consumer_ready: bool = False
+    a04_authority_path_consumer_ready: bool = False
+    a04_downstream_consumer_ready: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -1699,6 +1728,7 @@ class SubjectTickResult:
     a01_result: A01CanonicalOntologyResult
     a02_result: A02CapabilityGapResult
     a03_result: A03InternalToolAffordanceResult
+    a04_result: A04ExternalAffordanceBindingResult
     a_line_result: ALineNormalizationResult
     m_minimal_result: MMinimalResult
     n_minimal_result: NMinimalResult

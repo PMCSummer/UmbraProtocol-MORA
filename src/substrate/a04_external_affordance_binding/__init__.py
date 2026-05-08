@@ -1,0 +1,63 @@
+from substrate.a04_external_affordance_binding.downstream_contract import (
+    A04ExternalAffordanceConsumerView,
+    A04ExternalAffordanceContractView,
+    derive_a04_external_affordance_consumer_view,
+    derive_a04_external_affordance_contract_view,
+    require_a04_authority_path_consumer,
+    require_a04_binding_packet_consumer,
+)
+from substrate.a04_external_affordance_binding.models import (
+    A04AdmissionStatus,
+    A04BindingLedger,
+    A04BindingLedgerEntry,
+    A04BindingStatus,
+    A04BlockedCandidate,
+    A04ContestedCandidate,
+    A04DownstreamReadinessStatus,
+    A04ExternalAffordanceBinding,
+    A04ExternalAffordanceBindingResult,
+    A04ExternalAffordanceCandidate,
+    A04ExternalAffordanceCandidateSet,
+    A04ExternalAffordanceGateDecision,
+    A04LegalityStatus,
+    A04NormalizationDecision,
+    A04ObjectMaturityStatus,
+    A04ScopeMarker,
+    A04Telemetry,
+    A04WorldEntityScaffold,
+)
+from substrate.a04_external_affordance_binding.policy import (
+    build_a04_external_affordance_binding,
+)
+from substrate.a04_external_affordance_binding.telemetry import (
+    a04_external_affordance_binding_snapshot,
+)
+
+__all__ = [
+    "A04AdmissionStatus",
+    "A04BindingLedger",
+    "A04BindingLedgerEntry",
+    "A04BindingStatus",
+    "A04BlockedCandidate",
+    "A04ContestedCandidate",
+    "A04DownstreamReadinessStatus",
+    "A04ExternalAffordanceBinding",
+    "A04ExternalAffordanceBindingResult",
+    "A04ExternalAffordanceCandidate",
+    "A04ExternalAffordanceCandidateSet",
+    "A04ExternalAffordanceConsumerView",
+    "A04ExternalAffordanceContractView",
+    "A04ExternalAffordanceGateDecision",
+    "A04LegalityStatus",
+    "A04NormalizationDecision",
+    "A04ObjectMaturityStatus",
+    "A04ScopeMarker",
+    "A04Telemetry",
+    "A04WorldEntityScaffold",
+    "a04_external_affordance_binding_snapshot",
+    "build_a04_external_affordance_binding",
+    "derive_a04_external_affordance_consumer_view",
+    "derive_a04_external_affordance_contract_view",
+    "require_a04_authority_path_consumer",
+    "require_a04_binding_packet_consumer",
+]

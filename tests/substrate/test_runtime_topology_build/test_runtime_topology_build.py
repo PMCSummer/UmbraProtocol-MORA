@@ -189,6 +189,7 @@ def test_runtime_topology_bundle_and_graph_are_materialized() -> None:
     assert "rt01.a01_affordance_ontology_cleanup_checkpoint" in graph.mandatory_checkpoint_ids
     assert "rt01.a02_capability_gap_detection_checkpoint" in graph.mandatory_checkpoint_ids
     assert "rt01.a03_internal_tool_affordances_checkpoint" in graph.mandatory_checkpoint_ids
+    assert "rt01.a04_external_affordance_binding_checkpoint" in graph.mandatory_checkpoint_ids
     assert "rt01.a_line_normalization_checkpoint" in graph.mandatory_checkpoint_ids
     assert "rt01.m_minimal_contour_checkpoint" in graph.mandatory_checkpoint_ids
     assert "rt01.n_minimal_contour_checkpoint" in graph.mandatory_checkpoint_ids
@@ -226,6 +227,7 @@ def test_runtime_topology_bundle_and_graph_are_materialized() -> None:
     )
     assert "a02_capability_gap_detection.capability_gap_result" in graph.source_of_truth_surfaces
     assert "a03_internal_tool_affordances.tool_affordance_result" in graph.source_of_truth_surfaces
+    assert "a04_external_affordance_binding.external_affordance_binding_result" in graph.source_of_truth_surfaces
     assert "a_line_normalization.capability_state" in graph.source_of_truth_surfaces
     assert "m_minimal.lifecycle_state" in graph.source_of_truth_surfaces
     assert "n_minimal.commitment_state" in graph.source_of_truth_surfaces

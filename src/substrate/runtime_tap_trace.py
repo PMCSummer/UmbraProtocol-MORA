@@ -351,6 +351,17 @@ MODULE_ALLOWED_FIELDS: dict[str, tuple[str, ...]] = {
         "canonical_tool_id_coverage_complete",
         "downstream_consumer_ready",
     ),
+    "a04_external_affordance_binding": (
+        "a04_binding_count",
+        "a04_contested_count",
+        "a04_blocked_count",
+        "a04_revoked_count",
+        "a04_authority_missing_count",
+        "a04_object_overclaim_blocked_count",
+        "a04_consumer_ready",
+        "a04_staged_scaffold_only",
+        "a04_no_map_wide_claim",
+    ),
     "s_minimal_contour": (
         "minimal_self_status",
         "minimal_self_ready",

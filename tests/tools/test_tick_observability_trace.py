@@ -54,6 +54,7 @@ HOSTED_CONTOUR_SEGMENTS = (
     "a01_internal_affordance_ontology_cleanup",
     "a02_capability_gap_detection",
     "a03_internal_tool_affordances",
+    "a04_external_affordance_binding",
     "a_line_normalization",
     "m_minimal",
     "n_minimal",
@@ -335,6 +336,17 @@ HOSTED_CONTOUR_FIELDS: dict[str, set[str]] = {
         "legacy_direct_call_detected",
         "canonical_tool_id_coverage_complete",
         "downstream_consumer_ready",
+    },
+    "a04_external_affordance_binding": {
+        "a04_binding_count",
+        "a04_contested_count",
+        "a04_blocked_count",
+        "a04_revoked_count",
+        "a04_authority_missing_count",
+        "a04_object_overclaim_blocked_count",
+        "a04_consumer_ready",
+        "a04_staged_scaffold_only",
+        "a04_no_map_wide_claim",
     },
     "s_minimal_contour": {
         "minimal_self_status",
@@ -840,6 +852,9 @@ def test_hosted_contour_segments_follow_real_runtime_order(tmp_path: Path) -> No
         events, "p04_interpersonal_counterfactual_policy_simulation"
     )
     assert _first_order(events, "p04_interpersonal_counterfactual_policy_simulation") < _first_order(
+        events, "a04_external_affordance_binding"
+    )
+    assert _first_order(events, "a04_external_affordance_binding") < _first_order(
         events, "bounded_outcome_resolution"
     )
     assert _first_order(events, "s_minimal_contour") < _first_order(

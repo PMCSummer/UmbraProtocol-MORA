@@ -272,6 +272,11 @@ from substrate.a03_internal_tool_affordances import (
     build_a03_internal_tool_affordances,
     derive_a03_tool_consumer_view,
 )
+from substrate.a04_external_affordance_binding import (
+    A04ExternalAffordanceCandidateSet,
+    build_a04_external_affordance_binding,
+    derive_a04_external_affordance_consumer_view,
+)
 from substrate.s01_efference_copy import (
     S01EfferenceCopyState,
     build_s01_efference_copy,
@@ -319,6 +324,7 @@ ATTEMPTED_SUBJECT_TICK_PATHS: tuple[str, ...] = (
     "subject_tick.evaluate_p02_intervention_episode",
     "subject_tick.evaluate_p03_credit_assignment",
     "subject_tick.evaluate_p04_counterfactual_policy_simulation",
+    "subject_tick.evaluate_a04_external_affordance_binding",
     "subject_tick.world_seam_enforcement",
     "subject_tick.resolve_bounded_runtime_outcome",
     "subject_tick.downstream_gate",
@@ -6079,6 +6085,174 @@ def execute_subject_tick(
         )
     )
 
+    a04_explicit_input = (
+        context.a04_external_candidate_set
+        if isinstance(context.a04_external_candidate_set, A04ExternalAffordanceCandidateSet)
+        else None
+    )
+    a04_explicit_basis = bool(
+        a04_explicit_input is not None and a04_explicit_input.candidates
+    )
+    a04_result = build_a04_external_affordance_binding(
+        tick_id=tick_id,
+        tick_index=tick_index,
+        candidate_set=a04_explicit_input,
+        binding_enabled=True,
+    )
+    a04_view = derive_a04_external_affordance_consumer_view(a04_result)
+    a04_trace_values = {
+        "a04_binding_count": a04_result.telemetry.a04_binding_count,
+        "a04_contested_count": a04_result.telemetry.a04_contested_count,
+        "a04_blocked_count": a04_result.telemetry.a04_blocked_count,
+        "a04_revoked_count": a04_result.telemetry.a04_revoked_count,
+        "a04_authority_missing_count": a04_result.telemetry.a04_authority_missing_count,
+        "a04_object_overclaim_blocked_count": (
+            a04_result.telemetry.a04_object_overclaim_blocked_count
+        ),
+        "a04_consumer_ready": a04_result.telemetry.a04_consumer_ready,
+        "a04_staged_scaffold_only": a04_result.telemetry.a04_staged_scaffold_only,
+        "a04_no_map_wide_claim": a04_result.telemetry.a04_no_map_wide_claim,
+    }
+    trace_emit_active("a04_external_affordance_binding", "enter", a04_trace_values)
+    a04_checkpoint_status = SubjectTickCheckpointStatus.ALLOWED
+    a04_checkpoint_reason = a04_result.gate.reason
+    a04_default_blocked_binding_detour = False
+    a04_default_contested_binding_detour = False
+    a04_default_revoked_binding_detour = False
+    a04_default_no_authority_path_detour = False
+    a04_default_object_scaffold_only_detour = False
+    if not context.disable_a04_enforcement:
+        if (
+            context.require_a04_binding_packet_consumer
+            and not a04_view.binding_packet_consumer_ready
+            and halt_reason is None
+        ):
+            revalidation_needed = True
+            a04_checkpoint_status = SubjectTickCheckpointStatus.ENFORCED_DETOUR
+            a04_checkpoint_reason = (
+                "a04 binding-packet consumer requested but admitted/provisional external bindings are absent"
+            )
+            if active_execution_mode != "halt_execution":
+                active_execution_mode = "revalidate_scope"
+        if (
+            context.require_a04_authority_path_consumer
+            and not a04_view.authority_path_consumer_ready
+            and halt_reason is None
+        ):
+            revalidation_needed = True
+            a04_checkpoint_status = SubjectTickCheckpointStatus.ENFORCED_DETOUR
+            a04_checkpoint_reason = (
+                "a04 authority-path consumer requested but authority-tagged source path is incomplete"
+            )
+            if active_execution_mode != "halt_execution":
+                active_execution_mode = "revalidate_scope"
+        if (
+            a04_explicit_basis
+            and a04_result.telemetry.a04_blocked_count > 0
+            and halt_reason is None
+        ):
+            repair_needed = True
+            a04_default_blocked_binding_detour = True
+            a04_checkpoint_status = SubjectTickCheckpointStatus.ENFORCED_DETOUR
+            a04_checkpoint_reason = (
+                "a04 detected blocked external-affordance bindings and requires staged scaffold restoration detour"
+            )
+            if active_execution_mode not in {"halt_execution", "revalidate_scope"}:
+                active_execution_mode = "repair_runtime_path"
+        if (
+            a04_explicit_basis
+            and a04_result.telemetry.a04_contested_count > 0
+            and halt_reason is None
+        ):
+            revalidation_needed = True
+            a04_default_contested_binding_detour = True
+            a04_checkpoint_status = SubjectTickCheckpointStatus.ENFORCED_DETOUR
+            a04_checkpoint_reason = (
+                "a04 detected contested scaffold bindings and requires bounded authority/scope revalidation detour"
+            )
+            if active_execution_mode != "halt_execution":
+                active_execution_mode = "revalidate_scope"
+        if (
+            a04_explicit_basis
+            and a04_result.telemetry.a04_revoked_count > 0
+            and halt_reason is None
+        ):
+            repair_needed = True
+            a04_default_revoked_binding_detour = True
+            a04_checkpoint_status = SubjectTickCheckpointStatus.ENFORCED_DETOUR
+            a04_checkpoint_reason = (
+                "a04 detected revoked scaffold bindings and requires revocation-aware restriction detour"
+            )
+            if active_execution_mode not in {"halt_execution", "revalidate_scope"}:
+                active_execution_mode = "repair_runtime_path"
+        if (
+            a04_explicit_basis
+            and a04_result.telemetry.a04_authority_missing_count > 0
+            and halt_reason is None
+        ):
+            revalidation_needed = True
+            a04_default_no_authority_path_detour = True
+            a04_checkpoint_status = SubjectTickCheckpointStatus.ENFORCED_DETOUR
+            a04_checkpoint_reason = (
+                "a04 detected no authority path for external-affordance candidates and blocks unsafe promotion"
+            )
+            if active_execution_mode != "halt_execution":
+                active_execution_mode = "revalidate_scope"
+        if (
+            a04_explicit_basis
+            and a04_result.telemetry.a04_object_overclaim_blocked_count > 0
+            and halt_reason is None
+        ):
+            revalidation_needed = True
+            a04_default_object_scaffold_only_detour = True
+            a04_checkpoint_status = SubjectTickCheckpointStatus.ENFORCED_DETOUR
+            a04_checkpoint_reason = (
+                "a04 preserved object scaffold only status and blocks mature object overclaim in narrow slice"
+            )
+            if active_execution_mode != "halt_execution":
+                active_execution_mode = "revalidate_scope"
+    else:
+        a04_checkpoint_status = SubjectTickCheckpointStatus.ALLOWED
+        a04_checkpoint_reason = "A04 gate disabled in test fixture"
+
+    a04_required_actions: list[str] = []
+    if context.require_a04_binding_packet_consumer:
+        a04_required_actions.append("require_a04_binding_packet_consumer")
+    if context.require_a04_authority_path_consumer:
+        a04_required_actions.append("require_a04_authority_path_consumer")
+    if a04_default_blocked_binding_detour:
+        a04_required_actions.append("default_a04_blocked_binding_detour")
+    if a04_default_contested_binding_detour:
+        a04_required_actions.append("default_a04_contested_binding_detour")
+    if a04_default_revoked_binding_detour:
+        a04_required_actions.append("default_a04_revoked_binding_detour")
+    if a04_default_no_authority_path_detour:
+        a04_required_actions.append("default_a04_no_authority_path_detour")
+    if a04_default_object_scaffold_only_detour:
+        a04_required_actions.append("default_a04_object_scaffold_only_detour")
+    if not a04_required_actions:
+        a04_required_actions.append("a04_optional")
+
+    trace_emit_active("a04_external_affordance_binding", "decision", a04_trace_values)
+    if a04_checkpoint_status != SubjectTickCheckpointStatus.ALLOWED:
+        trace_emit_active(
+            "a04_external_affordance_binding",
+            "blocked",
+            a04_trace_values,
+            note=a04_checkpoint_reason,
+        )
+    trace_emit_active("a04_external_affordance_binding", "exit", a04_trace_values)
+    checkpoints.append(
+        SubjectTickCheckpointResult(
+            checkpoint_id="rt01.a04_external_affordance_binding_checkpoint",
+            source_contract="a04_external_affordance_binding.external_affordance_binding_result",
+            status=a04_checkpoint_status,
+            required_action=";".join(dict.fromkeys(a04_required_actions)),
+            applied_action=active_execution_mode,
+            reason=a04_checkpoint_reason,
+        )
+    )
+
     if halt_reason is not None:
         final_outcome = SubjectTickOutcome.HALT
         execution_stance = SubjectTickExecutionStance.HALT_PATH
@@ -7025,6 +7199,23 @@ def execute_subject_tick(
         a03_tool_gap_linkage_consumer_ready=a03_result.gate.tool_gap_linkage_consumer_ready,
         a03_no_legacy_direct_call_consumer_ready=a03_result.gate.no_legacy_direct_call_consumer_ready,
         a03_downstream_consumer_ready=a03_result.telemetry.downstream_consumer_ready,
+        a04_candidate_count=(
+            len(a04_explicit_input.candidates)
+            if isinstance(a04_explicit_input, A04ExternalAffordanceCandidateSet)
+            else 0
+        ),
+        a04_explicit_basis_present=a04_explicit_basis,
+        a04_binding_count=a04_result.telemetry.a04_binding_count,
+        a04_contested_count=a04_result.telemetry.a04_contested_count,
+        a04_blocked_count=a04_result.telemetry.a04_blocked_count,
+        a04_revoked_count=a04_result.telemetry.a04_revoked_count,
+        a04_authority_missing_count=a04_result.telemetry.a04_authority_missing_count,
+        a04_object_overclaim_blocked_count=(
+            a04_result.telemetry.a04_object_overclaim_blocked_count
+        ),
+        a04_binding_packet_consumer_ready=a04_result.gate.binding_packet_consumer_ready,
+        a04_authority_path_consumer_ready=a04_result.gate.authority_path_consumer_ready,
+        a04_downstream_consumer_ready=a04_result.telemetry.a04_consumer_ready,
     )
     gate = evaluate_subject_tick_downstream_gate(state)
     telemetry = build_subject_tick_telemetry(
@@ -7032,7 +7223,7 @@ def execute_subject_tick(
         attempted_paths=ATTEMPTED_SUBJECT_TICK_PATHS,
         downstream_gate=gate,
         causal_basis=(
-            "bounded runtime execution spine enforces roadmap authority roles for C04/C05, consumes world-entry, s01 efference-copy, s02 prediction-boundary seam, s03 ownership-weighted learning, s04 interoceptive self-binding, s05 multi-cause attribution, s-minimal, a01 affordance ontology cleanup, a02 capability-gap detection, a03 internal-tool affordance normalization, a-line, m-minimal, n-minimal, t01 semantic-field, t02 relation-binding, t03 hypothesis-competition, t04 attention-schema, o01 other-entity modeling, o02 intersubjective allostasis, o03 strategy-class evaluation, p01 authority-bounded project-formation, o04 rupture/hostility/coercion dynamics, r05 bounded protective regulation gates, v01 act-level normative licensing/commitment guards, v02 typed utterance-plan bridge constraints, v03 constrained realization alignment/report contract, c06 typed surfacing-candidates handoff, p02 typed intervention episodes, p03 typed long-horizon credit assignment, and p04 typed interpersonal counterfactual policy simulation before bounded outcome resolution, while keeping D01 observability-only over fixed R->C order"
+            "bounded runtime execution spine enforces roadmap authority roles for C04/C05, consumes world-entry, s01 efference-copy, s02 prediction-boundary seam, s03 ownership-weighted learning, s04 interoceptive self-binding, s05 multi-cause attribution, s-minimal, a01 affordance ontology cleanup, a02 capability-gap detection, a03 internal-tool affordance normalization, a-line, m-minimal, n-minimal, t01 semantic-field, t02 relation-binding, t03 hypothesis-competition, t04 attention-schema, o01 other-entity modeling, o02 intersubjective allostasis, o03 strategy-class evaluation, p01 authority-bounded project-formation, o04 rupture/hostility/coercion dynamics, r05 bounded protective regulation gates, v01 act-level normative licensing/commitment guards, v02 typed utterance-plan bridge constraints, v03 constrained realization alignment/report contract, c06 typed surfacing-candidates handoff, p02 typed intervention episodes, p03 typed long-horizon credit assignment, p04 typed interpersonal counterfactual policy simulation, and a04 staged external-affordance binding before bounded outcome resolution, while keeping D01 observability-only over fixed R->C order"
         ),
     )
     abstain = final_outcome in {SubjectTickOutcome.REPAIR, SubjectTickOutcome.REVALIDATE}
@@ -7115,6 +7306,7 @@ def execute_subject_tick(
         a01_result=a01_result,
         a02_result=a02_result,
         a03_result=a03_result,
+        a04_result=a04_result,
         a_line_result=a_line_result,
         m_minimal_result=m_minimal_result,
         n_minimal_result=n_minimal_result,

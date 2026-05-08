@@ -52,6 +52,7 @@ def evaluate_subject_tick_downstream_gate(
         SubjectTickRestrictionCode.A01_ONTOLOGY_CLEANUP_CONTRACT_MUST_BE_READ,
         SubjectTickRestrictionCode.A02_CAPABILITY_GAP_CONTRACT_MUST_BE_READ,
         SubjectTickRestrictionCode.A03_INTERNAL_TOOL_AFFORDANCE_CONTRACT_MUST_BE_READ,
+        SubjectTickRestrictionCode.A04_EXTERNAL_AFFORDANCE_BINDING_CONTRACT_MUST_BE_READ,
         SubjectTickRestrictionCode.M_MINIMAL_CONTOUR_CONTRACT_MUST_BE_READ,
         SubjectTickRestrictionCode.M_FORBIDDEN_SHORTCUTS_MUST_BE_READ,
         SubjectTickRestrictionCode.N_MINIMAL_CONTOUR_CONTRACT_MUST_BE_READ,
@@ -2107,6 +2108,79 @@ def evaluate_subject_tick_downstream_gate(
             accepted = False
             usability = SubjectTickUsabilityClass.BLOCKED
             reason = "a03 produced no consumer-ready canonical internal-tool affordance surface"
+
+    a04_checkpoint = next(
+        (
+            checkpoint
+            for checkpoint in state.execution_checkpoints
+            if checkpoint.checkpoint_id == "rt01.a04_external_affordance_binding_checkpoint"
+        ),
+        None,
+    )
+    if a04_checkpoint is not None:
+        if "require_a04_binding_packet_consumer" in a04_checkpoint.required_action:
+            restrictions.append(SubjectTickRestrictionCode.A04_BINDING_PACKET_CONSUMER_REQUIRED)
+        if "require_a04_authority_path_consumer" in a04_checkpoint.required_action:
+            restrictions.append(SubjectTickRestrictionCode.A04_AUTHORITY_PATH_CONSUMER_REQUIRED)
+        if "default_a04_blocked_binding_detour" in a04_checkpoint.required_action:
+            restrictions.append(SubjectTickRestrictionCode.A04_BLOCKED_BINDING_DETOUR_REQUIRED)
+        if "default_a04_contested_binding_detour" in a04_checkpoint.required_action:
+            restrictions.append(SubjectTickRestrictionCode.A04_CONTESTED_BINDING_DETOUR_REQUIRED)
+        if "default_a04_revoked_binding_detour" in a04_checkpoint.required_action:
+            restrictions.append(SubjectTickRestrictionCode.A04_REVOKED_BINDING_DETOUR_REQUIRED)
+        if "default_a04_no_authority_path_detour" in a04_checkpoint.required_action:
+            restrictions.append(SubjectTickRestrictionCode.A04_NO_AUTHORITY_PATH_DETOUR_REQUIRED)
+        if "default_a04_object_scaffold_only_detour" in a04_checkpoint.required_action:
+            restrictions.append(SubjectTickRestrictionCode.A04_OBJECT_SCAFFOLD_ONLY_RESTRICTION)
+
+    a04_basis_present = bool(state.a04_explicit_basis_present)
+    if a04_basis_present and state.a04_blocked_count > 0:
+        restrictions.append(SubjectTickRestrictionCode.A04_BLOCKED_BINDING_DETOUR_REQUIRED)
+        restrictions.append(SubjectTickRestrictionCode.DOWNSTREAM_AUTHORITY_DEGRADED)
+        if state.final_execution_outcome == SubjectTickOutcome.CONTINUE:
+            accepted = False
+            usability = SubjectTickUsabilityClass.BLOCKED
+            reason = "a04 detected blocked external-affordance bindings and blocks optimistic continuation"
+    if a04_basis_present and state.a04_contested_count > 0:
+        restrictions.append(SubjectTickRestrictionCode.A04_CONTESTED_BINDING_DETOUR_REQUIRED)
+        if (
+            state.final_execution_outcome == SubjectTickOutcome.CONTINUE
+            and usability == SubjectTickUsabilityClass.USABLE_BOUNDED
+        ):
+            usability = SubjectTickUsabilityClass.DEGRADED_BOUNDED
+            reason = "a04 contested scaffold bindings require bounded authority/scope revalidation"
+    if a04_basis_present and state.a04_revoked_count > 0:
+        restrictions.append(SubjectTickRestrictionCode.A04_REVOKED_BINDING_DETOUR_REQUIRED)
+        restrictions.append(SubjectTickRestrictionCode.DOWNSTREAM_AUTHORITY_DEGRADED)
+        if state.final_execution_outcome == SubjectTickOutcome.CONTINUE:
+            accepted = False
+            usability = SubjectTickUsabilityClass.BLOCKED
+            reason = "a04 revocation removes active external-affordance binding claims"
+    if a04_basis_present and state.a04_authority_missing_count > 0:
+        restrictions.append(SubjectTickRestrictionCode.A04_NO_AUTHORITY_PATH_DETOUR_REQUIRED)
+        restrictions.append(SubjectTickRestrictionCode.DOWNSTREAM_AUTHORITY_DEGRADED)
+        if state.final_execution_outcome == SubjectTickOutcome.CONTINUE:
+            accepted = False
+            usability = SubjectTickUsabilityClass.BLOCKED
+            reason = "a04 missing authority path blocks external-affordance promotion"
+    if a04_basis_present and state.a04_object_overclaim_blocked_count > 0:
+        restrictions.append(SubjectTickRestrictionCode.A04_OBJECT_SCAFFOLD_ONLY_RESTRICTION)
+        if (
+            state.final_execution_outcome == SubjectTickOutcome.CONTINUE
+            and usability == SubjectTickUsabilityClass.USABLE_BOUNDED
+        ):
+            usability = SubjectTickUsabilityClass.DEGRADED_BOUNDED
+            reason = "a04 keeps object scaffold staged and disallows mature object overclaim"
+    if a04_basis_present and not state.a04_binding_packet_consumer_ready:
+        restrictions.append(SubjectTickRestrictionCode.A04_BINDING_PACKET_CONSUMER_REQUIRED)
+    if a04_basis_present and not state.a04_authority_path_consumer_ready:
+        restrictions.append(SubjectTickRestrictionCode.A04_AUTHORITY_PATH_CONSUMER_REQUIRED)
+    if a04_basis_present and not state.a04_downstream_consumer_ready:
+        restrictions.append(SubjectTickRestrictionCode.DOWNSTREAM_AUTHORITY_DEGRADED)
+        if state.final_execution_outcome == SubjectTickOutcome.CONTINUE:
+            accepted = False
+            usability = SubjectTickUsabilityClass.BLOCKED
+            reason = "a04 produced no consumer-ready staged external-affordance binding packet"
 
     return SubjectTickGateDecision(
         accepted=accepted,
