@@ -50,6 +50,7 @@ def evaluate_subject_tick_downstream_gate(
         SubjectTickRestrictionCode.A_LINE_NORMALIZATION_CONTRACT_MUST_BE_READ,
         SubjectTickRestrictionCode.A_FORBIDDEN_SHORTCUTS_MUST_BE_READ,
         SubjectTickRestrictionCode.A01_ONTOLOGY_CLEANUP_CONTRACT_MUST_BE_READ,
+        SubjectTickRestrictionCode.A02_CAPABILITY_GAP_CONTRACT_MUST_BE_READ,
         SubjectTickRestrictionCode.M_MINIMAL_CONTOUR_CONTRACT_MUST_BE_READ,
         SubjectTickRestrictionCode.M_FORBIDDEN_SHORTCUTS_MUST_BE_READ,
         SubjectTickRestrictionCode.N_MINIMAL_CONTOUR_CONTRACT_MUST_BE_READ,
@@ -1868,6 +1869,140 @@ def evaluate_subject_tick_downstream_gate(
             accepted = False
             usability = SubjectTickUsabilityClass.BLOCKED
             reason = "a01 produced no consumer-ready canonical ontology surface"
+
+    a02_checkpoint = next(
+        (
+            checkpoint
+            for checkpoint in state.execution_checkpoints
+            if checkpoint.checkpoint_id == "rt01.a02_capability_gap_detection_checkpoint"
+        ),
+        None,
+    )
+    if a02_checkpoint is not None:
+        if "require_a02_gap_packet_consumer" in a02_checkpoint.required_action:
+            restrictions.append(SubjectTickRestrictionCode.A02_GAP_PACKET_CONSUMER_REQUIRED)
+        if "require_a02_partial_coverage_consumer" in a02_checkpoint.required_action:
+            restrictions.append(
+                SubjectTickRestrictionCode.A02_PARTIAL_COVERAGE_CONSUMER_REQUIRED
+            )
+        if "require_a02_ownership_boundary_consumer" in a02_checkpoint.required_action:
+            restrictions.append(
+                SubjectTickRestrictionCode.A02_OWNERSHIP_BOUNDARY_CONSUMER_REQUIRED
+            )
+        if "require_a02_composition_consumer" in a02_checkpoint.required_action:
+            restrictions.append(SubjectTickRestrictionCode.A02_COMPOSITION_CONSUMER_REQUIRED)
+        if "default_a02_missing_affordance_exploration_detour" in a02_checkpoint.required_action:
+            restrictions.append(
+                SubjectTickRestrictionCode.A02_MISSING_AFFORDANCE_DETOUR_REQUIRED
+            )
+        if "default_a02_blocked_affordance_restoration_detour" in a02_checkpoint.required_action:
+            restrictions.append(
+                SubjectTickRestrictionCode.A02_BLOCKED_AFFORDANCE_DETOUR_REQUIRED
+            )
+        if "default_a02_partial_coverage_detour" in a02_checkpoint.required_action:
+            restrictions.append(SubjectTickRestrictionCode.A02_PARTIAL_COVERAGE_DETOUR_REQUIRED)
+        if "default_a02_composition_unverified_detour" in a02_checkpoint.required_action:
+            restrictions.append(
+                SubjectTickRestrictionCode.A02_COMPOSITION_UNVERIFIED_DETOUR_REQUIRED
+            )
+        if "default_a02_ownership_boundary_detour" in a02_checkpoint.required_action:
+            restrictions.append(SubjectTickRestrictionCode.A02_OWNERSHIP_BOUNDARY_DETOUR_REQUIRED)
+        if "default_a02_no_clean_coverage_detour" in a02_checkpoint.required_action:
+            restrictions.append(SubjectTickRestrictionCode.A02_NO_CLEAN_COVERAGE_DETOUR_REQUIRED)
+        if "default_a02_lineage_partial_detour" in a02_checkpoint.required_action:
+            restrictions.append(SubjectTickRestrictionCode.A02_SOURCE_LINEAGE_PARTIAL)
+        if "default_a02_canonical_id_coverage_detour" in a02_checkpoint.required_action:
+            restrictions.append(SubjectTickRestrictionCode.A02_CANONICAL_ID_COVERAGE_INCOMPLETE)
+
+    a02_basis_present = bool(state.a02_explicit_basis_present)
+    if a02_basis_present and state.a02_missing_gap_count > 0:
+        restrictions.append(SubjectTickRestrictionCode.A02_MISSING_AFFORDANCE_DETOUR_REQUIRED)
+        if (
+            state.final_execution_outcome == SubjectTickOutcome.CONTINUE
+            and usability == SubjectTickUsabilityClass.USABLE_BOUNDED
+        ):
+            usability = SubjectTickUsabilityClass.DEGRADED_BOUNDED
+            reason = "a02 detected missing capability coverage and requires exploration detour"
+    if a02_basis_present and state.a02_blocked_gap_count > 0:
+        restrictions.append(SubjectTickRestrictionCode.A02_BLOCKED_AFFORDANCE_DETOUR_REQUIRED)
+        restrictions.append(SubjectTickRestrictionCode.DOWNSTREAM_AUTHORITY_DEGRADED)
+        if state.final_execution_outcome == SubjectTickOutcome.CONTINUE:
+            accepted = False
+            usability = SubjectTickUsabilityClass.BLOCKED
+            reason = "a02 detected blocked affordance conditions and blocks optimistic continuation"
+    if a02_basis_present and state.a02_partial_coverage_count > 0:
+        restrictions.append(SubjectTickRestrictionCode.A02_PARTIAL_COVERAGE_DETOUR_REQUIRED)
+        if (
+            state.final_execution_outcome == SubjectTickOutcome.CONTINUE
+            and usability == SubjectTickUsabilityClass.USABLE_BOUNDED
+        ):
+            usability = SubjectTickUsabilityClass.DEGRADED_BOUNDED
+            reason = "a02 partial coverage requires bounded residual-scope continuation"
+    if a02_basis_present and state.a02_composition_unverified_count > 0:
+        restrictions.append(SubjectTickRestrictionCode.A02_COMPOSITION_UNVERIFIED_DETOUR_REQUIRED)
+        if (
+            state.final_execution_outcome == SubjectTickOutcome.CONTINUE
+            and usability == SubjectTickUsabilityClass.USABLE_BOUNDED
+        ):
+            usability = SubjectTickUsabilityClass.DEGRADED_BOUNDED
+            reason = "a02 composition is possible but unverified and requires bounded continuation"
+    if a02_basis_present and state.a02_composition_gap_count > 0:
+        restrictions.append(SubjectTickRestrictionCode.A02_COMPOSITION_CONSUMER_REQUIRED)
+        restrictions.append(SubjectTickRestrictionCode.DOWNSTREAM_AUTHORITY_DEGRADED)
+        if state.final_execution_outcome == SubjectTickOutcome.CONTINUE:
+            accepted = False
+            usability = SubjectTickUsabilityClass.BLOCKED
+            reason = "a02 composition gap blocks strong continuation without explicit composition route"
+    if a02_basis_present and state.a02_ownership_boundary_gap_count > 0:
+        restrictions.append(SubjectTickRestrictionCode.A02_OWNERSHIP_BOUNDARY_DETOUR_REQUIRED)
+        restrictions.append(SubjectTickRestrictionCode.DOWNSTREAM_AUTHORITY_DEGRADED)
+        if state.final_execution_outcome == SubjectTickOutcome.CONTINUE:
+            accepted = False
+            usability = SubjectTickUsabilityClass.BLOCKED
+            reason = "a02 ownership-boundary gap suppresses agency overclaim continuation"
+    if a02_basis_present and state.a02_no_clean_coverage_count > 0:
+        restrictions.append(SubjectTickRestrictionCode.A02_NO_CLEAN_COVERAGE_DETOUR_REQUIRED)
+        if (
+            state.final_execution_outcome == SubjectTickOutcome.CONTINUE
+            and usability == SubjectTickUsabilityClass.USABLE_BOUNDED
+        ):
+            usability = SubjectTickUsabilityClass.DEGRADED_BOUNDED
+            reason = "a02 no-clean-coverage packet requires revalidation-bounded continuation"
+    if a02_basis_present and not state.a02_source_lineage_complete:
+        restrictions.append(SubjectTickRestrictionCode.A02_SOURCE_LINEAGE_PARTIAL)
+        restrictions.append(SubjectTickRestrictionCode.DOWNSTREAM_AUTHORITY_DEGRADED)
+        if state.final_execution_outcome == SubjectTickOutcome.CONTINUE:
+            accepted = False
+            usability = SubjectTickUsabilityClass.BLOCKED
+            reason = "a02 explicit-basis lineage is partial and blocks canonical downstream continuation"
+    if a02_basis_present and not state.a02_canonical_id_coverage_complete:
+        restrictions.append(SubjectTickRestrictionCode.A02_CANONICAL_ID_COVERAGE_INCOMPLETE)
+        restrictions.append(SubjectTickRestrictionCode.DOWNSTREAM_AUTHORITY_DEGRADED)
+        if state.final_execution_outcome == SubjectTickOutcome.CONTINUE:
+            accepted = False
+            usability = SubjectTickUsabilityClass.BLOCKED
+            reason = "a02 canonical-id coverage is incomplete and downstream cannot rely on stable capability packet ids"
+    if a02_basis_present and not state.a02_gap_packet_consumer_ready:
+        restrictions.append(SubjectTickRestrictionCode.A02_GAP_PACKET_CONSUMER_REQUIRED)
+    if a02_basis_present and state.a02_partial_coverage_count > 0 and not state.a02_partial_coverage_consumer_ready:
+        restrictions.append(SubjectTickRestrictionCode.A02_PARTIAL_COVERAGE_CONSUMER_REQUIRED)
+    if a02_basis_present and state.a02_ownership_boundary_gap_count > 0 and not state.a02_ownership_boundary_consumer_ready:
+        restrictions.append(SubjectTickRestrictionCode.A02_OWNERSHIP_BOUNDARY_CONSUMER_REQUIRED)
+    if (
+        a02_basis_present
+        and (
+            state.a02_composition_gap_count > 0
+            or state.a02_composition_unverified_count > 0
+        )
+        and not state.a02_composition_consumer_ready
+    ):
+        restrictions.append(SubjectTickRestrictionCode.A02_COMPOSITION_CONSUMER_REQUIRED)
+    if a02_basis_present and not state.a02_downstream_consumer_ready:
+        restrictions.append(SubjectTickRestrictionCode.DOWNSTREAM_AUTHORITY_DEGRADED)
+        if state.final_execution_outcome == SubjectTickOutcome.CONTINUE:
+            accepted = False
+            usability = SubjectTickUsabilityClass.BLOCKED
+            reason = "a02 produced no consumer-ready capability-gap packet"
 
     return SubjectTickGateDecision(
         accepted=accepted,

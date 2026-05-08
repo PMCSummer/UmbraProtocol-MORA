@@ -52,6 +52,7 @@ HOSTED_CONTOUR_SEGMENTS = (
     "p04_interpersonal_counterfactual_policy_simulation",
     "s_minimal_contour",
     "a01_internal_affordance_ontology_cleanup",
+    "a02_capability_gap_detection",
     "a_line_normalization",
     "m_minimal",
     "n_minimal",
@@ -305,6 +306,19 @@ HOSTED_CONTOUR_FIELDS: dict[str, set[str]] = {
         "canonical_id_hint_used_count",
         "canonical_id_generated_count",
         "canonical_id_coverage_complete",
+        "downstream_consumer_ready",
+    },
+    "a02_capability_gap_detection": {
+        "demand_count",
+        "gap_entry_count",
+        "fully_covered_count",
+        "partial_coverage_count",
+        "missing_gap_count",
+        "blocked_gap_count",
+        "composition_gap_count",
+        "composition_unverified_count",
+        "ownership_boundary_gap_count",
+        "no_clean_coverage_count",
         "downstream_consumer_ready",
     },
     "s_minimal_contour": {
@@ -817,6 +831,9 @@ def test_hosted_contour_segments_follow_real_runtime_order(tmp_path: Path) -> No
         events, "a01_internal_affordance_ontology_cleanup"
     )
     assert _first_order(events, "a01_internal_affordance_ontology_cleanup") < _first_order(
+        events, "a02_capability_gap_detection"
+    )
+    assert _first_order(events, "a02_capability_gap_detection") < _first_order(
         events, "a_line_normalization"
     )
     assert _first_order(events, "a_line_normalization") < _first_order(events, "m_minimal")

@@ -66,6 +66,10 @@ if TYPE_CHECKING:
         A01CanonicalOntologyResult,
         A01RawAffordanceCandidateSet,
     )
+    from substrate.a02_capability_gap_detection import (
+        A02CapabilityGapResult,
+        A02DemandSet,
+    )
     from substrate.p01_project_formation import (
         P01IntentionStackState,
         P01ProjectFormationResult,
@@ -440,6 +444,23 @@ class SubjectTickRestrictionCode(StrEnum):
     A01_LEGACY_LABEL_BYPASS_FORBIDDEN = "a01_legacy_label_bypass_forbidden"
     A01_SOURCE_LINEAGE_PARTIAL = "a01_source_lineage_partial"
     A01_CANONICAL_ID_COVERAGE_INCOMPLETE = "a01_canonical_id_coverage_incomplete"
+    A02_CAPABILITY_GAP_CONTRACT_MUST_BE_READ = "a02_capability_gap_contract_must_be_read"
+    A02_GAP_PACKET_CONSUMER_REQUIRED = "a02_gap_packet_consumer_required"
+    A02_PARTIAL_COVERAGE_CONSUMER_REQUIRED = "a02_partial_coverage_consumer_required"
+    A02_OWNERSHIP_BOUNDARY_CONSUMER_REQUIRED = (
+        "a02_ownership_boundary_consumer_required"
+    )
+    A02_COMPOSITION_CONSUMER_REQUIRED = "a02_composition_consumer_required"
+    A02_MISSING_AFFORDANCE_DETOUR_REQUIRED = "a02_missing_affordance_detour_required"
+    A02_BLOCKED_AFFORDANCE_DETOUR_REQUIRED = "a02_blocked_affordance_detour_required"
+    A02_PARTIAL_COVERAGE_DETOUR_REQUIRED = "a02_partial_coverage_detour_required"
+    A02_COMPOSITION_UNVERIFIED_DETOUR_REQUIRED = (
+        "a02_composition_unverified_detour_required"
+    )
+    A02_OWNERSHIP_BOUNDARY_DETOUR_REQUIRED = "a02_ownership_boundary_detour_required"
+    A02_NO_CLEAN_COVERAGE_DETOUR_REQUIRED = "a02_no_clean_coverage_detour_required"
+    A02_SOURCE_LINEAGE_PARTIAL = "a02_source_lineage_partial"
+    A02_CANONICAL_ID_COVERAGE_INCOMPLETE = "a02_canonical_id_coverage_incomplete"
     DOWNSTREAM_AUTHORITY_DEGRADED = "downstream_authority_degraded"
 
 
@@ -644,6 +665,12 @@ class SubjectTickContext:
     require_a01_contested_affordance_consumer: bool = False
     require_a01_deprecated_affordance_consumer: bool = False
     disable_a01_enforcement: bool = False
+    require_a02_gap_packet_consumer: bool = False
+    require_a02_partial_coverage_consumer: bool = False
+    require_a02_ownership_boundary_consumer: bool = False
+    require_a02_composition_consumer: bool = False
+    disable_a02_enforcement: bool = False
+    a02_composition_enabled: bool = True
     o01_entity_signals: tuple[O01EntitySignal, ...] = ()
     o02_interaction_diagnostics: O02InteractionDiagnosticsInput | None = None
     o03_candidate_strategy: O03CandidateStrategyInput | None = None
@@ -658,6 +685,7 @@ class SubjectTickContext:
     p03_credit_assignment_input: P03CreditAssignmentInput | None = None
     p04_simulation_input: P04SimulationInput | None = None
     a01_raw_affordance_candidate_set: A01RawAffordanceCandidateSet | None = None
+    a02_demand_set: A02DemandSet | None = None
     g08_appraisal_significance_hint: float | None = None
     source_lineage: tuple[str, ...] = ()
 
@@ -1266,6 +1294,27 @@ class SubjectTickState:
     a01_contested_affordance_consumer_ready: bool = False
     a01_deprecated_affordance_consumer_ready: bool = False
     a01_downstream_consumer_ready: bool = False
+    a02_demand_count: int = 0
+    a02_explicit_basis_present: bool = False
+    a02_gap_entry_count: int = 0
+    a02_fully_covered_count: int = 0
+    a02_partial_coverage_count: int = 0
+    a02_missing_gap_count: int = 0
+    a02_blocked_gap_count: int = 0
+    a02_composition_gap_count: int = 0
+    a02_composition_unverified_count: int = 0
+    a02_ownership_boundary_gap_count: int = 0
+    a02_no_clean_coverage_count: int = 0
+    a02_source_lineage_count: int = 0
+    a02_source_lineage_complete: bool = False
+    a02_canonical_id_hint_used_count: int = 0
+    a02_canonical_id_generated_count: int = 0
+    a02_canonical_id_coverage_complete: bool = False
+    a02_gap_packet_consumer_ready: bool = False
+    a02_partial_coverage_consumer_ready: bool = False
+    a02_ownership_boundary_consumer_ready: bool = False
+    a02_composition_consumer_ready: bool = False
+    a02_downstream_consumer_ready: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -1599,6 +1648,7 @@ class SubjectTickResult:
     world_entry_result: WorldEntryContractResult
     self_contour_result: SMinimalContourResult
     a01_result: A01CanonicalOntologyResult
+    a02_result: A02CapabilityGapResult
     a_line_result: ALineNormalizationResult
     m_minimal_result: MMinimalResult
     n_minimal_result: NMinimalResult

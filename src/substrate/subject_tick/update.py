@@ -245,6 +245,16 @@ from substrate.a01_internal_affordance_ontology_cleanup import (
     build_a01_internal_affordance_ontology_cleanup,
     derive_a01_ontology_consumer_view,
 )
+from substrate.a02_capability_gap_detection import (
+    A02CapabilityGapInput,
+    A02ControllabilityStatus,
+    A02DemandClass,
+    A02DemandLegitimacyStatus,
+    A02DemandPacket,
+    A02DemandSet,
+    build_a02_capability_gap_detection,
+    derive_a02_capability_gap_consumer_view,
+)
 from substrate.s01_efference_copy import (
     S01EfferenceCopyState,
     build_s01_efference_copy,
@@ -269,6 +279,7 @@ ATTEMPTED_SUBJECT_TICK_PATHS: tuple[str, ...] = (
     "subject_tick.evaluate_s04_interoceptive_self_binding",
     "subject_tick.evaluate_s05_multi_cause_attribution_factorization",
     "subject_tick.evaluate_a01_internal_affordance_ontology_cleanup",
+    "subject_tick.evaluate_a02_capability_gap_detection",
     "subject_tick.evaluate_s_minimal_contour",
     "subject_tick.evaluate_a_line_normalization",
     "subject_tick.evaluate_m_minimal_contour",
@@ -2456,6 +2467,268 @@ def execute_subject_tick(
             required_action=";".join(dict.fromkeys(a01_required_actions)),
             applied_action=active_execution_mode,
             reason=a01_checkpoint_reason,
+        )
+    )
+    a02_explicit_input = (
+        context.a02_demand_set if isinstance(context.a02_demand_set, A02DemandSet) else None
+    )
+    a02_explicit_basis = bool(a02_explicit_input is not None and a02_explicit_input.demands)
+    a02_input = A02CapabilityGapInput(
+        demand_set=(
+            a02_explicit_input
+            if a02_explicit_input is not None
+            else _build_default_a02_demand_set(
+                tick_id=tick_id,
+                a01_result=a01_result,
+                source_lineage=lineage,
+            )
+        ),
+        source_lineage=lineage,
+        ownership_boundary_basis=tuple(
+            dict.fromkeys(
+                (
+                    "s_minimal",
+                    s_minimal_result.state.internal_vs_external_source_status.value,
+                    s_minimal_result.state.attribution_class.value,
+                )
+            )
+        ),
+        composition_enabled=context.a02_composition_enabled,
+    )
+    a02_result = build_a02_capability_gap_detection(
+        tick_id=tick_id,
+        tick_index=tick_index,
+        capability_input=a02_input,
+        a01_result=a01_result,
+        gap_detection_enabled=not context.disable_a02_enforcement,
+    )
+    a02_view = derive_a02_capability_gap_consumer_view(a02_result)
+    a02_trace_values = {
+        "demand_count": a02_result.telemetry.demand_count,
+        "gap_entry_count": a02_result.telemetry.gap_entry_count,
+        "fully_covered_count": a02_result.telemetry.fully_covered_count,
+        "partial_coverage_count": a02_result.telemetry.partial_coverage_count,
+        "missing_gap_count": a02_result.telemetry.missing_gap_count,
+        "blocked_gap_count": a02_result.telemetry.blocked_gap_count,
+        "composition_gap_count": a02_result.telemetry.composition_gap_count,
+        "composition_unverified_count": a02_result.telemetry.composition_unverified_count,
+        "ownership_boundary_gap_count": a02_result.telemetry.ownership_boundary_gap_count,
+        "no_clean_coverage_count": a02_result.telemetry.no_clean_coverage_count,
+        "downstream_consumer_ready": a02_result.telemetry.downstream_consumer_ready,
+    }
+    trace_emit_active("a02_capability_gap_detection", "enter", a02_trace_values)
+    a02_checkpoint_status = SubjectTickCheckpointStatus.ALLOWED
+    a02_checkpoint_reason = a02_result.gate.reason
+    a02_default_missing_detour = False
+    a02_default_blocked_detour = False
+    a02_default_partial_detour = False
+    a02_default_composition_unverified_detour = False
+    a02_default_ownership_boundary_detour = False
+    a02_default_no_clean_detour = False
+    a02_default_lineage_partial_detour = False
+    a02_default_canonical_id_coverage_detour = False
+    if not context.disable_a02_enforcement:
+        if (
+            context.require_a02_gap_packet_consumer
+            and not a02_view.gap_packet_consumer_ready
+            and halt_reason is None
+        ):
+            revalidation_needed = True
+            a02_checkpoint_status = SubjectTickCheckpointStatus.ENFORCED_DETOUR
+            a02_checkpoint_reason = (
+                "a02 gap-packet consumer requested but typed capability-gap packet is not ready"
+            )
+            if active_execution_mode != "halt_execution":
+                active_execution_mode = "revalidate_scope"
+        if (
+            context.require_a02_partial_coverage_consumer
+            and not a02_view.partial_coverage_consumer_ready
+            and halt_reason is None
+        ):
+            revalidation_needed = True
+            a02_checkpoint_status = SubjectTickCheckpointStatus.ENFORCED_DETOUR
+            a02_checkpoint_reason = (
+                "a02 partial-coverage consumer requested but no explicit partial coverage packet is available"
+            )
+            if active_execution_mode != "halt_execution":
+                active_execution_mode = "revalidate_scope"
+        if (
+            context.require_a02_ownership_boundary_consumer
+            and not a02_view.ownership_boundary_consumer_ready
+            and halt_reason is None
+        ):
+            revalidation_needed = True
+            a02_checkpoint_status = SubjectTickCheckpointStatus.ENFORCED_DETOUR
+            a02_checkpoint_reason = (
+                "a02 ownership-boundary consumer requested but ownership-boundary gap packet is absent"
+            )
+            if active_execution_mode != "halt_execution":
+                active_execution_mode = "revalidate_scope"
+        if (
+            context.require_a02_composition_consumer
+            and not a02_view.composition_consumer_ready
+            and halt_reason is None
+        ):
+            revalidation_needed = True
+            a02_checkpoint_status = SubjectTickCheckpointStatus.ENFORCED_DETOUR
+            a02_checkpoint_reason = (
+                "a02 composition consumer requested but composition-dependent packet is absent"
+            )
+            if active_execution_mode != "halt_execution":
+                active_execution_mode = "revalidate_scope"
+        if (
+            a02_explicit_basis
+            and a02_result.telemetry.missing_gap_count > 0
+            and halt_reason is None
+        ):
+            revalidation_needed = True
+            a02_default_missing_detour = True
+            a02_checkpoint_status = SubjectTickCheckpointStatus.ENFORCED_DETOUR
+            a02_checkpoint_reason = (
+                "a02 detected missing affordance demand and requires bounded exploration detour"
+            )
+            if active_execution_mode != "halt_execution":
+                active_execution_mode = "revalidate_scope"
+        if (
+            a02_explicit_basis
+            and a02_result.telemetry.blocked_gap_count > 0
+            and halt_reason is None
+        ):
+            repair_needed = True
+            a02_default_blocked_detour = True
+            a02_checkpoint_status = SubjectTickCheckpointStatus.ENFORCED_DETOUR
+            a02_checkpoint_reason = (
+                "a02 detected blocked affordance demand and requires blocking-condition restoration detour"
+            )
+            if active_execution_mode not in {"halt_execution", "revalidate_scope"}:
+                active_execution_mode = "repair_runtime_path"
+        if (
+            a02_explicit_basis
+            and a02_result.telemetry.partial_coverage_count > 0
+            and halt_reason is None
+        ):
+            revalidation_needed = True
+            a02_default_partial_detour = True
+            a02_checkpoint_status = SubjectTickCheckpointStatus.ENFORCED_DETOUR
+            a02_checkpoint_reason = (
+                "a02 detected partial coverage and requires residual-scope detour"
+            )
+            if active_execution_mode != "halt_execution":
+                active_execution_mode = "revalidate_scope"
+        if (
+            a02_explicit_basis
+            and a02_result.telemetry.composition_unverified_count > 0
+            and halt_reason is None
+        ):
+            revalidation_needed = True
+            a02_default_composition_unverified_detour = True
+            a02_checkpoint_status = SubjectTickCheckpointStatus.ENFORCED_DETOUR
+            a02_checkpoint_reason = (
+                "a02 detected unverified composition and requires bounded composition search detour"
+            )
+            if active_execution_mode != "halt_execution":
+                active_execution_mode = "revalidate_scope"
+        if (
+            a02_explicit_basis
+            and a02_result.telemetry.ownership_boundary_gap_count > 0
+            and halt_reason is None
+        ):
+            revalidation_needed = True
+            a02_default_ownership_boundary_detour = True
+            a02_checkpoint_status = SubjectTickCheckpointStatus.ENFORCED_DETOUR
+            a02_checkpoint_reason = (
+                "a02 detected ownership boundary gap and requires agency-overclaim suppression detour"
+            )
+            if active_execution_mode != "halt_execution":
+                active_execution_mode = "revalidate_scope"
+        if (
+            a02_explicit_basis
+            and a02_result.telemetry.no_clean_coverage_count > 0
+            and halt_reason is None
+        ):
+            revalidation_needed = True
+            a02_default_no_clean_detour = True
+            a02_checkpoint_status = SubjectTickCheckpointStatus.ENFORCED_DETOUR
+            a02_checkpoint_reason = (
+                "a02 has no-clean-coverage demand packets and requires ontology/demand revalidation detour"
+            )
+            if active_execution_mode != "halt_execution":
+                active_execution_mode = "revalidate_scope"
+        if (
+            a02_explicit_basis
+            and not a02_result.telemetry.source_lineage_complete
+            and halt_reason is None
+        ):
+            revalidation_needed = True
+            a02_default_lineage_partial_detour = True
+            a02_checkpoint_status = SubjectTickCheckpointStatus.ENFORCED_DETOUR
+            a02_checkpoint_reason = (
+                "a02 explicit basis requires complete source lineage for auditable capability-gap packet"
+            )
+            if active_execution_mode != "halt_execution":
+                active_execution_mode = "revalidate_scope"
+        if (
+            a02_explicit_basis
+            and not a02_result.telemetry.canonical_id_coverage_complete
+            and halt_reason is None
+        ):
+            revalidation_needed = True
+            a02_default_canonical_id_coverage_detour = True
+            a02_checkpoint_status = SubjectTickCheckpointStatus.ENFORCED_DETOUR
+            a02_checkpoint_reason = (
+                "a02 explicit basis requires complete canonical-id coverage for stable gap mediation"
+            )
+            if active_execution_mode != "halt_execution":
+                active_execution_mode = "revalidate_scope"
+    else:
+        a02_checkpoint_status = SubjectTickCheckpointStatus.ALLOWED
+        a02_checkpoint_reason = "a02 enforcement disabled in ablation context"
+
+    a02_required_actions: list[str] = []
+    if context.require_a02_gap_packet_consumer:
+        a02_required_actions.append("require_a02_gap_packet_consumer")
+    if context.require_a02_partial_coverage_consumer:
+        a02_required_actions.append("require_a02_partial_coverage_consumer")
+    if context.require_a02_ownership_boundary_consumer:
+        a02_required_actions.append("require_a02_ownership_boundary_consumer")
+    if context.require_a02_composition_consumer:
+        a02_required_actions.append("require_a02_composition_consumer")
+    if a02_default_missing_detour:
+        a02_required_actions.append("default_a02_missing_affordance_exploration_detour")
+    if a02_default_blocked_detour:
+        a02_required_actions.append("default_a02_blocked_affordance_restoration_detour")
+    if a02_default_partial_detour:
+        a02_required_actions.append("default_a02_partial_coverage_detour")
+    if a02_default_composition_unverified_detour:
+        a02_required_actions.append("default_a02_composition_unverified_detour")
+    if a02_default_ownership_boundary_detour:
+        a02_required_actions.append("default_a02_ownership_boundary_detour")
+    if a02_default_no_clean_detour:
+        a02_required_actions.append("default_a02_no_clean_coverage_detour")
+    if a02_default_lineage_partial_detour:
+        a02_required_actions.append("default_a02_lineage_partial_detour")
+    if a02_default_canonical_id_coverage_detour:
+        a02_required_actions.append("default_a02_canonical_id_coverage_detour")
+    if not a02_required_actions:
+        a02_required_actions.append("a02_optional")
+
+    trace_emit_active("a02_capability_gap_detection", "decision", a02_trace_values)
+    if a02_checkpoint_status != SubjectTickCheckpointStatus.ALLOWED:
+        trace_emit_active(
+            "a02_capability_gap_detection",
+            "blocked",
+            a02_trace_values,
+            note=a02_checkpoint_reason,
+        )
+    trace_emit_active("a02_capability_gap_detection", "exit", a02_trace_values)
+    checkpoints.append(
+        SubjectTickCheckpointResult(
+            checkpoint_id="rt01.a02_capability_gap_detection_checkpoint",
+            source_contract="a02_capability_gap_detection.capability_gap_result",
+            status=a02_checkpoint_status,
+            required_action=";".join(dict.fromkeys(a02_required_actions)),
+            applied_action=active_execution_mode,
+            reason=a02_checkpoint_reason,
         )
     )
     a_line_result = build_a_line_normalization(
@@ -6477,6 +6750,27 @@ def execute_subject_tick(
             a01_result.gate.deprecated_affordance_consumer_ready
         ),
         a01_downstream_consumer_ready=a01_result.telemetry.downstream_consumer_ready,
+        a02_demand_count=a02_result.telemetry.demand_count,
+        a02_explicit_basis_present=a02_explicit_basis,
+        a02_gap_entry_count=a02_result.telemetry.gap_entry_count,
+        a02_fully_covered_count=a02_result.telemetry.fully_covered_count,
+        a02_partial_coverage_count=a02_result.telemetry.partial_coverage_count,
+        a02_missing_gap_count=a02_result.telemetry.missing_gap_count,
+        a02_blocked_gap_count=a02_result.telemetry.blocked_gap_count,
+        a02_composition_gap_count=a02_result.telemetry.composition_gap_count,
+        a02_composition_unverified_count=a02_result.telemetry.composition_unverified_count,
+        a02_ownership_boundary_gap_count=a02_result.telemetry.ownership_boundary_gap_count,
+        a02_no_clean_coverage_count=a02_result.telemetry.no_clean_coverage_count,
+        a02_source_lineage_count=a02_result.telemetry.source_lineage_count,
+        a02_source_lineage_complete=a02_result.telemetry.source_lineage_complete,
+        a02_canonical_id_hint_used_count=a02_result.telemetry.canonical_id_hint_used_count,
+        a02_canonical_id_generated_count=a02_result.telemetry.canonical_id_generated_count,
+        a02_canonical_id_coverage_complete=a02_result.telemetry.canonical_id_coverage_complete,
+        a02_gap_packet_consumer_ready=a02_result.gate.gap_packet_consumer_ready,
+        a02_partial_coverage_consumer_ready=a02_result.gate.partial_coverage_consumer_ready,
+        a02_ownership_boundary_consumer_ready=a02_result.gate.ownership_boundary_consumer_ready,
+        a02_composition_consumer_ready=a02_result.gate.composition_consumer_ready,
+        a02_downstream_consumer_ready=a02_result.telemetry.downstream_consumer_ready,
     )
     gate = evaluate_subject_tick_downstream_gate(state)
     telemetry = build_subject_tick_telemetry(
@@ -6484,7 +6778,7 @@ def execute_subject_tick(
         attempted_paths=ATTEMPTED_SUBJECT_TICK_PATHS,
         downstream_gate=gate,
         causal_basis=(
-            "bounded runtime execution spine enforces roadmap authority roles for C04/C05, consumes world-entry, s01 efference-copy, s02 prediction-boundary seam, s03 ownership-weighted learning, s04 interoceptive self-binding, s05 multi-cause attribution, s-minimal, a01 affordance ontology cleanup, a-line, m-minimal, n-minimal, t01 semantic-field, t02 relation-binding, t03 hypothesis-competition, t04 attention-schema, o01 other-entity modeling, o02 intersubjective allostasis, o03 strategy-class evaluation, p01 authority-bounded project-formation, o04 rupture/hostility/coercion dynamics, r05 bounded protective regulation gates, v01 act-level normative licensing/commitment guards, v02 typed utterance-plan bridge constraints, v03 constrained realization alignment/report contract, c06 typed surfacing-candidates handoff, p02 typed intervention episodes, p03 typed long-horizon credit assignment, and p04 typed interpersonal counterfactual policy simulation before bounded outcome resolution, while keeping D01 observability-only over fixed R->C order"
+            "bounded runtime execution spine enforces roadmap authority roles for C04/C05, consumes world-entry, s01 efference-copy, s02 prediction-boundary seam, s03 ownership-weighted learning, s04 interoceptive self-binding, s05 multi-cause attribution, s-minimal, a01 affordance ontology cleanup, a02 capability-gap detection, a-line, m-minimal, n-minimal, t01 semantic-field, t02 relation-binding, t03 hypothesis-competition, t04 attention-schema, o01 other-entity modeling, o02 intersubjective allostasis, o03 strategy-class evaluation, p01 authority-bounded project-formation, o04 rupture/hostility/coercion dynamics, r05 bounded protective regulation gates, v01 act-level normative licensing/commitment guards, v02 typed utterance-plan bridge constraints, v03 constrained realization alignment/report contract, c06 typed surfacing-candidates handoff, p02 typed intervention episodes, p03 typed long-horizon credit assignment, and p04 typed interpersonal counterfactual policy simulation before bounded outcome resolution, while keeping D01 observability-only over fixed R->C order"
         ),
     )
     abstain = final_outcome in {SubjectTickOutcome.REPAIR, SubjectTickOutcome.REVALIDATE}
@@ -6565,6 +6859,7 @@ def execute_subject_tick(
         world_entry_result=world_entry_result,
         self_contour_result=s_minimal_result,
         a01_result=a01_result,
+        a02_result=a02_result,
         a_line_result=a_line_result,
         m_minimal_result=m_minimal_result,
         n_minimal_result=n_minimal_result,
@@ -7043,6 +7338,55 @@ def _classify_s05_shape_profile(
     if downstream_route_class is S05DownstreamRouteClass.HIGH_RESIDUAL_UNDERDETERMINED:
         return "high_residual_underdetermined"
     return "other"
+
+
+def _build_default_a02_demand_set(
+    *,
+    tick_id: str,
+    a01_result,
+    source_lineage: tuple[str, ...],
+) -> A02DemandSet | None:
+    if not a01_result.ontology_snapshot.canonical_entries:
+        return None
+    demands: list[A02DemandPacket] = []
+    for index, entry in enumerate(a01_result.ontology_snapshot.canonical_entries, start=1):
+        demanded_class = (
+            A02DemandClass.WORLD_FACING
+            if "world" in entry.target_channels
+            else A02DemandClass.REGULATORY
+        )
+        required_control = (
+            A02ControllabilityStatus.OUTSIDE_CURRENT_CONTROL
+            if entry.controllability.controllability_class is A01ControllabilityClass.WORLD_DEPENDENT
+            else A02ControllabilityStatus.CONTROLLABLE_CURRENTLY
+        )
+        demands.append(
+            A02DemandPacket(
+                demand_id=f"{tick_id}:a02:default:{index}",
+                demanded_change_class=demanded_class,
+                demanded_scope=entry.effect_scope.primary_outcomes,
+                target_channels=entry.target_channels,
+                source_kind="default_a02_projection",
+                source_ref="subject_tick.default_a02_demand_projection",
+                urgency="normal",
+                severity=1,
+                allowed_latency="bounded_tick",
+                legitimacy_status=A02DemandLegitimacyStatus.TYPED_LEGITIMATE,
+                required_controllability=required_control,
+                world_side_requirement="required" if "world" in entry.target_channels else "optional",
+                provenance=("subject_tick.default_a02", entry.affordance_id),
+            )
+        )
+        if index >= 1:
+            break
+    if not demands:
+        return None
+    return A02DemandSet(
+        demand_set_id=f"a02:{tick_id}:default_demand_set",
+        demands=tuple(demands),
+        source_lineage=source_lineage,
+        reason="default narrow projection from a01 canonical entries for optional A02 observability",
+    )
 
 
 def _build_default_a01_raw_affordance_candidate_set(
