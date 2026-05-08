@@ -661,3 +661,156 @@ def test_module_name_baseline_differs_and_no_tool_inflation_occurs() -> None:
     assert result.telemetry.rejected_operation_count == 2
     assert rejected_refs == {"wrapper:helper", "wrapper:overbroad"}
     assert view.legacy_direct_call_detected is True
+
+
+def test_strategy_boundary_candidate_is_not_promoted_to_canonical_tool() -> None:
+    seed = _a01_result(
+        "a03-strategy-boundary",
+        (
+            a01_candidate(
+                candidate_id="c1",
+                local_label="diagnostic_scan",
+                affordance_class=A01AffordanceClass.SENSING_MONITORING,
+                aliases=(),
+                provenance="tests.a03.strategy",
+                preconditions=("requires_observation:internal_state",),
+                primary_outcomes=("diagnostic",),
+                target_channels=("internal",),
+                controllability_class=A01ControllabilityClass.SELF_CONTROLLED,
+                controllability_confidence=0.8,
+                observation_signals=("internal_state",),
+                observation_verification_required=True,
+                canonical_id_hint="a01:test:diagnostic_scan",
+            ),
+        ),
+    )
+
+    result = build_a03_harness_case(
+        A03HarnessCase(
+            case_id="strategy-boundary",
+            a01_result=seed,
+            a02_result=None,
+            operation_candidate_set=a03_candidate_set(
+                set_id="strategy-boundary:set",
+                candidates=(
+                    _typed_candidate(
+                        operation_ref="strategy:1",
+                        local_label="prefer safer reasoning route",
+                        tool_class=A03ToolClass.ROUTE_BUILDING,
+                        boundary_kind=A03OperationBoundaryKind.STRATEGY,
+                    ),
+                ),
+                reason="strategy boundary classification",
+                available_observation_channels=("internal_state",),
+            ),
+        )
+    ).a03_result
+
+    assert result.telemetry.canonical_tool_count == 0
+    assert result.telemetry.rejected_operation_count == 1
+    assert result.cleanup_ledger.rejected_operations[0].rejection_reason is A03RejectionReason.NO_REUSABLE_OPERATION
+    assert result.gate.internal_tool_consumer_ready is False
+
+
+def test_latent_state_boundary_candidate_is_not_canonicalized_as_tool() -> None:
+    seed = _a01_result(
+        "a03-latent-state",
+        (
+            a01_candidate(
+                candidate_id="c1",
+                local_label="diagnostic_scan",
+                affordance_class=A01AffordanceClass.SENSING_MONITORING,
+                aliases=(),
+                provenance="tests.a03.latent",
+                preconditions=("requires_observation:internal_state",),
+                primary_outcomes=("diagnostic",),
+                target_channels=("internal",),
+                controllability_class=A01ControllabilityClass.SELF_CONTROLLED,
+                controllability_confidence=0.8,
+                observation_signals=("internal_state",),
+                observation_verification_required=True,
+                canonical_id_hint="a01:test:diagnostic_scan",
+            ),
+        ),
+    )
+
+    result = build_a03_harness_case(
+        A03HarnessCase(
+            case_id="latent-state-boundary",
+            a01_result=seed,
+            a02_result=None,
+            operation_candidate_set=a03_candidate_set(
+                set_id="latent-state-boundary:set",
+                candidates=(
+                    _typed_candidate(
+                        operation_ref="latent:1",
+                        local_label="active uncertainty buffer",
+                        tool_class=A03ToolClass.SELF_QUERY,
+                        boundary_kind=A03OperationBoundaryKind.LATENT_STATE,
+                    ),
+                ),
+                reason="latent-state boundary classification",
+                available_observation_channels=("internal_state",),
+            ),
+        )
+    ).a03_result
+
+    assert result.telemetry.canonical_tool_count == 0
+    assert result.telemetry.rejected_operation_count == 1
+    assert result.cleanup_ledger.rejected_operations[0].rejection_reason is A03RejectionReason.STORED_CONTENT_NOT_TOOL
+    assert result.gate.internal_tool_consumer_ready is False
+
+
+def test_unknown_boundary_candidate_is_contested_and_not_fully_canonicalized() -> None:
+    seed = _a01_result(
+        "a03-unknown-boundary",
+        (
+            a01_candidate(
+                candidate_id="c1",
+                local_label="diagnostic_scan",
+                affordance_class=A01AffordanceClass.SENSING_MONITORING,
+                aliases=(),
+                provenance="tests.a03.unknown",
+                preconditions=("requires_observation:internal_state",),
+                primary_outcomes=("diagnostic",),
+                target_channels=("internal",),
+                controllability_class=A01ControllabilityClass.SELF_CONTROLLED,
+                controllability_confidence=0.8,
+                observation_signals=("internal_state",),
+                observation_verification_required=True,
+                canonical_id_hint="a01:test:diagnostic_scan",
+            ),
+        ),
+    )
+
+    result = build_a03_harness_case(
+        A03HarnessCase(
+            case_id="unknown-boundary",
+            a01_result=seed,
+            a02_result=None,
+            operation_candidate_set=a03_candidate_set(
+                set_id="unknown-boundary:set",
+                candidates=(
+                    _typed_candidate(
+                        operation_ref="unknown:1",
+                        local_label="unknown internal operation marker",
+                        tool_class=A03ToolClass.DIAGNOSTIC,
+                        boundary_kind=A03OperationBoundaryKind.UNKNOWN_BOUNDARY,
+                    ),
+                ),
+                reason="unknown-boundary classification",
+                available_observation_channels=("internal_state",),
+            ),
+        )
+    ).a03_result
+
+    contested_decisions = [
+        item
+        for item in result.cleanup_ledger.normalization_decisions
+        if item.decision_type is A03NormalizationDecisionType.CONTESTED_PENDING_CONTRACT
+    ]
+    assert result.telemetry.canonical_tool_count == 0
+    assert result.telemetry.contested_tool_count == 1
+    assert result.cleanup_ledger.rejected_operations[0].rejection_reason is A03RejectionReason.NO_REUSABLE_OPERATION
+    assert len(contested_decisions) == 1
+    assert result.gate.internal_tool_consumer_ready is False

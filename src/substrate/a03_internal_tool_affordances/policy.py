@@ -119,6 +119,29 @@ def build_a03_internal_tool_affordances(
                     reason=rejection.reason,
                 )
             )
+            if candidate.boundary_kind is A03OperationBoundaryKind.UNKNOWN_BOUNDARY:
+                contested_records.append(
+                    A03ContestedToolRecord(
+                        contested_id=f"a03:{tick_id}:{tick_index}:unknown-boundary:{candidate.operation_ref}",
+                        operation_refs=(candidate.operation_ref,),
+                        reason=(
+                            "unknown operation boundary does not support a strong canonical "
+                            "tool claim without additional contract evidence"
+                        ),
+                    )
+                )
+                normalization_decisions.append(
+                    A03ToolNormalizationDecision(
+                        decision_id=f"a03:{tick_id}:{tick_index}:contested:{candidate.operation_ref}",
+                        decision_type=A03NormalizationDecisionType.CONTESTED_PENDING_CONTRACT,
+                        source_operation_refs=(candidate.operation_ref,),
+                        produced_tool_ids=(),
+                        reason=(
+                            "unknown boundary candidate retained as contested until typed "
+                            "tool-vs-non-tool boundary evidence is provided"
+                        ),
+                    )
+                )
             if candidate.boundary_kind not in {
                 A03OperationBoundaryKind.REUSABLE_TOOL,
                 A03OperationBoundaryKind.PSEUDO_TOOL,
@@ -384,6 +407,16 @@ def _reject_non_tool_candidate(
             rejection_reason=A03RejectionReason.HELPER_NOT_AFFORDANCE,
             reason="helper routine does not expose agency-level invocation contract",
         )
+    if candidate.boundary_kind is A03OperationBoundaryKind.STRATEGY:
+        return A03RejectedInternalOperation(
+            operation_ref=candidate.operation_ref,
+            local_label=candidate.local_label,
+            rejection_reason=A03RejectionReason.NO_REUSABLE_OPERATION,
+            reason=(
+                "strategy preference is not treated as a reusable internal tool affordance "
+                "without a stable invocation contract"
+            ),
+        )
     if candidate.boundary_kind in {
         A03OperationBoundaryKind.HIDDEN_PLUMBING,
         A03OperationBoundaryKind.EXTERNAL_API_PROXY,
@@ -394,12 +427,25 @@ def _reject_non_tool_candidate(
             rejection_reason=A03RejectionReason.IMPLEMENTATION_PLUMBING,
             reason="implementation/module plumbing is not canonical internal tool affordance",
         )
-    if candidate.boundary_kind is A03OperationBoundaryKind.STORED_CONTENT:
+    if candidate.boundary_kind in {
+        A03OperationBoundaryKind.STORED_CONTENT,
+        A03OperationBoundaryKind.LATENT_STATE,
+    }:
         return A03RejectedInternalOperation(
             operation_ref=candidate.operation_ref,
             local_label=candidate.local_label,
             rejection_reason=A03RejectionReason.STORED_CONTENT_NOT_TOOL,
-            reason="stored content/state is not an invocable internal operation",
+            reason="stored or latent state is not an invocable reusable internal operation",
+        )
+    if candidate.boundary_kind is A03OperationBoundaryKind.UNKNOWN_BOUNDARY:
+        return A03RejectedInternalOperation(
+            operation_ref=candidate.operation_ref,
+            local_label=candidate.local_label,
+            rejection_reason=A03RejectionReason.NO_REUSABLE_OPERATION,
+            reason=(
+                "unknown boundary candidate cannot be promoted to canonical internal tool "
+                "without boundary-resolution evidence"
+            ),
         )
     if candidate.boundary_kind is A03OperationBoundaryKind.PSEUDO_TOOL or label_norm in _PSEUDOTOOL_LABEL_TOKENS:
         return A03RejectedInternalOperation(

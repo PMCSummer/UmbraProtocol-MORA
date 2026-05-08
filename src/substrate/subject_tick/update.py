@@ -2935,7 +2935,11 @@ def execute_subject_tick(
         a03_required_actions.append("default_a03_missing_internal_tool_gap_detour")
     if a03_default_legacy_direct_call_detour:
         a03_required_actions.append("default_a03_legacy_direct_call_detour")
-    if a03_explicit_basis and not a03_result.telemetry.canonical_tool_id_coverage_complete:
+    if (
+        not context.disable_a03_enforcement
+        and a03_explicit_basis
+        and not a03_result.telemetry.canonical_tool_id_coverage_complete
+    ):
         a03_required_actions.append("default_a03_canonical_tool_id_coverage_detour")
     if not a03_required_actions:
         a03_required_actions.append("a03_optional")

@@ -82,6 +82,7 @@ def _a03_candidate_set(
     *,
     legacy_direct_call: bool = False,
     incomplete_contract: bool = False,
+    canonical_hint_matches: bool = True,
 ) -> A03InternalOperationCandidateSet:
     produced_outputs = () if incomplete_contract else (
         A03ToolOutputSpec(type_name="diagnostic_record", guaranteed=False, scope_hint="bounded"),
@@ -94,6 +95,12 @@ def _a03_candidate_set(
             detectable=True,
         ),
     )
+    canonical_tool_id_hint = (
+        f"a01:{case_id}:internal_diagnostic_scan"
+        if canonical_hint_matches
+        else "a01:non_matching:internal_diagnostic_scan"
+    )
+
     candidate = A03InternalOperationCandidate(
         operation_ref=f"{case_id}:op",
         local_label="internal_diagnostic_scan",
@@ -127,7 +134,7 @@ def _a03_candidate_set(
         reliability_hint=0.8,
         reuse_scope="frontier_narrow",
         required_context=("mode:continue_stream",),
-        canonical_tool_id_hint=f"a01:{case_id}:internal_diagnostic_scan",
+        canonical_tool_id_hint=canonical_tool_id_hint,
         legacy_module_only=False,
     )
 
@@ -166,7 +173,7 @@ def _a03_candidate_set(
             reliability_hint=0.8,
             reuse_scope="frontier_narrow",
             required_context=("mode:continue_stream",),
-            canonical_tool_id_hint=f"a01:{case_id}:internal_diagnostic_scan",
+            canonical_tool_id_hint=canonical_tool_id_hint,
             legacy_module_only=True,
         )
         candidates = (candidate, legacy_helper)
@@ -317,3 +324,49 @@ def test_a03_gate_disabled_in_test_fixture_changes_behavior_materially() -> None
     assert disabled_checkpoint.required_action == "a03_optional"
     assert disabled_checkpoint.reason == "A03 gate disabled in test fixture"
     assert enabled.state.final_execution_outcome != disabled.state.final_execution_outcome
+
+
+def test_same_checkpoint_envelope_with_canonical_id_coverage_flip_changes_downstream_gate() -> None:
+    complete_case = "rt-a03-canonical-coverage-complete"
+    incomplete_case = "rt-a03-canonical-coverage-incomplete"
+    common_context_flags = {
+        "disable_a03_enforcement": True,
+        "require_a03_internal_tool_consumer": True,
+    }
+
+    complete = _result(
+        complete_case,
+        context=replace(
+            _base_context(),
+            **common_context_flags,
+            a01_raw_affordance_candidate_set=_canonical_candidate_set(complete_case),
+            a03_operation_candidate_set=_a03_candidate_set(
+                complete_case,
+                canonical_hint_matches=True,
+            ),
+        ),
+    )
+    incomplete = _result(
+        incomplete_case,
+        context=replace(
+            _base_context(),
+            **common_context_flags,
+            a01_raw_affordance_candidate_set=_canonical_candidate_set(incomplete_case),
+            a03_operation_candidate_set=_a03_candidate_set(
+                incomplete_case,
+                canonical_hint_matches=False,
+            ),
+        ),
+    )
+
+    complete_checkpoint = _a03_checkpoint(complete)
+    incomplete_checkpoint = _a03_checkpoint(incomplete)
+    assert complete_checkpoint.checkpoint_id == incomplete_checkpoint.checkpoint_id
+    assert complete_checkpoint.required_action == incomplete_checkpoint.required_action
+    assert complete_checkpoint.required_action == "require_a03_internal_tool_consumer"
+
+    assert complete.state.a03_canonical_tool_id_coverage_complete is True
+    assert incomplete.state.a03_canonical_tool_id_coverage_complete is False
+
+    assert complete.downstream_gate.accepted is True
+    assert incomplete.downstream_gate.accepted is False
