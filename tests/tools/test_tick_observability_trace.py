@@ -51,6 +51,7 @@ HOSTED_CONTOUR_SEGMENTS = (
     "p03_long_horizon_credit_assignment_intervention_learning",
     "p04_interpersonal_counterfactual_policy_simulation",
     "s_minimal_contour",
+    "a01_internal_affordance_ontology_cleanup",
     "a_line_normalization",
     "m_minimal",
     "n_minimal",
@@ -286,6 +287,19 @@ HOSTED_CONTOUR_FIELDS: dict[str, set[str]] = {
         "misread_case_support",
         "knowledge_uncertainty_support",
         "guardrail_exclusion_count",
+        "downstream_consumer_ready",
+    },
+    "a01_internal_affordance_ontology_cleanup": {
+        "raw_candidate_count",
+        "canonical_entry_count",
+        "merged_alias_group_count",
+        "split_decision_count",
+        "contested_entry_count",
+        "deprecated_entry_count",
+        "parent_child_relation_count",
+        "same_label_diff_precondition_count",
+        "class_conflict_count",
+        "legacy_label_bypass_detected",
         "downstream_consumer_ready",
     },
     "s_minimal_contour": {
@@ -794,7 +808,12 @@ def test_hosted_contour_segments_follow_real_runtime_order(tmp_path: Path) -> No
     assert _first_order(events, "p04_interpersonal_counterfactual_policy_simulation") < _first_order(
         events, "bounded_outcome_resolution"
     )
-    assert _first_order(events, "s_minimal_contour") < _first_order(events, "a_line_normalization")
+    assert _first_order(events, "s_minimal_contour") < _first_order(
+        events, "a01_internal_affordance_ontology_cleanup"
+    )
+    assert _first_order(events, "a01_internal_affordance_ontology_cleanup") < _first_order(
+        events, "a_line_normalization"
+    )
     assert _first_order(events, "a_line_normalization") < _first_order(events, "m_minimal")
     assert _first_order(events, "m_minimal") < _first_order(events, "n_minimal")
     assert _first_order(events, "n_minimal") < _first_order(events, "t01_semantic_field")
@@ -864,6 +883,7 @@ def test_representative_modules_have_runtime_steps(tmp_path: Path) -> None:
         "p02_intervention_episode_layer_licensed_action_trace",
         "p03_long_horizon_credit_assignment_intervention_learning",
         "p04_interpersonal_counterfactual_policy_simulation",
+        "a01_internal_affordance_ontology_cleanup",
         "downstream_obedience",
         "subject_tick",
     ):

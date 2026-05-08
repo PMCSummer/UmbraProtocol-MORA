@@ -232,6 +232,19 @@ from substrate.p04_interpersonal_counterfactual_policy_simulation import (
     build_p04_interpersonal_counterfactual_policy_simulation,
     derive_p04_simulation_consumer_view,
 )
+from substrate.a01_internal_affordance_ontology_cleanup import (
+    A01AffordanceClass,
+    A01ControllabilityClass,
+    A01ControllabilityProfile,
+    A01EffectScopeProfile,
+    A01ObservationExpectation,
+    A01OwnershipRelevance,
+    A01PreconditionProfile,
+    A01RawAffordanceCandidate,
+    A01RawAffordanceCandidateSet,
+    build_a01_internal_affordance_ontology_cleanup,
+    derive_a01_ontology_consumer_view,
+)
 from substrate.s01_efference_copy import (
     S01EfferenceCopyState,
     build_s01_efference_copy,
@@ -255,6 +268,7 @@ ATTEMPTED_SUBJECT_TICK_PATHS: tuple[str, ...] = (
     "subject_tick.evaluate_s03_ownership_weighted_learning",
     "subject_tick.evaluate_s04_interoceptive_self_binding",
     "subject_tick.evaluate_s05_multi_cause_attribution_factorization",
+    "subject_tick.evaluate_a01_internal_affordance_ontology_cleanup",
     "subject_tick.evaluate_s_minimal_contour",
     "subject_tick.evaluate_a_line_normalization",
     "subject_tick.evaluate_m_minimal_contour",
@@ -2239,6 +2253,188 @@ def execute_subject_tick(
             ),
             applied_action=active_execution_mode,
             reason=s_checkpoint_reason,
+        )
+    )
+    a01_explicit_input = (
+        context.a01_raw_affordance_candidate_set
+        if isinstance(context.a01_raw_affordance_candidate_set, A01RawAffordanceCandidateSet)
+        else None
+    )
+    a01_raw_candidate_set = (
+        a01_explicit_input
+        if a01_explicit_input is not None
+        else _build_default_a01_raw_affordance_candidate_set(
+            tick_id=tick_id,
+            affordance_ids=affordance_gate.accepted_candidate_ids,
+            source_lineage=lineage,
+        )
+    )
+    a01_explicit_basis = bool(
+        a01_explicit_input is not None and a01_explicit_input.candidates
+    )
+    a01_result = build_a01_internal_affordance_ontology_cleanup(
+        tick_id=tick_id,
+        tick_index=tick_index,
+        raw_candidate_set=a01_raw_candidate_set,
+        c04_execution_mode_claim=c04_execution_mode_claim,
+        c05_validity_action=c05_validity_action,
+        s04_result=s04_result,
+        s05_result=s05_result,
+        source_lineage=lineage,
+        cleanup_enabled=not context.disable_a01_enforcement,
+    )
+    a01_view = derive_a01_ontology_consumer_view(a01_result)
+    a01_trace_values = {
+        "raw_candidate_count": a01_result.telemetry.raw_candidate_count,
+        "canonical_entry_count": a01_result.telemetry.canonical_entry_count,
+        "merged_alias_group_count": a01_result.telemetry.merged_alias_group_count,
+        "split_decision_count": a01_result.telemetry.split_decision_count,
+        "contested_entry_count": a01_result.telemetry.contested_entry_count,
+        "deprecated_entry_count": a01_result.telemetry.deprecated_entry_count,
+        "parent_child_relation_count": a01_result.telemetry.parent_child_relation_count,
+        "same_label_diff_precondition_count": (
+            a01_result.telemetry.same_label_diff_precondition_count
+        ),
+        "class_conflict_count": a01_result.telemetry.class_conflict_count,
+        "legacy_label_bypass_detected": a01_result.telemetry.legacy_label_bypass_detected,
+        "downstream_consumer_ready": a01_result.telemetry.downstream_consumer_ready,
+    }
+    trace_emit_active(
+        "a01_internal_affordance_ontology_cleanup",
+        "enter",
+        a01_trace_values,
+    )
+    a01_checkpoint_status = SubjectTickCheckpointStatus.ALLOWED
+    a01_checkpoint_reason = a01_result.gate.reason
+    a01_default_contested_detour = False
+    a01_default_deprecated_detour = False
+    a01_default_legacy_bypass_detour = False
+    if not context.disable_a01_enforcement:
+        if (
+            context.require_a01_canonical_affordance_consumer
+            and not a01_view.canonical_affordance_consumer_ready
+            and halt_reason is None
+        ):
+            revalidation_needed = True
+            a01_checkpoint_status = SubjectTickCheckpointStatus.ENFORCED_DETOUR
+            a01_checkpoint_reason = (
+                "a01 canonical-affordance consumer requested but canonical ontology is not ready"
+            )
+            if active_execution_mode != "halt_execution":
+                active_execution_mode = "revalidate_scope"
+        if (
+            context.require_a01_contested_affordance_consumer
+            and not a01_view.contested_affordance_consumer_ready
+            and halt_reason is None
+        ):
+            revalidation_needed = True
+            a01_checkpoint_status = SubjectTickCheckpointStatus.ENFORCED_DETOUR
+            a01_checkpoint_reason = (
+                "a01 contested-affordance consumer requested but contested set is not ready"
+            )
+            if active_execution_mode != "halt_execution":
+                active_execution_mode = "revalidate_scope"
+        if (
+            context.require_a01_deprecated_affordance_consumer
+            and not a01_view.deprecated_affordance_consumer_ready
+            and halt_reason is None
+        ):
+            repair_needed = True
+            a01_checkpoint_status = SubjectTickCheckpointStatus.ENFORCED_DETOUR
+            a01_checkpoint_reason = (
+                "a01 deprecated-affordance consumer requested but deprecated/narrowed set is not ready"
+            )
+            if active_execution_mode != "halt_execution":
+                active_execution_mode = "repair_runtime_path"
+        if (
+            a01_explicit_basis
+            and a01_result.telemetry.contested_entry_count > 0
+            and not context.require_a01_contested_affordance_consumer
+            and halt_reason is None
+        ):
+            revalidation_needed = True
+            a01_default_contested_detour = True
+            a01_checkpoint_status = SubjectTickCheckpointStatus.ENFORCED_DETOUR
+            a01_checkpoint_reason = (
+                "a01 default contour detected contested canonicalization and requires bounded detour"
+            )
+            if active_execution_mode != "halt_execution":
+                active_execution_mode = "revalidate_scope"
+        if (
+            a01_explicit_basis
+            and a01_result.telemetry.deprecated_entry_count > 0
+            and not context.require_a01_deprecated_affordance_consumer
+            and halt_reason is None
+            and not a01_default_contested_detour
+        ):
+            repair_needed = True
+            a01_default_deprecated_detour = True
+            a01_checkpoint_status = SubjectTickCheckpointStatus.ENFORCED_DETOUR
+            a01_checkpoint_reason = (
+                "a01 default contour detected deprecated/unavailable affordance and requires guarded repair detour"
+            )
+            if active_execution_mode != "halt_execution":
+                active_execution_mode = "repair_runtime_path"
+        if (
+            a01_explicit_basis
+            and a01_result.telemetry.legacy_label_bypass_detected
+            and halt_reason is None
+        ):
+            revalidation_needed = True
+            a01_default_legacy_bypass_detour = True
+            a01_checkpoint_status = SubjectTickCheckpointStatus.ENFORCED_DETOUR
+            a01_checkpoint_reason = (
+                "a01 detected legacy-label-only bypass and blocked non-canonical consumer path"
+            )
+            if active_execution_mode != "halt_execution":
+                active_execution_mode = "revalidate_scope"
+    else:
+        a01_checkpoint_status = SubjectTickCheckpointStatus.ALLOWED
+        a01_checkpoint_reason = "a01 enforcement disabled in ablation context"
+
+    a01_required_actions: list[str] = []
+    if context.require_a01_canonical_affordance_consumer:
+        a01_required_actions.append("require_a01_canonical_affordance_consumer")
+    if context.require_a01_contested_affordance_consumer:
+        a01_required_actions.append("require_a01_contested_affordance_consumer")
+    if context.require_a01_deprecated_affordance_consumer:
+        a01_required_actions.append("require_a01_deprecated_affordance_consumer")
+    if a01_default_contested_detour:
+        a01_required_actions.append("default_a01_contested_canonicalization_detour")
+    if a01_default_deprecated_detour:
+        a01_required_actions.append("default_a01_deprecated_affordance_detour")
+    if a01_default_legacy_bypass_detour:
+        a01_required_actions.append("default_a01_legacy_label_bypass_forbidden")
+    if not a01_required_actions:
+        a01_required_actions.append("a01_optional")
+
+    trace_emit_active(
+        "a01_internal_affordance_ontology_cleanup",
+        "decision",
+        a01_trace_values,
+    )
+    if a01_checkpoint_status != SubjectTickCheckpointStatus.ALLOWED:
+        trace_emit_active(
+            "a01_internal_affordance_ontology_cleanup",
+            "blocked",
+            a01_trace_values,
+            note=a01_checkpoint_reason,
+        )
+    trace_emit_active(
+        "a01_internal_affordance_ontology_cleanup",
+        "exit",
+        a01_trace_values,
+    )
+    checkpoints.append(
+        SubjectTickCheckpointResult(
+            checkpoint_id="rt01.a01_affordance_ontology_cleanup_checkpoint",
+            source_contract=(
+                "a01_internal_affordance_ontology_cleanup.canonical_ontology_snapshot"
+            ),
+            status=a01_checkpoint_status,
+            required_action=";".join(dict.fromkeys(a01_required_actions)),
+            applied_action=active_execution_mode,
+            reason=a01_checkpoint_reason,
         )
     )
     a_line_result = build_a_line_normalization(
@@ -6232,6 +6428,29 @@ def execute_subject_tick(
         p04_comparison_consumer_ready=p04_result.gate.comparison_consumer_ready,
         p04_excluded_policy_consumer_ready=p04_result.gate.excluded_policy_consumer_ready,
         p04_downstream_consumer_ready=p04_result.telemetry.downstream_consumer_ready,
+        a01_raw_candidate_count=a01_result.telemetry.raw_candidate_count,
+        a01_explicit_basis_present=a01_explicit_basis,
+        a01_canonical_entry_count=a01_result.telemetry.canonical_entry_count,
+        a01_merged_alias_group_count=a01_result.telemetry.merged_alias_group_count,
+        a01_split_decision_count=a01_result.telemetry.split_decision_count,
+        a01_contested_entry_count=a01_result.telemetry.contested_entry_count,
+        a01_deprecated_entry_count=a01_result.telemetry.deprecated_entry_count,
+        a01_parent_child_relation_count=a01_result.telemetry.parent_child_relation_count,
+        a01_same_label_diff_precondition_count=(
+            a01_result.telemetry.same_label_diff_precondition_count
+        ),
+        a01_class_conflict_count=a01_result.telemetry.class_conflict_count,
+        a01_legacy_label_bypass_detected=a01_result.telemetry.legacy_label_bypass_detected,
+        a01_canonical_affordance_consumer_ready=(
+            a01_result.gate.canonical_affordance_consumer_ready
+        ),
+        a01_contested_affordance_consumer_ready=(
+            a01_result.gate.contested_affordance_consumer_ready
+        ),
+        a01_deprecated_affordance_consumer_ready=(
+            a01_result.gate.deprecated_affordance_consumer_ready
+        ),
+        a01_downstream_consumer_ready=a01_result.telemetry.downstream_consumer_ready,
     )
     gate = evaluate_subject_tick_downstream_gate(state)
     telemetry = build_subject_tick_telemetry(
@@ -6239,7 +6458,7 @@ def execute_subject_tick(
         attempted_paths=ATTEMPTED_SUBJECT_TICK_PATHS,
         downstream_gate=gate,
         causal_basis=(
-            "bounded runtime execution spine enforces roadmap authority roles for C04/C05, consumes world-entry, s01 efference-copy, s02 prediction-boundary seam, s03 ownership-weighted learning, s04 interoceptive self-binding, s05 multi-cause attribution, s-minimal, a-line, m-minimal, n-minimal, t01 semantic-field, t02 relation-binding, t03 hypothesis-competition, t04 attention-schema, o01 other-entity modeling, o02 intersubjective allostasis, o03 strategy-class evaluation, p01 authority-bounded project-formation, o04 rupture/hostility/coercion dynamics, r05 bounded protective regulation gates, v01 act-level normative licensing/commitment guards, v02 typed utterance-plan bridge constraints, v03 constrained realization alignment/report contract, c06 typed surfacing-candidates handoff, p02 typed intervention episodes, p03 typed long-horizon credit assignment, and p04 typed interpersonal counterfactual policy simulation before bounded outcome resolution, while keeping D01 observability-only over fixed R->C order"
+            "bounded runtime execution spine enforces roadmap authority roles for C04/C05, consumes world-entry, s01 efference-copy, s02 prediction-boundary seam, s03 ownership-weighted learning, s04 interoceptive self-binding, s05 multi-cause attribution, s-minimal, a01 affordance ontology cleanup, a-line, m-minimal, n-minimal, t01 semantic-field, t02 relation-binding, t03 hypothesis-competition, t04 attention-schema, o01 other-entity modeling, o02 intersubjective allostasis, o03 strategy-class evaluation, p01 authority-bounded project-formation, o04 rupture/hostility/coercion dynamics, r05 bounded protective regulation gates, v01 act-level normative licensing/commitment guards, v02 typed utterance-plan bridge constraints, v03 constrained realization alignment/report contract, c06 typed surfacing-candidates handoff, p02 typed intervention episodes, p03 typed long-horizon credit assignment, and p04 typed interpersonal counterfactual policy simulation before bounded outcome resolution, while keeping D01 observability-only over fixed R->C order"
         ),
     )
     abstain = final_outcome in {SubjectTickOutcome.REPAIR, SubjectTickOutcome.REVALIDATE}
@@ -6319,6 +6538,7 @@ def execute_subject_tick(
         world_adapter_result=world_adapter_result,
         world_entry_result=world_entry_result,
         self_contour_result=s_minimal_result,
+        a01_result=a01_result,
         a_line_result=a_line_result,
         m_minimal_result=m_minimal_result,
         n_minimal_result=n_minimal_result,
@@ -6797,6 +7017,66 @@ def _classify_s05_shape_profile(
     if downstream_route_class is S05DownstreamRouteClass.HIGH_RESIDUAL_UNDERDETERMINED:
         return "high_residual_underdetermined"
     return "other"
+
+
+def _build_default_a01_raw_affordance_candidate_set(
+    *,
+    tick_id: str,
+    affordance_ids: tuple[str, ...],
+    source_lineage: tuple[str, ...],
+) -> A01RawAffordanceCandidateSet | None:
+    if not affordance_ids:
+        return None
+    candidates: list[A01RawAffordanceCandidate] = []
+    for index, affordance_id in enumerate(affordance_ids, start=1):
+        class_guess = _infer_a01_class_from_affordance_id(affordance_id)
+        candidates.append(
+            A01RawAffordanceCandidate(
+                candidate_id=f"{tick_id}:a01:raw:{index}",
+                local_label=affordance_id,
+                affordance_class=class_guess,
+                aliases=(),
+                provenance="subject_tick.default_a01_candidate_projection",
+                preconditions=A01PreconditionProfile(requirements=("availability_basis_present",)),
+                effect_scope=A01EffectScopeProfile(primary_outcomes=("bounded_regulation",)),
+                target_channels=("internal",),
+                controllability=A01ControllabilityProfile(
+                    controllability_class=A01ControllabilityClass.SELF_CONTROLLED,
+                    confidence=0.6,
+                    basis_refs=("subject_tick.affordance_gate.accepted_candidate_ids",),
+                ),
+                observation_expectation=A01ObservationExpectation(
+                    expected_signals=("candidate_observed",),
+                    verification_required=True,
+                ),
+                interruption_semantics="bounded_interruptible",
+                ownership_relevance=A01OwnershipRelevance.SELF_RELEVANT,
+                self_world_relevance="self",
+                canonical_id_hint=affordance_id,
+                legacy_local_label_only=False,
+            )
+        )
+    return A01RawAffordanceCandidateSet(
+        candidate_set_id=f"a01:{tick_id}:default_raw_candidate_set",
+        candidates=tuple(candidates),
+        source_lineage=source_lineage,
+        reason="default projection from accepted affordance ids for bounded A01 frontier path",
+    )
+
+
+def _infer_a01_class_from_affordance_id(affordance_id: str) -> A01AffordanceClass:
+    token = str(affordance_id or "").lower()
+    if "safety" in token or "recheck" in token or "monitor" in token:
+        return A01AffordanceClass.SENSING_MONITORING
+    if "pause" in token or "recovery" in token:
+        return A01AffordanceClass.REPAIR_RECOVERY
+    if "suppress" in token or "shed" in token:
+        return A01AffordanceClass.INHIBITION_SUPPRESSION
+    if "resource" in token or "defer" in token:
+        return A01AffordanceClass.DEFER_REVISIT
+    if "social" in token or "communic" in token:
+        return A01AffordanceClass.COMMUNICATION_OUTPUT
+    return A01AffordanceClass.REGULATION_ADJUSTMENT
 
 
 def _phase_step(

@@ -49,6 +49,7 @@ def evaluate_subject_tick_downstream_gate(
         SubjectTickRestrictionCode.S_FORBIDDEN_SHORTCUTS_MUST_BE_READ,
         SubjectTickRestrictionCode.A_LINE_NORMALIZATION_CONTRACT_MUST_BE_READ,
         SubjectTickRestrictionCode.A_FORBIDDEN_SHORTCUTS_MUST_BE_READ,
+        SubjectTickRestrictionCode.A01_ONTOLOGY_CLEANUP_CONTRACT_MUST_BE_READ,
         SubjectTickRestrictionCode.M_MINIMAL_CONTOUR_CONTRACT_MUST_BE_READ,
         SubjectTickRestrictionCode.M_FORBIDDEN_SHORTCUTS_MUST_BE_READ,
         SubjectTickRestrictionCode.N_MINIMAL_CONTOUR_CONTRACT_MUST_BE_READ,
@@ -1772,6 +1773,85 @@ def evaluate_subject_tick_downstream_gate(
             accepted = False
             usability = SubjectTickUsabilityClass.BLOCKED
             reason = "p04 produced no consumer-ready simulation surface for downstream branch comparison"
+
+    a01_checkpoint = next(
+        (
+            checkpoint
+            for checkpoint in state.execution_checkpoints
+            if checkpoint.checkpoint_id == "rt01.a01_affordance_ontology_cleanup_checkpoint"
+        ),
+        None,
+    )
+    if a01_checkpoint is not None:
+        if "require_a01_canonical_affordance_consumer" in a01_checkpoint.required_action:
+            restrictions.append(
+                SubjectTickRestrictionCode.A01_CANONICAL_AFFORDANCE_CONSUMER_REQUIRED
+            )
+        if "require_a01_contested_affordance_consumer" in a01_checkpoint.required_action:
+            restrictions.append(
+                SubjectTickRestrictionCode.A01_CONTESTED_AFFORDANCE_CONSUMER_REQUIRED
+            )
+        if "require_a01_deprecated_affordance_consumer" in a01_checkpoint.required_action:
+            restrictions.append(
+                SubjectTickRestrictionCode.A01_DEPRECATED_AFFORDANCE_CONSUMER_REQUIRED
+            )
+        if "default_a01_contested_canonicalization_detour" in a01_checkpoint.required_action:
+            restrictions.append(
+                SubjectTickRestrictionCode.A01_CONTESTED_CANONICALIZATION_DETOUR_REQUIRED
+            )
+        if "default_a01_deprecated_affordance_detour" in a01_checkpoint.required_action:
+            restrictions.append(
+                SubjectTickRestrictionCode.A01_DEPRECATED_AFFORDANCE_DETOUR_REQUIRED
+            )
+        if "default_a01_legacy_label_bypass_forbidden" in a01_checkpoint.required_action:
+            restrictions.append(SubjectTickRestrictionCode.A01_LEGACY_LABEL_BYPASS_FORBIDDEN)
+
+    a01_basis_present = bool(state.a01_explicit_basis_present)
+    if a01_basis_present and state.a01_contested_entry_count > 0:
+        restrictions.append(SubjectTickRestrictionCode.A01_CONTESTED_CANONICALIZATION_DETOUR_REQUIRED)
+        if (
+            state.final_execution_outcome == SubjectTickOutcome.CONTINUE
+            and usability == SubjectTickUsabilityClass.USABLE_BOUNDED
+        ):
+            usability = SubjectTickUsabilityClass.DEGRADED_BOUNDED
+            reason = "a01 contested canonicalization preserved ambiguity and requires bounded continuation"
+    if a01_basis_present and state.a01_deprecated_entry_count > 0:
+        restrictions.append(SubjectTickRestrictionCode.A01_DEPRECATED_AFFORDANCE_DETOUR_REQUIRED)
+        if (
+            state.final_execution_outcome == SubjectTickOutcome.CONTINUE
+            and usability == SubjectTickUsabilityClass.USABLE_BOUNDED
+        ):
+            usability = SubjectTickUsabilityClass.DEGRADED_BOUNDED
+            reason = "a01 deprecated affordance requires guarded continuation"
+    if (
+        a01_basis_present
+        and state.a01_parent_child_relation_count > 0
+        and state.final_execution_outcome == SubjectTickOutcome.CONTINUE
+    ):
+        restrictions.append(SubjectTickRestrictionCode.A01_CONTESTED_AFFORDANCE_CONSUMER_REQUIRED)
+        restrictions.append(SubjectTickRestrictionCode.DOWNSTREAM_AUTHORITY_DEGRADED)
+        accepted = False
+        usability = SubjectTickUsabilityClass.BLOCKED
+        reason = "a01 parent-child granularity remains unresolved for direct continuation and requires explicit disambiguation"
+    if a01_basis_present and state.a01_legacy_label_bypass_detected:
+        restrictions.append(SubjectTickRestrictionCode.A01_LEGACY_LABEL_BYPASS_FORBIDDEN)
+        restrictions.append(SubjectTickRestrictionCode.DOWNSTREAM_AUTHORITY_DEGRADED)
+        if state.final_execution_outcome == SubjectTickOutcome.CONTINUE:
+            accepted = False
+            usability = SubjectTickUsabilityClass.BLOCKED
+            reason = "a01 detected legacy-label bypass and blocked non-canonical downstream path"
+    if a01_basis_present and not state.a01_canonical_affordance_consumer_ready:
+        restrictions.append(SubjectTickRestrictionCode.A01_CANONICAL_AFFORDANCE_CONSUMER_REQUIRED)
+    if a01_basis_present and state.a01_contested_entry_count > 0 and not state.a01_contested_affordance_consumer_ready:
+        restrictions.append(SubjectTickRestrictionCode.A01_CONTESTED_AFFORDANCE_CONSUMER_REQUIRED)
+    if a01_basis_present and state.a01_deprecated_entry_count > 0 and not state.a01_deprecated_affordance_consumer_ready:
+        restrictions.append(SubjectTickRestrictionCode.A01_DEPRECATED_AFFORDANCE_CONSUMER_REQUIRED)
+    if a01_basis_present and not state.a01_downstream_consumer_ready:
+        restrictions.append(SubjectTickRestrictionCode.DOWNSTREAM_AUTHORITY_DEGRADED)
+        if state.final_execution_outcome == SubjectTickOutcome.CONTINUE:
+            accepted = False
+            usability = SubjectTickUsabilityClass.BLOCKED
+            reason = "a01 produced no consumer-ready canonical ontology surface"
 
     return SubjectTickGateDecision(
         accepted=accepted,

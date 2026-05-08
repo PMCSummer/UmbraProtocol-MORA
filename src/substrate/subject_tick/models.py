@@ -62,6 +62,10 @@ if TYPE_CHECKING:
         P04SimulationInput,
         P04SimulationResult,
     )
+    from substrate.a01_internal_affordance_ontology_cleanup import (
+        A01CanonicalOntologyResult,
+        A01RawAffordanceCandidateSet,
+    )
     from substrate.p01_project_formation import (
         P01IntentionStackState,
         P01ProjectFormationResult,
@@ -415,6 +419,25 @@ class SubjectTickRestrictionCode(StrEnum):
     P04_EXCLUDED_POLICY_HAZARD_DETOUR_REQUIRED = (
         "p04_excluded_policy_hazard_detour_required"
     )
+    A01_ONTOLOGY_CLEANUP_CONTRACT_MUST_BE_READ = (
+        "a01_ontology_cleanup_contract_must_be_read"
+    )
+    A01_CANONICAL_AFFORDANCE_CONSUMER_REQUIRED = (
+        "a01_canonical_affordance_consumer_required"
+    )
+    A01_CONTESTED_AFFORDANCE_CONSUMER_REQUIRED = (
+        "a01_contested_affordance_consumer_required"
+    )
+    A01_DEPRECATED_AFFORDANCE_CONSUMER_REQUIRED = (
+        "a01_deprecated_affordance_consumer_required"
+    )
+    A01_CONTESTED_CANONICALIZATION_DETOUR_REQUIRED = (
+        "a01_contested_canonicalization_detour_required"
+    )
+    A01_DEPRECATED_AFFORDANCE_DETOUR_REQUIRED = (
+        "a01_deprecated_affordance_detour_required"
+    )
+    A01_LEGACY_LABEL_BYPASS_FORBIDDEN = "a01_legacy_label_bypass_forbidden"
     DOWNSTREAM_AUTHORITY_DEGRADED = "downstream_authority_degraded"
 
 
@@ -615,6 +638,10 @@ class SubjectTickContext:
     require_p04_comparison_consumer: bool = False
     require_p04_excluded_policy_consumer: bool = False
     disable_p04_enforcement: bool = False
+    require_a01_canonical_affordance_consumer: bool = False
+    require_a01_contested_affordance_consumer: bool = False
+    require_a01_deprecated_affordance_consumer: bool = False
+    disable_a01_enforcement: bool = False
     o01_entity_signals: tuple[O01EntitySignal, ...] = ()
     o02_interaction_diagnostics: O02InteractionDiagnosticsInput | None = None
     o03_candidate_strategy: O03CandidateStrategyInput | None = None
@@ -628,6 +655,7 @@ class SubjectTickContext:
     p02_episode_input: P02InterventionEpisodeInput | None = None
     p03_credit_assignment_input: P03CreditAssignmentInput | None = None
     p04_simulation_input: P04SimulationInput | None = None
+    a01_raw_affordance_candidate_set: A01RawAffordanceCandidateSet | None = None
     g08_appraisal_significance_hint: float | None = None
     source_lineage: tuple[str, ...] = ()
 
@@ -1216,6 +1244,21 @@ class SubjectTickState:
     p04_comparison_consumer_ready: bool = False
     p04_excluded_policy_consumer_ready: bool = False
     p04_downstream_consumer_ready: bool = False
+    a01_raw_candidate_count: int = 0
+    a01_explicit_basis_present: bool = False
+    a01_canonical_entry_count: int = 0
+    a01_merged_alias_group_count: int = 0
+    a01_split_decision_count: int = 0
+    a01_contested_entry_count: int = 0
+    a01_deprecated_entry_count: int = 0
+    a01_parent_child_relation_count: int = 0
+    a01_same_label_diff_precondition_count: int = 0
+    a01_class_conflict_count: int = 0
+    a01_legacy_label_bypass_detected: bool = False
+    a01_canonical_affordance_consumer_ready: bool = False
+    a01_contested_affordance_consumer_ready: bool = False
+    a01_deprecated_affordance_consumer_ready: bool = False
+    a01_downstream_consumer_ready: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -1548,6 +1591,7 @@ class SubjectTickResult:
     world_adapter_result: WorldAdapterResult
     world_entry_result: WorldEntryContractResult
     self_contour_result: SMinimalContourResult
+    a01_result: A01CanonicalOntologyResult
     a_line_result: ALineNormalizationResult
     m_minimal_result: MMinimalResult
     n_minimal_result: NMinimalResult

@@ -186,6 +186,7 @@ def test_runtime_topology_bundle_and_graph_are_materialized() -> None:
     assert "rt01.world_seam_checkpoint" in graph.mandatory_checkpoint_ids
     assert "rt01.world_entry_checkpoint" in graph.mandatory_checkpoint_ids
     assert "rt01.s_minimal_contour_checkpoint" in graph.mandatory_checkpoint_ids
+    assert "rt01.a01_affordance_ontology_cleanup_checkpoint" in graph.mandatory_checkpoint_ids
     assert "rt01.a_line_normalization_checkpoint" in graph.mandatory_checkpoint_ids
     assert "rt01.m_minimal_contour_checkpoint" in graph.mandatory_checkpoint_ids
     assert "rt01.n_minimal_contour_checkpoint" in graph.mandatory_checkpoint_ids
@@ -217,6 +218,10 @@ def test_runtime_topology_bundle_and_graph_are_materialized() -> None:
     assert "world_adapter.state" in graph.source_of_truth_surfaces
     assert "world_entry_contract.episode" in graph.source_of_truth_surfaces
     assert "s_minimal_contour.boundary_state" in graph.source_of_truth_surfaces
+    assert (
+        "a01_internal_affordance_ontology_cleanup.canonical_ontology_snapshot"
+        in graph.source_of_truth_surfaces
+    )
     assert "a_line_normalization.capability_state" in graph.source_of_truth_surfaces
     assert "m_minimal.lifecycle_state" in graph.source_of_truth_surfaces
     assert "n_minimal.commitment_state" in graph.source_of_truth_surfaces
