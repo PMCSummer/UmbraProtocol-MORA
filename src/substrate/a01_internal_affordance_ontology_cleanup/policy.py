@@ -81,6 +81,13 @@ def build_a01_internal_affordance_ontology_cleanup(
         "suspend_until_revalidation_basis",
         "halt_reuse_and_rebuild_scope",
     }
+    runtime_lineage_refs = tuple(dict.fromkeys(source_lineage))
+    candidate_lineage_refs = tuple(dict.fromkeys(candidate_set.source_lineage))
+    source_lineage_refs = tuple(dict.fromkeys((*runtime_lineage_refs, *candidate_lineage_refs)))
+    source_lineage_complete = bool(runtime_lineage_refs and candidate_lineage_refs)
+    canonical_id_hint_refs = {
+        item.canonical_id_hint for item in candidate_set.candidates if item.canonical_id_hint
+    }
 
     by_label: dict[str, list[A01RawAffordanceCandidate]] = defaultdict(list)
     for candidate in candidate_set.candidates:
@@ -352,6 +359,11 @@ def build_a01_internal_affordance_ontology_cleanup(
                 reason_codes=codes,
             )
         )
+    canonical_id_hint_used_count = sum(
+        int(entry.affordance_id in canonical_id_hint_refs) for entry in adjusted_entries
+    )
+    canonical_id_generated_count = len(adjusted_entries) - canonical_id_hint_used_count
+    canonical_id_coverage_complete = bool(adjusted_entries) and canonical_id_generated_count == 0
 
     ledger = A01OntologyCleanupLedger(
         ledger_id=f"a01:{tick_id}:ontology_ledger",
@@ -365,6 +377,12 @@ def build_a01_internal_affordance_ontology_cleanup(
         same_label_diff_precondition_count=same_label_diff_precondition_count,
         class_conflict_count=class_conflict_count,
         legacy_label_bypass_detected=legacy_label_bypass_detected,
+        source_lineage_refs=source_lineage_refs,
+        source_lineage_count=len(source_lineage_refs),
+        source_lineage_complete=source_lineage_complete,
+        canonical_id_hint_used_count=canonical_id_hint_used_count,
+        canonical_id_generated_count=canonical_id_generated_count,
+        canonical_id_coverage_complete=canonical_id_coverage_complete,
         reason="a01 ontology cleanup ledger preserves merge/split/contested decisions as first-class artifacts",
     )
     snapshot = A01CanonicalOntologySnapshot(
@@ -427,6 +445,14 @@ def _build_gate(snapshot: A01CanonicalOntologySnapshot) -> A01OntologyGateDecisi
         restrictions.append("a01_deprecated_affordance_present")
         if status is A01DownstreamReadinessStatus.READY:
             status = A01DownstreamReadinessStatus.DEGRADED
+    if not snapshot.ledger.source_lineage_complete:
+        restrictions.append("a01_source_lineage_partial")
+        if status is A01DownstreamReadinessStatus.READY:
+            status = A01DownstreamReadinessStatus.DEGRADED
+    if canonical_ready and not snapshot.ledger.canonical_id_coverage_complete:
+        restrictions.append("a01_canonical_id_hint_coverage_incomplete")
+        if status is A01DownstreamReadinessStatus.READY:
+            status = A01DownstreamReadinessStatus.DEGRADED
     return A01OntologyGateDecision(
         canonical_affordance_consumer_ready=canonical_ready,
         contested_affordance_consumer_ready=contested_ready,
@@ -462,7 +488,12 @@ def _build_telemetry(
         same_label_diff_precondition_count=ledger.same_label_diff_precondition_count,
         class_conflict_count=ledger.class_conflict_count,
         legacy_label_bypass_detected=ledger.legacy_label_bypass_detected,
-        downstream_consumer_ready=gate.canonical_affordance_consumer_ready,
+        source_lineage_count=ledger.source_lineage_count,
+        source_lineage_complete=ledger.source_lineage_complete,
+        canonical_id_hint_used_count=ledger.canonical_id_hint_used_count,
+        canonical_id_generated_count=ledger.canonical_id_generated_count,
+        canonical_id_coverage_complete=ledger.canonical_id_coverage_complete,
+        downstream_consumer_ready=gate.downstream_readiness_status is A01DownstreamReadinessStatus.READY,
     )
 
 
@@ -564,6 +595,12 @@ def _build_minimal_result(
         same_label_diff_precondition_count=0,
         class_conflict_count=0,
         legacy_label_bypass_detected=False,
+        source_lineage_refs=(),
+        source_lineage_count=0,
+        source_lineage_complete=False,
+        canonical_id_hint_used_count=0,
+        canonical_id_generated_count=0,
+        canonical_id_coverage_complete=False,
         reason=reason,
     )
     snapshot = A01CanonicalOntologySnapshot(
@@ -591,6 +628,11 @@ def _build_minimal_result(
         same_label_diff_precondition_count=0,
         class_conflict_count=0,
         legacy_label_bypass_detected=False,
+        source_lineage_count=0,
+        source_lineage_complete=False,
+        canonical_id_hint_used_count=0,
+        canonical_id_generated_count=0,
+        canonical_id_coverage_complete=False,
         downstream_consumer_ready=False,
     )
     scope = A01ScopeMarker(

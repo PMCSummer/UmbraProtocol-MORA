@@ -1805,6 +1805,8 @@ def evaluate_subject_tick_downstream_gate(
             )
         if "default_a01_legacy_label_bypass_forbidden" in a01_checkpoint.required_action:
             restrictions.append(SubjectTickRestrictionCode.A01_LEGACY_LABEL_BYPASS_FORBIDDEN)
+        if "default_a01_lineage_partial_detour" in a01_checkpoint.required_action:
+            restrictions.append(SubjectTickRestrictionCode.A01_SOURCE_LINEAGE_PARTIAL)
 
     a01_basis_present = bool(state.a01_explicit_basis_present)
     if a01_basis_present and state.a01_contested_entry_count > 0:
@@ -1840,6 +1842,20 @@ def evaluate_subject_tick_downstream_gate(
             accepted = False
             usability = SubjectTickUsabilityClass.BLOCKED
             reason = "a01 detected legacy-label bypass and blocked non-canonical downstream path"
+    if a01_basis_present and not state.a01_source_lineage_complete:
+        restrictions.append(SubjectTickRestrictionCode.A01_SOURCE_LINEAGE_PARTIAL)
+        restrictions.append(SubjectTickRestrictionCode.DOWNSTREAM_AUTHORITY_DEGRADED)
+        if state.final_execution_outcome == SubjectTickOutcome.CONTINUE:
+            accepted = False
+            usability = SubjectTickUsabilityClass.BLOCKED
+            reason = "a01 explicit-basis lineage is partial and blocked canonical downstream continuation"
+    if a01_basis_present and not state.a01_canonical_id_coverage_complete:
+        restrictions.append(SubjectTickRestrictionCode.A01_CANONICAL_ID_COVERAGE_INCOMPLETE)
+        restrictions.append(SubjectTickRestrictionCode.DOWNSTREAM_AUTHORITY_DEGRADED)
+        if state.final_execution_outcome == SubjectTickOutcome.CONTINUE:
+            accepted = False
+            usability = SubjectTickUsabilityClass.BLOCKED
+            reason = "a01 canonical-id coverage is incomplete and downstream cannot rely on stable canonical ids"
     if a01_basis_present and not state.a01_canonical_affordance_consumer_ready:
         restrictions.append(SubjectTickRestrictionCode.A01_CANONICAL_AFFORDANCE_CONSUMER_REQUIRED)
     if a01_basis_present and state.a01_contested_entry_count > 0 and not state.a01_contested_affordance_consumer_ready:

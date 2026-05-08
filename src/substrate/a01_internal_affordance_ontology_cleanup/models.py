@@ -120,10 +120,8 @@ class A01RawAffordanceCandidate:
     ownership_relevance: A01OwnershipRelevance = A01OwnershipRelevance.UNKNOWN_RELEVANCE
     self_world_relevance: str = "unknown"
     granularity_level: int = 1
-    parent_label_hint: str | None = None
     assumption_valid: bool = True
     effector_enabled: bool = True
-    contaminated_controllability: bool = False
     canonical_id_hint: str | None = None
     legacy_local_label_only: bool = False
 
@@ -230,6 +228,12 @@ class A01OntologyCleanupLedger:
     same_label_diff_precondition_count: int
     class_conflict_count: int
     legacy_label_bypass_detected: bool
+    source_lineage_refs: tuple[str, ...]
+    source_lineage_count: int
+    source_lineage_complete: bool
+    canonical_id_hint_used_count: int
+    canonical_id_generated_count: int
+    canonical_id_coverage_complete: bool
     reason: str
 
 
@@ -276,6 +280,11 @@ class A01Telemetry:
     same_label_diff_precondition_count: int
     class_conflict_count: int
     legacy_label_bypass_detected: bool
+    source_lineage_count: int
+    source_lineage_complete: bool
+    canonical_id_hint_used_count: int
+    canonical_id_generated_count: int
+    canonical_id_coverage_complete: bool
     downstream_consumer_ready: bool
     emitted_at: str = field(default_factory=lambda: datetime.now(tz=timezone.utc).isoformat())
 

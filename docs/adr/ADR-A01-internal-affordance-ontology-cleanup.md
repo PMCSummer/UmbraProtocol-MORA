@@ -51,8 +51,14 @@ Accepted (frontier build slice)
 - Downstream now has explicit canonical affordance IDs and typed contested/deprecated handling in this slice.
 - `subject_tick` downstream gate consumes typed A01 semantics directly (contested/deprecated/legacy-bypass/granularity effects), not checkpoint token only.
 - Disabling `disable_a01_enforcement` is materially observable in narrow integration behavior.
+- Source-lineage threading is now explicit in typed A01 surfaces (`source_lineage_count`, `source_lineage_complete`) and can enforce bounded detour when explicit-basis lineage is partial.
+- Canonical-ID migration completeness is now explicit in typed A01 surfaces (`canonical_id_hint_used_count`, `canonical_id_generated_count`, `canonical_id_coverage_complete`) and can degrade/block downstream continuation under explicit basis even when checkpoint token shell is unchanged.
 
 ## Bounded limitations
 - Dual-ontology risk outside this narrow slice remains open (map-wide migration is not part of this decision).
 - Full planner integration over canonical affordances remains open.
 - Canonicalization quality is bounded by explicit typed input quality; no claim of complete affordance discovery.
+
+## Narrow hardening updates (this decision scope)
+- Removed dormant schema fields `parent_label_hint` and `contaminated_controllability` from A01 raw candidate schema to avoid schema-façade drift in the current slice.
+- Strengthened narrow integration evidence for contested and deprecated default detours in `subject_tick`.

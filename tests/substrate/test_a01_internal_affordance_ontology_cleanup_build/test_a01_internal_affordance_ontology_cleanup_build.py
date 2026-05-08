@@ -4,7 +4,9 @@ from substrate.a01_internal_affordance_ontology_cleanup import (
     A01AffordanceClass,
     A01ControllabilityClass,
     A01OwnershipRelevance,
+    A01RawAffordanceCandidateSet,
     A01ValidityStatus,
+    derive_a01_ontology_contract_view,
 )
 from tests.substrate.a01_internal_affordance_ontology_cleanup_testkit import (
     A01HarnessCase,
@@ -492,3 +494,100 @@ def test_no_silent_deletion_of_messy_candidates() -> None:
     )
     assert result.telemetry.contested_entry_count == 1
     assert result.telemetry.canonical_entry_count == 2
+
+
+def test_source_lineage_is_threaded_and_partial_lineage_is_explicit() -> None:
+    candidate = a01_candidate(
+        candidate_id="lineage-c1",
+        local_label="pause_and_recover",
+        affordance_class=A01AffordanceClass.REPAIR_RECOVERY,
+        aliases=(),
+        provenance="test.lineage.c1",
+        preconditions=("energy_low",),
+        primary_outcomes=("reduce_overload",),
+        target_channels=("internal",),
+        controllability_class=A01ControllabilityClass.SELF_CONTROLLED,
+        controllability_confidence=0.8,
+        observation_signals=("calmer_state",),
+        observation_verification_required=True,
+        canonical_id_hint="a01:test:pause_and_recover",
+    )
+    partial_lineage_set = A01RawAffordanceCandidateSet(
+        candidate_set_id="set:partial-lineage",
+        candidates=(candidate,),
+        source_lineage=(),
+        reason="candidate lineage intentionally omitted",
+    )
+    result = _run(
+        A01HarnessCase(
+            case_id="partial-lineage",
+            raw_candidate_set=partial_lineage_set,
+        )
+    )
+    view = derive_a01_ontology_contract_view(result)
+    assert result.ontology_snapshot.ledger.source_lineage_count >= 1
+    assert result.ontology_snapshot.ledger.source_lineage_complete is False
+    assert "a01_source_lineage_partial" in set(result.gate.restrictions)
+    assert result.telemetry.source_lineage_complete is False
+    assert view.source_lineage_complete is False
+
+
+def test_canonical_id_coverage_is_explicit_for_hint_backed_vs_generated_entries() -> None:
+    hinted = _run(
+        A01HarnessCase(
+            case_id="canonical-id-hinted",
+            raw_candidate_set=a01_candidate_set(
+                set_id="set:canonical-id-hinted",
+                reason="hinted ids",
+                candidates=(
+                    a01_candidate(
+                        candidate_id="hinted-c1",
+                        local_label="pause_and_recover",
+                        affordance_class=A01AffordanceClass.REPAIR_RECOVERY,
+                        aliases=(),
+                        provenance="test.canonical.hinted.c1",
+                        preconditions=("energy_low",),
+                        primary_outcomes=("reduce_overload",),
+                        target_channels=("internal",),
+                        controllability_class=A01ControllabilityClass.SELF_CONTROLLED,
+                        controllability_confidence=0.8,
+                        observation_signals=("calmer_state",),
+                        observation_verification_required=True,
+                        canonical_id_hint="a01:test:pause_and_recover",
+                    ),
+                ),
+            ),
+        )
+    )
+    generated = _run(
+        A01HarnessCase(
+            case_id="canonical-id-generated",
+            raw_candidate_set=a01_candidate_set(
+                set_id="set:canonical-id-generated",
+                reason="generated ids",
+                candidates=(
+                    a01_candidate(
+                        candidate_id="generated-c1",
+                        local_label="pause_and_recover",
+                        affordance_class=A01AffordanceClass.REPAIR_RECOVERY,
+                        aliases=(),
+                        provenance="test.canonical.generated.c1",
+                        preconditions=("energy_low",),
+                        primary_outcomes=("reduce_overload",),
+                        target_channels=("internal",),
+                        controllability_class=A01ControllabilityClass.SELF_CONTROLLED,
+                        controllability_confidence=0.8,
+                        observation_signals=("calmer_state",),
+                        observation_verification_required=True,
+                        canonical_id_hint=None,
+                    ),
+                ),
+            ),
+        )
+    )
+    assert hinted.telemetry.canonical_id_hint_used_count == 1
+    assert hinted.telemetry.canonical_id_generated_count == 0
+    assert hinted.telemetry.canonical_id_coverage_complete is True
+    assert generated.telemetry.canonical_id_hint_used_count == 0
+    assert generated.telemetry.canonical_id_generated_count == 1
+    assert generated.telemetry.canonical_id_coverage_complete is False

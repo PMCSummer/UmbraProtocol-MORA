@@ -19,6 +19,11 @@ class A01OntologyContractView:
     same_label_diff_precondition_count: int
     class_conflict_count: int
     legacy_label_bypass_detected: bool
+    source_lineage_count: int
+    source_lineage_complete: bool
+    canonical_id_hint_used_count: int
+    canonical_id_generated_count: int
+    canonical_id_coverage_complete: bool
     canonical_affordance_consumer_ready: bool
     contested_affordance_consumer_ready: bool
     deprecated_affordance_consumer_ready: bool
@@ -49,6 +54,11 @@ class A01OntologyConsumerView:
     same_label_diff_precondition_count: int
     class_conflict_count: int
     legacy_label_bypass_detected: bool
+    source_lineage_count: int
+    source_lineage_complete: bool
+    canonical_id_hint_used_count: int
+    canonical_id_generated_count: int
+    canonical_id_coverage_complete: bool
     canonical_affordance_consumer_ready: bool
     contested_affordance_consumer_ready: bool
     deprecated_affordance_consumer_ready: bool
@@ -75,6 +85,11 @@ def derive_a01_ontology_contract_view(result: A01CanonicalOntologyResult) -> A01
         same_label_diff_precondition_count=telemetry.same_label_diff_precondition_count,
         class_conflict_count=telemetry.class_conflict_count,
         legacy_label_bypass_detected=telemetry.legacy_label_bypass_detected,
+        source_lineage_count=telemetry.source_lineage_count,
+        source_lineage_complete=telemetry.source_lineage_complete,
+        canonical_id_hint_used_count=telemetry.canonical_id_hint_used_count,
+        canonical_id_generated_count=telemetry.canonical_id_generated_count,
+        canonical_id_coverage_complete=telemetry.canonical_id_coverage_complete,
         canonical_affordance_consumer_ready=gate.canonical_affordance_consumer_ready,
         contested_affordance_consumer_ready=gate.contested_affordance_consumer_ready,
         deprecated_affordance_consumer_ready=gate.deprecated_affordance_consumer_ready,
@@ -117,6 +132,11 @@ def derive_a01_ontology_consumer_view(
         same_label_diff_precondition_count=view.same_label_diff_precondition_count,
         class_conflict_count=view.class_conflict_count,
         legacy_label_bypass_detected=view.legacy_label_bypass_detected,
+        source_lineage_count=view.source_lineage_count,
+        source_lineage_complete=view.source_lineage_complete,
+        canonical_id_hint_used_count=view.canonical_id_hint_used_count,
+        canonical_id_generated_count=view.canonical_id_generated_count,
+        canonical_id_coverage_complete=view.canonical_id_coverage_complete,
         canonical_affordance_consumer_ready=view.canonical_affordance_consumer_ready,
         contested_affordance_consumer_ready=view.contested_affordance_consumer_ready,
         deprecated_affordance_consumer_ready=view.deprecated_affordance_consumer_ready,

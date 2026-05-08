@@ -46,3 +46,14 @@
 - Map-wide dual-ontology migration remains open.
 - Full planner integration over canonical IDs remains open.
 - Creative affordance discovery remains out of scope.
+
+## Narrow hardening pass closures
+- `source_lineage` is now threaded end-to-end in A01 typed outputs:
+  - ledger + telemetry + contract view now publish `source_lineage_count` / `source_lineage_complete`.
+  - explicit-basis + partial lineage now triggers bounded A01 detour instead of silent pass-through.
+- Schema-façade drift removed:
+  - dormant `parent_label_hint` and `contaminated_controllability` fields were removed from A01 candidate schema/testkit because they had no mechanistic role in this slice.
+- Contested/deprecated downstream proofs strengthened:
+  - subject_tick integration now has explicit default-detour tests for contested canonicalization and deprecated/context-invalid affordances.
+- Typed-shape-over-token proof strengthened:
+  - new integration test keeps A01 checkpoint token shell constant (`require_a01_canonical_affordance_consumer`) while varying canonical-id coverage shape, and observes different downstream gate outcome.

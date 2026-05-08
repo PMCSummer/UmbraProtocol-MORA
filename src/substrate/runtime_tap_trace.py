@@ -317,6 +317,11 @@ MODULE_ALLOWED_FIELDS: dict[str, tuple[str, ...]] = {
         "same_label_diff_precondition_count",
         "class_conflict_count",
         "legacy_label_bypass_detected",
+        "source_lineage_count",
+        "source_lineage_complete",
+        "canonical_id_hint_used_count",
+        "canonical_id_generated_count",
+        "canonical_id_coverage_complete",
         "downstream_consumer_ready",
     ),
     "s_minimal_contour": (

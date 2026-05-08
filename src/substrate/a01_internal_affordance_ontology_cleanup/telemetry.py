@@ -33,6 +33,18 @@ def a01_internal_affordance_ontology_cleanup_snapshot(
             "legacy_label_bypass_detected": (
                 result.ontology_snapshot.ledger.legacy_label_bypass_detected
             ),
+            "source_lineage_refs": result.ontology_snapshot.ledger.source_lineage_refs,
+            "source_lineage_count": result.ontology_snapshot.ledger.source_lineage_count,
+            "source_lineage_complete": result.ontology_snapshot.ledger.source_lineage_complete,
+            "canonical_id_hint_used_count": (
+                result.ontology_snapshot.ledger.canonical_id_hint_used_count
+            ),
+            "canonical_id_generated_count": (
+                result.ontology_snapshot.ledger.canonical_id_generated_count
+            ),
+            "canonical_id_coverage_complete": (
+                result.ontology_snapshot.ledger.canonical_id_coverage_complete
+            ),
             "reason": result.ontology_snapshot.ledger.reason,
         },
         "gate": {
@@ -73,6 +85,11 @@ def a01_internal_affordance_ontology_cleanup_snapshot(
             ),
             "class_conflict_count": result.telemetry.class_conflict_count,
             "legacy_label_bypass_detected": result.telemetry.legacy_label_bypass_detected,
+            "source_lineage_count": result.telemetry.source_lineage_count,
+            "source_lineage_complete": result.telemetry.source_lineage_complete,
+            "canonical_id_hint_used_count": result.telemetry.canonical_id_hint_used_count,
+            "canonical_id_generated_count": result.telemetry.canonical_id_generated_count,
+            "canonical_id_coverage_complete": result.telemetry.canonical_id_coverage_complete,
             "downstream_consumer_ready": result.telemetry.downstream_consumer_ready,
             "emitted_at": result.telemetry.emitted_at,
         },

@@ -55,10 +55,8 @@ def a01_candidate(
     ownership_relevance: A01OwnershipRelevance = A01OwnershipRelevance.UNKNOWN_RELEVANCE,
     self_world_relevance: str = "unknown",
     granularity_level: int = 1,
-    parent_label_hint: str | None = None,
     assumption_valid: bool = True,
     effector_enabled: bool = True,
-    contaminated_controllability: bool = False,
     canonical_id_hint: str | None = None,
     legacy_local_label_only: bool = False,
 ) -> A01RawAffordanceCandidate:
@@ -90,10 +88,8 @@ def a01_candidate(
         ownership_relevance=ownership_relevance,
         self_world_relevance=self_world_relevance,
         granularity_level=granularity_level,
-        parent_label_hint=parent_label_hint,
         assumption_valid=assumption_valid,
         effector_enabled=effector_enabled,
-        contaminated_controllability=contaminated_controllability,
         canonical_id_hint=canonical_id_hint,
         legacy_local_label_only=legacy_local_label_only,
     )

@@ -2297,6 +2297,11 @@ def execute_subject_tick(
         ),
         "class_conflict_count": a01_result.telemetry.class_conflict_count,
         "legacy_label_bypass_detected": a01_result.telemetry.legacy_label_bypass_detected,
+        "source_lineage_count": a01_result.telemetry.source_lineage_count,
+        "source_lineage_complete": a01_result.telemetry.source_lineage_complete,
+        "canonical_id_hint_used_count": a01_result.telemetry.canonical_id_hint_used_count,
+        "canonical_id_generated_count": a01_result.telemetry.canonical_id_generated_count,
+        "canonical_id_coverage_complete": a01_result.telemetry.canonical_id_coverage_complete,
         "downstream_consumer_ready": a01_result.telemetry.downstream_consumer_ready,
     }
     trace_emit_active(
@@ -2309,6 +2314,7 @@ def execute_subject_tick(
     a01_default_contested_detour = False
     a01_default_deprecated_detour = False
     a01_default_legacy_bypass_detour = False
+    a01_default_lineage_partial_detour = False
     if not context.disable_a01_enforcement:
         if (
             context.require_a01_canonical_affordance_consumer
@@ -2388,6 +2394,19 @@ def execute_subject_tick(
             )
             if active_execution_mode != "halt_execution":
                 active_execution_mode = "revalidate_scope"
+        if (
+            a01_explicit_basis
+            and not a01_result.telemetry.source_lineage_complete
+            and halt_reason is None
+        ):
+            revalidation_needed = True
+            a01_default_lineage_partial_detour = True
+            a01_checkpoint_status = SubjectTickCheckpointStatus.ENFORCED_DETOUR
+            a01_checkpoint_reason = (
+                "a01 explicit basis requires complete source lineage for auditable canonicalization in narrow slice"
+            )
+            if active_execution_mode != "halt_execution":
+                active_execution_mode = "revalidate_scope"
     else:
         a01_checkpoint_status = SubjectTickCheckpointStatus.ALLOWED
         a01_checkpoint_reason = "a01 enforcement disabled in ablation context"
@@ -2405,6 +2424,8 @@ def execute_subject_tick(
         a01_required_actions.append("default_a01_deprecated_affordance_detour")
     if a01_default_legacy_bypass_detour:
         a01_required_actions.append("default_a01_legacy_label_bypass_forbidden")
+    if a01_default_lineage_partial_detour:
+        a01_required_actions.append("default_a01_lineage_partial_detour")
     if not a01_required_actions:
         a01_required_actions.append("a01_optional")
 
@@ -6441,6 +6462,11 @@ def execute_subject_tick(
         ),
         a01_class_conflict_count=a01_result.telemetry.class_conflict_count,
         a01_legacy_label_bypass_detected=a01_result.telemetry.legacy_label_bypass_detected,
+        a01_source_lineage_count=a01_result.telemetry.source_lineage_count,
+        a01_source_lineage_complete=a01_result.telemetry.source_lineage_complete,
+        a01_canonical_id_hint_used_count=a01_result.telemetry.canonical_id_hint_used_count,
+        a01_canonical_id_generated_count=a01_result.telemetry.canonical_id_generated_count,
+        a01_canonical_id_coverage_complete=a01_result.telemetry.canonical_id_coverage_complete,
         a01_canonical_affordance_consumer_ready=(
             a01_result.gate.canonical_affordance_consumer_ready
         ),

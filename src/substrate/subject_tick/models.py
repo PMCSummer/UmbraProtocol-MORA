@@ -438,6 +438,8 @@ class SubjectTickRestrictionCode(StrEnum):
         "a01_deprecated_affordance_detour_required"
     )
     A01_LEGACY_LABEL_BYPASS_FORBIDDEN = "a01_legacy_label_bypass_forbidden"
+    A01_SOURCE_LINEAGE_PARTIAL = "a01_source_lineage_partial"
+    A01_CANONICAL_ID_COVERAGE_INCOMPLETE = "a01_canonical_id_coverage_incomplete"
     DOWNSTREAM_AUTHORITY_DEGRADED = "downstream_authority_degraded"
 
 
@@ -1255,6 +1257,11 @@ class SubjectTickState:
     a01_same_label_diff_precondition_count: int = 0
     a01_class_conflict_count: int = 0
     a01_legacy_label_bypass_detected: bool = False
+    a01_source_lineage_count: int = 0
+    a01_source_lineage_complete: bool = False
+    a01_canonical_id_hint_used_count: int = 0
+    a01_canonical_id_generated_count: int = 0
+    a01_canonical_id_coverage_complete: bool = False
     a01_canonical_affordance_consumer_ready: bool = False
     a01_contested_affordance_consumer_ready: bool = False
     a01_deprecated_affordance_consumer_ready: bool = False
