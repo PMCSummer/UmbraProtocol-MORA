@@ -482,3 +482,89 @@ def test_anti_narrative_masquerade_requires_typed_branches_assumptions_uncertain
     assert result.simulation_set.branch_records[0].uncertainty_envelope.unstable_factors == ()
     assert result.simulation_set.comparison_matrix.contrasts
     assert any(item.outcome_status.value == "hazard_only" for item in result.simulation_set.branch_records)
+
+
+def test_excluded_policy_refs_never_reenter_branch_records_and_hazard_never_masquerades_selectable() -> None:
+    result = _run(
+        P04HarnessCase(
+            case_id="excluded-non-reentry",
+            simulation_input=p04_simulation_input(
+                input_id="input:excluded-non-reentry",
+                candidate_set=p04_candidate_set(
+                    set_id="set:excluded-non-reentry",
+                    candidates=(
+                        p04_candidate(
+                            candidate_id="cand:ordinary",
+                            policy_ref="policy.ordinary",
+                            policy_class=P04PolicyClass.HOLD_AND_VERIFY,
+                            action_class="dialogue",
+                            sequencing_rule="clarify_before_boundary",
+                            escalation_stance="defer",
+                            de_escalation_stance="repair_first",
+                            clarification_strategy="explicit",
+                            boundary_posture="guarded",
+                            boundary_timing="early",
+                            stopping_conditions=("verification",),
+                            horizon_steps=2,
+                        ),
+                        p04_candidate(
+                            candidate_id="cand:hazard-only",
+                            policy_ref="policy.hazard_only",
+                            policy_class=P04PolicyClass.ESCALATORY_ENFORCEMENT,
+                            action_class="force",
+                            sequencing_rule="escalate_early",
+                            escalation_stance="hard_assertive",
+                            de_escalation_stance="none",
+                            clarification_strategy="minimal",
+                            boundary_posture="rigid",
+                            boundary_timing="late",
+                            stopping_conditions=(),
+                            horizon_steps=2,
+                            candidate_role=P04CandidateRole.HAZARD_ONLY,
+                        ),
+                        p04_candidate(
+                            candidate_id="cand:excluded-unlicensed",
+                            policy_ref="policy.excluded_unlicensed",
+                            policy_class=P04PolicyClass.ESCALATORY_ENFORCEMENT,
+                            action_class="force",
+                            sequencing_rule="escalate_early",
+                            escalation_stance="hard_assertive",
+                            de_escalation_stance="none",
+                            clarification_strategy="minimal",
+                            boundary_posture="rigid",
+                            boundary_timing="late",
+                            stopping_conditions=(),
+                            horizon_steps=2,
+                            licensed=False,
+                        ),
+                        p04_candidate(
+                            candidate_id="cand:excluded-overrun",
+                            policy_ref="policy.excluded_overrun",
+                            policy_class=P04PolicyClass.ASSERTIVE_BOUNDARY,
+                            action_class="boundary_push",
+                            sequencing_rule="boundary_before_clarify",
+                            escalation_stance="hard_assertive",
+                            de_escalation_stance="none",
+                            clarification_strategy="minimal",
+                            boundary_posture="rigid",
+                            boundary_timing="late",
+                            stopping_conditions=(),
+                            horizon_steps=2,
+                            scope_overrun=True,
+                        ),
+                    ),
+                ),
+            ),
+        )
+    )
+    excluded_refs = {item.policy_ref for item in result.simulation_set.excluded_policies}
+    branch_refs = {item.policy_ref for item in result.simulation_set.branch_records}
+    assert excluded_refs.intersection(branch_refs) == set()
+    assert all(item.hazard_only is True for item in result.simulation_set.excluded_policies)
+    assert all(item.selectable_candidate is False for item in result.simulation_set.excluded_policies)
+    hazard_branches = [
+        item for item in result.simulation_set.branch_records if item.policy_ref == "policy.hazard_only"
+    ]
+    assert len(hazard_branches) == 1
+    assert hazard_branches[0].hazard_only is True
+    assert hazard_branches[0].outcome_status.value == "hazard_only"

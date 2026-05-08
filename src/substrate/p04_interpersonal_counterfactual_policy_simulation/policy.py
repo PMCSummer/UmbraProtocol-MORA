@@ -124,6 +124,7 @@ def build_p04_interpersonal_counterfactual_policy_simulation(
                 prior_open_window=prior_open_window,
             )
         )
+    _assert_exclusion_integrity(branches=tuple(branches), excluded=tuple(excluded))
 
     unstable_regions = _build_unstable_regions(
         tick_id=tick_id,
@@ -866,6 +867,25 @@ def _build_minimal_result(
         telemetry=telemetry,
         reason=reason,
     )
+
+
+def _assert_exclusion_integrity(
+    *,
+    branches: tuple[P04BranchRecord, ...],
+    excluded: tuple[P04ExcludedPolicyRecord, ...],
+) -> None:
+    excluded_refs = {item.policy_ref for item in excluded}
+    branch_refs = {item.policy_ref for item in branches}
+    overlap = excluded_refs.intersection(branch_refs)
+    if overlap:
+        raise ValueError(
+            "p04 exclusion integrity violation: excluded policy re-entered branch records"
+        )
+    for branch in branches:
+        if branch.hazard_only and branch.outcome_status is P04BranchOutcomeStatus.SELECTABLE:
+            raise ValueError(
+                "p04 exclusion integrity violation: hazard-only branch marked selectable"
+            )
 
 
 def _clamp(value: float, low: float = 0.0, high: float = 1.0) -> float:

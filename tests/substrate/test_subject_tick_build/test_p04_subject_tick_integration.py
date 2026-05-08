@@ -278,6 +278,80 @@ def _p04_checkpoint(result):
     )
 
 
+def _p04_shape_signature(result) -> tuple:
+    p04 = result.p04_result
+    branches = tuple(
+        sorted(
+            (
+                item.policy_ref,
+                item.outcome_status.value,
+                item.hazard_only,
+                round(item.ranking_score_hint, 6),
+                round(item.risk_vector.rupture_risk, 6),
+                round(item.risk_vector.coercion_risk, 6),
+                round(item.risk_vector.delay_cost, 6),
+                round(item.benefit_vector.project_progress, 6),
+                round(item.benefit_vector.clarity_gain, 6),
+                round(item.benefit_vector.boundary_preservation, 6),
+                item.uncertainty_envelope.status.value,
+                tuple(item.uncertainty_envelope.unstable_factors),
+            )
+            for item in p04.simulation_set.branch_records
+        )
+    )
+    excluded = tuple(
+        sorted(
+            (
+                item.policy_ref,
+                item.reason_code.value,
+                item.hazard_only,
+                item.selectable_candidate,
+            )
+            for item in p04.simulation_set.excluded_policies
+        )
+    )
+    contrasts = tuple(
+        sorted(
+            (
+                item.lhs_policy_ref,
+                item.rhs_policy_ref,
+                item.faster_but_riskier,
+                item.slower_but_safer,
+                item.preserves_boundary_leaves_ambiguity,
+                item.lowers_rupture_increases_delay,
+                item.summary_codes,
+            )
+            for item in p04.simulation_set.comparison_matrix.contrasts
+        )
+    )
+    unstable = tuple(
+        sorted(
+            (
+                item.policy_refs,
+                item.trigger_factors,
+                item.no_clear_dominance,
+                item.comparison_only,
+                item.simulation_blocked,
+            )
+            for item in p04.simulation_set.unstable_regions
+        )
+    )
+    matrix = p04.simulation_set.comparison_matrix
+    return (
+        branches,
+        excluded,
+        contrasts,
+        unstable,
+        matrix.dominance_state.value,
+        matrix.comparison_readiness.value,
+        matrix.no_clear_dominance,
+        p04.telemetry.branch_count,
+        p04.telemetry.excluded_policy_count,
+        p04.telemetry.unstable_region_count,
+        p04.telemetry.no_clear_dominance_count,
+    )
+
+
 def test_subject_tick_emits_p04_checkpoint_after_p03_and_before_outcome() -> None:
     case_id = "rt-p04-order"
     result = _result(case_id, context=_base_context(case_id))
@@ -374,3 +448,53 @@ def test_disable_p04_enforcement_materially_changes_downstream_behavior() -> Non
     assert disabled_checkpoint.status.value == "allowed"
     assert disabled_checkpoint.required_action == "p04_optional"
     assert enabled.state.final_execution_outcome != disabled.state.final_execution_outcome
+
+
+def test_downstream_preference_pressure_does_not_backflow_into_p04_branch_simulation_shape() -> None:
+    base_case = "rt-p04-no-backflow-base"
+    pressured_case = "rt-p04-no-backflow-pressured"
+    base = _result(
+        base_case,
+        context=replace(
+            _base_context(base_case),
+            p04_simulation_input=_safe_p04_input(base_case),
+        ),
+    )
+    pressured = _result(
+        pressured_case,
+        context=replace(
+            _base_context(pressured_case),
+            require_p04_excluded_policy_consumer=True,
+            p04_simulation_input=_safe_p04_input(base_case),
+        ),
+    )
+    base_checkpoint = _p04_checkpoint(base)
+    pressured_checkpoint = _p04_checkpoint(pressured)
+    assert base_checkpoint.status.value == "allowed"
+    assert pressured_checkpoint.status.value == "enforced_detour"
+    assert "require_p04_excluded_policy_consumer" in pressured_checkpoint.required_action
+    assert _p04_shape_signature(base) == _p04_shape_signature(pressured)
+
+
+def test_no_p04_input_produces_no_default_detour_pressure() -> None:
+    case_id = "rt-p04-no-basis-no-default-detour"
+    result = _result(
+        case_id,
+        context=replace(
+            _base_context(case_id),
+            p04_simulation_input=None,
+            require_p04_branch_record_consumer=False,
+            require_p04_comparison_consumer=False,
+            require_p04_excluded_policy_consumer=False,
+        ),
+    )
+    checkpoint = _p04_checkpoint(result)
+    assert checkpoint.status.value == "allowed"
+    assert checkpoint.required_action == "p04_optional"
+    assert "default_p04_unstable_region_detour" not in checkpoint.required_action
+    assert "default_p04_no_clear_dominance_detour" not in checkpoint.required_action
+    assert "default_p04_excluded_policy_hazard_detour" not in checkpoint.required_action
+    assert result.p04_result.telemetry.branch_count == 0
+    assert result.p04_result.telemetry.excluded_policy_count == 0
+    assert result.p04_result.telemetry.unstable_region_count == 0
+    assert result.p04_result.telemetry.no_clear_dominance_count == 0
