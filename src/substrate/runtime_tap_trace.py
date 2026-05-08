@@ -337,6 +337,20 @@ MODULE_ALLOWED_FIELDS: dict[str, tuple[str, ...]] = {
         "no_clean_coverage_count",
         "downstream_consumer_ready",
     ),
+    "a03_internal_tool_affordances": (
+        "canonical_tool_count",
+        "rejected_operation_count",
+        "contested_tool_count",
+        "contract_incomplete_count",
+        "degraded_tool_count",
+        "blocked_tool_count",
+        "missing_internal_tool_gap_count",
+        "blocked_internal_tool_gap_count",
+        "overbroad_generic_operation_rejected",
+        "legacy_direct_call_detected",
+        "canonical_tool_id_coverage_complete",
+        "downstream_consumer_ready",
+    ),
     "s_minimal_contour": (
         "minimal_self_status",
         "minimal_self_ready",
@@ -529,3 +543,4 @@ def trace_emit_active(
     if tick_id is None:
         return None
     return trace_emit(tick_id=tick_id, module=module, step=step, values=values, note=note)
+

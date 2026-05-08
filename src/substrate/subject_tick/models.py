@@ -70,6 +70,10 @@ if TYPE_CHECKING:
         A02CapabilityGapResult,
         A02DemandSet,
     )
+    from substrate.a03_internal_tool_affordances import (
+        A03InternalOperationCandidateSet,
+        A03InternalToolAffordanceResult,
+    )
     from substrate.p01_project_formation import (
         P01IntentionStackState,
         P01ProjectFormationResult,
@@ -461,6 +465,27 @@ class SubjectTickRestrictionCode(StrEnum):
     A02_NO_CLEAN_COVERAGE_DETOUR_REQUIRED = "a02_no_clean_coverage_detour_required"
     A02_SOURCE_LINEAGE_PARTIAL = "a02_source_lineage_partial"
     A02_CANONICAL_ID_COVERAGE_INCOMPLETE = "a02_canonical_id_coverage_incomplete"
+    A03_INTERNAL_TOOL_AFFORDANCE_CONTRACT_MUST_BE_READ = (
+        "a03_internal_tool_affordance_contract_must_be_read"
+    )
+    A03_INTERNAL_TOOL_CONSUMER_REQUIRED = "a03_internal_tool_consumer_required"
+    A03_TOOL_CONTRACT_CONSUMER_REQUIRED = "a03_tool_contract_consumer_required"
+    A03_TOOL_GAP_LINKAGE_CONSUMER_REQUIRED = "a03_tool_gap_linkage_consumer_required"
+    A03_NO_LEGACY_DIRECT_CALL_CONSUMER_REQUIRED = (
+        "a03_no_legacy_direct_call_consumer_required"
+    )
+    A03_CONTRACT_INCOMPLETE_DETOUR_REQUIRED = "a03_contract_incomplete_detour_required"
+    A03_TOOL_DEGRADED_OR_BLOCKED_DETOUR_REQUIRED = (
+        "a03_tool_degraded_or_blocked_detour_required"
+    )
+    A03_OVERBROAD_GENERIC_OPERATION_REJECTION_DETOUR_REQUIRED = (
+        "a03_overbroad_generic_operation_rejection_detour_required"
+    )
+    A03_MISSING_INTERNAL_TOOL_GAP_DETOUR_REQUIRED = (
+        "a03_missing_internal_tool_gap_detour_required"
+    )
+    A03_LEGACY_DIRECT_CALL_DETOUR_REQUIRED = "a03_legacy_direct_call_detour_required"
+    A03_CANONICAL_TOOL_ID_COVERAGE_INCOMPLETE = "a03_canonical_tool_id_coverage_incomplete"
     DOWNSTREAM_AUTHORITY_DEGRADED = "downstream_authority_degraded"
 
 
@@ -671,6 +696,11 @@ class SubjectTickContext:
     require_a02_composition_consumer: bool = False
     disable_a02_enforcement: bool = False
     a02_composition_enabled: bool = True
+    require_a03_internal_tool_consumer: bool = False
+    require_a03_tool_contract_consumer: bool = False
+    require_a03_tool_gap_linkage_consumer: bool = False
+    require_a03_no_legacy_direct_call_consumer: bool = False
+    disable_a03_enforcement: bool = False
     o01_entity_signals: tuple[O01EntitySignal, ...] = ()
     o02_interaction_diagnostics: O02InteractionDiagnosticsInput | None = None
     o03_candidate_strategy: O03CandidateStrategyInput | None = None
@@ -686,6 +716,7 @@ class SubjectTickContext:
     p04_simulation_input: P04SimulationInput | None = None
     a01_raw_affordance_candidate_set: A01RawAffordanceCandidateSet | None = None
     a02_demand_set: A02DemandSet | None = None
+    a03_operation_candidate_set: A03InternalOperationCandidateSet | None = None
     g08_appraisal_significance_hint: float | None = None
     source_lineage: tuple[str, ...] = ()
 
@@ -1315,6 +1346,24 @@ class SubjectTickState:
     a02_ownership_boundary_consumer_ready: bool = False
     a02_composition_consumer_ready: bool = False
     a02_downstream_consumer_ready: bool = False
+    a03_operation_candidate_count: int = 0
+    a03_explicit_basis_present: bool = False
+    a03_canonical_tool_count: int = 0
+    a03_rejected_operation_count: int = 0
+    a03_contested_tool_count: int = 0
+    a03_contract_incomplete_count: int = 0
+    a03_degraded_tool_count: int = 0
+    a03_blocked_tool_count: int = 0
+    a03_missing_internal_tool_gap_count: int = 0
+    a03_blocked_internal_tool_gap_count: int = 0
+    a03_legacy_direct_call_detected: bool = False
+    a03_overbroad_generic_operation_rejected: bool = False
+    a03_canonical_tool_id_coverage_complete: bool = False
+    a03_internal_tool_consumer_ready: bool = False
+    a03_tool_contract_consumer_ready: bool = False
+    a03_tool_gap_linkage_consumer_ready: bool = False
+    a03_no_legacy_direct_call_consumer_ready: bool = False
+    a03_downstream_consumer_ready: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -1649,6 +1698,7 @@ class SubjectTickResult:
     self_contour_result: SMinimalContourResult
     a01_result: A01CanonicalOntologyResult
     a02_result: A02CapabilityGapResult
+    a03_result: A03InternalToolAffordanceResult
     a_line_result: ALineNormalizationResult
     m_minimal_result: MMinimalResult
     n_minimal_result: NMinimalResult
@@ -1678,3 +1728,4 @@ class SubjectTickResult:
     abstain_reason: str | None
     no_planner_orchestrator_dependency: bool
     no_phase_semantics_override_dependency: bool
+

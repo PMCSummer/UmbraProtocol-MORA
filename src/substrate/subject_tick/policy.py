@@ -51,6 +51,7 @@ def evaluate_subject_tick_downstream_gate(
         SubjectTickRestrictionCode.A_FORBIDDEN_SHORTCUTS_MUST_BE_READ,
         SubjectTickRestrictionCode.A01_ONTOLOGY_CLEANUP_CONTRACT_MUST_BE_READ,
         SubjectTickRestrictionCode.A02_CAPABILITY_GAP_CONTRACT_MUST_BE_READ,
+        SubjectTickRestrictionCode.A03_INTERNAL_TOOL_AFFORDANCE_CONTRACT_MUST_BE_READ,
         SubjectTickRestrictionCode.M_MINIMAL_CONTOUR_CONTRACT_MUST_BE_READ,
         SubjectTickRestrictionCode.M_FORBIDDEN_SHORTCUTS_MUST_BE_READ,
         SubjectTickRestrictionCode.N_MINIMAL_CONTOUR_CONTRACT_MUST_BE_READ,
@@ -2004,6 +2005,109 @@ def evaluate_subject_tick_downstream_gate(
             usability = SubjectTickUsabilityClass.BLOCKED
             reason = "a02 produced no consumer-ready capability-gap packet"
 
+    a03_checkpoint = next(
+        (
+            checkpoint
+            for checkpoint in state.execution_checkpoints
+            if checkpoint.checkpoint_id == "rt01.a03_internal_tool_affordances_checkpoint"
+        ),
+        None,
+    )
+    if a03_checkpoint is not None:
+        if "require_a03_internal_tool_consumer" in a03_checkpoint.required_action:
+            restrictions.append(SubjectTickRestrictionCode.A03_INTERNAL_TOOL_CONSUMER_REQUIRED)
+        if "require_a03_tool_contract_consumer" in a03_checkpoint.required_action:
+            restrictions.append(SubjectTickRestrictionCode.A03_TOOL_CONTRACT_CONSUMER_REQUIRED)
+        if "require_a03_tool_gap_linkage_consumer" in a03_checkpoint.required_action:
+            restrictions.append(SubjectTickRestrictionCode.A03_TOOL_GAP_LINKAGE_CONSUMER_REQUIRED)
+        if "require_a03_no_legacy_direct_call_consumer" in a03_checkpoint.required_action:
+            restrictions.append(
+                SubjectTickRestrictionCode.A03_NO_LEGACY_DIRECT_CALL_CONSUMER_REQUIRED
+            )
+        if "default_a03_contract_incomplete_detour" in a03_checkpoint.required_action:
+            restrictions.append(SubjectTickRestrictionCode.A03_CONTRACT_INCOMPLETE_DETOUR_REQUIRED)
+        if "default_a03_tool_degraded_or_blocked_detour" in a03_checkpoint.required_action:
+            restrictions.append(
+                SubjectTickRestrictionCode.A03_TOOL_DEGRADED_OR_BLOCKED_DETOUR_REQUIRED
+            )
+        if "default_a03_overbroad_generic_operation_rejection_detour" in a03_checkpoint.required_action:
+            restrictions.append(
+                SubjectTickRestrictionCode.A03_OVERBROAD_GENERIC_OPERATION_REJECTION_DETOUR_REQUIRED
+            )
+        if "default_a03_missing_internal_tool_gap_detour" in a03_checkpoint.required_action:
+            restrictions.append(
+                SubjectTickRestrictionCode.A03_MISSING_INTERNAL_TOOL_GAP_DETOUR_REQUIRED
+            )
+        if "default_a03_legacy_direct_call_detour" in a03_checkpoint.required_action:
+            restrictions.append(SubjectTickRestrictionCode.A03_LEGACY_DIRECT_CALL_DETOUR_REQUIRED)
+        if "default_a03_canonical_tool_id_coverage_detour" in a03_checkpoint.required_action:
+            restrictions.append(
+                SubjectTickRestrictionCode.A03_CANONICAL_TOOL_ID_COVERAGE_INCOMPLETE
+            )
+
+    a03_basis_present = bool(state.a03_explicit_basis_present)
+    if a03_basis_present and state.a03_contract_incomplete_count > 0:
+        restrictions.append(SubjectTickRestrictionCode.A03_CONTRACT_INCOMPLETE_DETOUR_REQUIRED)
+        if (
+            state.final_execution_outcome == SubjectTickOutcome.CONTINUE
+            and usability == SubjectTickUsabilityClass.USABLE_BOUNDED
+        ):
+            usability = SubjectTickUsabilityClass.DEGRADED_BOUNDED
+            reason = "a03 requires contract completion before unrestricted internal-tool use"
+    if a03_basis_present and (state.a03_degraded_tool_count > 0 or state.a03_blocked_tool_count > 0):
+        restrictions.append(SubjectTickRestrictionCode.A03_TOOL_DEGRADED_OR_BLOCKED_DETOUR_REQUIRED)
+        restrictions.append(SubjectTickRestrictionCode.DOWNSTREAM_AUTHORITY_DEGRADED)
+        if state.final_execution_outcome == SubjectTickOutcome.CONTINUE:
+            accepted = False
+            usability = SubjectTickUsabilityClass.BLOCKED
+            reason = "a03 detected degraded/blocked tool affordances and blocks optimistic continuation"
+    if a03_basis_present and state.a03_overbroad_generic_operation_rejected:
+        restrictions.append(
+            SubjectTickRestrictionCode.A03_OVERBROAD_GENERIC_OPERATION_REJECTION_DETOUR_REQUIRED
+        )
+        if (
+            state.final_execution_outcome == SubjectTickOutcome.CONTINUE
+            and usability == SubjectTickUsabilityClass.USABLE_BOUNDED
+        ):
+            usability = SubjectTickUsabilityClass.DEGRADED_BOUNDED
+            reason = "a03 rejected pseudo-tool shortcut and requires bounded decomposition/revalidation"
+    if a03_basis_present and state.a03_missing_internal_tool_gap_count > 0:
+        restrictions.append(SubjectTickRestrictionCode.A03_MISSING_INTERNAL_TOOL_GAP_DETOUR_REQUIRED)
+        if (
+            state.final_execution_outcome == SubjectTickOutcome.CONTINUE
+            and usability == SubjectTickUsabilityClass.USABLE_BOUNDED
+        ):
+            usability = SubjectTickUsabilityClass.DEGRADED_BOUNDED
+            reason = "a03 localized missing internal-tool means and requires bounded continuation"
+    if a03_basis_present and state.a03_legacy_direct_call_detected:
+        restrictions.append(SubjectTickRestrictionCode.A03_LEGACY_DIRECT_CALL_DETOUR_REQUIRED)
+        restrictions.append(SubjectTickRestrictionCode.DOWNSTREAM_AUTHORITY_DEGRADED)
+        if state.final_execution_outcome == SubjectTickOutcome.CONTINUE:
+            accepted = False
+            usability = SubjectTickUsabilityClass.BLOCKED
+            reason = "a03 detected legacy direct-call path and blocks non-canonical tool continuation"
+    if a03_basis_present and not state.a03_canonical_tool_id_coverage_complete:
+        restrictions.append(SubjectTickRestrictionCode.A03_CANONICAL_TOOL_ID_COVERAGE_INCOMPLETE)
+        restrictions.append(SubjectTickRestrictionCode.DOWNSTREAM_AUTHORITY_DEGRADED)
+        if state.final_execution_outcome == SubjectTickOutcome.CONTINUE:
+            accepted = False
+            usability = SubjectTickUsabilityClass.BLOCKED
+            reason = "a03 canonical tool-id coverage is incomplete and downstream cannot rely on stable tool ids"
+    if a03_basis_present and not state.a03_internal_tool_consumer_ready:
+        restrictions.append(SubjectTickRestrictionCode.A03_INTERNAL_TOOL_CONSUMER_REQUIRED)
+    if a03_basis_present and state.a03_contract_incomplete_count > 0 and not state.a03_tool_contract_consumer_ready:
+        restrictions.append(SubjectTickRestrictionCode.A03_TOOL_CONTRACT_CONSUMER_REQUIRED)
+    if a03_basis_present and not state.a03_tool_gap_linkage_consumer_ready:
+        restrictions.append(SubjectTickRestrictionCode.A03_TOOL_GAP_LINKAGE_CONSUMER_REQUIRED)
+    if a03_basis_present and not state.a03_no_legacy_direct_call_consumer_ready:
+        restrictions.append(SubjectTickRestrictionCode.A03_NO_LEGACY_DIRECT_CALL_CONSUMER_REQUIRED)
+    if a03_basis_present and not state.a03_downstream_consumer_ready:
+        restrictions.append(SubjectTickRestrictionCode.DOWNSTREAM_AUTHORITY_DEGRADED)
+        if state.final_execution_outcome == SubjectTickOutcome.CONTINUE:
+            accepted = False
+            usability = SubjectTickUsabilityClass.BLOCKED
+            reason = "a03 produced no consumer-ready canonical internal-tool affordance surface"
+
     return SubjectTickGateDecision(
         accepted=accepted,
         usability_class=usability,
@@ -2011,3 +2115,4 @@ def evaluate_subject_tick_downstream_gate(
         reason=reason,
         state_ref=f"{state.tick_id}@{state.tick_index}",
     )
+

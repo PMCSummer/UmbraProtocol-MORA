@@ -255,6 +255,23 @@ from substrate.a02_capability_gap_detection import (
     build_a02_capability_gap_detection,
     derive_a02_capability_gap_consumer_view,
 )
+from substrate.a03_internal_tool_affordances import (
+    A03AvailabilityStatus,
+    A03InternalOperationCandidate,
+    A03InternalOperationCandidateSet,
+    A03InvocationContract,
+    A03ObservationHook,
+    A03OperationBoundaryKind,
+    A03OperationSourceProfile,
+    A03ToolClass,
+    A03ToolCostProfile,
+    A03ToolFailureSignature,
+    A03ToolInputSpec,
+    A03ToolOutputSpec,
+    A03ToolSideEffectProfile,
+    build_a03_internal_tool_affordances,
+    derive_a03_tool_consumer_view,
+)
 from substrate.s01_efference_copy import (
     S01EfferenceCopyState,
     build_s01_efference_copy,
@@ -280,6 +297,7 @@ ATTEMPTED_SUBJECT_TICK_PATHS: tuple[str, ...] = (
     "subject_tick.evaluate_s05_multi_cause_attribution_factorization",
     "subject_tick.evaluate_a01_internal_affordance_ontology_cleanup",
     "subject_tick.evaluate_a02_capability_gap_detection",
+    "subject_tick.evaluate_a03_internal_tool_affordances",
     "subject_tick.evaluate_s_minimal_contour",
     "subject_tick.evaluate_a_line_normalization",
     "subject_tick.evaluate_m_minimal_contour",
@@ -2729,6 +2747,216 @@ def execute_subject_tick(
             required_action=";".join(dict.fromkeys(a02_required_actions)),
             applied_action=active_execution_mode,
             reason=a02_checkpoint_reason,
+        )
+    )
+    a03_explicit_input = (
+        context.a03_operation_candidate_set
+        if isinstance(context.a03_operation_candidate_set, A03InternalOperationCandidateSet)
+        else None
+    )
+    a03_explicit_basis = bool(a03_explicit_input is not None and a03_explicit_input.candidates)
+    a03_candidate_set = (
+        a03_explicit_input
+        if a03_explicit_input is not None
+        else _build_default_a03_operation_candidate_set(
+            tick_id=tick_id,
+            a01_result=a01_result,
+            source_lineage=lineage,
+        )
+    )
+    a03_result = build_a03_internal_tool_affordances(
+        tick_id=tick_id,
+        tick_index=tick_index,
+        operation_candidate_set=a03_candidate_set,
+        a01_result=a01_result,
+        a02_result=a02_result,
+        tool_affordance_enabled=True,
+    )
+    a03_view = derive_a03_tool_consumer_view(a03_result)
+    a03_trace_values = {
+        "canonical_tool_count": a03_result.telemetry.canonical_tool_count,
+        "rejected_operation_count": a03_result.telemetry.rejected_operation_count,
+        "contested_tool_count": a03_result.telemetry.contested_tool_count,
+        "contract_incomplete_count": a03_result.telemetry.contract_incomplete_count,
+        "degraded_tool_count": a03_result.telemetry.degraded_tool_count,
+        "blocked_tool_count": a03_result.telemetry.blocked_tool_count,
+        "missing_internal_tool_gap_count": a03_result.telemetry.missing_internal_tool_gap_count,
+        "blocked_internal_tool_gap_count": a03_result.telemetry.blocked_internal_tool_gap_count,
+        "overbroad_generic_operation_rejected": a03_result.telemetry.overbroad_generic_operation_rejected,
+        "legacy_direct_call_detected": a03_result.telemetry.legacy_direct_call_detected,
+        "canonical_tool_id_coverage_complete": a03_result.telemetry.canonical_tool_id_coverage_complete,
+        "downstream_consumer_ready": a03_result.telemetry.downstream_consumer_ready,
+    }
+    trace_emit_active("a03_internal_tool_affordances", "enter", a03_trace_values)
+    a03_checkpoint_status = SubjectTickCheckpointStatus.ALLOWED
+    a03_checkpoint_reason = a03_result.gate.reason
+    a03_default_contract_incomplete_detour = False
+    a03_default_tool_degraded_or_blocked_detour = False
+    a03_default_overbroad_generic_operation_rejection_detour = False
+    a03_default_missing_internal_tool_gap_detour = False
+    a03_default_legacy_direct_call_detour = False
+    if not context.disable_a03_enforcement:
+        if (
+            context.require_a03_internal_tool_consumer
+            and not a03_view.internal_tool_consumer_ready
+            and halt_reason is None
+        ):
+            revalidation_needed = True
+            a03_checkpoint_status = SubjectTickCheckpointStatus.ENFORCED_DETOUR
+            a03_checkpoint_reason = (
+                "a03 internal-tool consumer requested but canonical internal tool registry is absent"
+            )
+            if active_execution_mode != "halt_execution":
+                active_execution_mode = "revalidate_scope"
+        if (
+            context.require_a03_tool_contract_consumer
+            and not a03_view.tool_contract_consumer_ready
+            and halt_reason is None
+        ):
+            revalidation_needed = True
+            a03_checkpoint_status = SubjectTickCheckpointStatus.ENFORCED_DETOUR
+            a03_checkpoint_reason = (
+                "a03 tool-contract consumer requested but complete canonical tool contracts are unavailable"
+            )
+            if active_execution_mode != "halt_execution":
+                active_execution_mode = "revalidate_scope"
+        if (
+            context.require_a03_tool_gap_linkage_consumer
+            and not a03_view.tool_gap_linkage_consumer_ready
+            and halt_reason is None
+        ):
+            revalidation_needed = True
+            a03_checkpoint_status = SubjectTickCheckpointStatus.ENFORCED_DETOUR
+            a03_checkpoint_reason = (
+                "a03 tool-gap linkage consumer requested but typed linkage from a02 packet is absent"
+            )
+            if active_execution_mode != "halt_execution":
+                active_execution_mode = "revalidate_scope"
+        if (
+            context.require_a03_no_legacy_direct_call_consumer
+            and not a03_view.no_legacy_direct_call_consumer_ready
+            and halt_reason is None
+        ):
+            revalidation_needed = True
+            a03_checkpoint_status = SubjectTickCheckpointStatus.ENFORCED_DETOUR
+            a03_checkpoint_reason = (
+                "a03 no-legacy-direct-call consumer requested but legacy direct-call path remains detected"
+            )
+            if active_execution_mode != "halt_execution":
+                active_execution_mode = "revalidate_scope"
+        if (
+            a03_explicit_basis
+            and a03_result.telemetry.contract_incomplete_count > 0
+            and halt_reason is None
+        ):
+            revalidation_needed = True
+            a03_default_contract_incomplete_detour = True
+            a03_checkpoint_status = SubjectTickCheckpointStatus.ENFORCED_DETOUR
+            a03_checkpoint_reason = (
+                "a03 detected incomplete tool contracts and requires bounded contract-completion detour"
+            )
+            if active_execution_mode != "halt_execution":
+                active_execution_mode = "revalidate_scope"
+        if (
+            a03_explicit_basis
+            and (
+                a03_result.telemetry.degraded_tool_count > 0
+                or a03_result.telemetry.blocked_tool_count > 0
+            )
+            and halt_reason is None
+        ):
+            repair_needed = True
+            a03_default_tool_degraded_or_blocked_detour = True
+            a03_checkpoint_status = SubjectTickCheckpointStatus.ENFORCED_DETOUR
+            a03_checkpoint_reason = (
+                "a03 detected degraded/blocked internal tools and requires restoration detour"
+            )
+            if active_execution_mode not in {"halt_execution", "revalidate_scope"}:
+                active_execution_mode = "repair_runtime_path"
+        if (
+            a03_explicit_basis
+            and a03_result.telemetry.overbroad_generic_operation_rejected
+            and halt_reason is None
+        ):
+            revalidation_needed = True
+            a03_default_overbroad_generic_operation_rejection_detour = True
+            a03_checkpoint_status = SubjectTickCheckpointStatus.ENFORCED_DETOUR
+            a03_checkpoint_reason = (
+                "a03 rejected overbroad generic operation and requires bounded tool decomposition/revalidation detour"
+            )
+            if active_execution_mode != "halt_execution":
+                active_execution_mode = "revalidate_scope"
+        if (
+            a03_explicit_basis
+            and a03_result.telemetry.missing_internal_tool_gap_count > 0
+            and halt_reason is None
+        ):
+            revalidation_needed = True
+            a03_default_missing_internal_tool_gap_detour = True
+            a03_checkpoint_status = SubjectTickCheckpointStatus.ENFORCED_DETOUR
+            a03_checkpoint_reason = (
+                "a03 localized missing internal-tool means and requires bounded missing-tool detour"
+            )
+            if active_execution_mode != "halt_execution":
+                active_execution_mode = "revalidate_scope"
+        if (
+            a03_explicit_basis
+            and a03_result.telemetry.legacy_direct_call_detected
+            and halt_reason is None
+        ):
+            revalidation_needed = True
+            a03_default_legacy_direct_call_detour = True
+            a03_checkpoint_status = SubjectTickCheckpointStatus.ENFORCED_DETOUR
+            a03_checkpoint_reason = (
+                "a03 detected legacy direct-call path and requires canonical tool-id mediation detour"
+            )
+            if active_execution_mode != "halt_execution":
+                active_execution_mode = "revalidate_scope"
+    else:
+        a03_checkpoint_status = SubjectTickCheckpointStatus.ALLOWED
+        a03_checkpoint_reason = "A03 gate disabled in test fixture"
+
+    a03_required_actions: list[str] = []
+    if context.require_a03_internal_tool_consumer:
+        a03_required_actions.append("require_a03_internal_tool_consumer")
+    if context.require_a03_tool_contract_consumer:
+        a03_required_actions.append("require_a03_tool_contract_consumer")
+    if context.require_a03_tool_gap_linkage_consumer:
+        a03_required_actions.append("require_a03_tool_gap_linkage_consumer")
+    if context.require_a03_no_legacy_direct_call_consumer:
+        a03_required_actions.append("require_a03_no_legacy_direct_call_consumer")
+    if a03_default_contract_incomplete_detour:
+        a03_required_actions.append("default_a03_contract_incomplete_detour")
+    if a03_default_tool_degraded_or_blocked_detour:
+        a03_required_actions.append("default_a03_tool_degraded_or_blocked_detour")
+    if a03_default_overbroad_generic_operation_rejection_detour:
+        a03_required_actions.append("default_a03_overbroad_generic_operation_rejection_detour")
+    if a03_default_missing_internal_tool_gap_detour:
+        a03_required_actions.append("default_a03_missing_internal_tool_gap_detour")
+    if a03_default_legacy_direct_call_detour:
+        a03_required_actions.append("default_a03_legacy_direct_call_detour")
+    if a03_explicit_basis and not a03_result.telemetry.canonical_tool_id_coverage_complete:
+        a03_required_actions.append("default_a03_canonical_tool_id_coverage_detour")
+    if not a03_required_actions:
+        a03_required_actions.append("a03_optional")
+
+    trace_emit_active("a03_internal_tool_affordances", "decision", a03_trace_values)
+    if a03_checkpoint_status != SubjectTickCheckpointStatus.ALLOWED:
+        trace_emit_active(
+            "a03_internal_tool_affordances",
+            "blocked",
+            a03_trace_values,
+            note=a03_checkpoint_reason,
+        )
+    trace_emit_active("a03_internal_tool_affordances", "exit", a03_trace_values)
+    checkpoints.append(
+        SubjectTickCheckpointResult(
+            checkpoint_id="rt01.a03_internal_tool_affordances_checkpoint",
+            source_contract="a03_internal_tool_affordances.tool_affordance_result",
+            status=a03_checkpoint_status,
+            required_action=";".join(dict.fromkeys(a03_required_actions)),
+            applied_action=active_execution_mode,
+            reason=a03_checkpoint_reason,
         )
     )
     a_line_result = build_a_line_normalization(
@@ -6771,6 +6999,28 @@ def execute_subject_tick(
         a02_ownership_boundary_consumer_ready=a02_result.gate.ownership_boundary_consumer_ready,
         a02_composition_consumer_ready=a02_result.gate.composition_consumer_ready,
         a02_downstream_consumer_ready=a02_result.telemetry.downstream_consumer_ready,
+        a03_operation_candidate_count=(
+            len(a03_candidate_set.candidates)
+            if isinstance(a03_candidate_set, A03InternalOperationCandidateSet)
+            else 0
+        ),
+        a03_explicit_basis_present=a03_explicit_basis,
+        a03_canonical_tool_count=a03_result.telemetry.canonical_tool_count,
+        a03_rejected_operation_count=a03_result.telemetry.rejected_operation_count,
+        a03_contested_tool_count=a03_result.telemetry.contested_tool_count,
+        a03_contract_incomplete_count=a03_result.telemetry.contract_incomplete_count,
+        a03_degraded_tool_count=a03_result.telemetry.degraded_tool_count,
+        a03_blocked_tool_count=a03_result.telemetry.blocked_tool_count,
+        a03_missing_internal_tool_gap_count=a03_result.telemetry.missing_internal_tool_gap_count,
+        a03_blocked_internal_tool_gap_count=a03_result.telemetry.blocked_internal_tool_gap_count,
+        a03_legacy_direct_call_detected=a03_result.telemetry.legacy_direct_call_detected,
+        a03_overbroad_generic_operation_rejected=a03_result.telemetry.overbroad_generic_operation_rejected,
+        a03_canonical_tool_id_coverage_complete=a03_result.telemetry.canonical_tool_id_coverage_complete,
+        a03_internal_tool_consumer_ready=a03_result.gate.internal_tool_consumer_ready,
+        a03_tool_contract_consumer_ready=a03_result.gate.tool_contract_consumer_ready,
+        a03_tool_gap_linkage_consumer_ready=a03_result.gate.tool_gap_linkage_consumer_ready,
+        a03_no_legacy_direct_call_consumer_ready=a03_result.gate.no_legacy_direct_call_consumer_ready,
+        a03_downstream_consumer_ready=a03_result.telemetry.downstream_consumer_ready,
     )
     gate = evaluate_subject_tick_downstream_gate(state)
     telemetry = build_subject_tick_telemetry(
@@ -6778,7 +7028,7 @@ def execute_subject_tick(
         attempted_paths=ATTEMPTED_SUBJECT_TICK_PATHS,
         downstream_gate=gate,
         causal_basis=(
-            "bounded runtime execution spine enforces roadmap authority roles for C04/C05, consumes world-entry, s01 efference-copy, s02 prediction-boundary seam, s03 ownership-weighted learning, s04 interoceptive self-binding, s05 multi-cause attribution, s-minimal, a01 affordance ontology cleanup, a02 capability-gap detection, a-line, m-minimal, n-minimal, t01 semantic-field, t02 relation-binding, t03 hypothesis-competition, t04 attention-schema, o01 other-entity modeling, o02 intersubjective allostasis, o03 strategy-class evaluation, p01 authority-bounded project-formation, o04 rupture/hostility/coercion dynamics, r05 bounded protective regulation gates, v01 act-level normative licensing/commitment guards, v02 typed utterance-plan bridge constraints, v03 constrained realization alignment/report contract, c06 typed surfacing-candidates handoff, p02 typed intervention episodes, p03 typed long-horizon credit assignment, and p04 typed interpersonal counterfactual policy simulation before bounded outcome resolution, while keeping D01 observability-only over fixed R->C order"
+            "bounded runtime execution spine enforces roadmap authority roles for C04/C05, consumes world-entry, s01 efference-copy, s02 prediction-boundary seam, s03 ownership-weighted learning, s04 interoceptive self-binding, s05 multi-cause attribution, s-minimal, a01 affordance ontology cleanup, a02 capability-gap detection, a03 internal-tool affordance normalization, a-line, m-minimal, n-minimal, t01 semantic-field, t02 relation-binding, t03 hypothesis-competition, t04 attention-schema, o01 other-entity modeling, o02 intersubjective allostasis, o03 strategy-class evaluation, p01 authority-bounded project-formation, o04 rupture/hostility/coercion dynamics, r05 bounded protective regulation gates, v01 act-level normative licensing/commitment guards, v02 typed utterance-plan bridge constraints, v03 constrained realization alignment/report contract, c06 typed surfacing-candidates handoff, p02 typed intervention episodes, p03 typed long-horizon credit assignment, and p04 typed interpersonal counterfactual policy simulation before bounded outcome resolution, while keeping D01 observability-only over fixed R->C order"
         ),
     )
     abstain = final_outcome in {SubjectTickOutcome.REPAIR, SubjectTickOutcome.REVALIDATE}
@@ -6860,6 +7110,7 @@ def execute_subject_tick(
         self_contour_result=s_minimal_result,
         a01_result=a01_result,
         a02_result=a02_result,
+        a03_result=a03_result,
         a_line_result=a_line_result,
         m_minimal_result=m_minimal_result,
         n_minimal_result=n_minimal_result,
@@ -7389,6 +7640,108 @@ def _build_default_a02_demand_set(
     )
 
 
+def _build_default_a03_operation_candidate_set(
+    *,
+    tick_id: str,
+    a01_result,
+    source_lineage: tuple[str, ...],
+) -> A03InternalOperationCandidateSet | None:
+    entries = a01_result.ontology_snapshot.canonical_entries
+    if not entries:
+        return None
+    candidates: list[A03InternalOperationCandidate] = []
+    for index, entry in enumerate(entries, start=1):
+        if "world" in entry.target_channels:
+            continue
+        candidates.append(
+            A03InternalOperationCandidate(
+                operation_ref=f"{tick_id}:a03:default:{index}",
+                local_label=entry.canonical_label,
+                tool_class=_infer_a03_tool_class_from_a01_entry(entry.affordance_class),
+                source_profile=A03OperationSourceProfile(
+                    source_module="subject_tick.default_a03_projection",
+                    source_surface="a01_internal_affordance_ontology_cleanup.canonical_ontology_snapshot",
+                    provenance_refs=("subject_tick.default_a03", entry.affordance_id),
+                    source_lineage=source_lineage,
+                ),
+                boundary_kind=A03OperationBoundaryKind.REUSABLE_TOOL,
+                invocation_contract=A03InvocationContract(
+                    accepted_input_types=(
+                        A03ToolInputSpec(type_name="tick_context", required=True),
+                    ),
+                    produced_output_types=(
+                        A03ToolOutputSpec(type_name="bounded_internal_projection", guaranteed=False),
+                    ),
+                    required_context=("mode:continue_stream",),
+                    preconditions=entry.preconditions.requirements,
+                    abort_conditions=("contract_guard_triggered",),
+                    completion_criteria=("bounded_projection_available",),
+                ),
+                observation_hooks=(
+                    A03ObservationHook(
+                        hook_id=f"{tick_id}:a03:obs:{index}",
+                        signal_ref=entry.observation_expectation.expected_signals[0]
+                        if entry.observation_expectation.expected_signals
+                        else "internal_observation",
+                        verification_required=entry.observation_expectation.verification_required,
+                    ),
+                ),
+                failure_signatures=(
+                    A03ToolFailureSignature(
+                        signature_id=f"{tick_id}:a03:fail:{index}",
+                        failure_mode="contract_guard_triggered",
+                        detectable=True,
+                    ),
+                ),
+                cost_profile=A03ToolCostProfile(
+                    latency_class="bounded_tick",
+                    cost_band="low",
+                ),
+                side_effect_profile=A03ToolSideEffectProfile(
+                    side_effect_refs=entry.effect_scope.side_effect_channels,
+                    risk_band="bounded",
+                ),
+                controllability_hint=entry.controllability.confidence,
+                reliability_hint=entry.controllability.confidence,
+                reuse_scope="frontier_narrow",
+                required_context=("mode:continue_stream",),
+                canonical_tool_id_hint=entry.affordance_id,
+                validity_hint=entry.validity_status.value,
+                legacy_module_only=False,
+            )
+        )
+        if candidates:
+            break
+    if not candidates:
+        return None
+    return A03InternalOperationCandidateSet(
+        candidate_set_id=f"a03:{tick_id}:default_operation_set",
+        candidates=tuple(candidates),
+        source_lineage=source_lineage,
+        active_mode="continue_stream",
+        resource_pressure=False,
+        available_observation_channels=("internal_observation", "calmer_state", "stable"),
+        reason="default narrow projection from a01 canonical entries for optional A03 observability",
+    )
+
+
+def _infer_a03_tool_class_from_a01_entry(affordance_class: A01AffordanceClass) -> A03ToolClass:
+    mapping = {
+        A01AffordanceClass.SENSING_MONITORING: A03ToolClass.MONITORING,
+        A01AffordanceClass.REGULATION_ADJUSTMENT: A03ToolClass.CONSTRAINT_CHECKING,
+        A01AffordanceClass.INTERNAL_MODE_SHIFT: A03ToolClass.ATTENTION_REDIRECTION,
+        A01AffordanceClass.REPAIR_RECOVERY: A03ToolClass.DIAGNOSTIC,
+        A01AffordanceClass.DEFER_REVISIT: A03ToolClass.ROUTE_BUILDING,
+        A01AffordanceClass.COMMUNICATION_OUTPUT: A03ToolClass.ROUTE_BUILDING,
+        A01AffordanceClass.INHIBITION_SUPPRESSION: A03ToolClass.CONSTRAINT_CHECKING,
+        A01AffordanceClass.EXPLORATION_DIVERSIFICATION: A03ToolClass.SEARCH_ENABLING,
+        A01AffordanceClass.WORLD_DIRECTED_ACTION: A03ToolClass.ROUTE_BUILDING,
+        A01AffordanceClass.OBSERVATION_ONLY: A03ToolClass.INSPECTION,
+        A01AffordanceClass.INTERNAL_ONLY: A03ToolClass.SELF_QUERY,
+    }
+    return mapping.get(affordance_class, A03ToolClass.SELF_QUERY)
+
+
 def _build_default_a01_raw_affordance_candidate_set(
     *,
     tick_id: str,
@@ -7521,3 +7874,4 @@ def _union_unique(*chunks: Iterable[str]) -> tuple[str, ...]:
             if token and token not in acc:
                 acc.append(token)
     return tuple(acc)
+

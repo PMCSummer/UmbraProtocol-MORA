@@ -53,6 +53,7 @@ HOSTED_CONTOUR_SEGMENTS = (
     "s_minimal_contour",
     "a01_internal_affordance_ontology_cleanup",
     "a02_capability_gap_detection",
+    "a03_internal_tool_affordances",
     "a_line_normalization",
     "m_minimal",
     "n_minimal",
@@ -319,6 +320,20 @@ HOSTED_CONTOUR_FIELDS: dict[str, set[str]] = {
         "composition_unverified_count",
         "ownership_boundary_gap_count",
         "no_clean_coverage_count",
+        "downstream_consumer_ready",
+    },
+    "a03_internal_tool_affordances": {
+        "canonical_tool_count",
+        "rejected_operation_count",
+        "contested_tool_count",
+        "contract_incomplete_count",
+        "degraded_tool_count",
+        "blocked_tool_count",
+        "missing_internal_tool_gap_count",
+        "blocked_internal_tool_gap_count",
+        "overbroad_generic_operation_rejected",
+        "legacy_direct_call_detected",
+        "canonical_tool_id_coverage_complete",
         "downstream_consumer_ready",
     },
     "s_minimal_contour": {
@@ -834,6 +849,9 @@ def test_hosted_contour_segments_follow_real_runtime_order(tmp_path: Path) -> No
         events, "a02_capability_gap_detection"
     )
     assert _first_order(events, "a02_capability_gap_detection") < _first_order(
+        events, "a03_internal_tool_affordances"
+    )
+    assert _first_order(events, "a03_internal_tool_affordances") < _first_order(
         events, "a_line_normalization"
     )
     assert _first_order(events, "a_line_normalization") < _first_order(events, "m_minimal")
@@ -954,3 +972,4 @@ def test_cli_smoke_writes_single_jsonl(tmp_path: Path) -> None:
     events = _load_events(files[0])
     assert events
     assert {"tick_id", "order", "module", "step", "values", "note"} == set(events[0].keys())
+

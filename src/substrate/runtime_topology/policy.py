@@ -118,6 +118,7 @@ def build_minimal_runtime_tick_graph() -> RuntimeTickGraph:
                 surfaces=(
                     "a01_internal_affordance_ontology_cleanup.canonical_ontology_snapshot",
                     "a02_capability_gap_detection.capability_gap_result",
+                    "a03_internal_tool_affordances.tool_affordance_result",
                     "a_line_normalization.capability_state",
                     "a_line_normalization.forbidden_shortcuts",
                     "a_line_normalization.a04_readiness",
@@ -125,6 +126,7 @@ def build_minimal_runtime_tick_graph() -> RuntimeTickGraph:
                 checkpoint_ids=(
                     "rt01.a01_affordance_ontology_cleanup_checkpoint",
                     "rt01.a02_capability_gap_detection_checkpoint",
+                    "rt01.a03_internal_tool_affordances_checkpoint",
                     "rt01.a_line_normalization_checkpoint",
                 ),
             ),
@@ -620,6 +622,7 @@ def build_minimal_runtime_tick_graph() -> RuntimeTickGraph:
             "rt01.s_minimal_contour_checkpoint",
             "rt01.a01_affordance_ontology_cleanup_checkpoint",
             "rt01.a02_capability_gap_detection_checkpoint",
+            "rt01.a03_internal_tool_affordances_checkpoint",
             "rt01.a_line_normalization_checkpoint",
             "rt01.m_minimal_contour_checkpoint",
             "rt01.n_minimal_contour_checkpoint",
@@ -658,6 +661,7 @@ def build_minimal_runtime_tick_graph() -> RuntimeTickGraph:
             "s_minimal_contour.boundary_state",
             "a01_internal_affordance_ontology_cleanup.canonical_ontology_snapshot",
             "a02_capability_gap_detection.capability_gap_result",
+            "a03_internal_tool_affordances.tool_affordance_result",
             "a_line_normalization.capability_state",
             "m_minimal.lifecycle_state",
             "n_minimal.commitment_state",
@@ -736,6 +740,7 @@ def build_minimal_runtime_topology_bundle() -> RuntimeTopologyBundle:
             "s_minimal_boundary_attribution_contract",
             "a01_internal_affordance_ontology_cleanup_contract",
             "a02_capability_gap_detection_contract",
+            "a03_internal_tool_affordance_contract",
             "a_line_normalization_capability_contract",
             "m_minimal_memory_lifecycle_contract",
             "n_minimal_narrative_commitment_contract",
@@ -922,6 +927,7 @@ def _context_has_ablation_flags(context: SubjectTickContext | None) -> bool:
         or context.disable_s_minimal_enforcement
         or context.disable_a01_enforcement
         or context.disable_a02_enforcement
+        or context.disable_a03_enforcement
         or context.disable_m_minimal_enforcement
         or context.disable_n_minimal_enforcement
         or context.disable_s01_enforcement
