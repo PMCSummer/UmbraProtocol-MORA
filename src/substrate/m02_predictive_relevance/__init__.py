@@ -1,0 +1,53 @@
+from substrate.m02_predictive_relevance.downstream_contract import (
+    M02ConsumerView,
+    M02ContractView,
+    derive_m02_consumer_packets,
+    derive_m02_contract_view,
+    require_m02_context_scope_consumer,
+    require_m02_predictive_packet_consumer,
+)
+from substrate.m02_predictive_relevance.models import (
+    M02GateDecision,
+    M02InputBundle,
+    M02LedgerEntry,
+    M02PredictiveFeedback,
+    M02PredictiveLifecycleAdjustment,
+    M02PredictiveRelevanceDecision,
+    M02PredictiveRelevanceMark,
+    M02PredictiveTrace,
+    M02PredictionTarget,
+    M02Result,
+    M02ScopeMarker,
+    M02TargetType,
+    M02Telemetry,
+    M02TraceKind,
+    M02UtilityHorizon,
+)
+from substrate.m02_predictive_relevance.policy import build_m02_predictive_relevance
+from substrate.m02_predictive_relevance.telemetry import m02_predictive_relevance_snapshot
+
+__all__ = [
+    "M02ConsumerView",
+    "M02ContractView",
+    "M02GateDecision",
+    "M02InputBundle",
+    "M02LedgerEntry",
+    "M02PredictiveFeedback",
+    "M02PredictiveLifecycleAdjustment",
+    "M02PredictiveRelevanceDecision",
+    "M02PredictiveRelevanceMark",
+    "M02PredictiveTrace",
+    "M02PredictionTarget",
+    "M02Result",
+    "M02ScopeMarker",
+    "M02TargetType",
+    "M02Telemetry",
+    "M02TraceKind",
+    "M02UtilityHorizon",
+    "build_m02_predictive_relevance",
+    "derive_m02_consumer_packets",
+    "derive_m02_contract_view",
+    "m02_predictive_relevance_snapshot",
+    "require_m02_context_scope_consumer",
+    "require_m02_predictive_packet_consumer",
+]

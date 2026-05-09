@@ -86,6 +86,14 @@ if TYPE_CHECKING:
         M01InputBundle,
         M01Result,
     )
+    from substrate.m02_predictive_relevance import (
+        M02InputBundle,
+        M02Result,
+    )
+    from substrate.n01_narrative_commitments import (
+        N01InputBundle,
+        N01Result,
+    )
     from substrate.p01_project_formation import (
         P01IntentionStackState,
         P01ProjectFormationResult,
@@ -526,6 +534,22 @@ class SubjectTickRestrictionCode(StrEnum):
     M01_ATTRIBUTION_LIMITED_DETOUR_REQUIRED = "m01_attribution_limited_detour_required"
     M01_STALE_BASIS_DETOUR_REQUIRED = "m01_stale_basis_detour_required"
     M01_RECOVERY_IMPRINT_ROUTE_REQUIRED = "m01_recovery_imprint_route_required"
+    M02_PREDICTIVE_RELEVANCE_CONTRACT_MUST_BE_READ = "m02_predictive_relevance_contract_must_be_read"
+    M02_PREDICTIVE_PACKET_CONSUMER_REQUIRED = "m02_predictive_packet_consumer_required"
+    M02_CONTEXT_SCOPE_CONSUMER_REQUIRED = "m02_context_scope_consumer_required"
+    M02_NO_SAFE_MARK_DETOUR_REQUIRED = "m02_no_safe_mark_detour_required"
+    M02_SPURIOUS_RISK_DETOUR_REQUIRED = "m02_spurious_risk_detour_required"
+    M02_CONTEXT_LOCKED_RESTRICTION_REQUIRED = "m02_context_locked_restriction_required"
+    M02_NOT_GENERIC_IMPORTANCE_RESTRICTION = "m02_not_generic_importance_restriction"
+    N01_NARRATIVE_COMMITMENT_CONTRACT_MUST_BE_READ = (
+        "n01_narrative_commitment_contract_must_be_read"
+    )
+    N01_COMMITMENT_CONSUMER_REQUIRED = "n01_commitment_consumer_required"
+    N01_CONSISTENCY_CONSUMER_REQUIRED = "n01_consistency_consumer_required"
+    N01_CONTESTED_COMMITMENT_RECHECK_REQUIRED = (
+        "n01_contested_commitment_recheck_required"
+    )
+    N01_UNGROUNDED_CAPABILITY_RESTRICTION = "n01_ungrounded_capability_restriction"
     DOWNSTREAM_AUTHORITY_DEGRADED = "downstream_authority_degraded"
 
 
@@ -750,6 +774,12 @@ class SubjectTickContext:
     require_m01_imprint_packet_consumer: bool = False
     require_m01_axis_scope_consumer: bool = False
     disable_m01_enforcement: bool = False
+    require_m02_predictive_packet_consumer: bool = False
+    require_m02_context_scope_consumer: bool = False
+    disable_m02_enforcement: bool = False
+    require_n01_commitment_consumer: bool = False
+    require_n01_consistency_consumer: bool = False
+    disable_n01_enforcement: bool = False
     o01_entity_signals: tuple[O01EntitySignal, ...] = ()
     o02_interaction_diagnostics: O02InteractionDiagnosticsInput | None = None
     o03_candidate_strategy: O03CandidateStrategyInput | None = None
@@ -769,6 +799,8 @@ class SubjectTickContext:
     a04_external_candidate_set: A04ExternalAffordanceCandidateSet | None = None
     w01_world_packet_set: W01WorldPacketSet | None = None
     m01_input_bundle: M01InputBundle | None = None
+    m02_input_bundle: M02InputBundle | None = None
+    n01_input_bundle: N01InputBundle | None = None
     g08_appraisal_significance_hint: float | None = None
     source_lineage: tuple[str, ...] = ()
 
@@ -1454,6 +1486,30 @@ class SubjectTickState:
     m01_imprint_packet_consumer_ready: bool = False
     m01_axis_scope_consumer_ready: bool = False
     m01_downstream_consumer_ready: bool = False
+    m02_predictive_mark_count: int = 0
+    m02_explicit_basis_present: bool = False
+    m02_clean_predictive_mark_count: int = 0
+    m02_weak_mark_count: int = 0
+    m02_context_locked_count: int = 0
+    m02_spurious_risk_count: int = 0
+    m02_no_safe_mark_count: int = 0
+    m02_predictive_packet_consumer_ready: bool = False
+    m02_context_scope_consumer_ready: bool = False
+    m02_downstream_consumer_ready: bool = False
+    m02_must_not_generalize: bool = True
+    m02_must_not_treat_as_generic_importance: bool = True
+    n01_commitment_count: int = 0
+    n01_explicit_basis_present: bool = False
+    n01_strong_commitment_count: int = 0
+    n01_provisional_commitment_count: int = 0
+    n01_statement_only_count: int = 0
+    n01_contested_commitment_count: int = 0
+    n01_revised_or_retired_count: int = 0
+    n01_scope_narrowed_count: int = 0
+    n01_ungrounded_capability_count: int = 0
+    n01_commitment_consumer_ready: bool = False
+    n01_consistency_consumer_ready: bool = False
+    n01_downstream_consumer_ready: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -1792,6 +1848,8 @@ class SubjectTickResult:
     a04_result: A04ExternalAffordanceBindingResult
     w01_result: W01Result
     m01_result: M01Result
+    m02_result: M02Result
+    n01_result: N01Result
     a_line_result: ALineNormalizationResult
     m_minimal_result: MMinimalResult
     n_minimal_result: NMinimalResult

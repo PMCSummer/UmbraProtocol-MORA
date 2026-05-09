@@ -55,6 +55,7 @@ def evaluate_subject_tick_downstream_gate(
         SubjectTickRestrictionCode.A04_EXTERNAL_AFFORDANCE_BINDING_CONTRACT_MUST_BE_READ,
         SubjectTickRestrictionCode.W01_BOUNDED_WORLD_LOOP_CONTRACT_MUST_BE_READ,
         SubjectTickRestrictionCode.M01_HOMEOSTATIC_IMPRINT_CONTRACT_MUST_BE_READ,
+        SubjectTickRestrictionCode.N01_NARRATIVE_COMMITMENT_CONTRACT_MUST_BE_READ,
         SubjectTickRestrictionCode.M_MINIMAL_CONTOUR_CONTRACT_MUST_BE_READ,
         SubjectTickRestrictionCode.M_FORBIDDEN_SHORTCUTS_MUST_BE_READ,
         SubjectTickRestrictionCode.N_MINIMAL_CONTOUR_CONTRACT_MUST_BE_READ,
@@ -2320,6 +2321,102 @@ def evaluate_subject_tick_downstream_gate(
             accepted = False
             usability = SubjectTickUsabilityClass.BLOCKED
             reason = "m01 produced no consumer-ready homeostatic-imprint packet for bounded memory-economics use"
+
+    m02_checkpoint = next(
+        (
+            checkpoint
+            for checkpoint in state.execution_checkpoints
+            if checkpoint.checkpoint_id == "rt01.m02_predictive_relevance_checkpoint"
+        ),
+        None,
+    )
+    if m02_checkpoint is not None:
+        if "require_m02_predictive_packet_consumer" in m02_checkpoint.required_action:
+            restrictions.append(SubjectTickRestrictionCode.M02_PREDICTIVE_PACKET_CONSUMER_REQUIRED)
+        if "require_m02_context_scope_consumer" in m02_checkpoint.required_action:
+            restrictions.append(SubjectTickRestrictionCode.M02_CONTEXT_SCOPE_CONSUMER_REQUIRED)
+        if "default_m02_no_safe_predictive_mark_detour" in m02_checkpoint.required_action:
+            restrictions.append(SubjectTickRestrictionCode.M02_NO_SAFE_MARK_DETOUR_REQUIRED)
+        if "default_m02_spurious_pattern_risk_detour" in m02_checkpoint.required_action:
+            restrictions.append(SubjectTickRestrictionCode.M02_SPURIOUS_RISK_DETOUR_REQUIRED)
+        if "default_m02_context_locked_predictor_restriction" in m02_checkpoint.required_action:
+            restrictions.append(SubjectTickRestrictionCode.M02_CONTEXT_LOCKED_RESTRICTION_REQUIRED)
+
+    m02_basis_present = bool(state.m02_explicit_basis_present)
+    if m02_basis_present and state.m02_no_safe_mark_count > 0:
+        restrictions.append(SubjectTickRestrictionCode.M02_NO_SAFE_MARK_DETOUR_REQUIRED)
+        if (
+            state.final_execution_outcome == SubjectTickOutcome.CONTINUE
+            and usability == SubjectTickUsabilityClass.USABLE_BOUNDED
+        ):
+            usability = SubjectTickUsabilityClass.DEGRADED_BOUNDED
+            reason = "m02 explicit basis produced no-safe predictive marks and cannot justify predictive-memory bias"
+    if m02_basis_present and state.m02_spurious_risk_count > 0:
+        restrictions.append(SubjectTickRestrictionCode.M02_SPURIOUS_RISK_DETOUR_REQUIRED)
+        if state.final_execution_outcome == SubjectTickOutcome.CONTINUE:
+            accepted = False
+            usability = SubjectTickUsabilityClass.BLOCKED
+            reason = "m02 spurious predictive risk blocks predictive-memory promotion under explicit basis"
+    if m02_basis_present and state.m02_context_locked_count > 0:
+        restrictions.append(SubjectTickRestrictionCode.M02_CONTEXT_LOCKED_RESTRICTION_REQUIRED)
+    if m02_basis_present and not state.m02_predictive_packet_consumer_ready:
+        restrictions.append(SubjectTickRestrictionCode.M02_PREDICTIVE_PACKET_CONSUMER_REQUIRED)
+    if m02_basis_present and not state.m02_context_scope_consumer_ready:
+        restrictions.append(SubjectTickRestrictionCode.M02_CONTEXT_SCOPE_CONSUMER_REQUIRED)
+    if m02_basis_present and state.m02_must_not_generalize:
+        restrictions.append(SubjectTickRestrictionCode.M02_CONTEXT_LOCKED_RESTRICTION_REQUIRED)
+    if m02_basis_present and state.m02_must_not_treat_as_generic_importance:
+        restrictions.append(SubjectTickRestrictionCode.M02_NOT_GENERIC_IMPORTANCE_RESTRICTION)
+    if m02_basis_present and not state.m02_downstream_consumer_ready:
+        restrictions.append(SubjectTickRestrictionCode.DOWNSTREAM_AUTHORITY_DEGRADED)
+        if state.final_execution_outcome == SubjectTickOutcome.CONTINUE:
+            accepted = False
+            usability = SubjectTickUsabilityClass.BLOCKED
+            reason = "m02 produced no consumer-ready predictive relevance packet for bounded memory-economics use"
+
+    n01_checkpoint = next(
+        (
+            checkpoint
+            for checkpoint in state.execution_checkpoints
+            if checkpoint.checkpoint_id == "rt01.n01_narrative_commitments_checkpoint"
+        ),
+        None,
+    )
+    if n01_checkpoint is not None:
+        if "require_n01_commitment_consumer" in n01_checkpoint.required_action:
+            restrictions.append(SubjectTickRestrictionCode.N01_COMMITMENT_CONSUMER_REQUIRED)
+        if "require_n01_consistency_consumer" in n01_checkpoint.required_action:
+            restrictions.append(SubjectTickRestrictionCode.N01_CONSISTENCY_CONSUMER_REQUIRED)
+        if "default_n01_contested_commitment_recheck" in n01_checkpoint.required_action:
+            restrictions.append(SubjectTickRestrictionCode.N01_CONTESTED_COMMITMENT_RECHECK_REQUIRED)
+        if "default_n01_ungrounded_capability_restriction" in n01_checkpoint.required_action:
+            restrictions.append(SubjectTickRestrictionCode.N01_UNGROUNDED_CAPABILITY_RESTRICTION)
+
+    n01_basis_present = bool(state.n01_explicit_basis_present)
+    if n01_basis_present and state.n01_contested_commitment_count > 0:
+        restrictions.append(SubjectTickRestrictionCode.N01_CONTESTED_COMMITMENT_RECHECK_REQUIRED)
+        if (
+            state.final_execution_outcome == SubjectTickOutcome.CONTINUE
+            and usability == SubjectTickUsabilityClass.USABLE_BOUNDED
+        ):
+            usability = SubjectTickUsabilityClass.DEGRADED_BOUNDED
+            reason = "n01 contested commitment records require recheck before clean continuation"
+    if n01_basis_present and state.n01_ungrounded_capability_count > 0:
+        restrictions.append(SubjectTickRestrictionCode.N01_UNGROUNDED_CAPABILITY_RESTRICTION)
+        if state.final_execution_outcome == SubjectTickOutcome.CONTINUE:
+            accepted = False
+            usability = SubjectTickUsabilityClass.BLOCKED
+            reason = "n01 ungrounded capability claim records block clean commitment continuation"
+    if n01_basis_present and not state.n01_commitment_consumer_ready:
+        restrictions.append(SubjectTickRestrictionCode.N01_COMMITMENT_CONSUMER_REQUIRED)
+    if n01_basis_present and not state.n01_consistency_consumer_ready:
+        restrictions.append(SubjectTickRestrictionCode.N01_CONSISTENCY_CONSUMER_REQUIRED)
+    if n01_basis_present and not state.n01_downstream_consumer_ready:
+        restrictions.append(SubjectTickRestrictionCode.DOWNSTREAM_AUTHORITY_DEGRADED)
+        if state.final_execution_outcome == SubjectTickOutcome.CONTINUE:
+            accepted = False
+            usability = SubjectTickUsabilityClass.BLOCKED
+            reason = "n01 produced no consumer-ready commitment records for downstream consistency use"
 
     return SubjectTickGateDecision(
         accepted=accepted,

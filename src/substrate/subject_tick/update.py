@@ -287,6 +287,16 @@ from substrate.m01_homeostatic_salience_imprint import (
     build_m01_homeostatic_salience_imprint,
     derive_m01_contract_view,
 )
+from substrate.m02_predictive_relevance import (
+    M02InputBundle,
+    build_m02_predictive_relevance,
+    derive_m02_contract_view,
+)
+from substrate.n01_narrative_commitments import (
+    N01InputBundle,
+    build_n01_narrative_commitments,
+    derive_n01_contract_view,
+)
 from substrate.s01_efference_copy import (
     S01EfferenceCopyState,
     build_s01_efference_copy,
@@ -337,6 +347,8 @@ ATTEMPTED_SUBJECT_TICK_PATHS: tuple[str, ...] = (
     "subject_tick.evaluate_a04_external_affordance_binding",
     "subject_tick.evaluate_w01_bounded_world_loop",
     "subject_tick.evaluate_m01_homeostatic_salience_imprint",
+    "subject_tick.evaluate_m02_predictive_relevance",
+    "subject_tick.evaluate_n01_narrative_commitments",
     "subject_tick.world_seam_enforcement",
     "subject_tick.resolve_bounded_runtime_outcome",
     "subject_tick.downstream_gate",
@@ -6571,6 +6583,235 @@ def execute_subject_tick(
         )
     )
 
+    m02_explicit_input = (
+        context.m02_input_bundle
+        if isinstance(context.m02_input_bundle, M02InputBundle)
+        else None
+    )
+    m02_explicit_basis = bool(m02_explicit_input is not None and m02_explicit_input.traces)
+    m02_result = build_m02_predictive_relevance(
+        tick_id=tick_id,
+        tick_index=tick_index,
+        input_bundle=m02_explicit_input,
+        relevance_enabled=True,
+    )
+    m02_view = derive_m02_contract_view(m02_result)
+    m02_trace_values = {
+        "m02_predictive_mark_count": m02_result.telemetry.predictive_mark_count,
+        "m02_context_locked_count": m02_result.telemetry.context_locked_count,
+        "m02_spurious_risk_count": m02_result.telemetry.spurious_risk_count,
+        "m02_no_safe_mark_count": m02_result.telemetry.no_safe_mark_count,
+        "m02_downstream_consumer_ready": m02_result.gate.consumer_ready,
+        "m02_must_not_generalize": m02_result.gate.downstream_must_not_generalize,
+        "m02_must_not_treat_as_generic_importance": m02_result.gate.downstream_must_not_treat_as_generic_importance,
+    }
+    trace_emit_active("m02_predictive_relevance", "enter", m02_trace_values)
+    m02_checkpoint_status = SubjectTickCheckpointStatus.ALLOWED
+    m02_checkpoint_reason = m02_result.reason
+    m02_default_no_safe_detour = False
+    m02_default_spurious_detour = False
+    m02_default_context_locked_restriction = False
+    if not context.disable_m02_enforcement:
+        if (
+            context.require_m02_predictive_packet_consumer
+            and not m02_view.predictive_packet_consumer_ready
+            and halt_reason is None
+        ):
+            revalidation_needed = True
+            m02_checkpoint_status = SubjectTickCheckpointStatus.ENFORCED_DETOUR
+            m02_checkpoint_reason = (
+                "m02 predictive-packet consumer requested but typed target-linked predictive marks are not ready"
+            )
+            if active_execution_mode != "halt_execution":
+                active_execution_mode = "revalidate_scope"
+        if (
+            context.require_m02_context_scope_consumer
+            and not m02_view.context_scope_consumer_ready
+            and halt_reason is None
+        ):
+            revalidation_needed = True
+            m02_checkpoint_status = SubjectTickCheckpointStatus.ENFORCED_DETOUR
+            m02_checkpoint_reason = (
+                "m02 context-scope consumer requested but context-preserving predictive marks are not ready"
+            )
+            if active_execution_mode != "halt_execution":
+                active_execution_mode = "revalidate_scope"
+        if m02_explicit_basis and m02_result.telemetry.no_safe_mark_count > 0 and halt_reason is None:
+            revalidation_needed = True
+            m02_default_no_safe_detour = True
+            m02_checkpoint_status = SubjectTickCheckpointStatus.ENFORCED_DETOUR
+            m02_checkpoint_reason = (
+                "m02 explicit basis produced no-safe predictive marks and requires predictive-memory abstain detour"
+            )
+            if active_execution_mode != "halt_execution":
+                active_execution_mode = "revalidate_scope"
+        if m02_explicit_basis and m02_result.telemetry.spurious_risk_count > 0 and halt_reason is None:
+            revalidation_needed = True
+            m02_default_spurious_detour = True
+            if m02_checkpoint_status == SubjectTickCheckpointStatus.ALLOWED:
+                m02_checkpoint_status = SubjectTickCheckpointStatus.ENFORCED_DETOUR
+            m02_checkpoint_reason = (
+                "m02 spurious predictive pattern risk requires suppression and bounded detour handling"
+            )
+            if active_execution_mode != "halt_execution":
+                active_execution_mode = "revalidate_scope"
+        if m02_explicit_basis and m02_result.telemetry.context_locked_count > 0 and halt_reason is None:
+            m02_default_context_locked_restriction = True
+    else:
+        m02_checkpoint_status = SubjectTickCheckpointStatus.ALLOWED
+        m02_checkpoint_reason = "M02 gate disabled in test fixture"
+
+    m02_required_actions: list[str] = []
+    if context.require_m02_predictive_packet_consumer:
+        m02_required_actions.append("require_m02_predictive_packet_consumer")
+    if context.require_m02_context_scope_consumer:
+        m02_required_actions.append("require_m02_context_scope_consumer")
+    if m02_default_no_safe_detour:
+        m02_required_actions.append("default_m02_no_safe_predictive_mark_detour")
+    if m02_default_spurious_detour:
+        m02_required_actions.append("default_m02_spurious_pattern_risk_detour")
+    if m02_default_context_locked_restriction:
+        m02_required_actions.append("default_m02_context_locked_predictor_restriction")
+    if not m02_required_actions:
+        m02_required_actions.append("m02_optional")
+
+    trace_emit_active("m02_predictive_relevance", "decision", m02_trace_values)
+    if m02_checkpoint_status != SubjectTickCheckpointStatus.ALLOWED:
+        trace_emit_active(
+            "m02_predictive_relevance",
+            "blocked",
+            m02_trace_values,
+            note=m02_checkpoint_reason,
+        )
+    trace_emit_active("m02_predictive_relevance", "exit", m02_trace_values)
+    checkpoints.append(
+        SubjectTickCheckpointResult(
+            checkpoint_id="rt01.m02_predictive_relevance_checkpoint",
+            source_contract="m02_predictive_relevance.predictive_relevance_result",
+            status=m02_checkpoint_status,
+            required_action=";".join(dict.fromkeys(m02_required_actions)),
+            applied_action=active_execution_mode,
+            reason=m02_checkpoint_reason,
+        )
+    )
+
+    n01_explicit_input = (
+        context.n01_input_bundle
+        if isinstance(context.n01_input_bundle, N01InputBundle)
+        else None
+    )
+    n01_explicit_basis = bool(n01_explicit_input is not None and n01_explicit_input.candidates)
+    n01_result = build_n01_narrative_commitments(
+        tick_id=tick_id,
+        tick_index=tick_index,
+        input_bundle=n01_explicit_input,
+        commitments_enabled=True,
+    )
+    n01_view = derive_n01_contract_view(n01_result)
+    n01_trace_values = {
+        "n01_commitment_ready": n01_result.gate.consumer_ready,
+        "n01_strong_count": n01_result.telemetry.strong_commitment_count,
+        "n01_provisional_count": n01_result.telemetry.provisional_commitment_count,
+        "n01_statement_only_count": n01_result.telemetry.statement_only_count,
+        "n01_contested_count": n01_result.telemetry.contested_commitment_count,
+        "n01_revision_count": n01_result.telemetry.revised_count + n01_result.telemetry.retired_count,
+        "n01_scope_narrowed_count": n01_result.telemetry.scope_narrowed_count,
+        "n01_ungrounded_capability_count": n01_result.telemetry.ungrounded_capability_claim_count,
+    }
+    trace_emit_active("n01_narrative_commitments", "enter", n01_trace_values)
+    n01_checkpoint_status = SubjectTickCheckpointStatus.ALLOWED
+    n01_checkpoint_reason = n01_result.reason
+    n01_default_contested_recheck = False
+    n01_default_ungrounded_capability = False
+    if not context.disable_n01_enforcement:
+        if (
+            context.require_n01_commitment_consumer
+            and not n01_view.consumer_ready
+            and halt_reason is None
+        ):
+            revalidation_needed = True
+            n01_checkpoint_status = SubjectTickCheckpointStatus.ENFORCED_DETOUR
+            n01_checkpoint_reason = (
+                "n01 commitment consumer requested but typed commitment records are not ready"
+            )
+            if active_execution_mode != "halt_execution":
+                active_execution_mode = "revalidate_scope"
+        if (
+            context.require_n01_consistency_consumer
+            and not n01_view.consistency_consumer_ready
+            and halt_reason is None
+        ):
+            revalidation_needed = True
+            n01_checkpoint_status = SubjectTickCheckpointStatus.ENFORCED_DETOUR
+            n01_checkpoint_reason = (
+                "n01 consistency consumer requested but scope/obligation-ready records are not available"
+            )
+            if active_execution_mode != "halt_execution":
+                active_execution_mode = "revalidate_scope"
+        if (
+            n01_explicit_basis
+            and n01_result.telemetry.contested_commitment_count > 0
+            and halt_reason is None
+        ):
+            revalidation_needed = True
+            n01_default_contested_recheck = True
+            if n01_checkpoint_status == SubjectTickCheckpointStatus.ALLOWED:
+                n01_checkpoint_status = SubjectTickCheckpointStatus.ENFORCED_DETOUR
+            n01_checkpoint_reason = (
+                "n01 contested commitment records require revision/recheck before clean continuation"
+            )
+            if active_execution_mode != "halt_execution":
+                active_execution_mode = "revalidate_scope"
+        if (
+            n01_explicit_basis
+            and n01_result.telemetry.ungrounded_capability_claim_count > 0
+            and halt_reason is None
+        ):
+            revalidation_needed = True
+            n01_default_ungrounded_capability = True
+            if n01_checkpoint_status == SubjectTickCheckpointStatus.ALLOWED:
+                n01_checkpoint_status = SubjectTickCheckpointStatus.ENFORCED_DETOUR
+            n01_checkpoint_reason = (
+                "n01 ungrounded capability claim records require capability support recheck"
+            )
+            if active_execution_mode != "halt_execution":
+                active_execution_mode = "revalidate_scope"
+    else:
+        n01_checkpoint_status = SubjectTickCheckpointStatus.ALLOWED
+        n01_checkpoint_reason = "N01 gate disabled in test fixture"
+
+    n01_required_actions: list[str] = []
+    if context.require_n01_commitment_consumer:
+        n01_required_actions.append("require_n01_commitment_consumer")
+    if context.require_n01_consistency_consumer:
+        n01_required_actions.append("require_n01_consistency_consumer")
+    if n01_default_contested_recheck:
+        n01_required_actions.append("default_n01_contested_commitment_recheck")
+    if n01_default_ungrounded_capability:
+        n01_required_actions.append("default_n01_ungrounded_capability_restriction")
+    if not n01_required_actions:
+        n01_required_actions.append("n01_optional")
+
+    trace_emit_active("n01_narrative_commitments", "decision", n01_trace_values)
+    if n01_checkpoint_status != SubjectTickCheckpointStatus.ALLOWED:
+        trace_emit_active(
+            "n01_narrative_commitments",
+            "blocked",
+            n01_trace_values,
+            note=n01_checkpoint_reason,
+        )
+    trace_emit_active("n01_narrative_commitments", "exit", n01_trace_values)
+    checkpoints.append(
+        SubjectTickCheckpointResult(
+            checkpoint_id="rt01.n01_narrative_commitments_checkpoint",
+            source_contract="n01_narrative_commitments.commitment_registry_result",
+            status=n01_checkpoint_status,
+            required_action=";".join(dict.fromkeys(n01_required_actions)),
+            applied_action=active_execution_mode,
+            reason=n01_checkpoint_reason,
+        )
+    )
+
     if halt_reason is not None:
         final_outcome = SubjectTickOutcome.HALT
         execution_stance = SubjectTickExecutionStance.HALT_PATH
@@ -7565,6 +7806,34 @@ def execute_subject_tick(
         m01_imprint_packet_consumer_ready=m01_result.gate.imprint_packet_consumer_ready,
         m01_axis_scope_consumer_ready=m01_result.gate.axis_scope_consumer_ready,
         m01_downstream_consumer_ready=m01_result.gate.consumer_ready,
+        m02_predictive_mark_count=m02_result.telemetry.predictive_mark_count,
+        m02_explicit_basis_present=m02_explicit_basis,
+        m02_clean_predictive_mark_count=m02_result.telemetry.clean_predictive_mark_count,
+        m02_weak_mark_count=m02_result.telemetry.weak_mark_count,
+        m02_context_locked_count=m02_result.telemetry.context_locked_count,
+        m02_spurious_risk_count=m02_result.telemetry.spurious_risk_count,
+        m02_no_safe_mark_count=m02_result.telemetry.no_safe_mark_count,
+        m02_predictive_packet_consumer_ready=m02_result.gate.predictive_packet_consumer_ready,
+        m02_context_scope_consumer_ready=m02_result.gate.context_scope_consumer_ready,
+        m02_downstream_consumer_ready=m02_result.gate.consumer_ready,
+        m02_must_not_generalize=m02_result.gate.downstream_must_not_generalize,
+        m02_must_not_treat_as_generic_importance=(
+            m02_result.gate.downstream_must_not_treat_as_generic_importance
+        ),
+        n01_commitment_count=n01_result.telemetry.commitment_count,
+        n01_explicit_basis_present=n01_explicit_basis,
+        n01_strong_commitment_count=n01_result.telemetry.strong_commitment_count,
+        n01_provisional_commitment_count=n01_result.telemetry.provisional_commitment_count,
+        n01_statement_only_count=n01_result.telemetry.statement_only_count,
+        n01_contested_commitment_count=n01_result.telemetry.contested_commitment_count,
+        n01_revised_or_retired_count=(
+            n01_result.telemetry.revised_count + n01_result.telemetry.retired_count
+        ),
+        n01_scope_narrowed_count=n01_result.telemetry.scope_narrowed_count,
+        n01_ungrounded_capability_count=n01_result.telemetry.ungrounded_capability_claim_count,
+        n01_commitment_consumer_ready=n01_result.gate.consumer_ready,
+        n01_consistency_consumer_ready=n01_result.gate.consistency_consumer_ready,
+        n01_downstream_consumer_ready=n01_result.gate.consumer_ready,
     )
     gate = evaluate_subject_tick_downstream_gate(state)
     telemetry = build_subject_tick_telemetry(
@@ -7572,7 +7841,7 @@ def execute_subject_tick(
         attempted_paths=ATTEMPTED_SUBJECT_TICK_PATHS,
         downstream_gate=gate,
         causal_basis=(
-            "bounded runtime execution spine enforces roadmap authority roles for C04/C05, consumes world-entry, s01 efference-copy, s02 prediction-boundary seam, s03 ownership-weighted learning, s04 interoceptive self-binding, s05 multi-cause attribution, s-minimal, a01 affordance ontology cleanup, a02 capability-gap detection, a03 internal-tool affordance normalization, a-line, m-minimal, n-minimal, t01 semantic-field, t02 relation-binding, t03 hypothesis-competition, t04 attention-schema, o01 other-entity modeling, o02 intersubjective allostasis, o03 strategy-class evaluation, p01 authority-bounded project-formation, o04 rupture/hostility/coercion dynamics, r05 bounded protective regulation gates, v01 act-level normative licensing/commitment guards, v02 typed utterance-plan bridge constraints, v03 constrained realization alignment/report contract, c06 typed surfacing-candidates handoff, p02 typed intervention episodes, p03 typed long-horizon credit assignment, p04 typed interpersonal counterfactual policy simulation, a04 staged external-affordance binding, w01 bounded world-loop admission, and m01 homeostatic salience imprint before bounded outcome resolution, while keeping D01 observability-only over fixed R->C order"
+            "bounded runtime execution spine enforces roadmap authority roles for C04/C05, consumes world-entry, s01 efference-copy, s02 prediction-boundary seam, s03 ownership-weighted learning, s04 interoceptive self-binding, s05 multi-cause attribution, s-minimal, a01 affordance ontology cleanup, a02 capability-gap detection, a03 internal-tool affordance normalization, a-line, m-minimal, n-minimal, t01 semantic-field, t02 relation-binding, t03 hypothesis-competition, t04 attention-schema, o01 other-entity modeling, o02 intersubjective allostasis, o03 strategy-class evaluation, p01 authority-bounded project-formation, o04 rupture/hostility/coercion dynamics, r05 bounded protective regulation gates, v01 act-level normative licensing/commitment guards, v02 typed utterance-plan bridge constraints, v03 constrained realization alignment/report contract, c06 typed surfacing-candidates handoff, p02 typed intervention episodes, p03 typed long-horizon credit assignment, p04 typed interpersonal counterfactual policy simulation, a04 staged external-affordance binding, w01 bounded world-loop admission, m01 homeostatic salience imprint, and m02 predictive relevance before bounded outcome resolution, while keeping D01 observability-only over fixed R->C order"
         ),
     )
     abstain = final_outcome in {SubjectTickOutcome.REPAIR, SubjectTickOutcome.REVALIDATE}
@@ -7658,6 +7927,8 @@ def execute_subject_tick(
         a04_result=a04_result,
         w01_result=w01_result,
         m01_result=m01_result,
+        m02_result=m02_result,
+        n01_result=n01_result,
         a_line_result=a_line_result,
         m_minimal_result=m_minimal_result,
         n_minimal_result=n_minimal_result,

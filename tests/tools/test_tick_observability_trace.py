@@ -57,6 +57,8 @@ HOSTED_CONTOUR_SEGMENTS = (
     "a04_external_affordance_binding",
     "w01_bounded_world_loop",
     "m01_homeostatic_salience_imprint",
+    "m02_predictive_relevance",
+    "n01_narrative_commitments",
     "a_line_normalization",
     "m_minimal",
     "n_minimal",
@@ -369,6 +371,25 @@ HOSTED_CONTOUR_FIELDS: dict[str, set[str]] = {
         "attribution_limited_count",
         "recovery_imprint_count",
         "consumer_ready",
+    },
+    "m02_predictive_relevance": {
+        "m02_predictive_mark_count",
+        "m02_context_locked_count",
+        "m02_spurious_risk_count",
+        "m02_no_safe_mark_count",
+        "m02_downstream_consumer_ready",
+        "m02_must_not_generalize",
+        "m02_must_not_treat_as_generic_importance",
+    },
+    "n01_narrative_commitments": {
+        "n01_commitment_ready",
+        "n01_strong_count",
+        "n01_provisional_count",
+        "n01_statement_only_count",
+        "n01_contested_count",
+        "n01_revision_count",
+        "n01_scope_narrowed_count",
+        "n01_ungrounded_capability_count",
     },
     "s_minimal_contour": {
         "minimal_self_status",
@@ -883,6 +904,12 @@ def test_hosted_contour_segments_follow_real_runtime_order(tmp_path: Path) -> No
         events, "m01_homeostatic_salience_imprint"
     )
     assert _first_order(events, "m01_homeostatic_salience_imprint") < _first_order(
+        events, "m02_predictive_relevance"
+    )
+    assert _first_order(events, "m02_predictive_relevance") < _first_order(
+        events, "n01_narrative_commitments"
+    )
+    assert _first_order(events, "n01_narrative_commitments") < _first_order(
         events, "bounded_outcome_resolution"
     )
     assert _first_order(events, "s_minimal_contour") < _first_order(
@@ -968,6 +995,8 @@ def test_representative_modules_have_runtime_steps(tmp_path: Path) -> None:
         "p04_interpersonal_counterfactual_policy_simulation",
         "a01_internal_affordance_ontology_cleanup",
         "m01_homeostatic_salience_imprint",
+        "m02_predictive_relevance",
+        "n01_narrative_commitments",
         "downstream_obedience",
         "subject_tick",
     ):
