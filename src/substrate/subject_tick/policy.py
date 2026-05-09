@@ -54,6 +54,7 @@ def evaluate_subject_tick_downstream_gate(
         SubjectTickRestrictionCode.A03_INTERNAL_TOOL_AFFORDANCE_CONTRACT_MUST_BE_READ,
         SubjectTickRestrictionCode.A04_EXTERNAL_AFFORDANCE_BINDING_CONTRACT_MUST_BE_READ,
         SubjectTickRestrictionCode.W01_BOUNDED_WORLD_LOOP_CONTRACT_MUST_BE_READ,
+        SubjectTickRestrictionCode.M01_HOMEOSTATIC_IMPRINT_CONTRACT_MUST_BE_READ,
         SubjectTickRestrictionCode.M_MINIMAL_CONTOUR_CONTRACT_MUST_BE_READ,
         SubjectTickRestrictionCode.M_FORBIDDEN_SHORTCUTS_MUST_BE_READ,
         SubjectTickRestrictionCode.N_MINIMAL_CONTOUR_CONTRACT_MUST_BE_READ,
@@ -2265,6 +2266,60 @@ def evaluate_subject_tick_downstream_gate(
             accepted = False
             usability = SubjectTickUsabilityClass.BLOCKED
             reason = "w01 produced no consumer-ready bounded world-loop permission packet"
+
+    m01_checkpoint = next(
+        (
+            checkpoint
+            for checkpoint in state.execution_checkpoints
+            if checkpoint.checkpoint_id == "rt01.m01_homeostatic_salience_imprint_checkpoint"
+        ),
+        None,
+    )
+    if m01_checkpoint is not None:
+        if "require_m01_imprint_packet_consumer" in m01_checkpoint.required_action:
+            restrictions.append(SubjectTickRestrictionCode.M01_IMPRINT_PACKET_CONSUMER_REQUIRED)
+        if "require_m01_axis_scope_consumer" in m01_checkpoint.required_action:
+            restrictions.append(SubjectTickRestrictionCode.M01_AXIS_SCOPE_CONSUMER_REQUIRED)
+        if "default_m01_no_safe_imprint_detour" in m01_checkpoint.required_action:
+            restrictions.append(SubjectTickRestrictionCode.M01_NO_SAFE_IMPRINT_DETOUR_REQUIRED)
+        if "default_m01_attribution_limited_detour" in m01_checkpoint.required_action:
+            restrictions.append(SubjectTickRestrictionCode.M01_ATTRIBUTION_LIMITED_DETOUR_REQUIRED)
+        if "default_m01_stale_basis_detour" in m01_checkpoint.required_action:
+            restrictions.append(SubjectTickRestrictionCode.M01_STALE_BASIS_DETOUR_REQUIRED)
+        if "default_m01_recovery_imprint_route" in m01_checkpoint.required_action:
+            restrictions.append(SubjectTickRestrictionCode.M01_RECOVERY_IMPRINT_ROUTE_REQUIRED)
+
+    m01_basis_present = bool(state.m01_explicit_basis_present)
+    if m01_basis_present and state.m01_no_safe_imprint_count > 0:
+        restrictions.append(SubjectTickRestrictionCode.M01_NO_SAFE_IMPRINT_DETOUR_REQUIRED)
+        if (
+            state.final_execution_outcome == SubjectTickOutcome.CONTINUE
+            and usability == SubjectTickUsabilityClass.USABLE_BOUNDED
+        ):
+            usability = SubjectTickUsabilityClass.DEGRADED_BOUNDED
+            reason = "m01 explicit basis produced no-safe-imprint claims and prevents strong memory-bias promotion"
+    if m01_basis_present and state.m01_attribution_limited_count > 0:
+        restrictions.append(SubjectTickRestrictionCode.M01_ATTRIBUTION_LIMITED_DETOUR_REQUIRED)
+        if (
+            state.final_execution_outcome == SubjectTickOutcome.CONTINUE
+            and usability == SubjectTickUsabilityClass.USABLE_BOUNDED
+        ):
+            usability = SubjectTickUsabilityClass.DEGRADED_BOUNDED
+            reason = "m01 attribution-limited imprint requires bounded transfer-limited memory handling"
+    if m01_basis_present and state.m01_weak_or_no_claim_count > 0:
+        restrictions.append(SubjectTickRestrictionCode.M01_STALE_BASIS_DETOUR_REQUIRED)
+    if m01_basis_present and state.m01_recovery_imprint_count > 0:
+        restrictions.append(SubjectTickRestrictionCode.M01_RECOVERY_IMPRINT_ROUTE_REQUIRED)
+    if m01_basis_present and not state.m01_imprint_packet_consumer_ready:
+        restrictions.append(SubjectTickRestrictionCode.M01_IMPRINT_PACKET_CONSUMER_REQUIRED)
+    if m01_basis_present and not state.m01_axis_scope_consumer_ready:
+        restrictions.append(SubjectTickRestrictionCode.M01_AXIS_SCOPE_CONSUMER_REQUIRED)
+    if m01_basis_present and not state.m01_downstream_consumer_ready:
+        restrictions.append(SubjectTickRestrictionCode.DOWNSTREAM_AUTHORITY_DEGRADED)
+        if state.final_execution_outcome == SubjectTickOutcome.CONTINUE:
+            accepted = False
+            usability = SubjectTickUsabilityClass.BLOCKED
+            reason = "m01 produced no consumer-ready homeostatic-imprint packet for bounded memory-economics use"
 
     return SubjectTickGateDecision(
         accepted=accepted,

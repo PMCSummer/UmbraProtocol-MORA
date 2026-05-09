@@ -282,6 +282,11 @@ from substrate.w01_bounded_world_loop import (
     build_w01_bounded_world_loop,
     derive_w01_consumer_view,
 )
+from substrate.m01_homeostatic_salience_imprint import (
+    M01InputBundle,
+    build_m01_homeostatic_salience_imprint,
+    derive_m01_contract_view,
+)
 from substrate.s01_efference_copy import (
     S01EfferenceCopyState,
     build_s01_efference_copy,
@@ -331,6 +336,7 @@ ATTEMPTED_SUBJECT_TICK_PATHS: tuple[str, ...] = (
     "subject_tick.evaluate_p04_counterfactual_policy_simulation",
     "subject_tick.evaluate_a04_external_affordance_binding",
     "subject_tick.evaluate_w01_bounded_world_loop",
+    "subject_tick.evaluate_m01_homeostatic_salience_imprint",
     "subject_tick.world_seam_enforcement",
     "subject_tick.resolve_bounded_runtime_outcome",
     "subject_tick.downstream_gate",
@@ -6431,6 +6437,140 @@ def execute_subject_tick(
         )
     )
 
+    m01_explicit_input = (
+        context.m01_input_bundle
+        if isinstance(context.m01_input_bundle, M01InputBundle)
+        else None
+    )
+    m01_explicit_basis = bool(m01_explicit_input is not None and m01_explicit_input.traces)
+    m01_result = build_m01_homeostatic_salience_imprint(
+        tick_id=tick_id,
+        tick_index=tick_index,
+        input_bundle=m01_explicit_input,
+        imprint_enabled=True,
+    )
+    m01_view = derive_m01_contract_view(m01_result)
+    m01_trace_values = {
+        "imprint_count": m01_result.telemetry.imprint_count,
+        "strong_imprint_count": m01_result.telemetry.strong_imprint_count,
+        "weak_or_no_claim_count": m01_result.telemetry.weak_or_no_claim_count,
+        "attribution_limited_count": m01_result.telemetry.attribution_limited_count,
+        "recovery_imprint_count": m01_result.telemetry.recovery_imprint_count,
+        "consumer_ready": m01_result.gate.consumer_ready,
+    }
+    trace_emit_active("m01_homeostatic_salience_imprint", "enter", m01_trace_values)
+    m01_checkpoint_status = SubjectTickCheckpointStatus.ALLOWED
+    m01_checkpoint_reason = m01_result.reason
+    m01_default_no_safe_detour = False
+    m01_default_attribution_limited_detour = False
+    m01_default_stale_basis_detour = False
+    m01_default_recovery_route = False
+    if not context.disable_m01_enforcement:
+        if (
+            context.require_m01_imprint_packet_consumer
+            and not m01_view.imprint_packet_consumer_ready
+            and halt_reason is None
+        ):
+            revalidation_needed = True
+            m01_checkpoint_status = SubjectTickCheckpointStatus.ENFORCED_DETOUR
+            m01_checkpoint_reason = (
+                "m01 imprint-packet consumer requested but typed homeostatic imprint packets are not ready"
+            )
+            if active_execution_mode != "halt_execution":
+                active_execution_mode = "revalidate_scope"
+        if (
+            context.require_m01_axis_scope_consumer
+            and not m01_view.axis_scope_consumer_ready
+            and halt_reason is None
+        ):
+            revalidation_needed = True
+            m01_checkpoint_status = SubjectTickCheckpointStatus.ENFORCED_DETOUR
+            m01_checkpoint_reason = (
+                "m01 axis-scope consumer requested but axis-preserving imprint packets are not ready"
+            )
+            if active_execution_mode != "halt_execution":
+                active_execution_mode = "revalidate_scope"
+        if m01_explicit_basis and m01_result.telemetry.no_safe_imprint_count > 0 and halt_reason is None:
+            revalidation_needed = True
+            m01_default_no_safe_detour = True
+            m01_checkpoint_status = SubjectTickCheckpointStatus.ENFORCED_DETOUR
+            m01_checkpoint_reason = (
+                "m01 explicit basis produced no-safe-imprint claims and requires bounded memory-bias abstain detour"
+            )
+            if active_execution_mode != "halt_execution":
+                active_execution_mode = "revalidate_scope"
+        if (
+            m01_explicit_basis
+            and m01_result.telemetry.attribution_limited_count > 0
+            and halt_reason is None
+        ):
+            m01_default_attribution_limited_detour = True
+            if (
+                m01_checkpoint_status == SubjectTickCheckpointStatus.ALLOWED
+                and active_execution_mode not in {"halt_execution", "revalidate_scope"}
+            ):
+                active_execution_mode = "revalidate_scope"
+            if m01_checkpoint_status == SubjectTickCheckpointStatus.ALLOWED:
+                m01_checkpoint_status = SubjectTickCheckpointStatus.ENFORCED_DETOUR
+                revalidation_needed = True
+                m01_checkpoint_reason = (
+                    "m01 attribution-limited imprint requires bounded transfer and revalidation-aware consumer handling"
+                )
+        if (
+            m01_explicit_basis
+            and any(
+                item.decision.value == "stale_basis_no_strong_imprint"
+                for item in m01_result.imprint_packets
+            )
+            and halt_reason is None
+        ):
+            m01_default_stale_basis_detour = True
+        if (
+            m01_explicit_basis
+            and m01_result.telemetry.recovery_imprint_count > 0
+            and halt_reason is None
+        ):
+            m01_default_recovery_route = True
+    else:
+        m01_checkpoint_status = SubjectTickCheckpointStatus.ALLOWED
+        m01_checkpoint_reason = "M01 gate disabled in test fixture"
+
+    m01_required_actions: list[str] = []
+    if context.require_m01_imprint_packet_consumer:
+        m01_required_actions.append("require_m01_imprint_packet_consumer")
+    if context.require_m01_axis_scope_consumer:
+        m01_required_actions.append("require_m01_axis_scope_consumer")
+    if m01_default_no_safe_detour:
+        m01_required_actions.append("default_m01_no_safe_imprint_detour")
+    if m01_default_attribution_limited_detour:
+        m01_required_actions.append("default_m01_attribution_limited_detour")
+    if m01_default_stale_basis_detour:
+        m01_required_actions.append("default_m01_stale_basis_detour")
+    if m01_default_recovery_route:
+        m01_required_actions.append("default_m01_recovery_imprint_route")
+    if not m01_required_actions:
+        m01_required_actions.append("m01_optional")
+
+    trace_emit_active("m01_homeostatic_salience_imprint", "decision", m01_trace_values)
+    if m01_checkpoint_status != SubjectTickCheckpointStatus.ALLOWED:
+        trace_emit_active(
+            "m01_homeostatic_salience_imprint",
+            "blocked",
+            m01_trace_values,
+            note=m01_checkpoint_reason,
+        )
+    trace_emit_active("m01_homeostatic_salience_imprint", "exit", m01_trace_values)
+    checkpoints.append(
+        SubjectTickCheckpointResult(
+            checkpoint_id="rt01.m01_homeostatic_salience_imprint_checkpoint",
+            source_contract="m01_homeostatic_salience_imprint.imprint_packets",
+            status=m01_checkpoint_status,
+            required_action=";".join(dict.fromkeys(m01_required_actions)),
+            applied_action=active_execution_mode,
+            reason=m01_checkpoint_reason,
+        )
+    )
+
     if halt_reason is not None:
         final_outcome = SubjectTickOutcome.HALT
         execution_stance = SubjectTickExecutionStance.HALT_PATH
@@ -7415,6 +7555,16 @@ def execute_subject_tick(
         w01_permission_packet_consumer_ready=w01_result.gate.consumer_ready,
         w01_action_effect_linkage_consumer_ready=w01_result.telemetry.linked_effect_count > 0,
         w01_downstream_consumer_ready=w01_result.gate.consumer_ready,
+        m01_imprint_count=m01_result.telemetry.imprint_count,
+        m01_explicit_basis_present=m01_explicit_basis,
+        m01_strong_imprint_count=m01_result.telemetry.strong_imprint_count,
+        m01_weak_or_no_claim_count=m01_result.telemetry.weak_or_no_claim_count,
+        m01_attribution_limited_count=m01_result.telemetry.attribution_limited_count,
+        m01_recovery_imprint_count=m01_result.telemetry.recovery_imprint_count,
+        m01_no_safe_imprint_count=m01_result.telemetry.no_safe_imprint_count,
+        m01_imprint_packet_consumer_ready=m01_result.gate.imprint_packet_consumer_ready,
+        m01_axis_scope_consumer_ready=m01_result.gate.axis_scope_consumer_ready,
+        m01_downstream_consumer_ready=m01_result.gate.consumer_ready,
     )
     gate = evaluate_subject_tick_downstream_gate(state)
     telemetry = build_subject_tick_telemetry(
@@ -7422,7 +7572,7 @@ def execute_subject_tick(
         attempted_paths=ATTEMPTED_SUBJECT_TICK_PATHS,
         downstream_gate=gate,
         causal_basis=(
-            "bounded runtime execution spine enforces roadmap authority roles for C04/C05, consumes world-entry, s01 efference-copy, s02 prediction-boundary seam, s03 ownership-weighted learning, s04 interoceptive self-binding, s05 multi-cause attribution, s-minimal, a01 affordance ontology cleanup, a02 capability-gap detection, a03 internal-tool affordance normalization, a-line, m-minimal, n-minimal, t01 semantic-field, t02 relation-binding, t03 hypothesis-competition, t04 attention-schema, o01 other-entity modeling, o02 intersubjective allostasis, o03 strategy-class evaluation, p01 authority-bounded project-formation, o04 rupture/hostility/coercion dynamics, r05 bounded protective regulation gates, v01 act-level normative licensing/commitment guards, v02 typed utterance-plan bridge constraints, v03 constrained realization alignment/report contract, c06 typed surfacing-candidates handoff, p02 typed intervention episodes, p03 typed long-horizon credit assignment, p04 typed interpersonal counterfactual policy simulation, a04 staged external-affordance binding, and w01 bounded world-loop admission before bounded outcome resolution, while keeping D01 observability-only over fixed R->C order"
+            "bounded runtime execution spine enforces roadmap authority roles for C04/C05, consumes world-entry, s01 efference-copy, s02 prediction-boundary seam, s03 ownership-weighted learning, s04 interoceptive self-binding, s05 multi-cause attribution, s-minimal, a01 affordance ontology cleanup, a02 capability-gap detection, a03 internal-tool affordance normalization, a-line, m-minimal, n-minimal, t01 semantic-field, t02 relation-binding, t03 hypothesis-competition, t04 attention-schema, o01 other-entity modeling, o02 intersubjective allostasis, o03 strategy-class evaluation, p01 authority-bounded project-formation, o04 rupture/hostility/coercion dynamics, r05 bounded protective regulation gates, v01 act-level normative licensing/commitment guards, v02 typed utterance-plan bridge constraints, v03 constrained realization alignment/report contract, c06 typed surfacing-candidates handoff, p02 typed intervention episodes, p03 typed long-horizon credit assignment, p04 typed interpersonal counterfactual policy simulation, a04 staged external-affordance binding, w01 bounded world-loop admission, and m01 homeostatic salience imprint before bounded outcome resolution, while keeping D01 observability-only over fixed R->C order"
         ),
     )
     abstain = final_outcome in {SubjectTickOutcome.REPAIR, SubjectTickOutcome.REVALIDATE}
@@ -7507,6 +7657,7 @@ def execute_subject_tick(
         a03_result=a03_result,
         a04_result=a04_result,
         w01_result=w01_result,
+        m01_result=m01_result,
         a_line_result=a_line_result,
         m_minimal_result=m_minimal_result,
         n_minimal_result=n_minimal_result,

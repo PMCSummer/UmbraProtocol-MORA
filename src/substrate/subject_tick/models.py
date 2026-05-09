@@ -82,6 +82,10 @@ if TYPE_CHECKING:
         W01Result,
         W01WorldPacketSet,
     )
+    from substrate.m01_homeostatic_salience_imprint import (
+        M01InputBundle,
+        M01Result,
+    )
     from substrate.p01_project_formation import (
         P01IntentionStackState,
         P01ProjectFormationResult,
@@ -513,6 +517,15 @@ class SubjectTickRestrictionCode(StrEnum):
     W01_REVOKED_WORLD_PACKET_DETOUR_REQUIRED = "w01_revoked_world_packet_detour_required"
     W01_NO_LINKAGE_DETOUR_REQUIRED = "w01_no_linkage_detour_required"
     W01_NON_MATURE_OBJECT_CLAIM_RESTRICTION = "w01_non_mature_object_claim_restriction"
+    M01_HOMEOSTATIC_IMPRINT_CONTRACT_MUST_BE_READ = (
+        "m01_homeostatic_imprint_contract_must_be_read"
+    )
+    M01_IMPRINT_PACKET_CONSUMER_REQUIRED = "m01_imprint_packet_consumer_required"
+    M01_AXIS_SCOPE_CONSUMER_REQUIRED = "m01_axis_scope_consumer_required"
+    M01_NO_SAFE_IMPRINT_DETOUR_REQUIRED = "m01_no_safe_imprint_detour_required"
+    M01_ATTRIBUTION_LIMITED_DETOUR_REQUIRED = "m01_attribution_limited_detour_required"
+    M01_STALE_BASIS_DETOUR_REQUIRED = "m01_stale_basis_detour_required"
+    M01_RECOVERY_IMPRINT_ROUTE_REQUIRED = "m01_recovery_imprint_route_required"
     DOWNSTREAM_AUTHORITY_DEGRADED = "downstream_authority_degraded"
 
 
@@ -734,6 +747,9 @@ class SubjectTickContext:
     require_w01_permission_packet_consumer: bool = False
     require_w01_action_effect_linkage_consumer: bool = False
     disable_w01_enforcement: bool = False
+    require_m01_imprint_packet_consumer: bool = False
+    require_m01_axis_scope_consumer: bool = False
+    disable_m01_enforcement: bool = False
     o01_entity_signals: tuple[O01EntitySignal, ...] = ()
     o02_interaction_diagnostics: O02InteractionDiagnosticsInput | None = None
     o03_candidate_strategy: O03CandidateStrategyInput | None = None
@@ -752,6 +768,7 @@ class SubjectTickContext:
     a03_operation_candidate_set: A03InternalOperationCandidateSet | None = None
     a04_external_candidate_set: A04ExternalAffordanceCandidateSet | None = None
     w01_world_packet_set: W01WorldPacketSet | None = None
+    m01_input_bundle: M01InputBundle | None = None
     g08_appraisal_significance_hint: float | None = None
     source_lineage: tuple[str, ...] = ()
 
@@ -1427,6 +1444,16 @@ class SubjectTickState:
     w01_permission_packet_consumer_ready: bool = False
     w01_action_effect_linkage_consumer_ready: bool = False
     w01_downstream_consumer_ready: bool = False
+    m01_imprint_count: int = 0
+    m01_explicit_basis_present: bool = False
+    m01_strong_imprint_count: int = 0
+    m01_weak_or_no_claim_count: int = 0
+    m01_attribution_limited_count: int = 0
+    m01_recovery_imprint_count: int = 0
+    m01_no_safe_imprint_count: int = 0
+    m01_imprint_packet_consumer_ready: bool = False
+    m01_axis_scope_consumer_ready: bool = False
+    m01_downstream_consumer_ready: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -1764,6 +1791,7 @@ class SubjectTickResult:
     a03_result: A03InternalToolAffordanceResult
     a04_result: A04ExternalAffordanceBindingResult
     w01_result: W01Result
+    m01_result: M01Result
     a_line_result: ALineNormalizationResult
     m_minimal_result: MMinimalResult
     n_minimal_result: NMinimalResult

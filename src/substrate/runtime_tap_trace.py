@@ -374,6 +374,14 @@ MODULE_ALLOWED_FIELDS: dict[str, tuple[str, ...]] = {
         "w01_linked_effect_count",
         "w01_no_link_count",
     ),
+    "m01_homeostatic_salience_imprint": (
+        "imprint_count",
+        "strong_imprint_count",
+        "weak_or_no_claim_count",
+        "attribution_limited_count",
+        "recovery_imprint_count",
+        "consumer_ready",
+    ),
     "s_minimal_contour": (
         "minimal_self_status",
         "minimal_self_ready",
