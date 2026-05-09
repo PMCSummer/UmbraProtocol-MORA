@@ -40,6 +40,9 @@ class N01ConsumerView:
     referenced_commitment_refs: tuple[str, ...]
     conflict_status: str
     revision_action: str
+    prior_decision: str | None
+    prior_validation_status: str | None
+    revision_reason: str | None
     downstream_obligations: tuple[str, ...]
     validation_status: str
     confidence: float
@@ -88,6 +91,9 @@ def derive_n01_consumer_packets(result: N01Result) -> tuple[N01ConsumerView, ...
             referenced_commitment_refs=item.referenced_commitment_refs,
             conflict_status=item.conflict_status.value,
             revision_action=item.revision_action.value,
+            prior_decision=item.prior_decision.value if item.prior_decision else None,
+            prior_validation_status=item.prior_validation_status,
+            revision_reason=item.revision_reason,
             downstream_obligations=tuple(value.value for value in item.downstream_obligations),
             validation_status=item.validation_status,
             confidence=item.confidence,

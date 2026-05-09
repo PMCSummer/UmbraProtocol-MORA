@@ -32,10 +32,13 @@
 - Support basis, scope caps, conflict status, and revision action are load-bearing fields.
 - Capability and limitation claim kinds use separate support requirements.
 - Existing commitment references are preserved on revision/retirement paths.
+- `revised_commitment` is now exercised as a distinct emitted decision with explicit prior-decision provenance.
+- Conflict-marked candidates without explicit `existing_commitment_refs` are routed to contested/no-clean states and cannot silently become clean commitments.
 - Downstream obligations are machine-readable and scope-aware.
 
 ## Known Limits
 - No N02 identity drift reflection.
 - No N03 autobiographical relevance channel.
 - No M03 retention/replay/retrieval lifecycle execution.
+- No identity drift reflection or user/other modeling claims.
 - No map-wide narrative migration claim.

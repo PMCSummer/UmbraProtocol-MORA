@@ -114,6 +114,8 @@ class N01NarrativeClaimCandidate:
     internal_tool_support: bool = False
     active_mode_support: bool = False
     continuity_support: bool = False
+    conflict_marker: bool = False
+    conflict_basis: str = ""
     existing_commitment_refs: tuple[str, ...] = ()
     provenance: tuple[str, ...] = ()
     timestamp_or_sequence: str = ""
@@ -142,6 +144,9 @@ class N01CommitmentEntry:
     revision_action: N01RevisionAction
     reason_codes: tuple[str, ...]
     provenance: tuple[str, ...]
+    prior_decision: N01CommitmentDecision | None = None
+    prior_validation_status: str | None = None
+    revision_reason: str | None = None
 
 
 @dataclass(frozen=True, slots=True)

@@ -248,6 +248,30 @@ def _n01_bundle(case_id: str, *, variant: str) -> N01InputBundle:
             existing_commitments=(existing,),
             source_lineage=("tests.n01.integration", case_id),
         )
+    if variant == "unreferenced_contradiction":
+        candidate = N01NarrativeClaimCandidate(
+            candidate_id=f"{case_id}:cand:unref-conflict",
+            claim_text_or_semantic_form="I am not operating in analysis mode",
+            claim_kind=N01NarrativeClaimKind.STATE_DESCRIPTION,
+            requested_scope=N01CommitmentScope.CURRENT_TURN,
+            expression_channel="text",
+            addressee_or_audience_scope="runtime",
+            grounding_basis=(
+                N01GroundingBasisKind.EXPLICIT_SELF_REPORT,
+                N01GroundingBasisKind.INTERNAL_STATE_SUMMARY,
+            ),
+            temporal_validity_status="fresh",
+            attribution_status="self",
+            self_side_confidence=0.82,
+            mixed_cause_marker=False,
+            conflict_marker=True,
+            conflict_basis="typed_conflict_marker_without_reference",
+        )
+        return N01InputBundle(
+            bundle_id=f"{case_id}:n01:unref-conflict",
+            candidates=(candidate,),
+            source_lineage=("tests.n01.integration", case_id),
+        )
     raise ValueError(variant)
 
 
@@ -405,3 +429,44 @@ def test_revised_or_retired_record_not_treated_as_clean_confirmed() -> None:
     assert result.state.n01_revised_or_retired_count > 0
     assert result.state.n01_strong_commitment_count == 0
     assert result.state.n01_downstream_consumer_ready is False
+
+
+def test_same_checkpoint_envelope_unreferenced_contradiction_changes_n01_gate_state() -> None:
+    common = {
+        "disable_n01_enforcement": True,
+        "require_n01_commitment_consumer": True,
+    }
+    strong_case = "rt-n01-envelope-strong-unref"
+    contradiction_case = "rt-n01-envelope-unref-conflict"
+    strong = _result(
+        strong_case,
+        context=replace(
+            _base_context(),
+            **common,
+            a01_raw_affordance_candidate_set=_a01_set(strong_case),
+            a04_external_candidate_set=_a04_set(strong_case),
+            w01_world_packet_set=_w01_set(strong_case),
+            n01_input_bundle=_n01_bundle(strong_case, variant="strong"),
+        ),
+    )
+    contradiction = _result(
+        contradiction_case,
+        context=replace(
+            _base_context(),
+            **common,
+            a01_raw_affordance_candidate_set=_a01_set(contradiction_case),
+            a04_external_candidate_set=_a04_set(contradiction_case),
+            w01_world_packet_set=_w01_set(contradiction_case),
+            n01_input_bundle=_n01_bundle(contradiction_case, variant="unreferenced_contradiction"),
+        ),
+    )
+    strong_checkpoint = _n01_checkpoint(strong)
+    contradiction_checkpoint = _n01_checkpoint(contradiction)
+    assert strong_checkpoint.checkpoint_id == contradiction_checkpoint.checkpoint_id
+    assert strong_checkpoint.required_action == contradiction_checkpoint.required_action
+    assert strong_checkpoint.required_action == "require_n01_commitment_consumer"
+    assert strong.state.n01_downstream_consumer_ready is True
+    assert contradiction.state.n01_downstream_consumer_ready is False
+    assert contradiction.state.n01_contested_commitment_count > 0
+    assert strong.downstream_gate.accepted is True
+    assert contradiction.downstream_gate.usability_class.value == "degraded_bounded"

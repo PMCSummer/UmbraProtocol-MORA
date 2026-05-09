@@ -321,3 +321,67 @@ def test_downstream_consumer_packet_is_machine_readable() -> None:
     assert packet.claim_kind == N01NarrativeClaimKind.STATE_DESCRIPTION.value
     assert packet.commitment_scope == N01CommitmentScope.CURRENT_TURN.value
     assert packet.semantic_content != ""
+
+
+def test_revision_path_emits_revised_commitment_with_provenance() -> None:
+    old = _run_single("revision-prior")
+    existing = old.commitment_entries[0]
+    result = _run_single(
+        "revision-emitted",
+        candidate_kwargs={
+            "claim_text_or_semantic_form": "I am operating in bounded analysis mode",
+            "grounding_basis": (
+                N01GroundingBasisKind.INVALIDATED_BASIS,
+                N01GroundingBasisKind.INTERNAL_STATE_SUMMARY,
+                N01GroundingBasisKind.TEMPORAL_VALIDITY_SUPPORT,
+                N01GroundingBasisKind.SELF_ATTRIBUTION_SUPPORT,
+            ),
+            "existing_commitment_refs": (existing.commitment_id,),
+            "temporal_validity_status": "fresh",
+            "self_side_confidence": 0.84,
+        },
+        existing=(existing,),
+    )
+    entry = result.commitment_entries[0]
+    assert entry.decision is N01CommitmentDecision.REVISED_COMMITMENT
+    assert entry.revision_action.value == "replace_with_explicit_revision"
+    assert entry.prior_decision is not None
+    assert entry.prior_validation_status
+    assert entry.revision_reason == "explicit_revision_after_invalidated_basis"
+    assert existing.commitment_id in entry.referenced_commitment_refs
+    assert result.ledger.revised_commitments and result.ledger.revised_commitments[0].commitment_id == entry.commitment_id
+    packet = derive_n01_consumer_packets(result)[0]
+    assert packet.revision_action == "replace_with_explicit_revision"
+    assert packet.prior_decision is not None
+    assert packet.revision_reason == "explicit_revision_after_invalidated_basis"
+    assert entry.decision is not N01CommitmentDecision.CONTESTED_COMMITMENT
+    assert entry.decision is not N01CommitmentDecision.RETIRED_COMMITMENT
+
+
+def test_unreferenced_contradiction_does_not_silently_confirm_or_overwrite() -> None:
+    old = _run_single("unreferenced-prior")
+    existing = old.commitment_entries[0]
+    result = _run_single(
+        "unreferenced-contradiction",
+        candidate_kwargs={
+            "claim_text_or_semantic_form": "I am not in analysis mode",
+            "conflict_marker": True,
+            "conflict_basis": "typed_conflict_marker_without_reference",
+            "existing_commitment_refs": (),
+            "grounding_basis": (
+                N01GroundingBasisKind.EXPLICIT_SELF_REPORT,
+                N01GroundingBasisKind.INTERNAL_STATE_SUMMARY,
+            ),
+        },
+        existing=(existing,),
+    )
+    entry = result.commitment_entries[0]
+    assert entry.decision not in {
+        N01CommitmentDecision.CONFIRMED_COMMITMENT,
+        N01CommitmentDecision.REVISED_COMMITMENT,
+    }
+    assert entry.decision is N01CommitmentDecision.CONTESTED_COMMITMENT
+    assert entry.conflict_status is not N01ConflictStatus.NO_CONFLICT
+    assert "unreferenced_conflict_marker" in entry.reason_codes
+    assert result.ledger.accepted_commitments == ()
+    assert result.telemetry.contested_commitment_count == 1

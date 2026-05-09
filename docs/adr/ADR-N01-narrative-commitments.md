@@ -22,6 +22,8 @@ N01 converts typed narrative claim candidates into bounded commitment records wi
 - Scope is capped by basis; broad requested scope is narrowed when support is local.
 - Conflicting candidates do not overwrite existing records silently.
 - Basis invalidation produces explicit revised/retired transitions with preserved references.
+- `revised_commitment` is an explicit typed emitted path with prior-decision provenance when a prior record is replaced under valid revision conditions.
+- Conflict-marked candidates without explicit commitment refs are not promoted to clean commitments; they remain contested/no-clean until explicit revalidation or revision routing.
 
 ## Runtime Placement
 Checkpoint placement in current contour:
@@ -50,3 +52,4 @@ N01 does not claim:
 - autobiographical relevance routing (N03)
 - full memory lifecycle actions (M03)
 - user/other model behavior (O01)
+- full self-report generation behavior

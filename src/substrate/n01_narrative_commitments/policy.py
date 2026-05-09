@@ -203,6 +203,34 @@ def _evaluate_candidate(
         or candidate.gap_support
         or N01GroundingBasisKind.CAPABILITY_GAP_SUPPORT in basis
     )
+    referenced_commitments = tuple(
+        item
+        for ref in candidate.existing_commitment_refs
+        for item in ((emitted_entries_by_id.get(ref) or existing_by_id.get(ref)),)
+        if item is not None
+    )
+    has_revision_support = bool(
+        referenced_commitments
+        and has_invalidated
+        and any(
+            value in basis
+            for value in (
+                N01GroundingBasisKind.INTERNAL_STATE_SUMMARY,
+                N01GroundingBasisKind.TEMPORAL_VALIDITY_SUPPORT,
+                N01GroundingBasisKind.SELF_ATTRIBUTION_SUPPORT,
+                N01GroundingBasisKind.CAPABILITY_AFFORDANCE_SUPPORT,
+                N01GroundingBasisKind.CAPABILITY_GAP_SUPPORT,
+                N01GroundingBasisKind.INTERNAL_TOOL_SUPPORT,
+                N01GroundingBasisKind.ACTIVE_MODE_SUPPORT,
+                N01GroundingBasisKind.CONTINUITY_SUPPORT,
+            )
+        )
+    )
+    prior_decision = referenced_commitments[0].decision if referenced_commitments else None
+    prior_validation_status = (
+        referenced_commitments[0].validation_status if referenced_commitments else None
+    )
+    revision_reason: str | None = None
 
     scope, scope_changed = _bounded_scope(candidate.requested_scope, has_continuity=has_continuity)
     if scope_changed:
@@ -220,15 +248,39 @@ def _evaluate_candidate(
     )
 
     if has_invalidated and candidate.existing_commitment_refs:
-        decision = N01CommitmentDecision.RETIRED_COMMITMENT
-        strength = N01CommitmentStrength.NONE
-        revision_action = N01RevisionAction.RETRACT
-        validation_status = "retired_due_to_invalidated_basis"
-        obligations = (
-            N01DownstreamObligationKind.MUST_SURFACE_CONTRADICTION,
-            N01DownstreamObligationKind.MUST_TRIGGER_RECHECK_BEFORE_REUSE,
-        )
-        reason_codes.append("basis_invalidated")
+        if has_revision_support:
+            decision = N01CommitmentDecision.REVISED_COMMITMENT
+            strength = N01CommitmentStrength.PROVISIONAL
+            revision_action = N01RevisionAction.REPLACE_WITH_EXPLICIT_REVISION
+            validation_status = "revised_after_invalidated_basis"
+            obligations = (
+                N01DownstreamObligationKind.MUST_NOT_CLAIM_BEYOND_SCOPE,
+                N01DownstreamObligationKind.MUST_TRIGGER_RECHECK_BEFORE_REUSE,
+                N01DownstreamObligationKind.MAY_BE_REVISED_ONLY_UNDER_CONDITION,
+            )
+            revision_reason = "explicit_revision_after_invalidated_basis"
+            reason_codes.extend(
+                (
+                    "basis_invalidated",
+                    "explicit_revision_applied",
+                    "prior_status_replaced",
+                )
+            )
+            if prior_decision is not None:
+                reason_codes.append(f"prior_decision:{prior_decision.value}")
+            if prior_validation_status:
+                reason_codes.append(f"prior_validation_status:{prior_validation_status}")
+        else:
+            decision = N01CommitmentDecision.RETIRED_COMMITMENT
+            strength = N01CommitmentStrength.NONE
+            revision_action = N01RevisionAction.RETRACT
+            validation_status = "retired_due_to_invalidated_basis"
+            obligations = (
+                N01DownstreamObligationKind.MUST_SURFACE_CONTRADICTION,
+                N01DownstreamObligationKind.MUST_TRIGGER_RECHECK_BEFORE_REUSE,
+            )
+            revision_reason = "invalidated_basis_without_replacement_support"
+            reason_codes.append("basis_invalidated")
     elif conflict_status is not N01ConflictStatus.NO_CONFLICT:
         decision = N01CommitmentDecision.CONTESTED_COMMITMENT
         strength = N01CommitmentStrength.CONTESTED
@@ -239,6 +291,8 @@ def _evaluate_candidate(
             N01DownstreamObligationKind.MUST_TRIGGER_RECHECK_BEFORE_REUSE,
         )
         reason_codes.append("conflict_detected")
+        if candidate.conflict_marker and not candidate.existing_commitment_refs:
+            reason_codes.append("unreferenced_conflict_marker")
     elif candidate.claim_kind is N01NarrativeClaimKind.CAPABILITY_CLAIM and not capability_support:
         decision = N01CommitmentDecision.STATEMENT_ONLY_RECORD
         strength = N01CommitmentStrength.NONE
@@ -335,6 +389,9 @@ def _evaluate_candidate(
         confidence=confidence,
         decision=decision,
         revision_action=revision_action,
+        prior_decision=prior_decision,
+        prior_validation_status=prior_validation_status,
+        revision_reason=revision_reason,
         reason_codes=tuple(dict.fromkeys(reason_codes)),
         provenance=tuple(dict.fromkeys((*source_lineage, *candidate.provenance, candidate.candidate_id))),
     )
@@ -362,6 +419,8 @@ def _detect_conflict(
     emitted_by_id: dict[str, N01CommitmentEntry],
 ) -> N01ConflictStatus:
     refs = tuple(dict.fromkeys((*candidate.existing_commitment_refs,)))
+    if not refs and candidate.conflict_marker:
+        return N01ConflictStatus.UNRESOLVED_NARRATIVE_TENSION
     if not refs:
         return N01ConflictStatus.NO_CONFLICT
     normalized_candidate = _normalize(candidate.claim_text_or_semantic_form)
