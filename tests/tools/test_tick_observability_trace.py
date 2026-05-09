@@ -55,6 +55,7 @@ HOSTED_CONTOUR_SEGMENTS = (
     "a02_capability_gap_detection",
     "a03_internal_tool_affordances",
     "a04_external_affordance_binding",
+    "w01_bounded_world_loop",
     "a_line_normalization",
     "m_minimal",
     "n_minimal",
@@ -347,6 +348,18 @@ HOSTED_CONTOUR_FIELDS: dict[str, set[str]] = {
         "a04_consumer_ready",
         "a04_staged_scaffold_only",
         "a04_no_map_wide_claim",
+    },
+    "w01_bounded_world_loop": {
+        "w01_admission_state",
+        "w01_presence_mode",
+        "w01_source_authority",
+        "w01_consumer_ready",
+        "w01_must_abstain",
+        "w01_must_preserve_uncertainty",
+        "w01_non_mature_object_claim_count",
+        "w01_contradiction_count",
+        "w01_linked_effect_count",
+        "w01_no_link_count",
     },
     "s_minimal_contour": {
         "minimal_self_status",
@@ -855,6 +868,9 @@ def test_hosted_contour_segments_follow_real_runtime_order(tmp_path: Path) -> No
         events, "a04_external_affordance_binding"
     )
     assert _first_order(events, "a04_external_affordance_binding") < _first_order(
+        events, "w01_bounded_world_loop"
+    )
+    assert _first_order(events, "w01_bounded_world_loop") < _first_order(
         events, "bounded_outcome_resolution"
     )
     assert _first_order(events, "s_minimal_contour") < _first_order(

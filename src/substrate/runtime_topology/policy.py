@@ -478,6 +478,7 @@ def build_minimal_runtime_tick_graph() -> RuntimeTickGraph:
                     "rt01.p02_intervention_episode_checkpoint",
                     "rt01.p03_credit_assignment_checkpoint",
                     "rt01.p04_counterfactual_policy_simulation_checkpoint",
+                    "rt01.w01_bounded_world_loop_checkpoint",
                     "rt01.outcome_resolution_checkpoint",
                 ),
                 checkpoint_ids=(
@@ -511,6 +512,7 @@ def build_minimal_runtime_tick_graph() -> RuntimeTickGraph:
                     "rt01.p02_intervention_episode_checkpoint",
                     "rt01.p03_credit_assignment_checkpoint",
                     "rt01.p04_counterfactual_policy_simulation_checkpoint",
+                    "rt01.w01_bounded_world_loop_checkpoint",
                     "rt01.outcome_resolution_checkpoint",
                 ),
             ),
@@ -624,6 +626,7 @@ def build_minimal_runtime_tick_graph() -> RuntimeTickGraph:
             "rt01.a02_capability_gap_detection_checkpoint",
             "rt01.a03_internal_tool_affordances_checkpoint",
             "rt01.a04_external_affordance_binding_checkpoint",
+            "rt01.w01_bounded_world_loop_checkpoint",
             "rt01.a_line_normalization_checkpoint",
             "rt01.m_minimal_contour_checkpoint",
             "rt01.n_minimal_contour_checkpoint",
@@ -650,6 +653,7 @@ def build_minimal_runtime_tick_graph() -> RuntimeTickGraph:
             "rt01.p02_intervention_episode_checkpoint",
             "rt01.p03_credit_assignment_checkpoint",
             "rt01.p04_counterfactual_policy_simulation_checkpoint",
+            "rt01.w01_bounded_world_loop_checkpoint",
             "rt01.outcome_resolution_checkpoint",
         ),
         source_of_truth_surfaces=(
@@ -664,6 +668,7 @@ def build_minimal_runtime_tick_graph() -> RuntimeTickGraph:
             "a02_capability_gap_detection.capability_gap_result",
             "a03_internal_tool_affordances.tool_affordance_result",
             "a04_external_affordance_binding.external_affordance_binding_result",
+            "w01_bounded_world_loop.world_admission_result",
             "a_line_normalization.capability_state",
             "m_minimal.lifecycle_state",
             "n_minimal.commitment_state",
@@ -744,6 +749,7 @@ def build_minimal_runtime_topology_bundle() -> RuntimeTopologyBundle:
             "a02_capability_gap_detection_contract",
             "a03_internal_tool_affordance_contract",
             "a04_external_affordance_binding_contract",
+            "w01_bounded_world_loop_contract",
             "a_line_normalization_capability_contract",
             "m_minimal_memory_lifecycle_contract",
             "n_minimal_narrative_commitment_contract",
@@ -932,6 +938,7 @@ def _context_has_ablation_flags(context: SubjectTickContext | None) -> bool:
         or context.disable_a02_enforcement
         or context.disable_a03_enforcement
         or context.disable_a04_enforcement
+        or context.disable_w01_enforcement
         or context.disable_m_minimal_enforcement
         or context.disable_n_minimal_enforcement
         or context.disable_s01_enforcement

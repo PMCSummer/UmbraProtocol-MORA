@@ -362,6 +362,18 @@ MODULE_ALLOWED_FIELDS: dict[str, tuple[str, ...]] = {
         "a04_staged_scaffold_only",
         "a04_no_map_wide_claim",
     ),
+    "w01_bounded_world_loop": (
+        "w01_admission_state",
+        "w01_presence_mode",
+        "w01_source_authority",
+        "w01_consumer_ready",
+        "w01_must_abstain",
+        "w01_must_preserve_uncertainty",
+        "w01_non_mature_object_claim_count",
+        "w01_contradiction_count",
+        "w01_linked_effect_count",
+        "w01_no_link_count",
+    ),
     "s_minimal_contour": (
         "minimal_self_status",
         "minimal_self_ready",

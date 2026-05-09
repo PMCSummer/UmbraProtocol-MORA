@@ -78,6 +78,10 @@ if TYPE_CHECKING:
         A04ExternalAffordanceBindingResult,
         A04ExternalAffordanceCandidateSet,
     )
+    from substrate.w01_bounded_world_loop import (
+        W01Result,
+        W01WorldPacketSet,
+    )
     from substrate.p01_project_formation import (
         P01IntentionStackState,
         P01ProjectFormationResult,
@@ -500,6 +504,15 @@ class SubjectTickRestrictionCode(StrEnum):
     A04_REVOKED_BINDING_DETOUR_REQUIRED = "a04_revoked_binding_detour_required"
     A04_NO_AUTHORITY_PATH_DETOUR_REQUIRED = "a04_no_authority_path_detour_required"
     A04_OBJECT_SCAFFOLD_ONLY_RESTRICTION = "a04_object_scaffold_only_restriction"
+    W01_BOUNDED_WORLD_LOOP_CONTRACT_MUST_BE_READ = "w01_bounded_world_loop_contract_must_be_read"
+    W01_PERMISSION_PACKET_CONSUMER_REQUIRED = "w01_permission_packet_consumer_required"
+    W01_ACTION_EFFECT_LINKAGE_CONSUMER_REQUIRED = "w01_action_effect_linkage_consumer_required"
+    W01_ABSENT_WORLD_PACKET_DETOUR_REQUIRED = "w01_absent_world_packet_detour_required"
+    W01_AUTHORITY_MISSING_DETOUR_REQUIRED = "w01_authority_missing_detour_required"
+    W01_CONTESTED_WORLD_PACKET_DETOUR_REQUIRED = "w01_contested_world_packet_detour_required"
+    W01_REVOKED_WORLD_PACKET_DETOUR_REQUIRED = "w01_revoked_world_packet_detour_required"
+    W01_NO_LINKAGE_DETOUR_REQUIRED = "w01_no_linkage_detour_required"
+    W01_NON_MATURE_OBJECT_CLAIM_RESTRICTION = "w01_non_mature_object_claim_restriction"
     DOWNSTREAM_AUTHORITY_DEGRADED = "downstream_authority_degraded"
 
 
@@ -718,6 +731,9 @@ class SubjectTickContext:
     require_a04_binding_packet_consumer: bool = False
     require_a04_authority_path_consumer: bool = False
     disable_a04_enforcement: bool = False
+    require_w01_permission_packet_consumer: bool = False
+    require_w01_action_effect_linkage_consumer: bool = False
+    disable_w01_enforcement: bool = False
     o01_entity_signals: tuple[O01EntitySignal, ...] = ()
     o02_interaction_diagnostics: O02InteractionDiagnosticsInput | None = None
     o03_candidate_strategy: O03CandidateStrategyInput | None = None
@@ -735,6 +751,7 @@ class SubjectTickContext:
     a02_demand_set: A02DemandSet | None = None
     a03_operation_candidate_set: A03InternalOperationCandidateSet | None = None
     a04_external_candidate_set: A04ExternalAffordanceCandidateSet | None = None
+    w01_world_packet_set: W01WorldPacketSet | None = None
     g08_appraisal_significance_hint: float | None = None
     source_lineage: tuple[str, ...] = ()
 
@@ -1393,6 +1410,23 @@ class SubjectTickState:
     a04_binding_packet_consumer_ready: bool = False
     a04_authority_path_consumer_ready: bool = False
     a04_downstream_consumer_ready: bool = False
+    w01_packet_count: int = 0
+    w01_explicit_basis_present: bool = False
+    w01_admitted_count: int = 0
+    w01_admitted_with_uncertainty_count: int = 0
+    w01_scaffold_only_count: int = 0
+    w01_absent_count: int = 0
+    w01_contested_count: int = 0
+    w01_rejected_count: int = 0
+    w01_revoked_count: int = 0
+    w01_contradiction_count: int = 0
+    w01_linked_effect_count: int = 0
+    w01_no_link_count: int = 0
+    w01_source_authority_missing_count: int = 0
+    w01_non_mature_object_claim_count: int = 0
+    w01_permission_packet_consumer_ready: bool = False
+    w01_action_effect_linkage_consumer_ready: bool = False
+    w01_downstream_consumer_ready: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -1729,6 +1763,7 @@ class SubjectTickResult:
     a02_result: A02CapabilityGapResult
     a03_result: A03InternalToolAffordanceResult
     a04_result: A04ExternalAffordanceBindingResult
+    w01_result: W01Result
     a_line_result: ALineNormalizationResult
     m_minimal_result: MMinimalResult
     n_minimal_result: NMinimalResult

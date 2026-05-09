@@ -53,6 +53,7 @@ def evaluate_subject_tick_downstream_gate(
         SubjectTickRestrictionCode.A02_CAPABILITY_GAP_CONTRACT_MUST_BE_READ,
         SubjectTickRestrictionCode.A03_INTERNAL_TOOL_AFFORDANCE_CONTRACT_MUST_BE_READ,
         SubjectTickRestrictionCode.A04_EXTERNAL_AFFORDANCE_BINDING_CONTRACT_MUST_BE_READ,
+        SubjectTickRestrictionCode.W01_BOUNDED_WORLD_LOOP_CONTRACT_MUST_BE_READ,
         SubjectTickRestrictionCode.M_MINIMAL_CONTOUR_CONTRACT_MUST_BE_READ,
         SubjectTickRestrictionCode.M_FORBIDDEN_SHORTCUTS_MUST_BE_READ,
         SubjectTickRestrictionCode.N_MINIMAL_CONTOUR_CONTRACT_MUST_BE_READ,
@@ -2181,6 +2182,89 @@ def evaluate_subject_tick_downstream_gate(
             accepted = False
             usability = SubjectTickUsabilityClass.BLOCKED
             reason = "a04 produced no consumer-ready staged external-affordance binding packet"
+
+    w01_checkpoint = next(
+        (
+            checkpoint
+            for checkpoint in state.execution_checkpoints
+            if checkpoint.checkpoint_id == "rt01.w01_bounded_world_loop_checkpoint"
+        ),
+        None,
+    )
+    if w01_checkpoint is not None:
+        if "require_w01_permission_packet_consumer" in w01_checkpoint.required_action:
+            restrictions.append(SubjectTickRestrictionCode.W01_PERMISSION_PACKET_CONSUMER_REQUIRED)
+        if "require_w01_action_effect_linkage_consumer" in w01_checkpoint.required_action:
+            restrictions.append(SubjectTickRestrictionCode.W01_ACTION_EFFECT_LINKAGE_CONSUMER_REQUIRED)
+        if "default_w01_absent_world_packet_detour" in w01_checkpoint.required_action:
+            restrictions.append(SubjectTickRestrictionCode.W01_ABSENT_WORLD_PACKET_DETOUR_REQUIRED)
+        if "default_w01_authority_missing_detour" in w01_checkpoint.required_action:
+            restrictions.append(SubjectTickRestrictionCode.W01_AUTHORITY_MISSING_DETOUR_REQUIRED)
+        if "default_w01_contested_world_packet_detour" in w01_checkpoint.required_action:
+            restrictions.append(SubjectTickRestrictionCode.W01_CONTESTED_WORLD_PACKET_DETOUR_REQUIRED)
+        if "default_w01_revoked_world_packet_detour" in w01_checkpoint.required_action:
+            restrictions.append(SubjectTickRestrictionCode.W01_REVOKED_WORLD_PACKET_DETOUR_REQUIRED)
+        if "default_w01_no_linkage_detour" in w01_checkpoint.required_action:
+            restrictions.append(SubjectTickRestrictionCode.W01_NO_LINKAGE_DETOUR_REQUIRED)
+        if "default_w01_non_mature_object_claim_restriction" in w01_checkpoint.required_action:
+            restrictions.append(SubjectTickRestrictionCode.W01_NON_MATURE_OBJECT_CLAIM_RESTRICTION)
+
+    w01_basis_present = bool(state.w01_explicit_basis_present)
+    if w01_basis_present and state.w01_absent_count > 0:
+        restrictions.append(SubjectTickRestrictionCode.W01_ABSENT_WORLD_PACKET_DETOUR_REQUIRED)
+        restrictions.append(SubjectTickRestrictionCode.DOWNSTREAM_AUTHORITY_DEGRADED)
+        if state.final_execution_outcome == SubjectTickOutcome.CONTINUE:
+            accepted = False
+            usability = SubjectTickUsabilityClass.BLOCKED
+            reason = "w01 explicit world packet basis indicates absence and blocks grounded continuation"
+    if w01_basis_present and state.w01_source_authority_missing_count > 0:
+        restrictions.append(SubjectTickRestrictionCode.W01_AUTHORITY_MISSING_DETOUR_REQUIRED)
+        restrictions.append(SubjectTickRestrictionCode.DOWNSTREAM_AUTHORITY_DEGRADED)
+        if state.final_execution_outcome == SubjectTickOutcome.CONTINUE:
+            accepted = False
+            usability = SubjectTickUsabilityClass.BLOCKED
+            reason = "w01 missing packet authority blocks world-grounded promotion"
+    if w01_basis_present and state.w01_contested_count > 0:
+        restrictions.append(SubjectTickRestrictionCode.W01_CONTESTED_WORLD_PACKET_DETOUR_REQUIRED)
+        if (
+            state.final_execution_outcome == SubjectTickOutcome.CONTINUE
+            and usability == SubjectTickUsabilityClass.USABLE_BOUNDED
+        ):
+            usability = SubjectTickUsabilityClass.DEGRADED_BOUNDED
+            reason = "w01 contested world packets require uncertainty-preserving revalidation"
+    if w01_basis_present and state.w01_revoked_count > 0:
+        restrictions.append(SubjectTickRestrictionCode.W01_REVOKED_WORLD_PACKET_DETOUR_REQUIRED)
+        restrictions.append(SubjectTickRestrictionCode.DOWNSTREAM_AUTHORITY_DEGRADED)
+        if state.final_execution_outcome == SubjectTickOutcome.CONTINUE:
+            accepted = False
+            usability = SubjectTickUsabilityClass.BLOCKED
+            reason = "w01 revoked world packets cannot remain active evidence"
+    if w01_basis_present and state.w01_no_link_count > 0:
+        restrictions.append(SubjectTickRestrictionCode.W01_NO_LINKAGE_DETOUR_REQUIRED)
+        if (
+            state.final_execution_outcome == SubjectTickOutcome.CONTINUE
+            and usability == SubjectTickUsabilityClass.USABLE_BOUNDED
+        ):
+            usability = SubjectTickUsabilityClass.DEGRADED_BOUNDED
+            reason = "w01 missing observation-action-effect linkage restricts grounded continuation confidence"
+    if w01_basis_present and state.w01_non_mature_object_claim_count > 0:
+        restrictions.append(SubjectTickRestrictionCode.W01_NON_MATURE_OBJECT_CLAIM_RESTRICTION)
+        if (
+            state.final_execution_outcome == SubjectTickOutcome.CONTINUE
+            and usability == SubjectTickUsabilityClass.USABLE_BOUNDED
+        ):
+            usability = SubjectTickUsabilityClass.DEGRADED_BOUNDED
+            reason = "w01 remains scaffold-only and blocks mature-object claim promotion"
+    if w01_basis_present and not state.w01_permission_packet_consumer_ready:
+        restrictions.append(SubjectTickRestrictionCode.W01_PERMISSION_PACKET_CONSUMER_REQUIRED)
+    if w01_basis_present and not state.w01_action_effect_linkage_consumer_ready:
+        restrictions.append(SubjectTickRestrictionCode.W01_ACTION_EFFECT_LINKAGE_CONSUMER_REQUIRED)
+    if w01_basis_present and not state.w01_downstream_consumer_ready:
+        restrictions.append(SubjectTickRestrictionCode.DOWNSTREAM_AUTHORITY_DEGRADED)
+        if state.final_execution_outcome == SubjectTickOutcome.CONTINUE:
+            accepted = False
+            usability = SubjectTickUsabilityClass.BLOCKED
+            reason = "w01 produced no consumer-ready bounded world-loop permission packet"
 
     return SubjectTickGateDecision(
         accepted=accepted,

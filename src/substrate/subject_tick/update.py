@@ -277,6 +277,11 @@ from substrate.a04_external_affordance_binding import (
     build_a04_external_affordance_binding,
     derive_a04_external_affordance_consumer_view,
 )
+from substrate.w01_bounded_world_loop import (
+    W01WorldPacketSet,
+    build_w01_bounded_world_loop,
+    derive_w01_consumer_view,
+)
 from substrate.s01_efference_copy import (
     S01EfferenceCopyState,
     build_s01_efference_copy,
@@ -325,6 +330,7 @@ ATTEMPTED_SUBJECT_TICK_PATHS: tuple[str, ...] = (
     "subject_tick.evaluate_p03_credit_assignment",
     "subject_tick.evaluate_p04_counterfactual_policy_simulation",
     "subject_tick.evaluate_a04_external_affordance_binding",
+    "subject_tick.evaluate_w01_bounded_world_loop",
     "subject_tick.world_seam_enforcement",
     "subject_tick.resolve_bounded_runtime_outcome",
     "subject_tick.downstream_gate",
@@ -6253,6 +6259,178 @@ def execute_subject_tick(
         )
     )
 
+    w01_explicit_input = (
+        context.w01_world_packet_set
+        if isinstance(context.w01_world_packet_set, W01WorldPacketSet)
+        else None
+    )
+    w01_explicit_basis = bool(w01_explicit_input is not None and w01_explicit_input.packets)
+    w01_result = build_w01_bounded_world_loop(
+        tick_id=tick_id,
+        tick_index=tick_index,
+        packet_set=w01_explicit_input,
+        enforcement_enabled=True,
+    )
+    w01_view = derive_w01_consumer_view(w01_result)
+    w01_trace_values = {
+        "w01_admission_state": (
+            w01_result.admission_records[0].admission_state.value
+            if w01_result.admission_records
+            else "no_clean_world_claim"
+        ),
+        "w01_presence_mode": (
+            w01_result.admission_records[0].presence_mode_normalized.value
+            if w01_result.admission_records
+            else "absent"
+        ),
+        "w01_source_authority": (
+            w01_result.admission_records[0].source_authority.value
+            if w01_result.admission_records
+            else "unknown_source"
+        ),
+        "w01_consumer_ready": w01_result.gate.consumer_ready,
+        "w01_must_abstain": any(item.must_abstain for item in w01_result.downstream_permissions),
+        "w01_must_preserve_uncertainty": any(
+            item.must_preserve_uncertainty for item in w01_result.downstream_permissions
+        ),
+        "w01_non_mature_object_claim_count": w01_result.telemetry.non_mature_object_claim_count,
+        "w01_contradiction_count": w01_result.telemetry.contradiction_count,
+        "w01_linked_effect_count": w01_result.telemetry.linked_effect_count,
+        "w01_no_link_count": w01_result.telemetry.no_link_count,
+    }
+    trace_emit_active("w01_bounded_world_loop", "enter", w01_trace_values)
+    w01_checkpoint_status = SubjectTickCheckpointStatus.ALLOWED
+    w01_checkpoint_reason = w01_result.reason
+    w01_default_absent_detour = False
+    w01_default_authority_missing_detour = False
+    w01_default_contested_detour = False
+    w01_default_revoked_detour = False
+    w01_default_no_linkage_detour = False
+    w01_default_non_mature_restriction = False
+    if not context.disable_w01_enforcement:
+        if (
+            context.require_w01_permission_packet_consumer
+            and not w01_view.consumer_ready
+            and halt_reason is None
+        ):
+            revalidation_needed = True
+            w01_checkpoint_status = SubjectTickCheckpointStatus.ENFORCED_DETOUR
+            w01_checkpoint_reason = (
+                "w01 permission-packet consumer requested but no consumer-ready world admission is available"
+            )
+            if active_execution_mode != "halt_execution":
+                active_execution_mode = "revalidate_scope"
+        if (
+            context.require_w01_action_effect_linkage_consumer
+            and w01_view.linked_effect_count == 0
+            and halt_reason is None
+        ):
+            revalidation_needed = True
+            w01_checkpoint_status = SubjectTickCheckpointStatus.ENFORCED_DETOUR
+            w01_checkpoint_reason = (
+                "w01 action-effect linkage consumer requested but no linked world effect lineage exists"
+            )
+            if active_execution_mode != "halt_execution":
+                active_execution_mode = "revalidate_scope"
+        if w01_explicit_basis and w01_result.telemetry.absent_count > 0 and halt_reason is None:
+            revalidation_needed = True
+            w01_default_absent_detour = True
+            w01_checkpoint_status = SubjectTickCheckpointStatus.ENFORCED_DETOUR
+            w01_checkpoint_reason = (
+                "w01 received explicit world basis with absent presence and requires abstain/revalidation detour"
+            )
+            if active_execution_mode != "halt_execution":
+                active_execution_mode = "revalidate_scope"
+        if (
+            w01_explicit_basis
+            and w01_result.telemetry.source_authority_missing_count > 0
+            and halt_reason is None
+        ):
+            revalidation_needed = True
+            w01_default_authority_missing_detour = True
+            w01_checkpoint_status = SubjectTickCheckpointStatus.ENFORCED_DETOUR
+            w01_checkpoint_reason = (
+                "w01 detected world packets with missing authority and blocks unsafe grounded promotion"
+            )
+            if active_execution_mode != "halt_execution":
+                active_execution_mode = "revalidate_scope"
+        if w01_explicit_basis and w01_result.telemetry.contested_count > 0 and halt_reason is None:
+            revalidation_needed = True
+            w01_default_contested_detour = True
+            w01_checkpoint_status = SubjectTickCheckpointStatus.ENFORCED_DETOUR
+            w01_checkpoint_reason = (
+                "w01 detected contested world admissions and requires uncertainty-preserving detour"
+            )
+            if active_execution_mode != "halt_execution":
+                active_execution_mode = "revalidate_scope"
+        if w01_explicit_basis and w01_result.telemetry.revoked_count > 0 and halt_reason is None:
+            repair_needed = True
+            w01_default_revoked_detour = True
+            w01_checkpoint_status = SubjectTickCheckpointStatus.ENFORCED_DETOUR
+            w01_checkpoint_reason = (
+                "w01 detected revoked world packets and requires revocation-aware restoration detour"
+            )
+            if active_execution_mode not in {"halt_execution", "revalidate_scope"}:
+                active_execution_mode = "repair_runtime_path"
+        if w01_explicit_basis and w01_result.telemetry.no_link_count > 0 and halt_reason is None:
+            revalidation_needed = True
+            w01_default_no_linkage_detour = True
+            w01_checkpoint_status = SubjectTickCheckpointStatus.ENFORCED_DETOUR
+            w01_checkpoint_reason = (
+                "w01 could not link observation/action/effect lineage and requires bounded revalidation"
+            )
+            if active_execution_mode != "halt_execution":
+                active_execution_mode = "revalidate_scope"
+        if (
+            w01_explicit_basis
+            and w01_result.telemetry.non_mature_object_claim_count > 0
+            and halt_reason is None
+        ):
+            w01_default_non_mature_restriction = True
+    else:
+        w01_checkpoint_status = SubjectTickCheckpointStatus.ALLOWED
+        w01_checkpoint_reason = "W01 gate disabled in test fixture"
+
+    w01_required_actions: list[str] = []
+    if context.require_w01_permission_packet_consumer:
+        w01_required_actions.append("require_w01_permission_packet_consumer")
+    if context.require_w01_action_effect_linkage_consumer:
+        w01_required_actions.append("require_w01_action_effect_linkage_consumer")
+    if w01_default_absent_detour:
+        w01_required_actions.append("default_w01_absent_world_packet_detour")
+    if w01_default_authority_missing_detour:
+        w01_required_actions.append("default_w01_authority_missing_detour")
+    if w01_default_contested_detour:
+        w01_required_actions.append("default_w01_contested_world_packet_detour")
+    if w01_default_revoked_detour:
+        w01_required_actions.append("default_w01_revoked_world_packet_detour")
+    if w01_default_no_linkage_detour:
+        w01_required_actions.append("default_w01_no_linkage_detour")
+    if w01_default_non_mature_restriction:
+        w01_required_actions.append("default_w01_non_mature_object_claim_restriction")
+    if not w01_required_actions:
+        w01_required_actions.append("w01_optional")
+
+    trace_emit_active("w01_bounded_world_loop", "decision", w01_trace_values)
+    if w01_checkpoint_status != SubjectTickCheckpointStatus.ALLOWED:
+        trace_emit_active(
+            "w01_bounded_world_loop",
+            "blocked",
+            w01_trace_values,
+            note=w01_checkpoint_reason,
+        )
+    trace_emit_active("w01_bounded_world_loop", "exit", w01_trace_values)
+    checkpoints.append(
+        SubjectTickCheckpointResult(
+            checkpoint_id="rt01.w01_bounded_world_loop_checkpoint",
+            source_contract="w01_bounded_world_loop.world_admission_result",
+            status=w01_checkpoint_status,
+            required_action=";".join(dict.fromkeys(w01_required_actions)),
+            applied_action=active_execution_mode,
+            reason=w01_checkpoint_reason,
+        )
+    )
+
     if halt_reason is not None:
         final_outcome = SubjectTickOutcome.HALT
         execution_stance = SubjectTickExecutionStance.HALT_PATH
@@ -7216,6 +7394,27 @@ def execute_subject_tick(
         a04_binding_packet_consumer_ready=a04_result.gate.binding_packet_consumer_ready,
         a04_authority_path_consumer_ready=a04_result.gate.authority_path_consumer_ready,
         a04_downstream_consumer_ready=a04_result.telemetry.a04_consumer_ready,
+        w01_packet_count=(
+            len(w01_explicit_input.packets)
+            if isinstance(w01_explicit_input, W01WorldPacketSet)
+            else 0
+        ),
+        w01_explicit_basis_present=w01_explicit_basis,
+        w01_admitted_count=w01_result.telemetry.admitted_count,
+        w01_admitted_with_uncertainty_count=w01_result.telemetry.admitted_with_uncertainty_count,
+        w01_scaffold_only_count=w01_result.telemetry.scaffold_only_count,
+        w01_absent_count=w01_result.telemetry.absent_count,
+        w01_contested_count=w01_result.telemetry.contested_count,
+        w01_rejected_count=w01_result.telemetry.rejected_count,
+        w01_revoked_count=w01_result.telemetry.revoked_count,
+        w01_contradiction_count=w01_result.telemetry.contradiction_count,
+        w01_linked_effect_count=w01_result.telemetry.linked_effect_count,
+        w01_no_link_count=w01_result.telemetry.no_link_count,
+        w01_source_authority_missing_count=w01_result.telemetry.source_authority_missing_count,
+        w01_non_mature_object_claim_count=w01_result.telemetry.non_mature_object_claim_count,
+        w01_permission_packet_consumer_ready=w01_result.gate.consumer_ready,
+        w01_action_effect_linkage_consumer_ready=w01_result.telemetry.linked_effect_count > 0,
+        w01_downstream_consumer_ready=w01_result.gate.consumer_ready,
     )
     gate = evaluate_subject_tick_downstream_gate(state)
     telemetry = build_subject_tick_telemetry(
@@ -7223,7 +7422,7 @@ def execute_subject_tick(
         attempted_paths=ATTEMPTED_SUBJECT_TICK_PATHS,
         downstream_gate=gate,
         causal_basis=(
-            "bounded runtime execution spine enforces roadmap authority roles for C04/C05, consumes world-entry, s01 efference-copy, s02 prediction-boundary seam, s03 ownership-weighted learning, s04 interoceptive self-binding, s05 multi-cause attribution, s-minimal, a01 affordance ontology cleanup, a02 capability-gap detection, a03 internal-tool affordance normalization, a-line, m-minimal, n-minimal, t01 semantic-field, t02 relation-binding, t03 hypothesis-competition, t04 attention-schema, o01 other-entity modeling, o02 intersubjective allostasis, o03 strategy-class evaluation, p01 authority-bounded project-formation, o04 rupture/hostility/coercion dynamics, r05 bounded protective regulation gates, v01 act-level normative licensing/commitment guards, v02 typed utterance-plan bridge constraints, v03 constrained realization alignment/report contract, c06 typed surfacing-candidates handoff, p02 typed intervention episodes, p03 typed long-horizon credit assignment, p04 typed interpersonal counterfactual policy simulation, and a04 staged external-affordance binding before bounded outcome resolution, while keeping D01 observability-only over fixed R->C order"
+            "bounded runtime execution spine enforces roadmap authority roles for C04/C05, consumes world-entry, s01 efference-copy, s02 prediction-boundary seam, s03 ownership-weighted learning, s04 interoceptive self-binding, s05 multi-cause attribution, s-minimal, a01 affordance ontology cleanup, a02 capability-gap detection, a03 internal-tool affordance normalization, a-line, m-minimal, n-minimal, t01 semantic-field, t02 relation-binding, t03 hypothesis-competition, t04 attention-schema, o01 other-entity modeling, o02 intersubjective allostasis, o03 strategy-class evaluation, p01 authority-bounded project-formation, o04 rupture/hostility/coercion dynamics, r05 bounded protective regulation gates, v01 act-level normative licensing/commitment guards, v02 typed utterance-plan bridge constraints, v03 constrained realization alignment/report contract, c06 typed surfacing-candidates handoff, p02 typed intervention episodes, p03 typed long-horizon credit assignment, p04 typed interpersonal counterfactual policy simulation, a04 staged external-affordance binding, and w01 bounded world-loop admission before bounded outcome resolution, while keeping D01 observability-only over fixed R->C order"
         ),
     )
     abstain = final_outcome in {SubjectTickOutcome.REPAIR, SubjectTickOutcome.REVALIDATE}
@@ -7307,6 +7506,7 @@ def execute_subject_tick(
         a02_result=a02_result,
         a03_result=a03_result,
         a04_result=a04_result,
+        w01_result=w01_result,
         a_line_result=a_line_result,
         m_minimal_result=m_minimal_result,
         n_minimal_result=n_minimal_result,
