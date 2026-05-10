@@ -59,6 +59,7 @@ HOSTED_CONTOUR_SEGMENTS = (
     "m01_homeostatic_salience_imprint",
     "m02_predictive_relevance",
     "n01_narrative_commitments",
+    "n02_identity_drift_reflection",
     "a_line_normalization",
     "m_minimal",
     "n_minimal",
@@ -390,6 +391,16 @@ HOSTED_CONTOUR_FIELDS: dict[str, set[str]] = {
         "n01_revision_count",
         "n01_scope_narrowed_count",
         "n01_ungrounded_capability_count",
+    },
+    "n02_identity_drift_reflection": {
+        "n02_decision_count",
+        "n02_reflection_needed_count",
+        "n02_context_split_count",
+        "n02_unresolved_identity_tension_count",
+        "n02_no_clean_drift_count",
+        "n02_consumer_ready",
+        "n02_stable_continuation_count",
+        "n02_bounded_revision_count",
     },
     "s_minimal_contour": {
         "minimal_self_status",
@@ -910,6 +921,9 @@ def test_hosted_contour_segments_follow_real_runtime_order(tmp_path: Path) -> No
         events, "n01_narrative_commitments"
     )
     assert _first_order(events, "n01_narrative_commitments") < _first_order(
+        events, "n02_identity_drift_reflection"
+    )
+    assert _first_order(events, "n02_identity_drift_reflection") < _first_order(
         events, "bounded_outcome_resolution"
     )
     assert _first_order(events, "s_minimal_contour") < _first_order(
@@ -997,6 +1011,7 @@ def test_representative_modules_have_runtime_steps(tmp_path: Path) -> None:
         "m01_homeostatic_salience_imprint",
         "m02_predictive_relevance",
         "n01_narrative_commitments",
+        "n02_identity_drift_reflection",
         "downstream_obedience",
         "subject_tick",
     ):

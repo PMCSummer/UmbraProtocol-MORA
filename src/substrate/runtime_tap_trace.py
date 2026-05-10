@@ -401,6 +401,16 @@ MODULE_ALLOWED_FIELDS: dict[str, tuple[str, ...]] = {
         "n01_scope_narrowed_count",
         "n01_ungrounded_capability_count",
     ),
+    "n02_identity_drift_reflection": (
+        "n02_decision_count",
+        "n02_reflection_needed_count",
+        "n02_context_split_count",
+        "n02_unresolved_identity_tension_count",
+        "n02_no_clean_drift_count",
+        "n02_consumer_ready",
+        "n02_stable_continuation_count",
+        "n02_bounded_revision_count",
+    ),
     "s_minimal_contour": (
         "minimal_self_status",
         "minimal_self_ready",

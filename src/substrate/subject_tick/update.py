@@ -297,6 +297,11 @@ from substrate.n01_narrative_commitments import (
     build_n01_narrative_commitments,
     derive_n01_contract_view,
 )
+from substrate.n02_identity_drift_reflection import (
+    N02InputBundle,
+    build_n02_identity_drift_reflection,
+    derive_n02_contract_view,
+)
 from substrate.s01_efference_copy import (
     S01EfferenceCopyState,
     build_s01_efference_copy,
@@ -349,6 +354,7 @@ ATTEMPTED_SUBJECT_TICK_PATHS: tuple[str, ...] = (
     "subject_tick.evaluate_m01_homeostatic_salience_imprint",
     "subject_tick.evaluate_m02_predictive_relevance",
     "subject_tick.evaluate_n01_narrative_commitments",
+    "subject_tick.evaluate_n02_identity_drift_reflection",
     "subject_tick.world_seam_enforcement",
     "subject_tick.resolve_bounded_runtime_outcome",
     "subject_tick.downstream_gate",
@@ -6812,6 +6818,152 @@ def execute_subject_tick(
         )
     )
 
+    n02_explicit_input = (
+        context.n02_input_bundle
+        if isinstance(context.n02_input_bundle, N02InputBundle)
+        else None
+    )
+    n02_explicit_basis = bool(
+        n02_explicit_input is not None and n02_explicit_input.current_references
+    )
+    n02_result = build_n02_identity_drift_reflection(
+        tick_id=tick_id,
+        tick_index=tick_index,
+        input_bundle=n02_explicit_input,
+        reflection_enabled=True,
+    )
+    n02_view = derive_n02_contract_view(n02_result)
+    n02_trace_values = {
+        "n02_decision_count": n02_result.telemetry.drift_entry_count,
+        "n02_reflection_needed_count": n02_result.telemetry.reflection_needed_count,
+        "n02_context_split_count": n02_result.telemetry.context_split_count,
+        "n02_unresolved_identity_tension_count": n02_result.telemetry.unresolved_identity_tension_count,
+        "n02_no_clean_drift_count": n02_result.telemetry.no_clean_drift_count,
+        "n02_consumer_ready": n02_result.gate.n02_consumer_ready,
+        "n02_stable_continuation_count": n02_result.telemetry.stable_continuation_count,
+        "n02_bounded_revision_count": n02_result.telemetry.bounded_revision_count,
+    }
+    trace_emit_active("n02_identity_drift_reflection", "enter", n02_trace_values)
+    n02_checkpoint_status = SubjectTickCheckpointStatus.ALLOWED
+    n02_checkpoint_reason = n02_result.reason
+    n02_default_unresolved_tension_detour = False
+    n02_default_context_split_restriction = False
+    n02_default_no_clean_detour = False
+    n02_default_baseline_uncertain_recheck = False
+    n02_default_caution_route = False
+    if not context.disable_n02_enforcement:
+        if (
+            context.require_n02_reflection_consumer
+            and not n02_view.reflection_consumer_ready
+            and halt_reason is None
+        ):
+            revalidation_needed = True
+            n02_checkpoint_status = SubjectTickCheckpointStatus.ENFORCED_DETOUR
+            n02_checkpoint_reason = (
+                "n02 reflection consumer requested but typed identity-drift reflection packets are not ready"
+            )
+            if active_execution_mode != "halt_execution":
+                active_execution_mode = "revalidate_scope"
+        if (
+            context.require_n02_consistency_consumer
+            and not n02_view.consistency_consumer_ready
+            and halt_reason is None
+        ):
+            revalidation_needed = True
+            n02_checkpoint_status = SubjectTickCheckpointStatus.ENFORCED_DETOUR
+            n02_checkpoint_reason = (
+                "n02 consistency consumer requested but unresolved identity tension handling is not ready"
+            )
+            if active_execution_mode != "halt_execution":
+                active_execution_mode = "revalidate_scope"
+        if (
+            n02_explicit_basis
+            and n02_result.telemetry.unresolved_identity_tension_count > 0
+            and halt_reason is None
+        ):
+            revalidation_needed = True
+            n02_default_unresolved_tension_detour = True
+            if n02_checkpoint_status == SubjectTickCheckpointStatus.ALLOWED:
+                n02_checkpoint_status = SubjectTickCheckpointStatus.ENFORCED_DETOUR
+            n02_checkpoint_reason = (
+                "n02 unresolved identity tension requires revalidation before clean continuation"
+            )
+            if active_execution_mode != "halt_execution":
+                active_execution_mode = "revalidate_scope"
+        if (
+            n02_explicit_basis
+            and n02_result.telemetry.context_split_count > 0
+            and halt_reason is None
+        ):
+            n02_default_context_split_restriction = True
+        if (
+            n02_explicit_basis
+            and n02_result.telemetry.no_clean_drift_count > 0
+            and halt_reason is None
+        ):
+            revalidation_needed = True
+            n02_default_no_clean_detour = True
+            if n02_checkpoint_status == SubjectTickCheckpointStatus.ALLOWED:
+                n02_checkpoint_status = SubjectTickCheckpointStatus.ENFORCED_DETOUR
+            n02_checkpoint_reason = (
+                "n02 explicit basis produced no-clean drift claims and requires bounded reflection detour"
+            )
+            if active_execution_mode != "halt_execution":
+                active_execution_mode = "revalidate_scope"
+        if (
+            n02_explicit_basis
+            and n02_result.telemetry.baseline_uncertain_count > 0
+            and halt_reason is None
+        ):
+            n02_default_baseline_uncertain_recheck = True
+        if (
+            n02_explicit_basis
+            and n02_result.telemetry.downstream_caution_count > 0
+            and halt_reason is None
+        ):
+            n02_default_caution_route = True
+    else:
+        n02_checkpoint_status = SubjectTickCheckpointStatus.ALLOWED
+        n02_checkpoint_reason = "N02 gate disabled in test fixture"
+
+    n02_required_actions: list[str] = []
+    if context.require_n02_reflection_consumer:
+        n02_required_actions.append("require_n02_reflection_consumer")
+    if context.require_n02_consistency_consumer:
+        n02_required_actions.append("require_n02_consistency_consumer")
+    if n02_default_unresolved_tension_detour:
+        n02_required_actions.append("default_n02_unresolved_tension_recheck")
+    if n02_default_context_split_restriction:
+        n02_required_actions.append("default_n02_context_split_restriction")
+    if n02_default_no_clean_detour:
+        n02_required_actions.append("default_n02_no_clean_drift_detour")
+    if n02_default_baseline_uncertain_recheck:
+        n02_required_actions.append("default_n02_baseline_uncertain_recheck")
+    if n02_default_caution_route:
+        n02_required_actions.append("default_n02_caution_route")
+    if not n02_required_actions:
+        n02_required_actions.append("n02_optional")
+
+    trace_emit_active("n02_identity_drift_reflection", "decision", n02_trace_values)
+    if n02_checkpoint_status != SubjectTickCheckpointStatus.ALLOWED:
+        trace_emit_active(
+            "n02_identity_drift_reflection",
+            "blocked",
+            n02_trace_values,
+            note=n02_checkpoint_reason,
+        )
+    trace_emit_active("n02_identity_drift_reflection", "exit", n02_trace_values)
+    checkpoints.append(
+        SubjectTickCheckpointResult(
+            checkpoint_id="rt01.n02_identity_drift_reflection_checkpoint",
+            source_contract="n02_identity_drift_reflection.identity_drift_result",
+            status=n02_checkpoint_status,
+            required_action=";".join(dict.fromkeys(n02_required_actions)),
+            applied_action=active_execution_mode,
+            reason=n02_checkpoint_reason,
+        )
+    )
+
     if halt_reason is not None:
         final_outcome = SubjectTickOutcome.HALT
         execution_stance = SubjectTickExecutionStance.HALT_PATH
@@ -7834,6 +7986,19 @@ def execute_subject_tick(
         n01_commitment_consumer_ready=n01_result.gate.consumer_ready,
         n01_consistency_consumer_ready=n01_result.gate.consistency_consumer_ready,
         n01_downstream_consumer_ready=n01_result.gate.consumer_ready,
+        n02_explicit_basis_present=n02_explicit_basis,
+        n02_consumer_ready=n02_result.gate.n02_consumer_ready,
+        n02_reflection_consumer_ready=n02_result.gate.reflection_consumer_ready,
+        n02_consistency_consumer_ready=n02_result.gate.consistency_consumer_ready,
+        n02_reflection_needed_count=n02_result.telemetry.reflection_needed_count,
+        n02_unresolved_identity_tension_count=n02_result.telemetry.unresolved_identity_tension_count,
+        n02_context_split_count=n02_result.telemetry.context_split_count,
+        n02_no_clean_drift_count=n02_result.telemetry.no_clean_drift_count,
+        n02_baseline_uncertain_count=n02_result.telemetry.baseline_uncertain_count,
+        n02_downstream_caution_count=n02_result.telemetry.downstream_caution_count,
+        n02_text_diff_only_blocked_count=n02_result.telemetry.text_diff_only_blocked_count,
+        n02_stable_continuation_count=n02_result.telemetry.stable_continuation_count,
+        n02_bounded_revision_count=n02_result.telemetry.bounded_revision_count,
     )
     gate = evaluate_subject_tick_downstream_gate(state)
     telemetry = build_subject_tick_telemetry(
@@ -7841,7 +8006,7 @@ def execute_subject_tick(
         attempted_paths=ATTEMPTED_SUBJECT_TICK_PATHS,
         downstream_gate=gate,
         causal_basis=(
-            "bounded runtime execution spine enforces roadmap authority roles for C04/C05, consumes world-entry, s01 efference-copy, s02 prediction-boundary seam, s03 ownership-weighted learning, s04 interoceptive self-binding, s05 multi-cause attribution, s-minimal, a01 affordance ontology cleanup, a02 capability-gap detection, a03 internal-tool affordance normalization, a-line, m-minimal, n-minimal, t01 semantic-field, t02 relation-binding, t03 hypothesis-competition, t04 attention-schema, o01 other-entity modeling, o02 intersubjective allostasis, o03 strategy-class evaluation, p01 authority-bounded project-formation, o04 rupture/hostility/coercion dynamics, r05 bounded protective regulation gates, v01 act-level normative licensing/commitment guards, v02 typed utterance-plan bridge constraints, v03 constrained realization alignment/report contract, c06 typed surfacing-candidates handoff, p02 typed intervention episodes, p03 typed long-horizon credit assignment, p04 typed interpersonal counterfactual policy simulation, a04 staged external-affordance binding, w01 bounded world-loop admission, m01 homeostatic salience imprint, and m02 predictive relevance before bounded outcome resolution, while keeping D01 observability-only over fixed R->C order"
+            "bounded runtime execution spine enforces roadmap authority roles for C04/C05, consumes world-entry, s01 efference-copy, s02 prediction-boundary seam, s03 ownership-weighted learning, s04 interoceptive self-binding, s05 multi-cause attribution, s-minimal, a01 affordance ontology cleanup, a02 capability-gap detection, a03 internal-tool affordance normalization, a-line, m-minimal, n-minimal, t01 semantic-field, t02 relation-binding, t03 hypothesis-competition, t04 attention-schema, o01 other-entity modeling, o02 intersubjective allostasis, o03 strategy-class evaluation, p01 authority-bounded project-formation, o04 rupture/hostility/coercion dynamics, r05 bounded protective regulation gates, v01 act-level normative licensing/commitment guards, v02 typed utterance-plan bridge constraints, v03 constrained realization alignment/report contract, c06 typed surfacing-candidates handoff, p02 typed intervention episodes, p03 typed long-horizon credit assignment, p04 typed interpersonal counterfactual policy simulation, a04 staged external-affordance binding, w01 bounded world-loop admission, m01 homeostatic salience imprint, m02 predictive relevance, and n02 identity-drift reflection before bounded outcome resolution, while keeping D01 observability-only over fixed R->C order"
         ),
     )
     abstain = final_outcome in {SubjectTickOutcome.REPAIR, SubjectTickOutcome.REVALIDATE}
@@ -7929,6 +8094,7 @@ def execute_subject_tick(
         m01_result=m01_result,
         m02_result=m02_result,
         n01_result=n01_result,
+        n02_result=n02_result,
         a_line_result=a_line_result,
         m_minimal_result=m_minimal_result,
         n_minimal_result=n_minimal_result,

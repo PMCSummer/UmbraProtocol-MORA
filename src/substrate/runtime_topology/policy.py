@@ -482,6 +482,7 @@ def build_minimal_runtime_tick_graph() -> RuntimeTickGraph:
                     "rt01.m01_homeostatic_salience_imprint_checkpoint",
                     "rt01.m02_predictive_relevance_checkpoint",
                     "rt01.n01_narrative_commitments_checkpoint",
+                    "rt01.n02_identity_drift_reflection_checkpoint",
                     "rt01.outcome_resolution_checkpoint",
                 ),
                 checkpoint_ids=(
@@ -519,6 +520,7 @@ def build_minimal_runtime_tick_graph() -> RuntimeTickGraph:
                     "rt01.m01_homeostatic_salience_imprint_checkpoint",
                     "rt01.m02_predictive_relevance_checkpoint",
                     "rt01.n01_narrative_commitments_checkpoint",
+                    "rt01.n02_identity_drift_reflection_checkpoint",
                     "rt01.outcome_resolution_checkpoint",
                 ),
             ),
@@ -636,6 +638,7 @@ def build_minimal_runtime_tick_graph() -> RuntimeTickGraph:
             "rt01.m01_homeostatic_salience_imprint_checkpoint",
             "rt01.m02_predictive_relevance_checkpoint",
             "rt01.n01_narrative_commitments_checkpoint",
+            "rt01.n02_identity_drift_reflection_checkpoint",
             "rt01.a_line_normalization_checkpoint",
             "rt01.m_minimal_contour_checkpoint",
             "rt01.n_minimal_contour_checkpoint",
@@ -666,6 +669,7 @@ def build_minimal_runtime_tick_graph() -> RuntimeTickGraph:
             "rt01.m01_homeostatic_salience_imprint_checkpoint",
             "rt01.m02_predictive_relevance_checkpoint",
             "rt01.n01_narrative_commitments_checkpoint",
+            "rt01.n02_identity_drift_reflection_checkpoint",
             "rt01.outcome_resolution_checkpoint",
         ),
         source_of_truth_surfaces=(
@@ -684,6 +688,7 @@ def build_minimal_runtime_tick_graph() -> RuntimeTickGraph:
             "m01_homeostatic_salience_imprint.imprint_result",
             "m02_predictive_relevance.predictive_relevance_result",
             "n01_narrative_commitments.commitment_registry_result",
+            "n02_identity_drift_reflection.identity_drift_result",
             "a_line_normalization.capability_state",
             "m_minimal.lifecycle_state",
             "n_minimal.commitment_state",
@@ -958,6 +963,7 @@ def _context_has_ablation_flags(context: SubjectTickContext | None) -> bool:
         or context.disable_m01_enforcement
         or context.disable_m02_enforcement
         or context.disable_n01_enforcement
+        or context.disable_n02_enforcement
         or context.disable_m_minimal_enforcement
         or context.disable_n_minimal_enforcement
         or context.disable_s01_enforcement

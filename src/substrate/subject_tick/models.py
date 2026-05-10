@@ -94,6 +94,10 @@ if TYPE_CHECKING:
         N01InputBundle,
         N01Result,
     )
+    from substrate.n02_identity_drift_reflection import (
+        N02InputBundle,
+        N02Result,
+    )
     from substrate.p01_project_formation import (
         P01IntentionStackState,
         P01ProjectFormationResult,
@@ -550,6 +554,15 @@ class SubjectTickRestrictionCode(StrEnum):
         "n01_contested_commitment_recheck_required"
     )
     N01_UNGROUNDED_CAPABILITY_RESTRICTION = "n01_ungrounded_capability_restriction"
+    N02_IDENTITY_DRIFT_CONTRACT_MUST_BE_READ = "n02_identity_drift_contract_must_be_read"
+    N02_REFLECTION_CONSUMER_REQUIRED = "n02_reflection_consumer_required"
+    N02_CONSISTENCY_CONSUMER_REQUIRED = "n02_consistency_consumer_required"
+    N02_UNRESOLVED_TENSION_RECHECK_REQUIRED = "n02_unresolved_tension_recheck_required"
+    N02_CONTEXT_SPLIT_RESTRICTION_REQUIRED = "n02_context_split_restriction_required"
+    N02_NO_CLEAN_DRIFT_DETOUR_REQUIRED = "n02_no_clean_drift_detour_required"
+    N02_BASELINE_UNCERTAIN_RECHECK_REQUIRED = "n02_baseline_uncertain_recheck_required"
+    N02_CAUTION_ROUTE_REQUIRED = "n02_caution_route_required"
+    N02_TEXT_DIFF_ONLY_BLOCKED_RESTRICTION = "n02_text_diff_only_blocked_restriction"
     DOWNSTREAM_AUTHORITY_DEGRADED = "downstream_authority_degraded"
 
 
@@ -780,6 +793,9 @@ class SubjectTickContext:
     require_n01_commitment_consumer: bool = False
     require_n01_consistency_consumer: bool = False
     disable_n01_enforcement: bool = False
+    require_n02_reflection_consumer: bool = False
+    require_n02_consistency_consumer: bool = False
+    disable_n02_enforcement: bool = False
     o01_entity_signals: tuple[O01EntitySignal, ...] = ()
     o02_interaction_diagnostics: O02InteractionDiagnosticsInput | None = None
     o03_candidate_strategy: O03CandidateStrategyInput | None = None
@@ -801,6 +817,7 @@ class SubjectTickContext:
     m01_input_bundle: M01InputBundle | None = None
     m02_input_bundle: M02InputBundle | None = None
     n01_input_bundle: N01InputBundle | None = None
+    n02_input_bundle: N02InputBundle | None = None
     g08_appraisal_significance_hint: float | None = None
     source_lineage: tuple[str, ...] = ()
 
@@ -1510,6 +1527,19 @@ class SubjectTickState:
     n01_commitment_consumer_ready: bool = False
     n01_consistency_consumer_ready: bool = False
     n01_downstream_consumer_ready: bool = False
+    n02_explicit_basis_present: bool = False
+    n02_consumer_ready: bool = False
+    n02_reflection_consumer_ready: bool = False
+    n02_consistency_consumer_ready: bool = False
+    n02_reflection_needed_count: int = 0
+    n02_unresolved_identity_tension_count: int = 0
+    n02_context_split_count: int = 0
+    n02_no_clean_drift_count: int = 0
+    n02_baseline_uncertain_count: int = 0
+    n02_downstream_caution_count: int = 0
+    n02_text_diff_only_blocked_count: int = 0
+    n02_stable_continuation_count: int = 0
+    n02_bounded_revision_count: int = 0
 
 
 @dataclass(frozen=True, slots=True)
@@ -1850,6 +1880,7 @@ class SubjectTickResult:
     m01_result: M01Result
     m02_result: M02Result
     n01_result: N01Result
+    n02_result: N02Result
     a_line_result: ALineNormalizationResult
     m_minimal_result: MMinimalResult
     n_minimal_result: NMinimalResult

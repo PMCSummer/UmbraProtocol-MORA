@@ -56,6 +56,7 @@ def evaluate_subject_tick_downstream_gate(
         SubjectTickRestrictionCode.W01_BOUNDED_WORLD_LOOP_CONTRACT_MUST_BE_READ,
         SubjectTickRestrictionCode.M01_HOMEOSTATIC_IMPRINT_CONTRACT_MUST_BE_READ,
         SubjectTickRestrictionCode.N01_NARRATIVE_COMMITMENT_CONTRACT_MUST_BE_READ,
+        SubjectTickRestrictionCode.N02_IDENTITY_DRIFT_CONTRACT_MUST_BE_READ,
         SubjectTickRestrictionCode.M_MINIMAL_CONTOUR_CONTRACT_MUST_BE_READ,
         SubjectTickRestrictionCode.M_FORBIDDEN_SHORTCUTS_MUST_BE_READ,
         SubjectTickRestrictionCode.N_MINIMAL_CONTOUR_CONTRACT_MUST_BE_READ,
@@ -2417,6 +2418,70 @@ def evaluate_subject_tick_downstream_gate(
             accepted = False
             usability = SubjectTickUsabilityClass.BLOCKED
             reason = "n01 produced no consumer-ready commitment records for downstream consistency use"
+
+    n02_checkpoint = next(
+        (
+            checkpoint
+            for checkpoint in state.execution_checkpoints
+            if checkpoint.checkpoint_id == "rt01.n02_identity_drift_reflection_checkpoint"
+        ),
+        None,
+    )
+    if n02_checkpoint is not None:
+        if "require_n02_reflection_consumer" in n02_checkpoint.required_action:
+            restrictions.append(SubjectTickRestrictionCode.N02_REFLECTION_CONSUMER_REQUIRED)
+        if "require_n02_consistency_consumer" in n02_checkpoint.required_action:
+            restrictions.append(SubjectTickRestrictionCode.N02_CONSISTENCY_CONSUMER_REQUIRED)
+        if "default_n02_unresolved_tension_recheck" in n02_checkpoint.required_action:
+            restrictions.append(SubjectTickRestrictionCode.N02_UNRESOLVED_TENSION_RECHECK_REQUIRED)
+        if "default_n02_context_split_restriction" in n02_checkpoint.required_action:
+            restrictions.append(SubjectTickRestrictionCode.N02_CONTEXT_SPLIT_RESTRICTION_REQUIRED)
+        if "default_n02_no_clean_drift_detour" in n02_checkpoint.required_action:
+            restrictions.append(SubjectTickRestrictionCode.N02_NO_CLEAN_DRIFT_DETOUR_REQUIRED)
+        if "default_n02_baseline_uncertain_recheck" in n02_checkpoint.required_action:
+            restrictions.append(SubjectTickRestrictionCode.N02_BASELINE_UNCERTAIN_RECHECK_REQUIRED)
+        if "default_n02_caution_route" in n02_checkpoint.required_action:
+            restrictions.append(SubjectTickRestrictionCode.N02_CAUTION_ROUTE_REQUIRED)
+
+    n02_basis_present = bool(state.n02_explicit_basis_present)
+    if n02_basis_present and state.n02_unresolved_identity_tension_count > 0:
+        restrictions.append(SubjectTickRestrictionCode.N02_UNRESOLVED_TENSION_RECHECK_REQUIRED)
+        if state.final_execution_outcome == SubjectTickOutcome.CONTINUE:
+            accepted = False
+            usability = SubjectTickUsabilityClass.BLOCKED
+            reason = "n02 unresolved identity tension requires revalidation before clean continuation"
+    if n02_basis_present and state.n02_context_split_count > 0:
+        restrictions.append(SubjectTickRestrictionCode.N02_CONTEXT_SPLIT_RESTRICTION_REQUIRED)
+        if (
+            state.final_execution_outcome == SubjectTickOutcome.CONTINUE
+            and usability == SubjectTickUsabilityClass.USABLE_BOUNDED
+        ):
+            usability = SubjectTickUsabilityClass.DEGRADED_BOUNDED
+            reason = "n02 context split requires scoped consistency caution before broad reuse"
+    if n02_basis_present and state.n02_no_clean_drift_count > 0:
+        restrictions.append(SubjectTickRestrictionCode.N02_NO_CLEAN_DRIFT_DETOUR_REQUIRED)
+        if (
+            state.final_execution_outcome == SubjectTickOutcome.CONTINUE
+            and usability == SubjectTickUsabilityClass.USABLE_BOUNDED
+        ):
+            usability = SubjectTickUsabilityClass.DEGRADED_BOUNDED
+            reason = "n02 explicit basis produced no-clean drift claim and blocks strong reflection routing"
+    if n02_basis_present and state.n02_baseline_uncertain_count > 0:
+        restrictions.append(SubjectTickRestrictionCode.N02_BASELINE_UNCERTAIN_RECHECK_REQUIRED)
+    if n02_basis_present and state.n02_downstream_caution_count > 0:
+        restrictions.append(SubjectTickRestrictionCode.N02_CAUTION_ROUTE_REQUIRED)
+    if n02_basis_present and state.n02_text_diff_only_blocked_count > 0:
+        restrictions.append(SubjectTickRestrictionCode.N02_TEXT_DIFF_ONLY_BLOCKED_RESTRICTION)
+    if n02_basis_present and not state.n02_reflection_consumer_ready:
+        restrictions.append(SubjectTickRestrictionCode.N02_REFLECTION_CONSUMER_REQUIRED)
+    if n02_basis_present and not state.n02_consistency_consumer_ready:
+        restrictions.append(SubjectTickRestrictionCode.N02_CONSISTENCY_CONSUMER_REQUIRED)
+    if n02_basis_present and not state.n02_consumer_ready:
+        restrictions.append(SubjectTickRestrictionCode.DOWNSTREAM_AUTHORITY_DEGRADED)
+        if state.final_execution_outcome == SubjectTickOutcome.CONTINUE:
+            accepted = False
+            usability = SubjectTickUsabilityClass.BLOCKED
+            reason = "n02 produced no consumer-ready identity drift reflection packet for downstream consistency use"
 
     return SubjectTickGateDecision(
         accepted=accepted,
