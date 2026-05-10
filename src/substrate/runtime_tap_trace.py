@@ -374,6 +374,18 @@ MODULE_ALLOWED_FIELDS: dict[str, tuple[str, ...]] = {
         "w01_linked_effect_count",
         "w01_no_link_count",
     ),
+    "w02_regularity_extraction": (
+        "w02_candidate_count",
+        "w02_promoted_count",
+        "w02_blocked_count",
+        "w02_contested_count",
+        "w02_downgraded_count",
+        "w02_contradiction_count",
+        "w02_lineage_ambiguity_count",
+        "w02_consumer_ready",
+        "w02_no_clean_regularities",
+        "w02_must_abstain_count",
+    ),
     "m01_homeostatic_salience_imprint": (
         "imprint_count",
         "strong_imprint_count",

@@ -82,6 +82,10 @@ if TYPE_CHECKING:
         W01Result,
         W01WorldPacketSet,
     )
+    from substrate.w02_regularity_extraction import (
+        W02InputBundle,
+        W02ResultBundle,
+    )
     from substrate.m01_homeostatic_salience_imprint import (
         M01InputBundle,
         M01Result,
@@ -525,6 +529,7 @@ class SubjectTickRestrictionCode(StrEnum):
     A04_NO_AUTHORITY_PATH_DETOUR_REQUIRED = "a04_no_authority_path_detour_required"
     A04_OBJECT_SCAFFOLD_ONLY_RESTRICTION = "a04_object_scaffold_only_restriction"
     W01_BOUNDED_WORLD_LOOP_CONTRACT_MUST_BE_READ = "w01_bounded_world_loop_contract_must_be_read"
+    W02_REGULARITY_EXTRACTION_CONTRACT_MUST_BE_READ = "w02_regularity_extraction_contract_must_be_read"
     W01_PERMISSION_PACKET_CONSUMER_REQUIRED = "w01_permission_packet_consumer_required"
     W01_ACTION_EFFECT_LINKAGE_CONSUMER_REQUIRED = "w01_action_effect_linkage_consumer_required"
     W01_ABSENT_WORLD_PACKET_DETOUR_REQUIRED = "w01_absent_world_packet_detour_required"
@@ -533,6 +538,10 @@ class SubjectTickRestrictionCode(StrEnum):
     W01_REVOKED_WORLD_PACKET_DETOUR_REQUIRED = "w01_revoked_world_packet_detour_required"
     W01_NO_LINKAGE_DETOUR_REQUIRED = "w01_no_linkage_detour_required"
     W01_NON_MATURE_OBJECT_CLAIM_RESTRICTION = "w01_non_mature_object_claim_restriction"
+    W02_PERMISSION_PACKET_CONSUMER_REQUIRED = "w02_permission_packet_consumer_required"
+    W02_CONTRADICTION_REVIEW_REQUIRED = "w02_contradiction_review_required"
+    W02_NO_CLEAN_REGULARITY_DETOUR_REQUIRED = "w02_no_clean_regularity_detour_required"
+    W02_MUST_ABSTAIN_RESTRICTION = "w02_must_abstain_restriction"
     M01_HOMEOSTATIC_IMPRINT_CONTRACT_MUST_BE_READ = (
         "m01_homeostatic_imprint_contract_must_be_read"
     )
@@ -796,6 +805,9 @@ class SubjectTickContext:
     require_w01_permission_packet_consumer: bool = False
     require_w01_action_effect_linkage_consumer: bool = False
     disable_w01_enforcement: bool = False
+    require_w02_permission_packet_consumer: bool = False
+    require_w02_contradiction_consumer: bool = False
+    disable_w02_enforcement: bool = False
     require_m01_imprint_packet_consumer: bool = False
     require_m01_axis_scope_consumer: bool = False
     disable_m01_enforcement: bool = False
@@ -829,6 +841,7 @@ class SubjectTickContext:
     a03_operation_candidate_set: A03InternalOperationCandidateSet | None = None
     a04_external_candidate_set: A04ExternalAffordanceCandidateSet | None = None
     w01_world_packet_set: W01WorldPacketSet | None = None
+    w02_input_bundle: W02InputBundle | None = None
     m01_input_bundle: M01InputBundle | None = None
     m02_input_bundle: M02InputBundle | None = None
     n01_input_bundle: N01InputBundle | None = None
@@ -1509,6 +1522,18 @@ class SubjectTickState:
     w01_permission_packet_consumer_ready: bool = False
     w01_action_effect_linkage_consumer_ready: bool = False
     w01_downstream_consumer_ready: bool = False
+    w02_checkpoint_present: bool = False
+    w02_explicit_basis_present: bool = False
+    w02_candidate_count: int = 0
+    w02_promoted_count: int = 0
+    w02_blocked_count: int = 0
+    w02_contested_count: int = 0
+    w02_downgraded_count: int = 0
+    w02_contradiction_count: int = 0
+    w02_lineage_ambiguity_count: int = 0
+    w02_must_abstain_count: int = 0
+    w02_consumer_ready: bool = False
+    w02_no_clean_regularities: bool = True
     m01_imprint_count: int = 0
     m01_explicit_basis_present: bool = False
     m01_strong_imprint_count: int = 0
@@ -1907,6 +1932,7 @@ class SubjectTickResult:
     a03_result: A03InternalToolAffordanceResult
     a04_result: A04ExternalAffordanceBindingResult
     w01_result: W01Result
+    w02_result: W02ResultBundle
     m01_result: M01Result
     m02_result: M02Result
     n01_result: N01Result

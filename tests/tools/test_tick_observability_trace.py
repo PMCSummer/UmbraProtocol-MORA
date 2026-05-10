@@ -56,6 +56,7 @@ HOSTED_CONTOUR_SEGMENTS = (
     "a03_internal_tool_affordances",
     "a04_external_affordance_binding",
     "w01_bounded_world_loop",
+    "w02_regularity_extraction",
     "m01_homeostatic_salience_imprint",
     "m02_predictive_relevance",
     "n01_narrative_commitments",
@@ -365,6 +366,18 @@ HOSTED_CONTOUR_FIELDS: dict[str, set[str]] = {
         "w01_contradiction_count",
         "w01_linked_effect_count",
         "w01_no_link_count",
+    },
+    "w02_regularity_extraction": {
+        "w02_candidate_count",
+        "w02_promoted_count",
+        "w02_blocked_count",
+        "w02_contested_count",
+        "w02_downgraded_count",
+        "w02_contradiction_count",
+        "w02_lineage_ambiguity_count",
+        "w02_consumer_ready",
+        "w02_no_clean_regularities",
+        "w02_must_abstain_count",
     },
     "m01_homeostatic_salience_imprint": {
         "imprint_count",
@@ -922,6 +935,9 @@ def test_hosted_contour_segments_follow_real_runtime_order(tmp_path: Path) -> No
         events, "w01_bounded_world_loop"
     )
     assert _first_order(events, "w01_bounded_world_loop") < _first_order(
+        events, "w02_regularity_extraction"
+    )
+    assert _first_order(events, "w02_regularity_extraction") < _first_order(
         events, "m01_homeostatic_salience_imprint"
     )
     assert _first_order(events, "m01_homeostatic_salience_imprint") < _first_order(
@@ -1021,6 +1037,8 @@ def test_representative_modules_have_runtime_steps(tmp_path: Path) -> None:
         "p03_long_horizon_credit_assignment_intervention_learning",
         "p04_interpersonal_counterfactual_policy_simulation",
         "a01_internal_affordance_ontology_cleanup",
+        "w01_bounded_world_loop",
+        "w02_regularity_extraction",
         "m01_homeostatic_salience_imprint",
         "m02_predictive_relevance",
         "n01_narrative_commitments",

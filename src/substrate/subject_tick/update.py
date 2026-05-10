@@ -282,6 +282,14 @@ from substrate.w01_bounded_world_loop import (
     build_w01_bounded_world_loop,
     derive_w01_consumer_view,
 )
+from substrate.w02_regularity_extraction import (
+    W02InputBundle,
+    W02PresenceMode,
+    W02RegularityCandidateType,
+    W02TraceRef,
+    build_w02_regularity_extraction,
+    derive_w02_contract_view,
+)
 from substrate.m01_homeostatic_salience_imprint import (
     M01InputBundle,
     build_m01_homeostatic_salience_imprint,
@@ -360,6 +368,7 @@ ATTEMPTED_SUBJECT_TICK_PATHS: tuple[str, ...] = (
     "subject_tick.evaluate_p04_counterfactual_policy_simulation",
     "subject_tick.evaluate_a04_external_affordance_binding",
     "subject_tick.evaluate_w01_bounded_world_loop",
+    "subject_tick.evaluate_w02_regularity_extraction",
     "subject_tick.evaluate_m01_homeostatic_salience_imprint",
     "subject_tick.evaluate_m02_predictive_relevance",
     "subject_tick.evaluate_n01_narrative_commitments",
@@ -6465,6 +6474,135 @@ def execute_subject_tick(
         )
     )
 
+    w02_explicit_input = (
+        context.w02_input_bundle
+        if isinstance(context.w02_input_bundle, W02InputBundle)
+        else _build_default_w02_input_bundle(
+            tick_id=tick_id,
+            tick_index=tick_index,
+            w01_result=w01_result,
+            source_lineage=lineage,
+        )
+    )
+    w02_explicit_basis = bool(w02_explicit_input is not None and w02_explicit_input.traces)
+    w02_result = build_w02_regularity_extraction(
+        tick_id=tick_id,
+        tick_index=tick_index,
+        input_bundle=w02_explicit_input,
+        enforcement_enabled=True,
+    )
+    w02_view = derive_w02_contract_view(w02_result)
+    w02_trace_values = {
+        "w02_candidate_count": w02_result.telemetry.candidate_count,
+        "w02_promoted_count": w02_result.telemetry.promoted_count,
+        "w02_blocked_count": w02_result.telemetry.blocked_count,
+        "w02_contested_count": w02_result.telemetry.contested_count,
+        "w02_downgraded_count": w02_result.telemetry.downgraded_count,
+        "w02_contradiction_count": w02_result.telemetry.contradiction_count,
+        "w02_lineage_ambiguity_count": w02_result.telemetry.lineage_ambiguity_count,
+        "w02_consumer_ready": w02_result.gate.consumer_ready,
+        "w02_no_clean_regularities": w02_result.telemetry.no_clean_regularities,
+        "w02_must_abstain_count": w02_result.telemetry.must_abstain_count,
+    }
+    trace_emit_active("w02_regularity_extraction", "enter", w02_trace_values)
+    w02_checkpoint_status = SubjectTickCheckpointStatus.ALLOWED
+    w02_checkpoint_reason = w02_result.reason
+    w02_default_no_clean_detour = False
+    w02_default_contradiction_review = False
+    w02_default_must_abstain_restriction = False
+    if not context.disable_w02_enforcement:
+        if (
+            context.require_w02_permission_packet_consumer
+            and not w02_view.consumer_ready
+            and halt_reason is None
+        ):
+            revalidation_needed = True
+            w02_checkpoint_status = SubjectTickCheckpointStatus.ENFORCED_DETOUR
+            w02_checkpoint_reason = (
+                "w02 permission-packet consumer requested but staged regularity packets are not consumer-ready"
+            )
+            if active_execution_mode != "halt_execution":
+                active_execution_mode = "revalidate_scope"
+        if (
+            context.require_w02_contradiction_consumer
+            and w02_view.contradiction_count == 0
+            and halt_reason is None
+        ):
+            revalidation_needed = True
+            w02_checkpoint_status = SubjectTickCheckpointStatus.ENFORCED_DETOUR
+            w02_checkpoint_reason = (
+                "w02 contradiction-review consumer requested but contradiction-bearing regularity state is absent"
+            )
+            if active_execution_mode != "halt_execution":
+                active_execution_mode = "revalidate_scope"
+        if w02_explicit_basis and w02_result.telemetry.no_clean_regularities and halt_reason is None:
+            revalidation_needed = True
+            w02_default_no_clean_detour = True
+            if w02_checkpoint_status == SubjectTickCheckpointStatus.ALLOWED:
+                w02_checkpoint_status = SubjectTickCheckpointStatus.ENFORCED_DETOUR
+            w02_checkpoint_reason = (
+                "w02 explicit basis produced no-clean-regularity state and requires abstain/revalidation detour"
+            )
+            if active_execution_mode != "halt_execution":
+                active_execution_mode = "revalidate_scope"
+        if w02_explicit_basis and w02_result.telemetry.contradiction_count > 0 and halt_reason is None:
+            w02_default_contradiction_review = True
+            if w02_checkpoint_status == SubjectTickCheckpointStatus.ALLOWED:
+                w02_checkpoint_status = SubjectTickCheckpointStatus.ENFORCED_DETOUR
+                revalidation_needed = True
+            w02_checkpoint_reason = (
+                "w02 contradiction ledger is non-empty and requires contradiction-preserving review before transfer"
+            )
+            if active_execution_mode != "halt_execution":
+                active_execution_mode = "revalidate_scope"
+        if w02_explicit_basis and w02_result.telemetry.must_abstain_count > 0 and halt_reason is None:
+            w02_default_must_abstain_restriction = True
+            if w02_checkpoint_status == SubjectTickCheckpointStatus.ALLOWED:
+                w02_checkpoint_status = SubjectTickCheckpointStatus.ENFORCED_DETOUR
+                revalidation_needed = True
+            w02_checkpoint_reason = (
+                "w02 downstream permissions include must-abstain packets and block clean regularity transfer"
+            )
+            if active_execution_mode != "halt_execution":
+                active_execution_mode = "revalidate_scope"
+    else:
+        w02_checkpoint_status = SubjectTickCheckpointStatus.ALLOWED
+        w02_checkpoint_reason = "W02 gate disabled in test fixture"
+
+    w02_required_actions: list[str] = []
+    if context.require_w02_permission_packet_consumer:
+        w02_required_actions.append("require_w02_permission_packet_consumer")
+    if context.require_w02_contradiction_consumer:
+        w02_required_actions.append("require_w02_contradiction_consumer")
+    if w02_default_no_clean_detour:
+        w02_required_actions.append("default_w02_no_clean_regularity_detour")
+    if w02_default_contradiction_review:
+        w02_required_actions.append("default_w02_contradiction_review_required")
+    if w02_default_must_abstain_restriction:
+        w02_required_actions.append("default_w02_must_abstain_restriction")
+    if not w02_required_actions:
+        w02_required_actions.append("w02_optional")
+
+    trace_emit_active("w02_regularity_extraction", "decision", w02_trace_values)
+    if w02_checkpoint_status != SubjectTickCheckpointStatus.ALLOWED:
+        trace_emit_active(
+            "w02_regularity_extraction",
+            "blocked",
+            w02_trace_values,
+            note=w02_checkpoint_reason,
+        )
+    trace_emit_active("w02_regularity_extraction", "exit", w02_trace_values)
+    checkpoints.append(
+        SubjectTickCheckpointResult(
+            checkpoint_id="rt01.w02_regularity_extraction_checkpoint",
+            source_contract="w02_regularity_extraction.regularity_extraction_result",
+            status=w02_checkpoint_status,
+            required_action=";".join(dict.fromkeys(w02_required_actions)),
+            applied_action=active_execution_mode,
+            reason=w02_checkpoint_reason,
+        )
+    )
+
     m01_explicit_input = (
         context.m01_input_bundle
         if isinstance(context.m01_input_bundle, M01InputBundle)
@@ -8090,6 +8228,18 @@ def execute_subject_tick(
         w01_permission_packet_consumer_ready=w01_result.gate.consumer_ready,
         w01_action_effect_linkage_consumer_ready=w01_result.telemetry.linked_effect_count > 0,
         w01_downstream_consumer_ready=w01_result.gate.consumer_ready,
+        w02_checkpoint_present=True,
+        w02_explicit_basis_present=w02_explicit_basis,
+        w02_candidate_count=w02_result.telemetry.candidate_count,
+        w02_promoted_count=w02_result.telemetry.promoted_count,
+        w02_blocked_count=w02_result.telemetry.blocked_count,
+        w02_contested_count=w02_result.telemetry.contested_count,
+        w02_downgraded_count=w02_result.telemetry.downgraded_count,
+        w02_contradiction_count=w02_result.telemetry.contradiction_count,
+        w02_lineage_ambiguity_count=w02_result.telemetry.lineage_ambiguity_count,
+        w02_must_abstain_count=w02_result.telemetry.must_abstain_count,
+        w02_consumer_ready=w02_result.gate.consumer_ready,
+        w02_no_clean_regularities=w02_result.telemetry.no_clean_regularities,
         m01_imprint_count=m01_result.telemetry.imprint_count,
         m01_explicit_basis_present=m01_explicit_basis,
         m01_strong_imprint_count=m01_result.telemetry.strong_imprint_count,
@@ -8170,7 +8320,7 @@ def execute_subject_tick(
         attempted_paths=ATTEMPTED_SUBJECT_TICK_PATHS,
         downstream_gate=gate,
         causal_basis=(
-            "bounded runtime execution spine enforces roadmap authority roles for C04/C05, consumes world-entry, s01 efference-copy, s02 prediction-boundary seam, s03 ownership-weighted learning, s04 interoceptive self-binding, s05 multi-cause attribution, s-minimal, a01 affordance ontology cleanup, a02 capability-gap detection, a03 internal-tool affordance normalization, a-line, m-minimal, n-minimal, t01 semantic-field, t02 relation-binding, t03 hypothesis-competition, t04 attention-schema, o01 other-entity modeling, o02 intersubjective allostasis, o03 strategy-class evaluation, p01 authority-bounded project-formation, o04 rupture/hostility/coercion dynamics, r05 bounded protective regulation gates, v01 act-level normative licensing/commitment guards, v02 typed utterance-plan bridge constraints, v03 constrained realization alignment/report contract, c06 typed surfacing-candidates handoff, p02 typed intervention episodes, p03 typed long-horizon credit assignment, p04 typed interpersonal counterfactual policy simulation, a04 staged external-affordance binding, w01 bounded world-loop admission, m01 homeostatic salience imprint, m02 predictive relevance, n01 narrative commitments, n02 identity-drift reflection, and n03 autobiographical relevance before bounded outcome resolution, while keeping D01 observability-only over fixed R->C order"
+            "bounded runtime execution spine enforces roadmap authority roles for C04/C05, consumes world-entry, s01 efference-copy, s02 prediction-boundary seam, s03 ownership-weighted learning, s04 interoceptive self-binding, s05 multi-cause attribution, s-minimal, a01 affordance ontology cleanup, a02 capability-gap detection, a03 internal-tool affordance normalization, a-line, m-minimal, n-minimal, t01 semantic-field, t02 relation-binding, t03 hypothesis-competition, t04 attention-schema, o01 other-entity modeling, o02 intersubjective allostasis, o03 strategy-class evaluation, p01 authority-bounded project-formation, o04 rupture/hostility/coercion dynamics, r05 bounded protective regulation gates, v01 act-level normative licensing/commitment guards, v02 typed utterance-plan bridge constraints, v03 constrained realization alignment/report contract, c06 typed surfacing-candidates handoff, p02 typed intervention episodes, p03 typed long-horizon credit assignment, p04 typed interpersonal counterfactual policy simulation, a04 staged external-affordance binding, w01 bounded world-loop admission, w02 staged regularity extraction, m01 homeostatic salience imprint, m02 predictive relevance, n01 narrative commitments, n02 identity-drift reflection, and n03 autobiographical relevance before bounded outcome resolution, while keeping D01 observability-only over fixed R->C order"
         ),
     )
     abstain = final_outcome in {SubjectTickOutcome.REPAIR, SubjectTickOutcome.REVALIDATE}
@@ -8255,6 +8405,7 @@ def execute_subject_tick(
         a03_result=a03_result,
         a04_result=a04_result,
         w01_result=w01_result,
+        w02_result=w02_result,
         m01_result=m01_result,
         m02_result=m02_result,
         n01_result=n01_result,
@@ -8889,6 +9040,95 @@ def _infer_a03_tool_class_from_a01_entry(affordance_class: A01AffordanceClass) -
         A01AffordanceClass.INTERNAL_ONLY: A03ToolClass.SELF_QUERY,
     }
     return mapping.get(affordance_class, A03ToolClass.SELF_QUERY)
+
+
+def _build_default_w02_input_bundle(
+    *,
+    tick_id: str,
+    tick_index: int,
+    w01_result,
+    source_lineage: tuple[str, ...],
+) -> W02InputBundle | None:
+    admissions = tuple(getattr(w01_result, "admission_records", ()))
+    if not admissions:
+        return None
+    traces: list[W02TraceRef] = []
+    linked_effect_refs = {
+        getattr(link, "effect_packet_ref", None)
+        for link in getattr(w01_result, "action_effect_linkages", ())
+        if getattr(link, "effect_packet_ref", None)
+    }
+    for index, admission in enumerate(admissions, start=1):
+        presence_raw = str(
+            getattr(
+                getattr(admission, "presence_mode_normalized", None),
+                "value",
+                getattr(admission, "presence_mode_normalized", "unknown"),
+            )
+        )
+        presence_mode = {
+            "present": W02PresenceMode.PRESENT,
+            "partial": W02PresenceMode.PARTIAL,
+            "scaffold_only": W02PresenceMode.SCAFFOLD_ONLY,
+            "absent": W02PresenceMode.ABSENT,
+            "contradictory": W02PresenceMode.CONTRADICTORY,
+            "revoked_or_invalid": W02PresenceMode.REVOKED,
+            "unknown": W02PresenceMode.UNKNOWN,
+        }.get(presence_raw, W02PresenceMode.UNKNOWN)
+        state_token = str(
+            getattr(
+                getattr(admission, "admission_state", None),
+                "value",
+                getattr(admission, "admission_state", "unknown"),
+            )
+        )
+        source_authority = str(
+            getattr(
+                getattr(admission, "source_authority", None),
+                "value",
+                getattr(admission, "source_authority", "unknown_source"),
+            )
+        )
+        traces.append(
+            W02TraceRef(
+                trace_id=admission.packet_ref,
+                sequence_index=(tick_index * 1000) + index,
+                entity_id=str(getattr(admission, "entity_id", f"entity:{index}")),
+                source_authority=source_authority,
+                presence_mode=presence_mode,
+                admission_state=state_token,
+                confidence_band=str(getattr(admission, "confidence_band", "low")),
+                provenance_ref=tuple(getattr(admission, "provenance_ref", ())),
+                action_ref=(
+                    f"action:{admission.packet_ref}"
+                    if admission.packet_ref in linked_effect_refs
+                    else None
+                ),
+                effect_ref=(
+                    f"effect:{admission.packet_ref}"
+                    if admission.packet_ref in linked_effect_refs
+                    else None
+                ),
+                structural_signature=f"sig:{getattr(admission, 'entity_id', f'entity:{index}')}",
+                kind_label=f"kind:{getattr(admission, 'entity_id', f'entity:{index}')}",
+                role_label="role:world_scaffold",
+                provider_label=source_authority,
+                contradiction_markers=tuple(getattr(admission, "uncertainty_markers", ())),
+                is_duplicate_packet=False,
+                provider_bias_marker=False,
+                text_artifact_marker=(source_authority == "language_context"),
+                revoked=(state_token == "revoked"),
+                candidate_type=W02RegularityCandidateType.INSTANCE,
+            )
+        )
+    if not traces:
+        return None
+    return W02InputBundle(
+        bundle_id=f"w02:{tick_id}:default_bundle",
+        traces=tuple(traces),
+        source_lineage=source_lineage,
+        reason="default projection from w01 admission records",
+    )
 
 
 def _build_default_a01_raw_affordance_candidate_set(

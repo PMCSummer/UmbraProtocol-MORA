@@ -54,6 +54,7 @@ def evaluate_subject_tick_downstream_gate(
         SubjectTickRestrictionCode.A03_INTERNAL_TOOL_AFFORDANCE_CONTRACT_MUST_BE_READ,
         SubjectTickRestrictionCode.A04_EXTERNAL_AFFORDANCE_BINDING_CONTRACT_MUST_BE_READ,
         SubjectTickRestrictionCode.W01_BOUNDED_WORLD_LOOP_CONTRACT_MUST_BE_READ,
+        SubjectTickRestrictionCode.W02_REGULARITY_EXTRACTION_CONTRACT_MUST_BE_READ,
         SubjectTickRestrictionCode.M01_HOMEOSTATIC_IMPRINT_CONTRACT_MUST_BE_READ,
         SubjectTickRestrictionCode.N01_NARRATIVE_COMMITMENT_CONTRACT_MUST_BE_READ,
         SubjectTickRestrictionCode.N02_IDENTITY_DRIFT_CONTRACT_MUST_BE_READ,
@@ -2269,6 +2270,58 @@ def evaluate_subject_tick_downstream_gate(
             accepted = False
             usability = SubjectTickUsabilityClass.BLOCKED
             reason = "w01 produced no consumer-ready bounded world-loop permission packet"
+
+    w02_checkpoint = next(
+        (
+            checkpoint
+            for checkpoint in state.execution_checkpoints
+            if checkpoint.checkpoint_id == "rt01.w02_regularity_extraction_checkpoint"
+        ),
+        None,
+    )
+    if w02_checkpoint is not None:
+        if "require_w02_permission_packet_consumer" in w02_checkpoint.required_action:
+            restrictions.append(SubjectTickRestrictionCode.W02_PERMISSION_PACKET_CONSUMER_REQUIRED)
+        if "require_w02_contradiction_consumer" in w02_checkpoint.required_action:
+            restrictions.append(SubjectTickRestrictionCode.W02_CONTRADICTION_REVIEW_REQUIRED)
+        if "default_w02_no_clean_regularity_detour" in w02_checkpoint.required_action:
+            restrictions.append(SubjectTickRestrictionCode.W02_NO_CLEAN_REGULARITY_DETOUR_REQUIRED)
+        if "default_w02_contradiction_review_required" in w02_checkpoint.required_action:
+            restrictions.append(SubjectTickRestrictionCode.W02_CONTRADICTION_REVIEW_REQUIRED)
+        if "default_w02_must_abstain_restriction" in w02_checkpoint.required_action:
+            restrictions.append(SubjectTickRestrictionCode.W02_MUST_ABSTAIN_RESTRICTION)
+
+    w02_basis_present = bool(state.w02_explicit_basis_present)
+    if w02_basis_present and state.w02_no_clean_regularities:
+        restrictions.append(SubjectTickRestrictionCode.W02_NO_CLEAN_REGULARITY_DETOUR_REQUIRED)
+        if (
+            state.final_execution_outcome == SubjectTickOutcome.CONTINUE
+            and usability == SubjectTickUsabilityClass.USABLE_BOUNDED
+        ):
+            usability = SubjectTickUsabilityClass.DEGRADED_BOUNDED
+            reason = "w02 explicit basis produced no-clean regularity state and requires abstain/revalidation discipline"
+    if w02_basis_present and state.w02_contradiction_count > 0:
+        restrictions.append(SubjectTickRestrictionCode.W02_CONTRADICTION_REVIEW_REQUIRED)
+        if state.final_execution_outcome == SubjectTickOutcome.CONTINUE:
+            accepted = False
+            usability = SubjectTickUsabilityClass.BLOCKED
+            reason = "w02 contradiction ledger requires contradiction review before regularity transfer"
+    if w02_basis_present and state.w02_must_abstain_count > 0:
+        restrictions.append(SubjectTickRestrictionCode.W02_MUST_ABSTAIN_RESTRICTION)
+        if (
+            state.final_execution_outcome == SubjectTickOutcome.CONTINUE
+            and usability == SubjectTickUsabilityClass.USABLE_BOUNDED
+        ):
+            usability = SubjectTickUsabilityClass.DEGRADED_BOUNDED
+            reason = "w02 permission packets include must-abstain constraints"
+    if w02_basis_present and not state.w02_consumer_ready:
+        restrictions.append(SubjectTickRestrictionCode.W02_PERMISSION_PACKET_CONSUMER_REQUIRED)
+    if w02_basis_present and not state.w02_consumer_ready:
+        restrictions.append(SubjectTickRestrictionCode.DOWNSTREAM_AUTHORITY_DEGRADED)
+        if state.final_execution_outcome == SubjectTickOutcome.CONTINUE:
+            accepted = False
+            usability = SubjectTickUsabilityClass.BLOCKED
+            reason = "w02 produced no consumer-ready staged regularity packets for downstream bounded use"
 
     m01_checkpoint = next(
         (
