@@ -57,6 +57,7 @@ HOSTED_CONTOUR_SEGMENTS = (
     "a04_external_affordance_binding",
     "w01_bounded_world_loop",
     "w02_regularity_extraction",
+    "w03_schema_consolidation",
     "m01_homeostatic_salience_imprint",
     "m02_predictive_relevance",
     "n01_narrative_commitments",
@@ -378,6 +379,19 @@ HOSTED_CONTOUR_FIELDS: dict[str, set[str]] = {
         "w02_consumer_ready",
         "w02_no_clean_regularities",
         "w02_must_abstain_count",
+    },
+    "w03_schema_consolidation": {
+        "w03_schema_candidate_count",
+        "w03_everyday_prior_count",
+        "w03_operational_default_count",
+        "w03_contested_count",
+        "w03_stale_count",
+        "w03_must_revalidate_count",
+        "w03_must_abstain_count",
+        "w03_contradiction_count",
+        "w03_version_update_count",
+        "w03_consumer_ready",
+        "w03_no_clean_schema",
     },
     "m01_homeostatic_salience_imprint": {
         "imprint_count",
@@ -938,6 +952,9 @@ def test_hosted_contour_segments_follow_real_runtime_order(tmp_path: Path) -> No
         events, "w02_regularity_extraction"
     )
     assert _first_order(events, "w02_regularity_extraction") < _first_order(
+        events, "w03_schema_consolidation"
+    )
+    assert _first_order(events, "w03_schema_consolidation") < _first_order(
         events, "m01_homeostatic_salience_imprint"
     )
     assert _first_order(events, "m01_homeostatic_salience_imprint") < _first_order(
@@ -1039,6 +1056,7 @@ def test_representative_modules_have_runtime_steps(tmp_path: Path) -> None:
         "a01_internal_affordance_ontology_cleanup",
         "w01_bounded_world_loop",
         "w02_regularity_extraction",
+        "w03_schema_consolidation",
         "m01_homeostatic_salience_imprint",
         "m02_predictive_relevance",
         "n01_narrative_commitments",

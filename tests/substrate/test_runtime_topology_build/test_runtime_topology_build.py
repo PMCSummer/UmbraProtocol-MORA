@@ -192,6 +192,7 @@ def test_runtime_topology_bundle_and_graph_are_materialized() -> None:
     assert "rt01.a04_external_affordance_binding_checkpoint" in graph.mandatory_checkpoint_ids
     assert "rt01.w01_bounded_world_loop_checkpoint" in graph.mandatory_checkpoint_ids
     assert "rt01.w02_regularity_extraction_checkpoint" in graph.mandatory_checkpoint_ids
+    assert "rt01.w03_schema_consolidation_checkpoint" in graph.mandatory_checkpoint_ids
     assert "rt01.m01_homeostatic_salience_imprint_checkpoint" in graph.mandatory_checkpoint_ids
     assert "rt01.m02_predictive_relevance_checkpoint" in graph.mandatory_checkpoint_ids
     assert "rt01.n01_narrative_commitments_checkpoint" in graph.mandatory_checkpoint_ids
@@ -237,6 +238,7 @@ def test_runtime_topology_bundle_and_graph_are_materialized() -> None:
     assert "a04_external_affordance_binding.external_affordance_binding_result" in graph.source_of_truth_surfaces
     assert "w01_bounded_world_loop.world_admission_result" in graph.source_of_truth_surfaces
     assert "w02_regularity_extraction.regularity_extraction_result" in graph.source_of_truth_surfaces
+    assert "w03_schema_consolidation.schema_consolidation_result" in graph.source_of_truth_surfaces
     assert "m01_homeostatic_salience_imprint.imprint_result" in graph.source_of_truth_surfaces
     assert "m02_predictive_relevance.predictive_relevance_result" in graph.source_of_truth_surfaces
     assert "n01_narrative_commitments.commitment_registry_result" in graph.source_of_truth_surfaces

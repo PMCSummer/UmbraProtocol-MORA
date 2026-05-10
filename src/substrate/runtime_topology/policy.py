@@ -480,6 +480,7 @@ def build_minimal_runtime_tick_graph() -> RuntimeTickGraph:
                     "rt01.p04_counterfactual_policy_simulation_checkpoint",
                     "rt01.w01_bounded_world_loop_checkpoint",
                     "rt01.w02_regularity_extraction_checkpoint",
+                    "rt01.w03_schema_consolidation_checkpoint",
                     "rt01.m01_homeostatic_salience_imprint_checkpoint",
                     "rt01.m02_predictive_relevance_checkpoint",
                     "rt01.n01_narrative_commitments_checkpoint",
@@ -520,6 +521,7 @@ def build_minimal_runtime_tick_graph() -> RuntimeTickGraph:
                     "rt01.p04_counterfactual_policy_simulation_checkpoint",
                     "rt01.w01_bounded_world_loop_checkpoint",
                     "rt01.w02_regularity_extraction_checkpoint",
+                    "rt01.w03_schema_consolidation_checkpoint",
                     "rt01.m01_homeostatic_salience_imprint_checkpoint",
                     "rt01.m02_predictive_relevance_checkpoint",
                     "rt01.n01_narrative_commitments_checkpoint",
@@ -640,6 +642,7 @@ def build_minimal_runtime_tick_graph() -> RuntimeTickGraph:
             "rt01.a04_external_affordance_binding_checkpoint",
             "rt01.w01_bounded_world_loop_checkpoint",
             "rt01.w02_regularity_extraction_checkpoint",
+            "rt01.w03_schema_consolidation_checkpoint",
             "rt01.m01_homeostatic_salience_imprint_checkpoint",
             "rt01.m02_predictive_relevance_checkpoint",
             "rt01.n01_narrative_commitments_checkpoint",
@@ -673,6 +676,7 @@ def build_minimal_runtime_tick_graph() -> RuntimeTickGraph:
             "rt01.p04_counterfactual_policy_simulation_checkpoint",
             "rt01.w01_bounded_world_loop_checkpoint",
             "rt01.w02_regularity_extraction_checkpoint",
+            "rt01.w03_schema_consolidation_checkpoint",
             "rt01.m01_homeostatic_salience_imprint_checkpoint",
             "rt01.m02_predictive_relevance_checkpoint",
             "rt01.n01_narrative_commitments_checkpoint",
@@ -694,6 +698,7 @@ def build_minimal_runtime_tick_graph() -> RuntimeTickGraph:
             "a04_external_affordance_binding.external_affordance_binding_result",
             "w01_bounded_world_loop.world_admission_result",
             "w02_regularity_extraction.regularity_extraction_result",
+            "w03_schema_consolidation.schema_consolidation_result",
             "m01_homeostatic_salience_imprint.imprint_result",
             "m02_predictive_relevance.predictive_relevance_result",
             "n01_narrative_commitments.commitment_registry_result",
@@ -781,6 +786,7 @@ def build_minimal_runtime_topology_bundle() -> RuntimeTopologyBundle:
             "a04_external_affordance_binding_contract",
             "w01_bounded_world_loop_contract",
             "w02_regularity_extraction_contract",
+            "w03_schema_consolidation_contract",
             "m01_homeostatic_salience_imprint_contract",
             "a_line_normalization_capability_contract",
             "m_minimal_memory_lifecycle_contract",
@@ -972,6 +978,7 @@ def _context_has_ablation_flags(context: SubjectTickContext | None) -> bool:
         or context.disable_a04_enforcement
         or context.disable_w01_enforcement
         or context.disable_w02_enforcement
+        or context.disable_w03_enforcement
         or context.disable_m01_enforcement
         or context.disable_m02_enforcement
         or context.disable_n01_enforcement

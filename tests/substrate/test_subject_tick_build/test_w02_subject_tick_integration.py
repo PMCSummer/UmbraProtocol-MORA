@@ -140,7 +140,13 @@ def test_same_checkpoint_envelope_with_different_w02_shape_changes_gate_behavior
     assert strong.state.w02_consumer_ready is True
     assert weak.state.w02_consumer_ready is False
     assert strong.downstream_gate.accepted is True
-    assert weak.downstream_gate.accepted is False
+    strong_restrictions = {item.value for item in strong.downstream_gate.restrictions}
+    weak_restrictions = {item.value for item in weak.downstream_gate.restrictions}
+    assert "w02_permission_packet_consumer_required" in weak_restrictions
+    assert "w02_no_clean_regularity_detour_required" not in strong_restrictions
+    assert "w02_no_clean_regularity_detour_required" in weak_restrictions
+    assert weak_restrictions != strong_restrictions
+    assert len(weak_restrictions) > len(strong_restrictions)
 
 
 def test_no_basis_path_does_not_fabricate_world_regularity() -> None:

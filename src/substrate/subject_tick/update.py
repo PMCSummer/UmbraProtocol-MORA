@@ -290,6 +290,11 @@ from substrate.w02_regularity_extraction import (
     build_w02_regularity_extraction,
     derive_w02_contract_view,
 )
+from substrate.w03_schema_consolidation import (
+    W03InputBundle,
+    build_w03_schema_consolidation,
+    derive_w03_contract_view,
+)
 from substrate.m01_homeostatic_salience_imprint import (
     M01InputBundle,
     build_m01_homeostatic_salience_imprint,
@@ -369,6 +374,7 @@ ATTEMPTED_SUBJECT_TICK_PATHS: tuple[str, ...] = (
     "subject_tick.evaluate_a04_external_affordance_binding",
     "subject_tick.evaluate_w01_bounded_world_loop",
     "subject_tick.evaluate_w02_regularity_extraction",
+    "subject_tick.evaluate_w03_schema_consolidation",
     "subject_tick.evaluate_m01_homeostatic_salience_imprint",
     "subject_tick.evaluate_m02_predictive_relevance",
     "subject_tick.evaluate_n01_narrative_commitments",
@@ -6603,6 +6609,161 @@ def execute_subject_tick(
         )
     )
 
+    w03_explicit_input = (
+        context.w03_input_bundle
+        if isinstance(context.w03_input_bundle, W03InputBundle)
+        else _build_default_w03_input_bundle(
+            tick_id=tick_id,
+            tick_index=tick_index,
+            w02_result=w02_result,
+            source_lineage=lineage,
+        )
+    )
+    w03_explicit_basis = bool(
+        w03_explicit_input is not None and w03_explicit_input.w02_regularity_records
+    )
+    w03_result = build_w03_schema_consolidation(
+        tick_id=tick_id,
+        tick_index=tick_index,
+        input_bundle=w03_explicit_input,
+        enforcement_enabled=True,
+    )
+    w03_view = derive_w03_contract_view(w03_result)
+    w03_trace_values = {
+        "w03_schema_candidate_count": w03_result.telemetry.schema_candidate_count,
+        "w03_everyday_prior_count": w03_result.telemetry.everyday_prior_count,
+        "w03_operational_default_count": w03_result.telemetry.operational_default_count,
+        "w03_contested_count": w03_result.telemetry.contested_count,
+        "w03_stale_count": w03_result.telemetry.stale_count,
+        "w03_must_revalidate_count": w03_result.telemetry.must_revalidate_count,
+        "w03_must_abstain_count": w03_result.telemetry.must_abstain_count,
+        "w03_contradiction_count": w03_result.telemetry.contradiction_count,
+        "w03_version_update_count": w03_result.telemetry.version_update_count,
+        "w03_consumer_ready": w03_result.gate.consumer_ready,
+        "w03_no_clean_schema": w03_result.gate.no_clean_schema,
+    }
+    trace_emit_active("w03_schema_consolidation", "enter", w03_trace_values)
+    w03_checkpoint_status = SubjectTickCheckpointStatus.ALLOWED
+    w03_checkpoint_reason = w03_result.reason
+    w03_default_no_clean_detour = False
+    w03_default_contradiction_review = False
+    w03_default_revalidation_required = False
+    w03_default_must_abstain_restriction = False
+    if not context.disable_w03_enforcement:
+        if (
+            context.require_w03_schema_packet_consumer
+            and not w03_view.consumer_ready
+            and halt_reason is None
+        ):
+            revalidation_needed = True
+            w03_checkpoint_status = SubjectTickCheckpointStatus.ENFORCED_DETOUR
+            w03_checkpoint_reason = (
+                "w03 schema packet consumer requested but typed schema/prior packets are not consumer-ready"
+            )
+            if active_execution_mode != "halt_execution":
+                active_execution_mode = "revalidate_scope"
+        if (
+            context.require_w03_contradiction_consumer
+            and w03_view.contradiction_count == 0
+            and halt_reason is None
+        ):
+            revalidation_needed = True
+            w03_checkpoint_status = SubjectTickCheckpointStatus.ENFORCED_DETOUR
+            w03_checkpoint_reason = (
+                "w03 contradiction consumer requested but contradiction-bearing schema consequences are absent"
+            )
+            if active_execution_mode != "halt_execution":
+                active_execution_mode = "revalidate_scope"
+        if w03_explicit_basis and w03_result.gate.no_clean_schema and halt_reason is None:
+            revalidation_needed = True
+            w03_default_no_clean_detour = True
+            if w03_checkpoint_status == SubjectTickCheckpointStatus.ALLOWED:
+                w03_checkpoint_status = SubjectTickCheckpointStatus.ENFORCED_DETOUR
+            w03_checkpoint_reason = (
+                "w03 explicit basis produced no-clean schema claims and requires bounded detour"
+            )
+            if active_execution_mode != "halt_execution":
+                active_execution_mode = "revalidate_scope"
+        if (
+            w03_explicit_basis
+            and w03_result.telemetry.contradiction_count > 0
+            and halt_reason is None
+        ):
+            revalidation_needed = True
+            w03_default_contradiction_review = True
+            if w03_checkpoint_status == SubjectTickCheckpointStatus.ALLOWED:
+                w03_checkpoint_status = SubjectTickCheckpointStatus.ENFORCED_DETOUR
+            w03_checkpoint_reason = (
+                "w03 contradiction consequences are active and require contradiction-preserving review"
+            )
+            if active_execution_mode != "halt_execution":
+                active_execution_mode = "revalidate_scope"
+        if (
+            w03_explicit_basis
+            and w03_result.telemetry.must_revalidate_count > 0
+            and halt_reason is None
+        ):
+            w03_default_revalidation_required = True
+            if (
+                w03_checkpoint_status == SubjectTickCheckpointStatus.ALLOWED
+                and active_execution_mode not in {"halt_execution", "revalidate_scope"}
+            ):
+                active_execution_mode = "revalidate_scope"
+                revalidation_needed = True
+        if (
+            w03_explicit_basis
+            and w03_result.telemetry.must_abstain_count > 0
+            and halt_reason is None
+        ):
+            revalidation_needed = True
+            w03_default_must_abstain_restriction = True
+            if w03_checkpoint_status == SubjectTickCheckpointStatus.ALLOWED:
+                w03_checkpoint_status = SubjectTickCheckpointStatus.ENFORCED_DETOUR
+            w03_checkpoint_reason = (
+                "w03 downstream schema permissions include must-abstain constraints"
+            )
+            if active_execution_mode != "halt_execution":
+                active_execution_mode = "revalidate_scope"
+    else:
+        w03_checkpoint_status = SubjectTickCheckpointStatus.ALLOWED
+        w03_checkpoint_reason = "W03 gate disabled in test fixture"
+
+    w03_required_actions: list[str] = []
+    if context.require_w03_schema_packet_consumer:
+        w03_required_actions.append("require_w03_schema_packet_consumer")
+    if context.require_w03_contradiction_consumer:
+        w03_required_actions.append("require_w03_contradiction_consumer")
+    if w03_default_no_clean_detour:
+        w03_required_actions.append("default_w03_no_clean_schema_detour")
+    if w03_default_contradiction_review:
+        w03_required_actions.append("default_w03_contradiction_review_required")
+    if w03_default_revalidation_required:
+        w03_required_actions.append("default_w03_revalidation_required")
+    if w03_default_must_abstain_restriction:
+        w03_required_actions.append("default_w03_must_abstain_restriction")
+    if not w03_required_actions:
+        w03_required_actions.append("w03_optional")
+
+    trace_emit_active("w03_schema_consolidation", "decision", w03_trace_values)
+    if w03_checkpoint_status != SubjectTickCheckpointStatus.ALLOWED:
+        trace_emit_active(
+            "w03_schema_consolidation",
+            "blocked",
+            w03_trace_values,
+            note=w03_checkpoint_reason,
+        )
+    trace_emit_active("w03_schema_consolidation", "exit", w03_trace_values)
+    checkpoints.append(
+        SubjectTickCheckpointResult(
+            checkpoint_id="rt01.w03_schema_consolidation_checkpoint",
+            source_contract="w03_schema_consolidation.schema_consolidation_result",
+            status=w03_checkpoint_status,
+            required_action=";".join(dict.fromkeys(w03_required_actions)),
+            applied_action=active_execution_mode,
+            reason=w03_checkpoint_reason,
+        )
+    )
+
     m01_explicit_input = (
         context.m01_input_bundle
         if isinstance(context.m01_input_bundle, M01InputBundle)
@@ -8240,6 +8401,20 @@ def execute_subject_tick(
         w02_must_abstain_count=w02_result.telemetry.must_abstain_count,
         w02_consumer_ready=w02_result.gate.consumer_ready,
         w02_no_clean_regularities=w02_result.telemetry.no_clean_regularities,
+        w03_checkpoint_present=True,
+        w03_explicit_basis_present=w03_explicit_basis,
+        w03_schema_candidate_count=w03_result.telemetry.schema_candidate_count,
+        w03_everyday_prior_count=w03_result.telemetry.everyday_prior_count,
+        w03_operational_default_count=w03_result.telemetry.operational_default_count,
+        w03_contested_count=w03_result.telemetry.contested_count,
+        w03_stale_count=w03_result.telemetry.stale_count,
+        w03_must_revalidate_count=w03_result.telemetry.must_revalidate_count,
+        w03_must_abstain_count=w03_result.telemetry.must_abstain_count,
+        w03_contradiction_count=w03_result.telemetry.contradiction_count,
+        w03_version_update_count=w03_result.telemetry.version_update_count,
+        w03_consumer_ready=w03_result.gate.consumer_ready,
+        w03_no_clean_schema=w03_result.gate.no_clean_schema,
+        w03_scope_marker=w03_result.scope_marker.scope,
         m01_imprint_count=m01_result.telemetry.imprint_count,
         m01_explicit_basis_present=m01_explicit_basis,
         m01_strong_imprint_count=m01_result.telemetry.strong_imprint_count,
@@ -8320,7 +8495,7 @@ def execute_subject_tick(
         attempted_paths=ATTEMPTED_SUBJECT_TICK_PATHS,
         downstream_gate=gate,
         causal_basis=(
-            "bounded runtime execution spine enforces roadmap authority roles for C04/C05, consumes world-entry, s01 efference-copy, s02 prediction-boundary seam, s03 ownership-weighted learning, s04 interoceptive self-binding, s05 multi-cause attribution, s-minimal, a01 affordance ontology cleanup, a02 capability-gap detection, a03 internal-tool affordance normalization, a-line, m-minimal, n-minimal, t01 semantic-field, t02 relation-binding, t03 hypothesis-competition, t04 attention-schema, o01 other-entity modeling, o02 intersubjective allostasis, o03 strategy-class evaluation, p01 authority-bounded project-formation, o04 rupture/hostility/coercion dynamics, r05 bounded protective regulation gates, v01 act-level normative licensing/commitment guards, v02 typed utterance-plan bridge constraints, v03 constrained realization alignment/report contract, c06 typed surfacing-candidates handoff, p02 typed intervention episodes, p03 typed long-horizon credit assignment, p04 typed interpersonal counterfactual policy simulation, a04 staged external-affordance binding, w01 bounded world-loop admission, w02 staged regularity extraction, m01 homeostatic salience imprint, m02 predictive relevance, n01 narrative commitments, n02 identity-drift reflection, and n03 autobiographical relevance before bounded outcome resolution, while keeping D01 observability-only over fixed R->C order"
+            "bounded runtime execution spine enforces roadmap authority roles for C04/C05, consumes world-entry, s01 efference-copy, s02 prediction-boundary seam, s03 ownership-weighted learning, s04 interoceptive self-binding, s05 multi-cause attribution, s-minimal, a01 affordance ontology cleanup, a02 capability-gap detection, a03 internal-tool affordance normalization, a-line, m-minimal, n-minimal, t01 semantic-field, t02 relation-binding, t03 hypothesis-competition, t04 attention-schema, o01 other-entity modeling, o02 intersubjective allostasis, o03 strategy-class evaluation, p01 authority-bounded project-formation, o04 rupture/hostility/coercion dynamics, r05 bounded protective regulation gates, v01 act-level normative licensing/commitment guards, v02 typed utterance-plan bridge constraints, v03 constrained realization alignment/report contract, c06 typed surfacing-candidates handoff, p02 typed intervention episodes, p03 typed long-horizon credit assignment, p04 typed interpersonal counterfactual policy simulation, a04 staged external-affordance binding, w01 bounded world-loop admission, w02 staged regularity extraction, w03 schema consolidation, m01 homeostatic salience imprint, m02 predictive relevance, n01 narrative commitments, n02 identity-drift reflection, and n03 autobiographical relevance before bounded outcome resolution, while keeping D01 observability-only over fixed R->C order"
         ),
     )
     abstain = final_outcome in {SubjectTickOutcome.REPAIR, SubjectTickOutcome.REVALIDATE}
@@ -8406,6 +8581,7 @@ def execute_subject_tick(
         a04_result=a04_result,
         w01_result=w01_result,
         w02_result=w02_result,
+        w03_result=w03_result,
         m01_result=m01_result,
         m02_result=m02_result,
         n01_result=n01_result,
@@ -9128,6 +9304,29 @@ def _build_default_w02_input_bundle(
         traces=tuple(traces),
         source_lineage=source_lineage,
         reason="default projection from w01 admission records",
+    )
+
+
+def _build_default_w03_input_bundle(
+    *,
+    tick_id: str,
+    tick_index: int,
+    w02_result,
+    source_lineage: tuple[str, ...],
+) -> W03InputBundle | None:
+    regularities = tuple(getattr(w02_result, "regularity_records", ()))
+    permissions = tuple(getattr(w02_result, "downstream_permission_packets", ()))
+    contradictions = tuple(getattr(w02_result, "contradiction_ledger", ()))
+    if not regularities:
+        return None
+    return W03InputBundle(
+        bundle_id=f"w03:{tick_id}:default_bundle",
+        source_lineage=source_lineage,
+        w02_regularity_records=regularities,
+        w02_permission_packets=permissions,
+        w02_contradiction_ledger=contradictions,
+        reason="default projection from w02 regularity extraction result",
+        previous_schema_versions=(),
     )
 
 

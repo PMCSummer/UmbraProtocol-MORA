@@ -55,6 +55,7 @@ def evaluate_subject_tick_downstream_gate(
         SubjectTickRestrictionCode.A04_EXTERNAL_AFFORDANCE_BINDING_CONTRACT_MUST_BE_READ,
         SubjectTickRestrictionCode.W01_BOUNDED_WORLD_LOOP_CONTRACT_MUST_BE_READ,
         SubjectTickRestrictionCode.W02_REGULARITY_EXTRACTION_CONTRACT_MUST_BE_READ,
+        SubjectTickRestrictionCode.W03_SCHEMA_CONSOLIDATION_CONTRACT_MUST_BE_READ,
         SubjectTickRestrictionCode.M01_HOMEOSTATIC_IMPRINT_CONTRACT_MUST_BE_READ,
         SubjectTickRestrictionCode.N01_NARRATIVE_COMMITMENT_CONTRACT_MUST_BE_READ,
         SubjectTickRestrictionCode.N02_IDENTITY_DRIFT_CONTRACT_MUST_BE_READ,
@@ -2322,6 +2323,64 @@ def evaluate_subject_tick_downstream_gate(
             accepted = False
             usability = SubjectTickUsabilityClass.BLOCKED
             reason = "w02 produced no consumer-ready staged regularity packets for downstream bounded use"
+
+    w03_checkpoint = next(
+        (
+            checkpoint
+            for checkpoint in state.execution_checkpoints
+            if checkpoint.checkpoint_id == "rt01.w03_schema_consolidation_checkpoint"
+        ),
+        None,
+    )
+    if w03_checkpoint is not None:
+        if "require_w03_schema_packet_consumer" in w03_checkpoint.required_action:
+            restrictions.append(SubjectTickRestrictionCode.W03_SCHEMA_PACKET_CONSUMER_REQUIRED)
+        if "require_w03_contradiction_consumer" in w03_checkpoint.required_action:
+            restrictions.append(SubjectTickRestrictionCode.W03_CONTRADICTION_REVIEW_REQUIRED)
+        if "default_w03_no_clean_schema_detour" in w03_checkpoint.required_action:
+            restrictions.append(SubjectTickRestrictionCode.W03_NO_CLEAN_SCHEMA_DETOUR_REQUIRED)
+        if "default_w03_contradiction_review_required" in w03_checkpoint.required_action:
+            restrictions.append(SubjectTickRestrictionCode.W03_CONTRADICTION_REVIEW_REQUIRED)
+        if "default_w03_revalidation_required" in w03_checkpoint.required_action:
+            restrictions.append(SubjectTickRestrictionCode.W03_STALE_SCHEMA_REVALIDATION_REQUIRED)
+        if "default_w03_must_abstain_restriction" in w03_checkpoint.required_action:
+            restrictions.append(SubjectTickRestrictionCode.W03_MUST_ABSTAIN_RESTRICTION)
+
+    w03_basis_present = bool(state.w03_explicit_basis_present)
+    if w03_basis_present and state.w03_no_clean_schema:
+        restrictions.append(SubjectTickRestrictionCode.W03_NO_CLEAN_SCHEMA_DETOUR_REQUIRED)
+        if (
+            state.final_execution_outcome == SubjectTickOutcome.CONTINUE
+            and usability == SubjectTickUsabilityClass.USABLE_BOUNDED
+        ):
+            usability = SubjectTickUsabilityClass.DEGRADED_BOUNDED
+            reason = "w03 explicit basis produced no-clean schema claims and requires bounded detour"
+    if w03_basis_present and state.w03_contradiction_count > 0:
+        restrictions.append(SubjectTickRestrictionCode.W03_CONTRADICTION_REVIEW_REQUIRED)
+        if state.final_execution_outcome == SubjectTickOutcome.CONTINUE:
+            accepted = False
+            usability = SubjectTickUsabilityClass.BLOCKED
+            reason = "w03 contradiction consequences require contradiction-preserving review before schema transfer"
+    if w03_basis_present and state.w03_stale_count > 0:
+        restrictions.append(SubjectTickRestrictionCode.W03_STALE_SCHEMA_REVALIDATION_REQUIRED)
+    if w03_basis_present and state.w03_must_revalidate_count > 0:
+        restrictions.append(SubjectTickRestrictionCode.W03_STALE_SCHEMA_REVALIDATION_REQUIRED)
+    if w03_basis_present and state.w03_must_abstain_count > 0:
+        restrictions.append(SubjectTickRestrictionCode.W03_MUST_ABSTAIN_RESTRICTION)
+        if (
+            state.final_execution_outcome == SubjectTickOutcome.CONTINUE
+            and usability == SubjectTickUsabilityClass.USABLE_BOUNDED
+        ):
+            usability = SubjectTickUsabilityClass.DEGRADED_BOUNDED
+            reason = "w03 schema permissions include must-abstain constraints"
+    if w03_basis_present and not state.w03_consumer_ready:
+        restrictions.append(SubjectTickRestrictionCode.W03_SCHEMA_PACKET_CONSUMER_REQUIRED)
+    if w03_basis_present and not state.w03_consumer_ready:
+        restrictions.append(SubjectTickRestrictionCode.DOWNSTREAM_AUTHORITY_DEGRADED)
+        if state.final_execution_outcome == SubjectTickOutcome.CONTINUE:
+            accepted = False
+            usability = SubjectTickUsabilityClass.BLOCKED
+            reason = "w03 produced no consumer-ready schema/prior packets for bounded downstream use"
 
     m01_checkpoint = next(
         (

@@ -86,6 +86,10 @@ if TYPE_CHECKING:
         W02InputBundle,
         W02ResultBundle,
     )
+    from substrate.w03_schema_consolidation import (
+        W03InputBundle,
+        W03ResultBundle,
+    )
     from substrate.m01_homeostatic_salience_imprint import (
         M01InputBundle,
         M01Result,
@@ -542,6 +546,14 @@ class SubjectTickRestrictionCode(StrEnum):
     W02_CONTRADICTION_REVIEW_REQUIRED = "w02_contradiction_review_required"
     W02_NO_CLEAN_REGULARITY_DETOUR_REQUIRED = "w02_no_clean_regularity_detour_required"
     W02_MUST_ABSTAIN_RESTRICTION = "w02_must_abstain_restriction"
+    W03_SCHEMA_CONSOLIDATION_CONTRACT_MUST_BE_READ = (
+        "w03_schema_consolidation_contract_must_be_read"
+    )
+    W03_SCHEMA_PACKET_CONSUMER_REQUIRED = "w03_schema_packet_consumer_required"
+    W03_CONTRADICTION_REVIEW_REQUIRED = "w03_contradiction_review_required"
+    W03_NO_CLEAN_SCHEMA_DETOUR_REQUIRED = "w03_no_clean_schema_detour_required"
+    W03_STALE_SCHEMA_REVALIDATION_REQUIRED = "w03_stale_schema_revalidation_required"
+    W03_MUST_ABSTAIN_RESTRICTION = "w03_must_abstain_restriction"
     M01_HOMEOSTATIC_IMPRINT_CONTRACT_MUST_BE_READ = (
         "m01_homeostatic_imprint_contract_must_be_read"
     )
@@ -808,6 +820,9 @@ class SubjectTickContext:
     require_w02_permission_packet_consumer: bool = False
     require_w02_contradiction_consumer: bool = False
     disable_w02_enforcement: bool = False
+    require_w03_schema_packet_consumer: bool = False
+    require_w03_contradiction_consumer: bool = False
+    disable_w03_enforcement: bool = False
     require_m01_imprint_packet_consumer: bool = False
     require_m01_axis_scope_consumer: bool = False
     disable_m01_enforcement: bool = False
@@ -842,6 +857,7 @@ class SubjectTickContext:
     a04_external_candidate_set: A04ExternalAffordanceCandidateSet | None = None
     w01_world_packet_set: W01WorldPacketSet | None = None
     w02_input_bundle: W02InputBundle | None = None
+    w03_input_bundle: W03InputBundle | None = None
     m01_input_bundle: M01InputBundle | None = None
     m02_input_bundle: M02InputBundle | None = None
     n01_input_bundle: N01InputBundle | None = None
@@ -1534,6 +1550,20 @@ class SubjectTickState:
     w02_must_abstain_count: int = 0
     w02_consumer_ready: bool = False
     w02_no_clean_regularities: bool = True
+    w03_checkpoint_present: bool = False
+    w03_explicit_basis_present: bool = False
+    w03_schema_candidate_count: int = 0
+    w03_everyday_prior_count: int = 0
+    w03_operational_default_count: int = 0
+    w03_contested_count: int = 0
+    w03_stale_count: int = 0
+    w03_must_revalidate_count: int = 0
+    w03_must_abstain_count: int = 0
+    w03_contradiction_count: int = 0
+    w03_version_update_count: int = 0
+    w03_consumer_ready: bool = False
+    w03_no_clean_schema: bool = True
+    w03_scope_marker: str = ""
     m01_imprint_count: int = 0
     m01_explicit_basis_present: bool = False
     m01_strong_imprint_count: int = 0
@@ -1933,6 +1963,7 @@ class SubjectTickResult:
     a04_result: A04ExternalAffordanceBindingResult
     w01_result: W01Result
     w02_result: W02ResultBundle
+    w03_result: W03ResultBundle
     m01_result: M01Result
     m02_result: M02Result
     n01_result: N01Result
