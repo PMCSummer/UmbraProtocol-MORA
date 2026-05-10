@@ -57,6 +57,7 @@ def evaluate_subject_tick_downstream_gate(
         SubjectTickRestrictionCode.M01_HOMEOSTATIC_IMPRINT_CONTRACT_MUST_BE_READ,
         SubjectTickRestrictionCode.N01_NARRATIVE_COMMITMENT_CONTRACT_MUST_BE_READ,
         SubjectTickRestrictionCode.N02_IDENTITY_DRIFT_CONTRACT_MUST_BE_READ,
+        SubjectTickRestrictionCode.N03_AUTOBIOGRAPHICAL_RELEVANCE_CONTRACT_MUST_BE_READ,
         SubjectTickRestrictionCode.M_MINIMAL_CONTOUR_CONTRACT_MUST_BE_READ,
         SubjectTickRestrictionCode.M_FORBIDDEN_SHORTCUTS_MUST_BE_READ,
         SubjectTickRestrictionCode.N_MINIMAL_CONTOUR_CONTRACT_MUST_BE_READ,
@@ -2482,6 +2483,54 @@ def evaluate_subject_tick_downstream_gate(
             accepted = False
             usability = SubjectTickUsabilityClass.BLOCKED
             reason = "n02 produced no consumer-ready identity drift reflection packet for downstream consistency use"
+
+    n03_checkpoint = next(
+        (
+            checkpoint
+            for checkpoint in state.execution_checkpoints
+            if checkpoint.checkpoint_id == "rt01.n03_autobiographical_relevance_checkpoint"
+        ),
+        None,
+    )
+    if n03_checkpoint is not None:
+        if "require_n03_transfer_packet_consumer" in n03_checkpoint.required_action:
+            restrictions.append(SubjectTickRestrictionCode.N03_TRANSFER_PACKET_CONSUMER_REQUIRED)
+        if "require_n03_consistency_consumer" in n03_checkpoint.required_action:
+            restrictions.append(SubjectTickRestrictionCode.N03_CONSISTENCY_CONSUMER_REQUIRED)
+        if "default_n03_conflict_review_required" in n03_checkpoint.required_action:
+            restrictions.append(SubjectTickRestrictionCode.N03_CONFLICT_REVIEW_REQUIRED)
+        if "default_n03_blocked_transfer_detour" in n03_checkpoint.required_action:
+            restrictions.append(SubjectTickRestrictionCode.N03_BLOCKED_TRANSFER_DETOUR_REQUIRED)
+        if "default_n03_caution_route" in n03_checkpoint.required_action:
+            restrictions.append(SubjectTickRestrictionCode.N03_CAUTION_ROUTE_REQUIRED)
+
+    n03_basis_present = bool(state.n03_explicit_basis_present)
+    if n03_basis_present and state.n03_conflict_count > 0:
+        restrictions.append(SubjectTickRestrictionCode.N03_CONFLICT_REVIEW_REQUIRED)
+        if state.final_execution_outcome == SubjectTickOutcome.CONTINUE:
+            accepted = False
+            usability = SubjectTickUsabilityClass.BLOCKED
+            reason = "n03 conflicting autobiographical guidance requires conflict review before transfer"
+    if n03_basis_present and state.n03_blocked_transfer_count > 0 and state.n03_relevant_trace_count == 0:
+        restrictions.append(SubjectTickRestrictionCode.N03_BLOCKED_TRANSFER_DETOUR_REQUIRED)
+        if (
+            state.final_execution_outcome == SubjectTickOutcome.CONTINUE
+            and usability == SubjectTickUsabilityClass.USABLE_BOUNDED
+        ):
+            usability = SubjectTickUsabilityClass.DEGRADED_BOUNDED
+            reason = "n03 explicit basis produced blocked/no-safe autobiographical transfer path"
+    if n03_basis_present and state.n03_provisional_transfer_count > 0:
+        restrictions.append(SubjectTickRestrictionCode.N03_CAUTION_ROUTE_REQUIRED)
+    if n03_basis_present and not state.n03_transfer_packet_consumer_ready:
+        restrictions.append(SubjectTickRestrictionCode.N03_TRANSFER_PACKET_CONSUMER_REQUIRED)
+    if n03_basis_present and not state.n03_consistency_consumer_ready:
+        restrictions.append(SubjectTickRestrictionCode.N03_CONSISTENCY_CONSUMER_REQUIRED)
+    if n03_basis_present and not state.n03_consumer_ready:
+        restrictions.append(SubjectTickRestrictionCode.DOWNSTREAM_AUTHORITY_DEGRADED)
+        if state.final_execution_outcome == SubjectTickOutcome.CONTINUE:
+            accepted = False
+            usability = SubjectTickUsabilityClass.BLOCKED
+            reason = "n03 produced no consumer-ready autobiographical relevance packet for bounded transfer use"
 
     return SubjectTickGateDecision(
         accepted=accepted,

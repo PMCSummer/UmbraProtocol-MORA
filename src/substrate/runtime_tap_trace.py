@@ -411,6 +411,15 @@ MODULE_ALLOWED_FIELDS: dict[str, tuple[str, ...]] = {
         "n02_stable_continuation_count",
         "n02_bounded_revision_count",
     ),
+    "n03_autobiographical_relevance": (
+        "n03_relevance_entry_count",
+        "n03_relevant_trace_count",
+        "n03_blocked_transfer_count",
+        "n03_conflict_count",
+        "n03_provisional_transfer_count",
+        "n03_consumer_ready",
+        "n03_primary_transfer_decision",
+    ),
     "s_minimal_contour": (
         "minimal_self_status",
         "minimal_self_ready",

@@ -98,6 +98,10 @@ if TYPE_CHECKING:
         N02InputBundle,
         N02Result,
     )
+    from substrate.n03_autobiographical_relevance import (
+        N03InputBundle,
+        N03Result,
+    )
     from substrate.p01_project_formation import (
         P01IntentionStackState,
         P01ProjectFormationResult,
@@ -563,6 +567,14 @@ class SubjectTickRestrictionCode(StrEnum):
     N02_BASELINE_UNCERTAIN_RECHECK_REQUIRED = "n02_baseline_uncertain_recheck_required"
     N02_CAUTION_ROUTE_REQUIRED = "n02_caution_route_required"
     N02_TEXT_DIFF_ONLY_BLOCKED_RESTRICTION = "n02_text_diff_only_blocked_restriction"
+    N03_AUTOBIOGRAPHICAL_RELEVANCE_CONTRACT_MUST_BE_READ = (
+        "n03_autobiographical_relevance_contract_must_be_read"
+    )
+    N03_TRANSFER_PACKET_CONSUMER_REQUIRED = "n03_transfer_packet_consumer_required"
+    N03_CONSISTENCY_CONSUMER_REQUIRED = "n03_consistency_consumer_required"
+    N03_CONFLICT_REVIEW_REQUIRED = "n03_conflict_review_required"
+    N03_BLOCKED_TRANSFER_DETOUR_REQUIRED = "n03_blocked_transfer_detour_required"
+    N03_CAUTION_ROUTE_REQUIRED = "n03_caution_route_required"
     DOWNSTREAM_AUTHORITY_DEGRADED = "downstream_authority_degraded"
 
 
@@ -796,6 +808,9 @@ class SubjectTickContext:
     require_n02_reflection_consumer: bool = False
     require_n02_consistency_consumer: bool = False
     disable_n02_enforcement: bool = False
+    require_n03_transfer_packet_consumer: bool = False
+    require_n03_consistency_consumer: bool = False
+    disable_n03_enforcement: bool = False
     o01_entity_signals: tuple[O01EntitySignal, ...] = ()
     o02_interaction_diagnostics: O02InteractionDiagnosticsInput | None = None
     o03_candidate_strategy: O03CandidateStrategyInput | None = None
@@ -818,6 +833,7 @@ class SubjectTickContext:
     m02_input_bundle: M02InputBundle | None = None
     n01_input_bundle: N01InputBundle | None = None
     n02_input_bundle: N02InputBundle | None = None
+    n03_input_bundle: N03InputBundle | None = None
     g08_appraisal_significance_hint: float | None = None
     source_lineage: tuple[str, ...] = ()
 
@@ -1540,6 +1556,20 @@ class SubjectTickState:
     n02_text_diff_only_blocked_count: int = 0
     n02_stable_continuation_count: int = 0
     n02_bounded_revision_count: int = 0
+    n03_checkpoint_present: bool = False
+    n03_explicit_basis_present: bool = False
+    n03_consumer_ready: bool = False
+    n03_transfer_packet_consumer_ready: bool = False
+    n03_consistency_consumer_ready: bool = False
+    n03_relevant_trace_count: int = 0
+    n03_blocked_transfer_count: int = 0
+    n03_conflict_count: int = 0
+    n03_provisional_transfer_count: int = 0
+    n03_no_safe_transfer_count: int = 0
+    n03_strongest_relevance_kind: str = "none"
+    n03_primary_transfer_decision: str = "none"
+    n03_restriction_reason: str = ""
+    n03_scope_marker: str = ""
 
 
 @dataclass(frozen=True, slots=True)
@@ -1881,6 +1911,7 @@ class SubjectTickResult:
     m02_result: M02Result
     n01_result: N01Result
     n02_result: N02Result
+    n03_result: N03Result
     a_line_result: ALineNormalizationResult
     m_minimal_result: MMinimalResult
     n_minimal_result: NMinimalResult

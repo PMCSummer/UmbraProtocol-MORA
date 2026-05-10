@@ -195,6 +195,7 @@ def test_runtime_topology_bundle_and_graph_are_materialized() -> None:
     assert "rt01.m02_predictive_relevance_checkpoint" in graph.mandatory_checkpoint_ids
     assert "rt01.n01_narrative_commitments_checkpoint" in graph.mandatory_checkpoint_ids
     assert "rt01.n02_identity_drift_reflection_checkpoint" in graph.mandatory_checkpoint_ids
+    assert "rt01.n03_autobiographical_relevance_checkpoint" in graph.mandatory_checkpoint_ids
     assert "rt01.a_line_normalization_checkpoint" in graph.mandatory_checkpoint_ids
     assert "rt01.m_minimal_contour_checkpoint" in graph.mandatory_checkpoint_ids
     assert "rt01.n_minimal_contour_checkpoint" in graph.mandatory_checkpoint_ids
@@ -238,6 +239,7 @@ def test_runtime_topology_bundle_and_graph_are_materialized() -> None:
     assert "m02_predictive_relevance.predictive_relevance_result" in graph.source_of_truth_surfaces
     assert "n01_narrative_commitments.commitment_registry_result" in graph.source_of_truth_surfaces
     assert "n02_identity_drift_reflection.identity_drift_result" in graph.source_of_truth_surfaces
+    assert "n03_autobiographical_relevance.autobiographical_relevance_result" in graph.source_of_truth_surfaces
     assert "a_line_normalization.capability_state" in graph.source_of_truth_surfaces
     assert "m_minimal.lifecycle_state" in graph.source_of_truth_surfaces
     assert "n_minimal.commitment_state" in graph.source_of_truth_surfaces

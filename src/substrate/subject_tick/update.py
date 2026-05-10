@@ -302,6 +302,15 @@ from substrate.n02_identity_drift_reflection import (
     build_n02_identity_drift_reflection,
     derive_n02_contract_view,
 )
+from substrate.n03_autobiographical_relevance import (
+    N03InputBundle,
+    N03TraceCandidate,
+    N03CurrentTarget,
+    N03CurrentTargetKind,
+    N03AutobiographicalTraceKind,
+    build_n03_autobiographical_relevance,
+    derive_n03_contract_view,
+)
 from substrate.s01_efference_copy import (
     S01EfferenceCopyState,
     build_s01_efference_copy,
@@ -355,6 +364,7 @@ ATTEMPTED_SUBJECT_TICK_PATHS: tuple[str, ...] = (
     "subject_tick.evaluate_m02_predictive_relevance",
     "subject_tick.evaluate_n01_narrative_commitments",
     "subject_tick.evaluate_n02_identity_drift_reflection",
+    "subject_tick.evaluate_n03_autobiographical_relevance",
     "subject_tick.world_seam_enforcement",
     "subject_tick.resolve_bounded_runtime_outcome",
     "subject_tick.downstream_gate",
@@ -6964,6 +6974,138 @@ def execute_subject_tick(
         )
     )
 
+    n03_explicit_input = (
+        context.n03_input_bundle
+        if isinstance(context.n03_input_bundle, N03InputBundle)
+        else None
+    )
+    n03_explicit_basis = bool(
+        n03_explicit_input is not None
+        and n03_explicit_input.trace_candidates
+        and n03_explicit_input.current_targets
+    )
+    n03_result = build_n03_autobiographical_relevance(
+        tick_id=tick_id,
+        tick_index=tick_index,
+        input_bundle=n03_explicit_input,
+        relevance_enabled=True,
+    )
+    n03_view = derive_n03_contract_view(n03_result)
+    n03_trace_values = {
+        "n03_relevance_entry_count": n03_result.telemetry.relevance_entry_count,
+        "n03_relevant_trace_count": n03_result.telemetry.relevant_trace_count,
+        "n03_blocked_transfer_count": n03_result.telemetry.blocked_transfer_count,
+        "n03_conflict_count": n03_result.telemetry.conflict_count,
+        "n03_provisional_transfer_count": n03_result.telemetry.provisional_transfer_count,
+        "n03_consumer_ready": n03_result.gate.consumer_ready,
+        "n03_primary_transfer_decision": (
+            n03_result.relevance_entries[0].transfer_decision.value if n03_result.relevance_entries else "none"
+        ),
+    }
+    trace_emit_active("n03_autobiographical_relevance", "enter", n03_trace_values)
+    n03_checkpoint_status = SubjectTickCheckpointStatus.ALLOWED
+    n03_checkpoint_reason = n03_result.reason
+    n03_default_conflict_review = False
+    n03_default_blocked_transfer_detour = False
+    n03_default_caution_route = False
+    if not context.disable_n03_enforcement:
+        if (
+            context.require_n03_transfer_packet_consumer
+            and not n03_view.transfer_packet_consumer_ready
+            and halt_reason is None
+        ):
+            revalidation_needed = True
+            n03_checkpoint_status = SubjectTickCheckpointStatus.ENFORCED_DETOUR
+            n03_checkpoint_reason = (
+                "n03 transfer packet consumer requested but autobiographical relevance packets are not ready"
+            )
+            if active_execution_mode != "halt_execution":
+                active_execution_mode = "revalidate_scope"
+        if (
+            context.require_n03_consistency_consumer
+            and not n03_view.consistency_consumer_ready
+            and halt_reason is None
+        ):
+            revalidation_needed = True
+            n03_checkpoint_status = SubjectTickCheckpointStatus.ENFORCED_DETOUR
+            n03_checkpoint_reason = (
+                "n03 consistency consumer requested but autobiographical conflicts remain unresolved"
+            )
+            if active_execution_mode != "halt_execution":
+                active_execution_mode = "revalidate_scope"
+        if (
+            n03_explicit_basis
+            and n03_result.telemetry.conflict_count > 0
+            and halt_reason is None
+        ):
+            revalidation_needed = True
+            n03_default_conflict_review = True
+            if n03_checkpoint_status == SubjectTickCheckpointStatus.ALLOWED:
+                n03_checkpoint_status = SubjectTickCheckpointStatus.ENFORCED_DETOUR
+            n03_checkpoint_reason = (
+                "n03 conflicting autobiographical guidance requires conflict review before transfer"
+            )
+            if active_execution_mode != "halt_execution":
+                active_execution_mode = "revalidate_scope"
+        if (
+            n03_explicit_basis
+            and n03_result.telemetry.blocked_transfer_count > 0
+            and n03_result.telemetry.relevant_trace_count == 0
+            and halt_reason is None
+        ):
+            revalidation_needed = True
+            n03_default_blocked_transfer_detour = True
+            if n03_checkpoint_status == SubjectTickCheckpointStatus.ALLOWED:
+                n03_checkpoint_status = SubjectTickCheckpointStatus.ENFORCED_DETOUR
+            n03_checkpoint_reason = (
+                "n03 explicit basis produced blocked/no-safe transfer and requires bounded detour"
+            )
+            if active_execution_mode != "halt_execution":
+                active_execution_mode = "revalidate_scope"
+        if (
+            n03_explicit_basis
+            and n03_result.telemetry.provisional_transfer_count > 0
+            and halt_reason is None
+        ):
+            n03_default_caution_route = True
+    else:
+        n03_checkpoint_status = SubjectTickCheckpointStatus.ALLOWED
+        n03_checkpoint_reason = "N03 gate disabled in test fixture"
+
+    n03_required_actions: list[str] = []
+    if context.require_n03_transfer_packet_consumer:
+        n03_required_actions.append("require_n03_transfer_packet_consumer")
+    if context.require_n03_consistency_consumer:
+        n03_required_actions.append("require_n03_consistency_consumer")
+    if n03_default_conflict_review:
+        n03_required_actions.append("default_n03_conflict_review_required")
+    if n03_default_blocked_transfer_detour:
+        n03_required_actions.append("default_n03_blocked_transfer_detour")
+    if n03_default_caution_route:
+        n03_required_actions.append("default_n03_caution_route")
+    if not n03_required_actions:
+        n03_required_actions.append("n03_optional")
+
+    trace_emit_active("n03_autobiographical_relevance", "decision", n03_trace_values)
+    if n03_checkpoint_status != SubjectTickCheckpointStatus.ALLOWED:
+        trace_emit_active(
+            "n03_autobiographical_relevance",
+            "blocked",
+            n03_trace_values,
+            note=n03_checkpoint_reason,
+        )
+    trace_emit_active("n03_autobiographical_relevance", "exit", n03_trace_values)
+    checkpoints.append(
+        SubjectTickCheckpointResult(
+            checkpoint_id="rt01.n03_autobiographical_relevance_checkpoint",
+            source_contract="n03_autobiographical_relevance.autobiographical_relevance_result",
+            status=n03_checkpoint_status,
+            required_action=";".join(dict.fromkeys(n03_required_actions)),
+            applied_action=active_execution_mode,
+            reason=n03_checkpoint_reason,
+        )
+    )
+
     if halt_reason is not None:
         final_outcome = SubjectTickOutcome.HALT
         execution_stance = SubjectTickExecutionStance.HALT_PATH
@@ -7999,6 +8141,28 @@ def execute_subject_tick(
         n02_text_diff_only_blocked_count=n02_result.telemetry.text_diff_only_blocked_count,
         n02_stable_continuation_count=n02_result.telemetry.stable_continuation_count,
         n02_bounded_revision_count=n02_result.telemetry.bounded_revision_count,
+        n03_checkpoint_present=True,
+        n03_explicit_basis_present=n03_explicit_basis,
+        n03_consumer_ready=n03_result.gate.consumer_ready,
+        n03_transfer_packet_consumer_ready=n03_result.gate.transfer_packet_consumer_ready,
+        n03_consistency_consumer_ready=n03_result.gate.consistency_consumer_ready,
+        n03_relevant_trace_count=n03_result.telemetry.relevant_trace_count,
+        n03_blocked_transfer_count=n03_result.telemetry.blocked_transfer_count,
+        n03_conflict_count=n03_result.telemetry.conflict_count,
+        n03_provisional_transfer_count=n03_result.telemetry.provisional_transfer_count,
+        n03_no_safe_transfer_count=n03_result.telemetry.no_safe_transfer_count,
+        n03_strongest_relevance_kind=(
+            max(n03_result.relevance_entries, key=lambda item: item.relevance_strength).relevance_kind.value
+            if n03_result.relevance_entries
+            else "none"
+        ),
+        n03_primary_transfer_decision=(
+            max(n03_result.relevance_entries, key=lambda item: item.relevance_strength).transfer_decision.value
+            if n03_result.relevance_entries
+            else "none"
+        ),
+        n03_restriction_reason=n03_result.gate.reason,
+        n03_scope_marker=n03_result.scope_marker.scope,
     )
     gate = evaluate_subject_tick_downstream_gate(state)
     telemetry = build_subject_tick_telemetry(
@@ -8006,7 +8170,7 @@ def execute_subject_tick(
         attempted_paths=ATTEMPTED_SUBJECT_TICK_PATHS,
         downstream_gate=gate,
         causal_basis=(
-            "bounded runtime execution spine enforces roadmap authority roles for C04/C05, consumes world-entry, s01 efference-copy, s02 prediction-boundary seam, s03 ownership-weighted learning, s04 interoceptive self-binding, s05 multi-cause attribution, s-minimal, a01 affordance ontology cleanup, a02 capability-gap detection, a03 internal-tool affordance normalization, a-line, m-minimal, n-minimal, t01 semantic-field, t02 relation-binding, t03 hypothesis-competition, t04 attention-schema, o01 other-entity modeling, o02 intersubjective allostasis, o03 strategy-class evaluation, p01 authority-bounded project-formation, o04 rupture/hostility/coercion dynamics, r05 bounded protective regulation gates, v01 act-level normative licensing/commitment guards, v02 typed utterance-plan bridge constraints, v03 constrained realization alignment/report contract, c06 typed surfacing-candidates handoff, p02 typed intervention episodes, p03 typed long-horizon credit assignment, p04 typed interpersonal counterfactual policy simulation, a04 staged external-affordance binding, w01 bounded world-loop admission, m01 homeostatic salience imprint, m02 predictive relevance, and n02 identity-drift reflection before bounded outcome resolution, while keeping D01 observability-only over fixed R->C order"
+            "bounded runtime execution spine enforces roadmap authority roles for C04/C05, consumes world-entry, s01 efference-copy, s02 prediction-boundary seam, s03 ownership-weighted learning, s04 interoceptive self-binding, s05 multi-cause attribution, s-minimal, a01 affordance ontology cleanup, a02 capability-gap detection, a03 internal-tool affordance normalization, a-line, m-minimal, n-minimal, t01 semantic-field, t02 relation-binding, t03 hypothesis-competition, t04 attention-schema, o01 other-entity modeling, o02 intersubjective allostasis, o03 strategy-class evaluation, p01 authority-bounded project-formation, o04 rupture/hostility/coercion dynamics, r05 bounded protective regulation gates, v01 act-level normative licensing/commitment guards, v02 typed utterance-plan bridge constraints, v03 constrained realization alignment/report contract, c06 typed surfacing-candidates handoff, p02 typed intervention episodes, p03 typed long-horizon credit assignment, p04 typed interpersonal counterfactual policy simulation, a04 staged external-affordance binding, w01 bounded world-loop admission, m01 homeostatic salience imprint, m02 predictive relevance, n01 narrative commitments, n02 identity-drift reflection, and n03 autobiographical relevance before bounded outcome resolution, while keeping D01 observability-only over fixed R->C order"
         ),
     )
     abstain = final_outcome in {SubjectTickOutcome.REPAIR, SubjectTickOutcome.REVALIDATE}
@@ -8095,6 +8259,7 @@ def execute_subject_tick(
         m02_result=m02_result,
         n01_result=n01_result,
         n02_result=n02_result,
+        n03_result=n03_result,
         a_line_result=a_line_result,
         m_minimal_result=m_minimal_result,
         n_minimal_result=n_minimal_result,
