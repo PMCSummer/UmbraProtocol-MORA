@@ -142,6 +142,57 @@ def test_identity_drift_downweights_or_blocks_old_transfer() -> None:
     assert entry.transfer_decision in {N03TransferDecision.PROVISIONAL_TRANSFER_ONLY, N03TransferDecision.DO_NOT_TRANSFER}
 
 
+def test_n02_drift_markers_change_transfer_decision_and_gate_readiness_on_same_trace_target() -> None:
+    trace = n03_trace(
+        source_trace_id="t-drift-contrast",
+        trace_kind=N03AutobiographicalTraceKind.PRIOR_FAILURE,
+        commitment_refs=("c:drift",),
+        recurrence_count=4,
+        confidence=0.88,
+    )
+    clean = _run(
+        "drift-contrast-clean",
+        traces=(trace,),
+        targets=(
+            n03_target(
+                current_target_id="g-drift",
+                target_kind=N03CurrentTargetKind.COMMITMENT_UNDER_LOAD,
+                active_commitment_refs=("c:drift",),
+                active_drift_markers=(),
+                regulation_or_planning_pressure=0.8,
+            ),
+        ),
+    )
+    drifted = _run(
+        "drift-contrast-drifted",
+        traces=(trace,),
+        targets=(
+            n03_target(
+                current_target_id="g-drift",
+                target_kind=N03CurrentTargetKind.COMMITMENT_UNDER_LOAD,
+                active_commitment_refs=("c:drift",),
+                active_drift_markers=("drift_fracture",),
+                regulation_or_planning_pressure=0.8,
+            ),
+        ),
+    )
+    clean_entry = _first_entry(clean)
+    drifted_entry = _first_entry(drifted)
+    assert clean_entry.transfer_decision in {
+        N03TransferDecision.USE_AS_REGULATORY_WARNING,
+        N03TransferDecision.USE_AS_COMMITMENT_ANCHOR,
+        N03TransferDecision.USE_AS_SUPPORTING_PATTERN,
+    }
+    assert drifted_entry.transfer_decision in {
+        N03TransferDecision.PROVISIONAL_TRANSFER_ONLY,
+        N03TransferDecision.DO_NOT_TRANSFER,
+    }
+    assert N03LimitingReason.IDENTITY_DRIFT_REDUCES_TRANSFER in drifted_entry.limiting_reasons
+    assert clean.gate.consumer_ready is True
+    assert drifted.gate.consumer_ready is False
+    assert clean.gate.required_restrictions != drifted.gate.required_restrictions
+
+
 def test_affordance_change_blocks_old_recovery_template_transfer() -> None:
     result = _run(
         "affordance-change",

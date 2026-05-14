@@ -100,6 +100,9 @@ def build_n03_autobiographical_relevance(
     provisional_transfer_count = sum(
         1 for item in entries if item.transfer_decision is N03TransferDecision.PROVISIONAL_TRANSFER_ONLY
     )
+    drift_adjusted_transfer_count = sum(
+        1 for item in entries if item.drift_adjustment == "reduced_by_identity_drift"
+    )
     conflict_count = sum(
         1 for item in entries if item.transfer_decision is N03TransferDecision.CONFLICTING_AUTOBIOGRAPHICAL_GUIDANCE
     )
@@ -119,6 +122,7 @@ def build_n03_autobiographical_relevance(
             N03TransferDecision.PROVISIONAL_TRANSFER_ONLY,
         }
         and bool(item.anti_generalization_limits)
+        and item.drift_adjustment == "none"
         for item in entries
     )
     consistency_ready = conflict_count == 0
@@ -139,6 +143,9 @@ def build_n03_autobiographical_relevance(
     if blocked_transfer_count > 0 and relevant_trace_count == 0:
         restrictions.append("n03_blocked_transfer_path")
         reason_codes.append("blocked_transfer_path")
+    if drift_adjusted_transfer_count > 0:
+        restrictions.append("n03_drift_adjusted_transfer")
+        reason_codes.append("drift_adjusted_transfer")
     if not consumer_ready:
         restrictions.append("n03_consumer_not_ready")
         reason_codes.append("consumer_not_ready")

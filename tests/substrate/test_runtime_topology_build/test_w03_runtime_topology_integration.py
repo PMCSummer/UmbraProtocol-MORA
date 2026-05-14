@@ -111,6 +111,37 @@ def test_w03_is_after_w02_before_m01() -> None:
     )
 
 
+def test_world_to_narrative_chain_order_remains_stable_after_w03_hardening() -> None:
+    case_id = "runtime-topology-w03-chain-order"
+    w02_input = _w02_input(case_id)
+    w03_input = w03_input_from_w02(case_id=case_id, w02_input=w02_input, source_lineage=("tests.w03.runtime", case_id))
+    result = dispatch_runtime_tick(
+        RuntimeDispatchRequest(
+            tick_input=_tick_input(case_id),
+            context=SubjectTickContext(
+                w02_input_bundle=w02_input,
+                w03_input_bundle=w03_input,
+            ),
+            route_class=RuntimeRouteClass.PRODUCTION_CONTOUR,
+        )
+    )
+    assert result.subject_tick_result is not None
+    ids = [item.checkpoint_id for item in result.subject_tick_result.state.execution_checkpoints]
+    chain = [
+        "rt01.w01_bounded_world_loop_checkpoint",
+        "rt01.w02_regularity_extraction_checkpoint",
+        "rt01.w03_schema_consolidation_checkpoint",
+        "rt01.m01_homeostatic_salience_imprint_checkpoint",
+        "rt01.m02_predictive_relevance_checkpoint",
+        "rt01.n01_narrative_commitments_checkpoint",
+        "rt01.n02_identity_drift_reflection_checkpoint",
+        "rt01.n03_autobiographical_relevance_checkpoint",
+        "rt01.outcome_resolution_checkpoint",
+    ]
+    positions = [ids.index(item) for item in chain]
+    assert positions == sorted(positions)
+
+
 def test_w03_disable_flag_rejected_in_production_route() -> None:
     case_id = "runtime-topology-w03-disabled"
     denied = dispatch_runtime_tick(

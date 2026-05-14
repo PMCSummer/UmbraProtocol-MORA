@@ -1077,6 +1077,25 @@ def test_no_verdict_vocabulary_anywhere_on_main_path(tmp_path: Path) -> None:
         assert token not in payload
 
 
+def test_w03_n03_trace_payload_does_not_leak_raw_owner_objects(tmp_path: Path) -> None:
+    trace_path, _ = _run_sample_trace(tmp_path, case_id="runtime-no-raw-w03-n03-leak")
+    payload = trace_path.read_text(encoding="utf-8")
+    forbidden_tokens = (
+        "schema_candidates",
+        "everyday_priors",
+        "contradiction_consequences",
+        "version_records",
+        "stale_assessments",
+        "downstream_permission_packets",
+        "relevance_entries",
+        "trace_candidates",
+        "current_targets",
+        "n03_ledger",
+    )
+    for token in forbidden_tokens:
+        assert token not in payload
+
+
 def test_no_snapshot_map_reconstruction_path_in_simple_trace_module() -> None:
     source = Path("src/substrate/simple_trace.py").read_text(encoding="utf-8")
     assert "_build_snapshot_map" not in source

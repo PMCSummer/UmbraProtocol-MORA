@@ -22,6 +22,12 @@ Checkpoint:
 - `runtime_topology/policy.py` requires W03 checkpoint/surface and rejects `disable_w03_enforcement` in production route.
 - `runtime_tap_trace.py` + trace tests allowlist compact W03 observability fields.
 
+## Narrow Hardening (MH-01..MH-04)
+- W03 permission emission now prevents clean bounded-prior leaks from deferred/stale/contested/scaffold-laundered states.
+- W03 authority/provenance ablation is operational: permission/status changes, not just provenance string differences.
+- W03 contradiction route coverage is explicit for distinct operational routes (`block_downstream_use` vs `split`).
+- W02 same-envelope integration proof is strengthened with strong-vs-weak restriction-set divergence assertions under W03 mediation.
+
 ## Files Added
 - `src/substrate/w03_schema_consolidation/__init__.py`
 - `src/substrate/w03_schema_consolidation/models.py`
@@ -57,7 +63,7 @@ Checkpoint:
 
 ## Test Commands and Results
 Required W03:
-- `pytest -q tests/substrate/test_w03_schema_consolidation_build/test_w03_schema_consolidation_build.py` -> `27 passed`
+- `pytest -q tests/substrate/test_w03_schema_consolidation_build/test_w03_schema_consolidation_build.py` -> `33 passed`
 - `pytest -q tests/substrate/test_subject_tick_build/test_w03_subject_tick_integration.py` -> `7 passed`
 - `pytest -q tests/substrate/test_runtime_topology_build/test_w03_runtime_topology_integration.py` -> `4 passed`
 - `pytest -q tests/substrate/test_runtime_topology_build/test_runtime_topology_build.py` -> `47 passed`
