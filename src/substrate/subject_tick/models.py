@@ -98,6 +98,10 @@ if TYPE_CHECKING:
         W05InputBundle,
         W05ResultBundle,
     )
+    from substrate.w06_error_driven_revision import (
+        W06InputBundle,
+        W06ResultBundle,
+    )
     from substrate.m01_homeostatic_salience_imprint import (
         M01InputBundle,
         M01Result,
@@ -591,6 +595,22 @@ class SubjectTickRestrictionCode(StrEnum):
     W05_MUST_ABSTAIN_RESTRICTION = "w05_must_abstain_restriction"
     W05_NO_CLEAN_ROUTING_DETOUR_REQUIRED = "w05_no_clean_routing_detour_required"
     W05_MUST_NOT_EXECUTE_UPDATE_RESTRICTION = "w05_must_not_execute_update_restriction"
+    W06_ERROR_DRIVEN_REVISION_CONTRACT_MUST_BE_READ = (
+        "w06_error_driven_revision_contract_must_be_read"
+    )
+    W06_REVISION_PACKET_CONSUMER_REQUIRED = "w06_revision_packet_consumer_required"
+    W06_EXECUTION_SEAM_CONSUMER_REQUIRED = "w06_execution_seam_consumer_required"
+    W06_MUST_NOT_EXECUTE_CORRECTION_RESTRICTION = (
+        "w06_must_not_execute_correction_restriction"
+    )
+    W06_CLAIM_BLOCKED_RESTRICTION = "w06_claim_blocked_restriction"
+    W06_REVALIDATE_REQUIRED_RESTRICTION = "w06_revalidate_required_restriction"
+    W06_RESIDUAL_UNCERTAINTY_RESTRICTION = "w06_residual_uncertainty_restriction"
+    W06_IDENTITY_SPLIT_RESTRICTION = "w06_identity_split_restriction"
+    W06_ANTI_PARALYSIS_RESTRICTION = "w06_anti_paralysis_restriction"
+    W06_QUARANTINE_RESTRICTION = "w06_quarantine_restriction"
+    W06_ESCALATE_RESTRICTION = "w06_escalate_restriction"
+    W06_NO_CLEAN_REVISION_DETOUR_REQUIRED = "w06_no_clean_revision_detour_required"
     M01_HOMEOSTATIC_IMPRINT_CONTRACT_MUST_BE_READ = (
         "m01_homeostatic_imprint_contract_must_be_read"
     )
@@ -866,6 +886,9 @@ class SubjectTickContext:
     require_w05_routing_packet_consumer: bool = False
     require_w05_execution_seam_consumer: bool = False
     disable_w05_enforcement: bool = False
+    require_w06_revision_packet_consumer: bool = False
+    require_w06_execution_seam_consumer: bool = False
+    disable_w06_enforcement: bool = False
     require_m01_imprint_packet_consumer: bool = False
     require_m01_axis_scope_consumer: bool = False
     disable_m01_enforcement: bool = False
@@ -903,6 +926,7 @@ class SubjectTickContext:
     w03_input_bundle: W03InputBundle | None = None
     w04_input_bundle: W04InputBundle | None = None
     w05_input_bundle: W05InputBundle | None = None
+    w06_input_bundle: W06InputBundle | None = None
     m01_input_bundle: M01InputBundle | None = None
     m02_input_bundle: M02InputBundle | None = None
     n01_input_bundle: N01InputBundle | None = None
@@ -1648,6 +1672,28 @@ class SubjectTickState:
     w05_consumer_ready: bool = False
     w05_no_clean_routing: bool = True
     w05_scope_marker: str = ""
+    w06_checkpoint_present: bool = False
+    w06_explicit_basis_present: bool = False
+    w06_revision_decision_count: int = 0
+    w06_consequence_count: int = 0
+    w06_revalidate_count: int = 0
+    w06_downgrade_count: int = 0
+    w06_invalidate_count: int = 0
+    w06_split_identity_count: int = 0
+    w06_block_claim_count: int = 0
+    w06_quarantine_count: int = 0
+    w06_retain_unresolved_count: int = 0
+    w06_correction_candidate_count: int = 0
+    w06_residual_uncertainty_count: int = 0
+    w06_anti_paralysis_count: int = 0
+    w06_global_scope_count: int = 0
+    w06_local_scope_count: int = 0
+    w06_confidence_drop_count: int = 0
+    w06_must_not_execute_correction: bool = True
+    w06_claim_blocked: bool = False
+    w06_no_clean_revision: bool = True
+    w06_consumer_ready: bool = False
+    w06_scope_marker: str = ""
     m01_imprint_count: int = 0
     m01_explicit_basis_present: bool = False
     m01_strong_imprint_count: int = 0
@@ -2050,6 +2096,7 @@ class SubjectTickResult:
     w03_result: W03ResultBundle
     w04_result: W04ResultBundle
     w05_result: W05ResultBundle
+    w06_result: W06ResultBundle
     m01_result: M01Result
     m02_result: M02Result
     n01_result: N01Result

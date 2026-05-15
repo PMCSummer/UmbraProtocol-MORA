@@ -60,6 +60,7 @@ HOSTED_CONTOUR_SEGMENTS = (
     "w03_schema_consolidation",
     "w04_applicability_gating",
     "w05_predictive_prior_injection",
+    "w06_error_driven_revision",
     "m01_homeostatic_salience_imprint",
     "m02_predictive_relevance",
     "n01_narrative_commitments",
@@ -431,6 +432,27 @@ HOSTED_CONTOUR_FIELDS: dict[str, set[str]] = {
         "w05_channel_collapse_block_count",
         "w05_consumer_ready",
         "w05_no_clean_routing",
+    },
+    "w06_error_driven_revision": {
+        "w06_revision_decision_count",
+        "w06_consequence_count",
+        "w06_revalidate_count",
+        "w06_downgrade_count",
+        "w06_invalidate_count",
+        "w06_split_identity_count",
+        "w06_block_claim_count",
+        "w06_quarantine_count",
+        "w06_retain_unresolved_count",
+        "w06_correction_candidate_count",
+        "w06_residual_uncertainty_count",
+        "w06_anti_paralysis_count",
+        "w06_global_scope_count",
+        "w06_local_scope_count",
+        "w06_confidence_drop_count",
+        "w06_must_not_execute_correction",
+        "w06_claim_blocked",
+        "w06_consumer_ready",
+        "w06_no_clean_revision",
     },
     "m01_homeostatic_salience_imprint": {
         "imprint_count",
@@ -1000,6 +1022,9 @@ def test_hosted_contour_segments_follow_real_runtime_order(tmp_path: Path) -> No
         events, "w05_predictive_prior_injection"
     )
     assert _first_order(events, "w05_predictive_prior_injection") < _first_order(
+        events, "w06_error_driven_revision"
+    )
+    assert _first_order(events, "w06_error_driven_revision") < _first_order(
         events, "m01_homeostatic_salience_imprint"
     )
     assert _first_order(events, "m01_homeostatic_salience_imprint") < _first_order(
@@ -1104,6 +1129,7 @@ def test_representative_modules_have_runtime_steps(tmp_path: Path) -> None:
         "w03_schema_consolidation",
         "w04_applicability_gating",
         "w05_predictive_prior_injection",
+        "w06_error_driven_revision",
         "m01_homeostatic_salience_imprint",
         "m02_predictive_relevance",
         "n01_narrative_commitments",
@@ -1150,6 +1176,16 @@ def test_w03_w04_w05_n03_trace_payload_does_not_leak_raw_owner_objects(tmp_path:
         "permitted_channel_enforcement_records",
         "revalidation_or_escalation_requests",
         "downstream_routing_packets",
+        "\"revision_decision\":",
+        "\"revision_ledger\":",
+        "\"operational_consequence\":",
+        "\"confidence_adjustment\":",
+        "\"residual_uncertainty\":",
+        "\"anti_paralysis_state\":",
+        "\"identity_revision\":",
+        "\"claim_block_packet\":",
+        "\"correction_candidate\":",
+        "\"downstream_revision_packet\":",
         "relevance_entries",
         "trace_candidates",
         "current_targets",

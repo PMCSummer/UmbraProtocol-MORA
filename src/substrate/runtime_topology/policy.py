@@ -483,6 +483,7 @@ def build_minimal_runtime_tick_graph() -> RuntimeTickGraph:
                     "rt01.w03_schema_consolidation_checkpoint",
                     "rt01.w04_applicability_gating_checkpoint",
                     "rt01.w05_predictive_prior_injection_checkpoint",
+                    "rt01.w06_error_driven_revision_checkpoint",
                     "rt01.m01_homeostatic_salience_imprint_checkpoint",
                     "rt01.m02_predictive_relevance_checkpoint",
                     "rt01.n01_narrative_commitments_checkpoint",
@@ -526,6 +527,7 @@ def build_minimal_runtime_tick_graph() -> RuntimeTickGraph:
                     "rt01.w03_schema_consolidation_checkpoint",
                     "rt01.w04_applicability_gating_checkpoint",
                     "rt01.w05_predictive_prior_injection_checkpoint",
+                    "rt01.w06_error_driven_revision_checkpoint",
                     "rt01.m01_homeostatic_salience_imprint_checkpoint",
                     "rt01.m02_predictive_relevance_checkpoint",
                     "rt01.n01_narrative_commitments_checkpoint",
@@ -649,6 +651,7 @@ def build_minimal_runtime_tick_graph() -> RuntimeTickGraph:
             "rt01.w03_schema_consolidation_checkpoint",
             "rt01.w04_applicability_gating_checkpoint",
             "rt01.w05_predictive_prior_injection_checkpoint",
+            "rt01.w06_error_driven_revision_checkpoint",
             "rt01.m01_homeostatic_salience_imprint_checkpoint",
             "rt01.m02_predictive_relevance_checkpoint",
             "rt01.n01_narrative_commitments_checkpoint",
@@ -685,6 +688,7 @@ def build_minimal_runtime_tick_graph() -> RuntimeTickGraph:
             "rt01.w03_schema_consolidation_checkpoint",
             "rt01.w04_applicability_gating_checkpoint",
             "rt01.w05_predictive_prior_injection_checkpoint",
+            "rt01.w06_error_driven_revision_checkpoint",
             "rt01.m01_homeostatic_salience_imprint_checkpoint",
             "rt01.m02_predictive_relevance_checkpoint",
             "rt01.n01_narrative_commitments_checkpoint",
@@ -709,6 +713,7 @@ def build_minimal_runtime_tick_graph() -> RuntimeTickGraph:
             "w03_schema_consolidation.schema_consolidation_result",
             "w04_applicability_gating.applicability_result",
             "w05_predictive_prior_injection.routing_result",
+            "w06_error_driven_revision.revision_result",
             "m01_homeostatic_salience_imprint.imprint_result",
             "m02_predictive_relevance.predictive_relevance_result",
             "n01_narrative_commitments.commitment_registry_result",
@@ -799,6 +804,7 @@ def build_minimal_runtime_topology_bundle() -> RuntimeTopologyBundle:
             "w03_schema_consolidation_contract",
             "w04_applicability_gating_contract",
             "w05_predictive_prior_injection_contract",
+            "w06_error_driven_revision_contract",
             "m01_homeostatic_salience_imprint_contract",
             "a_line_normalization_capability_contract",
             "m_minimal_memory_lifecycle_contract",
@@ -993,6 +999,7 @@ def _context_has_ablation_flags(context: SubjectTickContext | None) -> bool:
         or context.disable_w03_enforcement
         or context.disable_w04_enforcement
         or context.disable_w05_enforcement
+        or context.disable_w06_enforcement
         or context.disable_m01_enforcement
         or context.disable_m02_enforcement
         or context.disable_n01_enforcement

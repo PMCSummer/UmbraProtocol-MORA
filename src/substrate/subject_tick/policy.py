@@ -2545,6 +2545,71 @@ def evaluate_subject_tick_downstream_gate(
             usability = SubjectTickUsabilityClass.BLOCKED
             reason = "w05 produced no consumer-ready routing packet under bounded execution seam"
 
+    w06_checkpoint = next(
+        (
+            checkpoint
+            for checkpoint in state.execution_checkpoints
+            if checkpoint.checkpoint_id == "rt01.w06_error_driven_revision_checkpoint"
+        ),
+        None,
+    )
+    if w06_checkpoint is not None:
+        if "require_w06_revision_packet_consumer" in w06_checkpoint.required_action:
+            restrictions.append(SubjectTickRestrictionCode.W06_REVISION_PACKET_CONSUMER_REQUIRED)
+        if "require_w06_execution_seam_consumer" in w06_checkpoint.required_action:
+            restrictions.append(SubjectTickRestrictionCode.W06_EXECUTION_SEAM_CONSUMER_REQUIRED)
+        if "default_w06_no_clean_revision_detour" in w06_checkpoint.required_action:
+            restrictions.append(SubjectTickRestrictionCode.W06_NO_CLEAN_REVISION_DETOUR_REQUIRED)
+        if "default_w06_claim_blocked" in w06_checkpoint.required_action:
+            restrictions.append(SubjectTickRestrictionCode.W06_CLAIM_BLOCKED_RESTRICTION)
+        if "default_w06_revalidate_required" in w06_checkpoint.required_action:
+            restrictions.append(SubjectTickRestrictionCode.W06_REVALIDATE_REQUIRED_RESTRICTION)
+        if "default_w06_residual_uncertainty" in w06_checkpoint.required_action:
+            restrictions.append(SubjectTickRestrictionCode.W06_RESIDUAL_UNCERTAINTY_RESTRICTION)
+        if "default_w06_identity_split" in w06_checkpoint.required_action:
+            restrictions.append(SubjectTickRestrictionCode.W06_IDENTITY_SPLIT_RESTRICTION)
+        if "default_w06_anti_paralysis" in w06_checkpoint.required_action:
+            restrictions.append(SubjectTickRestrictionCode.W06_ANTI_PARALYSIS_RESTRICTION)
+        if "default_w06_quarantine" in w06_checkpoint.required_action:
+            restrictions.append(SubjectTickRestrictionCode.W06_QUARANTINE_RESTRICTION)
+        if "default_w06_escalate" in w06_checkpoint.required_action:
+            restrictions.append(SubjectTickRestrictionCode.W06_ESCALATE_RESTRICTION)
+
+    w06_basis_present = bool(state.w06_explicit_basis_present)
+    if w06_basis_present and state.w06_no_clean_revision:
+        restrictions.append(SubjectTickRestrictionCode.W06_NO_CLEAN_REVISION_DETOUR_REQUIRED)
+        if (
+            state.final_execution_outcome == SubjectTickOutcome.CONTINUE
+            and usability == SubjectTickUsabilityClass.USABLE_BOUNDED
+        ):
+            usability = SubjectTickUsabilityClass.DEGRADED_BOUNDED
+            reason = "w06 explicit basis produced no-clean revision route and requires bounded detour"
+    if w06_basis_present and state.w06_claim_blocked:
+        restrictions.append(SubjectTickRestrictionCode.W06_CLAIM_BLOCKED_RESTRICTION)
+        if state.final_execution_outcome == SubjectTickOutcome.CONTINUE:
+            accepted = False
+            usability = SubjectTickUsabilityClass.BLOCKED
+            reason = "w06 blocked claim propagation under unresolved contradiction route"
+    if w06_basis_present and state.w06_revalidate_count > 0:
+        restrictions.append(SubjectTickRestrictionCode.W06_REVALIDATE_REQUIRED_RESTRICTION)
+    if w06_basis_present and state.w06_residual_uncertainty_count > 0:
+        restrictions.append(SubjectTickRestrictionCode.W06_RESIDUAL_UNCERTAINTY_RESTRICTION)
+    if w06_basis_present and state.w06_split_identity_count > 0:
+        restrictions.append(SubjectTickRestrictionCode.W06_IDENTITY_SPLIT_RESTRICTION)
+    if w06_basis_present and state.w06_anti_paralysis_count > 0:
+        restrictions.append(SubjectTickRestrictionCode.W06_ANTI_PARALYSIS_RESTRICTION)
+    if w06_basis_present and state.w06_quarantine_count > 0:
+        restrictions.append(SubjectTickRestrictionCode.W06_QUARANTINE_RESTRICTION)
+    if w06_basis_present and state.w06_must_not_execute_correction:
+        restrictions.append(SubjectTickRestrictionCode.W06_MUST_NOT_EXECUTE_CORRECTION_RESTRICTION)
+    if w06_basis_present and not state.w06_consumer_ready:
+        restrictions.append(SubjectTickRestrictionCode.W06_REVISION_PACKET_CONSUMER_REQUIRED)
+        restrictions.append(SubjectTickRestrictionCode.DOWNSTREAM_AUTHORITY_DEGRADED)
+        if state.final_execution_outcome == SubjectTickOutcome.CONTINUE:
+            accepted = False
+            usability = SubjectTickUsabilityClass.BLOCKED
+            reason = "w06 produced no consumer-ready bounded revision packet"
+
     m01_checkpoint = next(
         (
             checkpoint

@@ -195,6 +195,7 @@ def test_runtime_topology_bundle_and_graph_are_materialized() -> None:
     assert "rt01.w03_schema_consolidation_checkpoint" in graph.mandatory_checkpoint_ids
     assert "rt01.w04_applicability_gating_checkpoint" in graph.mandatory_checkpoint_ids
     assert "rt01.w05_predictive_prior_injection_checkpoint" in graph.mandatory_checkpoint_ids
+    assert "rt01.w06_error_driven_revision_checkpoint" in graph.mandatory_checkpoint_ids
     assert "rt01.m01_homeostatic_salience_imprint_checkpoint" in graph.mandatory_checkpoint_ids
     assert "rt01.m02_predictive_relevance_checkpoint" in graph.mandatory_checkpoint_ids
     assert "rt01.n01_narrative_commitments_checkpoint" in graph.mandatory_checkpoint_ids
@@ -243,6 +244,7 @@ def test_runtime_topology_bundle_and_graph_are_materialized() -> None:
     assert "w03_schema_consolidation.schema_consolidation_result" in graph.source_of_truth_surfaces
     assert "w04_applicability_gating.applicability_result" in graph.source_of_truth_surfaces
     assert "w05_predictive_prior_injection.routing_result" in graph.source_of_truth_surfaces
+    assert "w06_error_driven_revision.revision_result" in graph.source_of_truth_surfaces
     assert "m01_homeostatic_salience_imprint.imprint_result" in graph.source_of_truth_surfaces
     assert "m02_predictive_relevance.predictive_relevance_result" in graph.source_of_truth_surfaces
     assert "n01_narrative_commitments.commitment_registry_result" in graph.source_of_truth_surfaces

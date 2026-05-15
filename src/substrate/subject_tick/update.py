@@ -319,6 +319,17 @@ from substrate.w05_predictive_prior_injection import (
     build_w05_predictive_prior_injection,
     derive_w05_contract_view,
 )
+from substrate.w06_error_driven_revision import (
+    W06ContradictionIntakeView,
+    W06InputBundle,
+    W06MismatchClass,
+    W06MismatchIntakeView,
+    W06PriorSchemaLineageView,
+    W06RevisionContext,
+    W06RevisionScope,
+    build_w06_error_driven_revision,
+    derive_w06_contract_view,
+)
 from substrate.m01_homeostatic_salience_imprint import (
     M01InputBundle,
     build_m01_homeostatic_salience_imprint,
@@ -7173,6 +7184,163 @@ def execute_subject_tick(
         )
     )
 
+    w06_explicit_input = (
+        context.w06_input_bundle
+        if isinstance(context.w06_input_bundle, W06InputBundle)
+        else _build_default_w06_input_bundle(
+            tick_id=tick_id,
+            tick_index=tick_index,
+            w05_result=w05_result,
+            w04_result=w04_result,
+            w03_result=w03_result,
+            source_lineage=lineage,
+        )
+    )
+    w06_explicit_basis = bool(
+        w06_explicit_input is not None and w06_explicit_input.mismatch_intake is not None
+    )
+    w06_result = build_w06_error_driven_revision(
+        tick_id=tick_id,
+        tick_index=tick_index,
+        input_bundle=w06_explicit_input,
+        enforcement_enabled=True,
+    )
+    w06_view = derive_w06_contract_view(w06_result)
+    w06_trace_values = {
+        "w06_revision_decision_count": 1,
+        "w06_consequence_count": 1,
+        "w06_revalidate_count": w06_result.telemetry.revalidate_count,
+        "w06_downgrade_count": w06_result.telemetry.downgrade_count,
+        "w06_invalidate_count": w06_result.telemetry.invalidate_count,
+        "w06_split_identity_count": w06_result.telemetry.split_identity_count,
+        "w06_block_claim_count": w06_result.telemetry.block_claim_count,
+        "w06_quarantine_count": w06_result.telemetry.quarantine_count,
+        "w06_retain_unresolved_count": w06_result.telemetry.retain_unresolved_count,
+        "w06_correction_candidate_count": w06_result.telemetry.correction_candidate_count,
+        "w06_residual_uncertainty_count": w06_result.telemetry.residue_retention_count,
+        "w06_anti_paralysis_count": w06_result.telemetry.anti_paralysis_count,
+        "w06_global_scope_count": w06_result.telemetry.global_scope_count,
+        "w06_local_scope_count": w06_result.telemetry.local_scope_count,
+        "w06_confidence_drop_count": w06_result.telemetry.confidence_drop_count,
+        "w06_must_not_execute_correction": w06_result.gate.must_not_execute_correction,
+        "w06_claim_blocked": w06_result.gate.must_block_claim,
+        "w06_consumer_ready": w06_result.gate.consumer_ready,
+        "w06_no_clean_revision": w06_result.gate.no_clean_revision,
+    }
+    trace_emit_active("w06_error_driven_revision", "enter", w06_trace_values)
+    w06_checkpoint_status = SubjectTickCheckpointStatus.ALLOWED
+    w06_checkpoint_reason = w06_result.reason
+    w06_default_no_clean_detour = False
+    w06_default_claim_blocked = False
+    w06_default_revalidate_required = False
+    w06_default_residual_uncertainty = False
+    w06_default_identity_split = False
+    w06_default_anti_paralysis = False
+    w06_default_quarantine = False
+    w06_default_escalate = False
+    if not context.disable_w06_enforcement:
+        if (
+            context.require_w06_revision_packet_consumer
+            and not w06_view.consumer_ready
+            and halt_reason is None
+        ):
+            revalidation_needed = True
+            w06_checkpoint_status = SubjectTickCheckpointStatus.ENFORCED_DETOUR
+            w06_checkpoint_reason = (
+                "w06 revision packet consumer requested but revision route is not consumer-ready"
+            )
+            if active_execution_mode != "halt_execution":
+                active_execution_mode = "revalidate_scope"
+        if (
+            context.require_w06_execution_seam_consumer
+            and not w06_view.must_not_execute_correction
+            and halt_reason is None
+        ):
+            revalidation_needed = True
+            w06_checkpoint_status = SubjectTickCheckpointStatus.ENFORCED_DETOUR
+            w06_checkpoint_reason = (
+                "w06 execution-seam consumer requested but must-not-execute-correction guarantee is absent"
+            )
+            if active_execution_mode != "halt_execution":
+                active_execution_mode = "revalidate_scope"
+        if w06_explicit_basis and w06_result.gate.no_clean_revision and halt_reason is None:
+            revalidation_needed = True
+            w06_default_no_clean_detour = True
+            if w06_checkpoint_status == SubjectTickCheckpointStatus.ALLOWED:
+                w06_checkpoint_status = SubjectTickCheckpointStatus.ENFORCED_DETOUR
+            if active_execution_mode != "halt_execution":
+                active_execution_mode = "revalidate_scope"
+        if w06_explicit_basis and w06_result.gate.must_block_claim and halt_reason is None:
+            w06_default_claim_blocked = True
+            if w06_checkpoint_status == SubjectTickCheckpointStatus.ALLOWED:
+                w06_checkpoint_status = SubjectTickCheckpointStatus.ENFORCED_DETOUR
+        if w06_explicit_basis and w06_result.gate.must_revalidate and halt_reason is None:
+            w06_default_revalidate_required = True
+            if active_execution_mode != "halt_execution":
+                active_execution_mode = "revalidate_scope"
+                revalidation_needed = True
+        if w06_explicit_basis and w06_result.telemetry.residue_retention_count > 0 and halt_reason is None:
+            w06_default_residual_uncertainty = True
+        if w06_explicit_basis and w06_result.telemetry.split_identity_count > 0 and halt_reason is None:
+            w06_default_identity_split = True
+        if w06_explicit_basis and w06_result.telemetry.anti_paralysis_count > 0 and halt_reason is None:
+            w06_default_anti_paralysis = True
+        if w06_explicit_basis and w06_result.telemetry.quarantine_count > 0 and halt_reason is None:
+            w06_default_quarantine = True
+            if active_execution_mode != "halt_execution":
+                active_execution_mode = "revalidate_scope"
+        if w06_explicit_basis and w06_result.gate.must_escalate and halt_reason is None:
+            w06_default_escalate = True
+            if active_execution_mode != "halt_execution":
+                active_execution_mode = "repair_runtime_path"
+    else:
+        w06_checkpoint_status = SubjectTickCheckpointStatus.ALLOWED
+        w06_checkpoint_reason = "W06 gate disabled in test fixture"
+
+    w06_required_actions: list[str] = []
+    if context.require_w06_revision_packet_consumer:
+        w06_required_actions.append("require_w06_revision_packet_consumer")
+    if context.require_w06_execution_seam_consumer:
+        w06_required_actions.append("require_w06_execution_seam_consumer")
+    if w06_default_no_clean_detour:
+        w06_required_actions.append("default_w06_no_clean_revision_detour")
+    if w06_default_claim_blocked:
+        w06_required_actions.append("default_w06_claim_blocked")
+    if w06_default_revalidate_required:
+        w06_required_actions.append("default_w06_revalidate_required")
+    if w06_default_residual_uncertainty:
+        w06_required_actions.append("default_w06_residual_uncertainty")
+    if w06_default_identity_split:
+        w06_required_actions.append("default_w06_identity_split")
+    if w06_default_anti_paralysis:
+        w06_required_actions.append("default_w06_anti_paralysis")
+    if w06_default_quarantine:
+        w06_required_actions.append("default_w06_quarantine")
+    if w06_default_escalate:
+        w06_required_actions.append("default_w06_escalate")
+    if not w06_required_actions:
+        w06_required_actions.append("w06_optional")
+
+    trace_emit_active("w06_error_driven_revision", "decision", w06_trace_values)
+    if w06_checkpoint_status != SubjectTickCheckpointStatus.ALLOWED:
+        trace_emit_active(
+            "w06_error_driven_revision",
+            "blocked",
+            w06_trace_values,
+            note=w06_checkpoint_reason,
+        )
+    trace_emit_active("w06_error_driven_revision", "exit", w06_trace_values)
+    checkpoints.append(
+        SubjectTickCheckpointResult(
+            checkpoint_id="rt01.w06_error_driven_revision_checkpoint",
+            source_contract="w06_error_driven_revision.revision_result",
+            status=w06_checkpoint_status,
+            required_action=";".join(dict.fromkeys(w06_required_actions)),
+            applied_action=active_execution_mode,
+            reason=w06_checkpoint_reason,
+        )
+    )
+
     m01_explicit_input = (
         context.m01_input_bundle
         if isinstance(context.m01_input_bundle, M01InputBundle)
@@ -8863,6 +9031,28 @@ def execute_subject_tick(
         w05_consumer_ready=w05_result.gate.consumer_ready,
         w05_no_clean_routing=w05_result.gate.no_clean_routing,
         w05_scope_marker=w05_result.scope_marker.scope,
+        w06_checkpoint_present=True,
+        w06_explicit_basis_present=w06_explicit_basis,
+        w06_revision_decision_count=1,
+        w06_consequence_count=1,
+        w06_revalidate_count=w06_result.telemetry.revalidate_count,
+        w06_downgrade_count=w06_result.telemetry.downgrade_count,
+        w06_invalidate_count=w06_result.telemetry.invalidate_count,
+        w06_split_identity_count=w06_result.telemetry.split_identity_count,
+        w06_block_claim_count=w06_result.telemetry.block_claim_count,
+        w06_quarantine_count=w06_result.telemetry.quarantine_count,
+        w06_retain_unresolved_count=w06_result.telemetry.retain_unresolved_count,
+        w06_correction_candidate_count=w06_result.telemetry.correction_candidate_count,
+        w06_residual_uncertainty_count=w06_result.telemetry.residue_retention_count,
+        w06_anti_paralysis_count=w06_result.telemetry.anti_paralysis_count,
+        w06_global_scope_count=w06_result.telemetry.global_scope_count,
+        w06_local_scope_count=w06_result.telemetry.local_scope_count,
+        w06_confidence_drop_count=w06_result.telemetry.confidence_drop_count,
+        w06_must_not_execute_correction=w06_result.gate.must_not_execute_correction,
+        w06_claim_blocked=w06_result.gate.must_block_claim,
+        w06_no_clean_revision=w06_result.gate.no_clean_revision,
+        w06_consumer_ready=w06_result.gate.consumer_ready,
+        w06_scope_marker=w06_result.scope_marker.scope,
         m01_imprint_count=m01_result.telemetry.imprint_count,
         m01_explicit_basis_present=m01_explicit_basis,
         m01_strong_imprint_count=m01_result.telemetry.strong_imprint_count,
@@ -9032,6 +9222,7 @@ def execute_subject_tick(
         w03_result=w03_result,
         w04_result=w04_result,
         w05_result=w05_result,
+        w06_result=w06_result,
         m01_result=m01_result,
         m02_result=m02_result,
         n01_result=n01_result,
@@ -10050,6 +10241,139 @@ def _build_default_w05_input_bundle(
         prior_gain_config=gain_config,
         protected_target_registry=(W05InjectionTarget.PROTECTED_CONSTITUTIONAL_LAYER,),
         reason="default projection from w04 applicability packet",
+    )
+
+
+def _build_default_w06_input_bundle(
+    *,
+    tick_id: str,
+    tick_index: int,
+    w05_result,
+    w04_result,
+    w03_result,
+    source_lineage: tuple[str, ...],
+) -> W06InputBundle | None:
+    mismatch_records = tuple(getattr(w05_result, "mismatch_classifications", ()))
+    if not mismatch_records:
+        return None
+    mismatch = mismatch_records[0]
+    if mismatch is None:
+        return None
+    routing_packets = tuple(getattr(w05_result, "update_routing_packets", ()))
+    routing = routing_packets[0] if routing_packets else None
+    predicted_records = tuple(getattr(w05_result, "prediction_use_records", ()))
+    predicted = predicted_records[0] if predicted_records else None
+    raw_mismatch_class = getattr(mismatch, "mismatch_class", W06MismatchClass.NO_MISMATCH)
+    raw_mismatch_value = str(
+        getattr(raw_mismatch_class, "value", raw_mismatch_class)
+    )
+    try:
+        mapped_mismatch_class = W06MismatchClass(raw_mismatch_value)
+    except ValueError:
+        mapped_mismatch_class = W06MismatchClass.PREDICTED_VS_OBSERVED
+
+    contradictions = tuple(
+        getattr(item, "contradiction_id", "")
+        for item in tuple(getattr(w03_result, "contradiction_consequences", ()))
+    )
+    contradiction_views = tuple(
+        W06ContradictionIntakeView(
+            contradiction_id=item or f"w06:{tick_id}:contradiction:{index}",
+            conflict_type="w03_contradiction",
+            conflicting_trace_refs=(item,),
+            affected_scope=("schema_scope",),
+            affected_maturity_level="mixed",
+            schema_id=getattr(predicted, "prior_id", ""),
+            prior_id=getattr(predicted, "prior_id", ""),
+            severity="high",
+            unresolved_status=True,
+            previous_consequence="w03_contradiction_preserve",
+            evidence_refs=(item,),
+            provenance=("subject_tick.default_w06_contradiction",),
+        )
+        for index, item in enumerate(contradictions, start=1)
+        if item
+    )
+
+    mismatch_view = W06MismatchIntakeView(
+        mismatch_id=str(getattr(mismatch, "mismatch_id", f"w06:{tick_id}:mismatch:1")),
+        compared_channels=tuple(
+            str(getattr(channel, "value", channel))
+            for channel in tuple(getattr(mismatch, "compared_channels", ()))
+        ),
+        mismatch_class=mapped_mismatch_class,
+        mismatch_direction=str(getattr(getattr(mismatch, "mismatch_direction", ""), "value", getattr(mismatch, "mismatch_direction", ""))),
+        severity=str(getattr(mismatch, "severity", "medium")),
+        confidence=float(getattr(mismatch, "confidence", 0.5)),
+        evidence_refs=tuple(getattr(mismatch, "evidence_refs", ())),
+        ambiguity_markers=tuple(getattr(mismatch, "ambiguity_markers", ())),
+        competing_class_candidates=tuple(
+            str(getattr(item, "value", item))
+            for item in tuple(getattr(mismatch, "competing_class_candidates", ()))
+        ),
+        target_scope=tuple(getattr(routing, "target_scope", ()) or ("local_scope",)),
+        target_layer=str(getattr(getattr(routing, "target_layer", None), "value", getattr(routing, "target_layer", "interpretation_interface"))),
+        update_candidate_type=str(getattr(routing, "update_candidate_type", "bounded_update_candidate")),
+        execution_prohibited=bool(getattr(routing, "execution_prohibited", True)),
+        constitutional_guard_flags=tuple(getattr(routing, "constitutional_guard_flags", ())),
+        required_revalidation=bool(getattr(routing, "required_revalidation", False)),
+        source_reliability=0.8,
+        evidence_precision=float(getattr(predicted, "evidence_precision", 0.5)),
+        prior_strength=float(getattr(predicted, "prior_strength", 0.5)),
+        effective_prior_gain=float(getattr(predicted, "effective_prior_gain", 0.5)),
+        provenance=("subject_tick.default_w06_mismatch",),
+    )
+
+    lineage = W06PriorSchemaLineageView(
+        prior_id=str(getattr(predicted, "prior_id", f"prior:{tick_id}")),
+        schema_id=str(getattr(predicted, "prior_id", f"schema:{tick_id}")),
+        regularity_id="",
+        object_id="",
+        maturity_level="mixed",
+        authority_scope=("bounded_context",),
+        context_scope=("bounded_context",),
+        stale_status=bool(getattr(w04_result.gate, "no_clean_applicability", False)),
+        confidence_band="medium",
+        negative_evidence_refs=tuple(getattr(mismatch, "evidence_refs", ())),
+        contradiction_refs=tuple(item.contradiction_id for item in contradiction_views),
+        prohibited_claims=tuple(
+            getattr(w04_result.downstream_permission_packets[0], "prohibited_uses", ())
+        )
+        if tuple(getattr(w04_result, "downstream_permission_packets", ()))
+        else (),
+    )
+    revision_context = W06RevisionContext(
+        cycle_id=tick_id,
+        stream_id="rt01",
+        temporal_window=(tick_index, tick_index + 1),
+        revalidation_loop_id=f"w06:{tick_id}:loop:1",
+        repeated_revalidation_count=1 if mismatch_view.required_revalidation else 0,
+        progress_detected=not mismatch_view.required_revalidation,
+        protected_targets=tuple(getattr(routing, "constitutional_guard_flags", ())),
+        allowed_revision_scopes=(
+            W06RevisionScope.LOCAL,
+            W06RevisionScope.OBJECT_LEVEL,
+            W06RevisionScope.SCHEMA_LEVEL,
+            W06RevisionScope.ACTION_EFFECT_LEVEL,
+            W06RevisionScope.AFFORDANCE_LEVEL,
+            W06RevisionScope.OWNERSHIP_LEVEL,
+            W06RevisionScope.GOAL_SATISFACTION_LEVEL,
+            W06RevisionScope.VALIDITY_LEVEL,
+            W06RevisionScope.TEMPORAL_WINDOW_LEVEL,
+            W06RevisionScope.AUTHORITY_SCOPE_LEVEL,
+        ),
+        global_revision_allowed=False,
+        consumer_id="subject_tick.default_w06_consumer",
+        loop_threshold=3,
+    )
+    return W06InputBundle(
+        bundle_id=f"w06:{tick_id}:default_bundle",
+        source_lineage=source_lineage,
+        mismatch_intake=mismatch_view,
+        contradiction_intake=contradiction_views,
+        lineage_view=lineage,
+        revision_context=revision_context,
+        reason="default projection from w05 mismatch routing",
     )
 
 
