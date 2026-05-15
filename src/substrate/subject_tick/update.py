@@ -308,6 +308,17 @@ from substrate.w04_applicability_gating import (
     build_w04_applicability_gating,
     derive_w04_contract_view,
 )
+from substrate.w05_predictive_prior_injection import (
+    W05DesiredSignal,
+    W05InjectionTarget,
+    W05InputBundle,
+    W05ObservedSignal,
+    W05PermittedSignal,
+    W05PredictedSignal,
+    W05PriorGainControlConfig,
+    build_w05_predictive_prior_injection,
+    derive_w05_contract_view,
+)
 from substrate.m01_homeostatic_salience_imprint import (
     M01InputBundle,
     build_m01_homeostatic_salience_imprint,
@@ -389,6 +400,7 @@ ATTEMPTED_SUBJECT_TICK_PATHS: tuple[str, ...] = (
     "subject_tick.evaluate_w02_regularity_extraction",
     "subject_tick.evaluate_w03_schema_consolidation",
     "subject_tick.evaluate_w04_applicability_gating",
+    "subject_tick.evaluate_w05_predictive_prior_injection",
     "subject_tick.evaluate_m01_homeostatic_salience_imprint",
     "subject_tick.evaluate_m02_predictive_relevance",
     "subject_tick.evaluate_n01_narrative_commitments",
@@ -6994,6 +7006,173 @@ def execute_subject_tick(
         )
     )
 
+    w05_explicit_input = (
+        context.w05_input_bundle
+        if isinstance(context.w05_input_bundle, W05InputBundle)
+        else _build_default_w05_input_bundle(
+            tick_id=tick_id,
+            tick_index=tick_index,
+            w04_result=w04_result,
+            source_lineage=lineage,
+        )
+    )
+    w05_explicit_basis = bool(
+        w05_explicit_input is not None and w05_explicit_input.permitted_signal is not None
+    )
+    w05_result = build_w05_predictive_prior_injection(
+        tick_id=tick_id,
+        tick_index=tick_index,
+        input_bundle=w05_explicit_input,
+        enforcement_enabled=True,
+    )
+    w05_view = derive_w05_contract_view(w05_result)
+    w05_trace_values = {
+        "w05_signal_stack_count": w05_result.telemetry.signal_stack_count,
+        "w05_prediction_use_count": w05_result.telemetry.prediction_use_count,
+        "w05_prior_gain_suppressed_count": w05_result.telemetry.prior_gain_suppressed_count,
+        "w05_prior_gain_amplified_count": w05_result.telemetry.prior_gain_amplified_count,
+        "w05_prior_gain_unchanged_count": w05_result.telemetry.prior_gain_unchanged_count,
+        "w05_mismatch_count": w05_result.telemetry.mismatch_count,
+        "w05_ambiguous_mismatch_count": w05_result.telemetry.ambiguous_mismatch_count,
+        "w05_revalidate_route_count": w05_result.telemetry.revalidate_route_count,
+        "w05_escalate_route_count": w05_result.telemetry.escalate_route_count,
+        "w05_abstain_count": w05_result.telemetry.abstain_count,
+        "w05_constitutional_guard_count": w05_result.telemetry.constitutional_guard_count,
+        "w05_protected_target_block_count": w05_result.telemetry.protected_target_block_count,
+        "w05_must_not_execute_update_count": w05_result.telemetry.must_not_execute_update_count,
+        "w05_permitted_channel_block_count": w05_result.telemetry.permitted_channel_block_count,
+        "w05_channel_collapse_block_count": w05_result.telemetry.channel_collapse_block_count,
+        "w05_consumer_ready": w05_result.gate.consumer_ready,
+        "w05_no_clean_routing": w05_result.gate.no_clean_routing,
+    }
+    trace_emit_active("w05_predictive_prior_injection", "enter", w05_trace_values)
+    w05_checkpoint_status = SubjectTickCheckpointStatus.ALLOWED
+    w05_checkpoint_reason = w05_result.reason
+    w05_default_no_clean_detour = False
+    w05_default_permitted_channel_block = False
+    w05_default_channel_collapse_block = False
+    w05_default_revalidate_route = False
+    w05_default_escalate_route = False
+    w05_default_ambiguous_mismatch = False
+    w05_default_constitutional_guard = False
+    w05_default_protected_target_block = False
+    w05_default_prior_gain_suppressed = False
+    w05_default_must_abstain = False
+    if not context.disable_w05_enforcement:
+        if (
+            context.require_w05_routing_packet_consumer
+            and not w05_view.consumer_ready
+            and halt_reason is None
+        ):
+            revalidation_needed = True
+            w05_checkpoint_status = SubjectTickCheckpointStatus.ENFORCED_DETOUR
+            w05_checkpoint_reason = (
+                "w05 routing consumer requested but typed routing packets are not consumer-ready"
+            )
+            if active_execution_mode != "halt_execution":
+                active_execution_mode = "revalidate_scope"
+        if (
+            context.require_w05_execution_seam_consumer
+            and w05_view.must_not_execute_update_count <= 0
+            and halt_reason is None
+        ):
+            revalidation_needed = True
+            w05_checkpoint_status = SubjectTickCheckpointStatus.ENFORCED_DETOUR
+            w05_checkpoint_reason = (
+                "w05 execution-seam consumer requested but must-not-execute guarantees are absent"
+            )
+            if active_execution_mode != "halt_execution":
+                active_execution_mode = "revalidate_scope"
+        if w05_explicit_basis and w05_result.gate.no_clean_routing and halt_reason is None:
+            revalidation_needed = True
+            w05_default_no_clean_detour = True
+            if w05_checkpoint_status == SubjectTickCheckpointStatus.ALLOWED:
+                w05_checkpoint_status = SubjectTickCheckpointStatus.ENFORCED_DETOUR
+            w05_checkpoint_reason = "w05 explicit basis produced no-clean routing and requires bounded detour"
+            if active_execution_mode != "halt_execution":
+                active_execution_mode = "revalidate_scope"
+        if w05_explicit_basis and w05_result.telemetry.permitted_channel_block_count > 0 and halt_reason is None:
+            w05_default_permitted_channel_block = True
+        if w05_explicit_basis and w05_result.telemetry.channel_collapse_block_count > 0 and halt_reason is None:
+            w05_default_channel_collapse_block = True
+            if w05_checkpoint_status == SubjectTickCheckpointStatus.ALLOWED:
+                w05_checkpoint_status = SubjectTickCheckpointStatus.ENFORCED_DETOUR
+        if w05_explicit_basis and w05_result.telemetry.revalidate_route_count > 0 and halt_reason is None:
+            w05_default_revalidate_route = True
+            if (
+                w05_checkpoint_status == SubjectTickCheckpointStatus.ALLOWED
+                and active_execution_mode not in {"halt_execution", "revalidate_scope"}
+            ):
+                active_execution_mode = "revalidate_scope"
+                revalidation_needed = True
+        if w05_explicit_basis and w05_result.telemetry.escalate_route_count > 0 and halt_reason is None:
+            w05_default_escalate_route = True
+            if active_execution_mode != "halt_execution":
+                active_execution_mode = "repair_runtime_path"
+        if w05_explicit_basis and w05_result.telemetry.ambiguous_mismatch_count > 0 and halt_reason is None:
+            w05_default_ambiguous_mismatch = True
+        if w05_explicit_basis and w05_result.telemetry.constitutional_guard_count > 0 and halt_reason is None:
+            w05_default_constitutional_guard = True
+        if w05_explicit_basis and w05_result.telemetry.protected_target_block_count > 0 and halt_reason is None:
+            w05_default_protected_target_block = True
+        if w05_explicit_basis and w05_result.telemetry.prior_gain_suppressed_count > 0 and halt_reason is None:
+            w05_default_prior_gain_suppressed = True
+        if w05_explicit_basis and w05_result.telemetry.abstain_count > 0 and halt_reason is None:
+            w05_default_must_abstain = True
+            if w05_checkpoint_status == SubjectTickCheckpointStatus.ALLOWED:
+                w05_checkpoint_status = SubjectTickCheckpointStatus.ENFORCED_DETOUR
+    else:
+        w05_checkpoint_status = SubjectTickCheckpointStatus.ALLOWED
+        w05_checkpoint_reason = "W05 gate disabled in test fixture"
+
+    w05_required_actions: list[str] = []
+    if context.require_w05_routing_packet_consumer:
+        w05_required_actions.append("require_w05_routing_packet_consumer")
+    if context.require_w05_execution_seam_consumer:
+        w05_required_actions.append("require_w05_execution_seam_consumer")
+    if w05_default_no_clean_detour:
+        w05_required_actions.append("default_w05_no_clean_routing_detour")
+    if w05_default_permitted_channel_block:
+        w05_required_actions.append("default_w05_permitted_channel_block")
+    if w05_default_channel_collapse_block:
+        w05_required_actions.append("default_w05_channel_collapse_block")
+    if w05_default_revalidate_route:
+        w05_required_actions.append("default_w05_revalidate_route")
+    if w05_default_escalate_route:
+        w05_required_actions.append("default_w05_escalate_route")
+    if w05_default_ambiguous_mismatch:
+        w05_required_actions.append("default_w05_ambiguous_mismatch")
+    if w05_default_constitutional_guard:
+        w05_required_actions.append("default_w05_constitutional_guard")
+    if w05_default_protected_target_block:
+        w05_required_actions.append("default_w05_protected_target_block")
+    if w05_default_prior_gain_suppressed:
+        w05_required_actions.append("default_w05_prior_gain_suppressed")
+    if w05_default_must_abstain:
+        w05_required_actions.append("default_w05_must_abstain")
+    if not w05_required_actions:
+        w05_required_actions.append("w05_optional")
+
+    trace_emit_active("w05_predictive_prior_injection", "decision", w05_trace_values)
+    if w05_checkpoint_status != SubjectTickCheckpointStatus.ALLOWED:
+        trace_emit_active(
+            "w05_predictive_prior_injection",
+            "blocked",
+            w05_trace_values,
+            note=w05_checkpoint_reason,
+        )
+    trace_emit_active("w05_predictive_prior_injection", "exit", w05_trace_values)
+    checkpoints.append(
+        SubjectTickCheckpointResult(
+            checkpoint_id="rt01.w05_predictive_prior_injection_checkpoint",
+            source_contract="w05_predictive_prior_injection.routing_result",
+            status=w05_checkpoint_status,
+            required_action=";".join(dict.fromkeys(w05_required_actions)),
+            applied_action=active_execution_mode,
+            reason=w05_checkpoint_reason,
+        )
+    )
+
     m01_explicit_input = (
         context.m01_input_bundle
         if isinstance(context.m01_input_bundle, M01InputBundle)
@@ -8664,6 +8843,26 @@ def execute_subject_tick(
         w04_consumer_ready=w04_result.gate.consumer_ready,
         w04_no_clean_applicability=w04_result.gate.no_clean_applicability,
         w04_scope_marker=w04_result.scope_marker.scope,
+        w05_checkpoint_present=True,
+        w05_explicit_basis_present=w05_explicit_basis,
+        w05_signal_stack_count=w05_result.telemetry.signal_stack_count,
+        w05_prediction_use_count=w05_result.telemetry.prediction_use_count,
+        w05_prior_gain_suppressed_count=w05_result.telemetry.prior_gain_suppressed_count,
+        w05_prior_gain_amplified_count=w05_result.telemetry.prior_gain_amplified_count,
+        w05_prior_gain_unchanged_count=w05_result.telemetry.prior_gain_unchanged_count,
+        w05_mismatch_count=w05_result.telemetry.mismatch_count,
+        w05_ambiguous_mismatch_count=w05_result.telemetry.ambiguous_mismatch_count,
+        w05_revalidate_route_count=w05_result.telemetry.revalidate_route_count,
+        w05_escalate_route_count=w05_result.telemetry.escalate_route_count,
+        w05_abstain_count=w05_result.telemetry.abstain_count,
+        w05_constitutional_guard_count=w05_result.telemetry.constitutional_guard_count,
+        w05_protected_target_block_count=w05_result.telemetry.protected_target_block_count,
+        w05_must_not_execute_update_count=w05_result.telemetry.must_not_execute_update_count,
+        w05_permitted_channel_block_count=w05_result.telemetry.permitted_channel_block_count,
+        w05_channel_collapse_block_count=w05_result.telemetry.channel_collapse_block_count,
+        w05_consumer_ready=w05_result.gate.consumer_ready,
+        w05_no_clean_routing=w05_result.gate.no_clean_routing,
+        w05_scope_marker=w05_result.scope_marker.scope,
         m01_imprint_count=m01_result.telemetry.imprint_count,
         m01_explicit_basis_present=m01_explicit_basis,
         m01_strong_imprint_count=m01_result.telemetry.strong_imprint_count,
@@ -8832,6 +9031,7 @@ def execute_subject_tick(
         w02_result=w02_result,
         w03_result=w03_result,
         w04_result=w04_result,
+        w05_result=w05_result,
         m01_result=m01_result,
         m02_result=m02_result,
         n01_result=n01_result,
@@ -9722,6 +9922,134 @@ def _build_default_w04_input_bundle(
         perspective_frame=frame,
         constraint_profile=profile,
         reason="default projection from w03 schema/prior permissions",
+    )
+
+
+def _build_default_w05_input_bundle(
+    *,
+    tick_id: str,
+    tick_index: int,
+    w04_result,
+    source_lineage: tuple[str, ...],
+) -> W05InputBundle | None:
+    packets = tuple(getattr(w04_result, "downstream_permission_packets", ()))
+    decisions = tuple(getattr(w04_result, "applicability_decisions", ()))
+    if not packets:
+        return None
+
+    packet = packets[0]
+    decision = decisions[0] if decisions else None
+    desired = W05DesiredSignal(
+        signal_id=f"w05:{tick_id}:desired:signal",
+        desired_state_id=f"w05:{tick_id}:desired",
+        requested_outcome="bounded_prior_alignment",
+        actor_id="self",
+        perspective_id="self",
+        priority="normal",
+        source_authority="rt01_default",
+        provenance=("subject_tick.default_w05_desired",),
+        allowed_relaxation_fields=("soft_conflict",),
+        non_negotiable_constraints=("hard_non_negotiable",),
+        forbidden_update_targets=(),
+        malformed_markers=(),
+        target_scope=("bounded_scope",),
+        confidence=0.6,
+        precision=0.6,
+        uncertainty_markers=(),
+    )
+    predicted = W05PredictedSignal(
+        signal_id=f"w05:{tick_id}:predicted:signal",
+        prediction_id=f"w05:{tick_id}:prediction",
+        prior_id=str(getattr(decision, "prior_id", f"prior:{tick_id}")),
+        expected_observation="obs:expected",
+        expected_action_effect="effect:expected",
+        expected_affordance="affordance:expected",
+        expected_goal_satisfaction="bounded_prior_alignment",
+        expected_validity_window=(tick_index, tick_index + 1),
+        prior_strength=0.7,
+        prediction_confidence=0.75,
+        source_reliability=0.8,
+        source_authority="rt01_default",
+        provenance=("subject_tick.default_w05_predicted",),
+        target_scope=("bounded_scope",),
+        confidence=0.75,
+        precision=0.7,
+        timestamp_or_sequence=tick_index,
+        uncertainty_markers=(),
+    )
+    observed = W05ObservedSignal(
+        signal_id=f"w05:{tick_id}:observed:signal",
+        observation_id=f"w05:{tick_id}:observation",
+        observation_refs=(f"obs:{tick_id}:1",),
+        observed_outcome="obs:expected",
+        observed_action_effect="effect:expected",
+        observed_affordance="affordance:expected",
+        evidence_precision=0.75,
+        source_reliability=0.8,
+        source_authority="rt01_default",
+        presence_mode="present",
+        timestamp_or_sequence=tick_index,
+        contradiction_markers=(),
+        provenance=("subject_tick.default_w05_observed",),
+        target_scope=("bounded_scope",),
+        confidence=0.75,
+        precision=0.75,
+        uncertainty_markers=(),
+    )
+    permitted = W05PermittedSignal(
+        signal_id=f"w05:{tick_id}:permitted:signal",
+        permitted_signal_id=f"w05:{tick_id}:permitted",
+        w04_decision_ref=str(getattr(packet, "decision_id", f"w04:{tick_id}:decision")),
+        permitted_status="allowed" if bool(getattr(packet, "may_deploy_candidate", False)) else "restricted",
+        may_deploy_candidate=bool(getattr(packet, "may_deploy_candidate", False)),
+        may_use_as_hint_only=bool(getattr(packet, "may_use_as_hint_only", False)),
+        may_use_after_revalidation=bool(getattr(packet, "may_use_after_revalidation", False)),
+        may_use_with_relaxation=bool(getattr(packet, "may_use_with_relaxation", False)),
+        must_abstain=bool(getattr(packet, "must_abstain", False)),
+        must_block=bool(getattr(packet, "must_block", False)),
+        must_revalidate=bool(getattr(packet, "must_revalidate", False)),
+        prohibited_uses=tuple(getattr(packet, "prohibited_uses", ())),
+        protected_targets=(W05InjectionTarget.PROTECTED_CONSTITUTIONAL_LAYER,),
+        non_learnable_layer_flags=("constitutional_locked",),
+        allowed_update_targets=(
+            W05InjectionTarget.INTERPRETATION_INTERFACE,
+            W05InjectionTarget.POLICY_INTERFACE,
+        ),
+        prohibited_update_targets=(W05InjectionTarget.PROTECTED_CONSTITUTIONAL_LAYER,),
+        constitutional_guard_flags=("preserve_constitution",),
+        source_authority="rt01_default",
+        provenance=("subject_tick.default_w05_permitted",),
+        target_scope=("bounded_scope",),
+        confidence=1.0,
+        precision=1.0,
+        timestamp_or_sequence=tick_index,
+        uncertainty_markers=(),
+    )
+    gain_config = W05PriorGainControlConfig(
+        prior_strength_policy="bounded_linear",
+        evidence_precision_policy="precision_weighted",
+        source_reliability_interaction_matrix=("reliable_amplify", "weak_suppress"),
+        suppress_conditions=("high_precision_contradiction", "permitted_block"),
+        amplify_conditions=("high_reliability_and_consistency",),
+        maximum_gain=1.0,
+        minimum_gain=0.0,
+        high_precision_contradiction_threshold=0.8,
+        low_precision_noise_threshold=0.25,
+        protected_target_gain_cap=0.2,
+        reason_codes=("w05.1_gain_control",),
+    )
+    return W05InputBundle(
+        bundle_id=f"w05:{tick_id}:default_bundle",
+        source_lineage=source_lineage,
+        w04_decision_ref=permitted.w04_decision_ref,
+        w03_prior_ref=predicted.prior_id,
+        desired_signal=desired,
+        predicted_signal=predicted,
+        observed_signal=observed,
+        permitted_signal=permitted,
+        prior_gain_config=gain_config,
+        protected_target_registry=(W05InjectionTarget.PROTECTED_CONSTITUTIONAL_LAYER,),
+        reason="default projection from w04 applicability packet",
     )
 
 

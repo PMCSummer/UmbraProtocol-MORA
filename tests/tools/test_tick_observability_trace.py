@@ -59,6 +59,7 @@ HOSTED_CONTOUR_SEGMENTS = (
     "w02_regularity_extraction",
     "w03_schema_consolidation",
     "w04_applicability_gating",
+    "w05_predictive_prior_injection",
     "m01_homeostatic_salience_imprint",
     "m02_predictive_relevance",
     "n01_narrative_commitments",
@@ -411,6 +412,25 @@ HOSTED_CONTOUR_FIELDS: dict[str, set[str]] = {
         "w04_stale_block_count",
         "w04_consumer_ready",
         "w04_no_clean_applicability",
+    },
+    "w05_predictive_prior_injection": {
+        "w05_signal_stack_count",
+        "w05_prediction_use_count",
+        "w05_prior_gain_suppressed_count",
+        "w05_prior_gain_amplified_count",
+        "w05_prior_gain_unchanged_count",
+        "w05_mismatch_count",
+        "w05_ambiguous_mismatch_count",
+        "w05_revalidate_route_count",
+        "w05_escalate_route_count",
+        "w05_abstain_count",
+        "w05_constitutional_guard_count",
+        "w05_protected_target_block_count",
+        "w05_must_not_execute_update_count",
+        "w05_permitted_channel_block_count",
+        "w05_channel_collapse_block_count",
+        "w05_consumer_ready",
+        "w05_no_clean_routing",
     },
     "m01_homeostatic_salience_imprint": {
         "imprint_count",
@@ -977,6 +997,9 @@ def test_hosted_contour_segments_follow_real_runtime_order(tmp_path: Path) -> No
         events, "w04_applicability_gating"
     )
     assert _first_order(events, "w04_applicability_gating") < _first_order(
+        events, "w05_predictive_prior_injection"
+    )
+    assert _first_order(events, "w05_predictive_prior_injection") < _first_order(
         events, "m01_homeostatic_salience_imprint"
     )
     assert _first_order(events, "m01_homeostatic_salience_imprint") < _first_order(
@@ -1080,6 +1103,7 @@ def test_representative_modules_have_runtime_steps(tmp_path: Path) -> None:
         "w02_regularity_extraction",
         "w03_schema_consolidation",
         "w04_applicability_gating",
+        "w05_predictive_prior_injection",
         "m01_homeostatic_salience_imprint",
         "m02_predictive_relevance",
         "n01_narrative_commitments",
@@ -1100,7 +1124,7 @@ def test_no_verdict_vocabulary_anywhere_on_main_path(tmp_path: Path) -> None:
         assert token not in payload
 
 
-def test_w03_w04_n03_trace_payload_does_not_leak_raw_owner_objects(tmp_path: Path) -> None:
+def test_w03_w04_w05_n03_trace_payload_does_not_leak_raw_owner_objects(tmp_path: Path) -> None:
     trace_path, _ = _run_sample_trace(tmp_path, case_id="runtime-no-raw-w03-n03-leak")
     payload = trace_path.read_text(encoding="utf-8")
     forbidden_tokens = (
@@ -1117,6 +1141,15 @@ def test_w03_w04_n03_trace_payload_does_not_leak_raw_owner_objects(tmp_path: Pat
         "relaxation_ledger_entries",
         "revalidation_requests",
         "blocked_records",
+        "signal_stacks",
+        "prediction_use_records",
+        "prior_gain_decisions",
+        "mismatch_classifications",
+        "update_routing_packets",
+        "constitutional_guard_checks",
+        "permitted_channel_enforcement_records",
+        "revalidation_or_escalation_requests",
+        "downstream_routing_packets",
         "relevance_entries",
         "trace_candidates",
         "current_targets",

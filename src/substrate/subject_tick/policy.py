@@ -2470,6 +2470,81 @@ def evaluate_subject_tick_downstream_gate(
             usability = SubjectTickUsabilityClass.BLOCKED
             reason = "w04 produced no consumer-ready applicability packet for bounded deployment use"
 
+    w05_checkpoint = next(
+        (
+            checkpoint
+            for checkpoint in state.execution_checkpoints
+            if checkpoint.checkpoint_id == "rt01.w05_predictive_prior_injection_checkpoint"
+        ),
+        None,
+    )
+    if w05_checkpoint is not None:
+        if "require_w05_routing_packet_consumer" in w05_checkpoint.required_action:
+            restrictions.append(SubjectTickRestrictionCode.W05_ROUTING_PACKET_CONSUMER_REQUIRED)
+        if "require_w05_execution_seam_consumer" in w05_checkpoint.required_action:
+            restrictions.append(SubjectTickRestrictionCode.W05_EXECUTION_SEAM_CONSUMER_REQUIRED)
+        if "default_w05_no_clean_routing_detour" in w05_checkpoint.required_action:
+            restrictions.append(SubjectTickRestrictionCode.W05_NO_CLEAN_ROUTING_DETOUR_REQUIRED)
+        if "default_w05_permitted_channel_block" in w05_checkpoint.required_action:
+            restrictions.append(SubjectTickRestrictionCode.W05_PERMITTED_CHANNEL_BLOCK_RESTRICTION)
+        if "default_w05_channel_collapse_block" in w05_checkpoint.required_action:
+            restrictions.append(SubjectTickRestrictionCode.W05_CHANNEL_COLLAPSE_BLOCK_RESTRICTION)
+        if "default_w05_revalidate_route" in w05_checkpoint.required_action:
+            restrictions.append(SubjectTickRestrictionCode.W05_REVALIDATE_ROUTE_RESTRICTION)
+        if "default_w05_escalate_route" in w05_checkpoint.required_action:
+            restrictions.append(SubjectTickRestrictionCode.W05_ESCALATE_ROUTE_RESTRICTION)
+        if "default_w05_ambiguous_mismatch" in w05_checkpoint.required_action:
+            restrictions.append(SubjectTickRestrictionCode.W05_AMBIGUOUS_MISMATCH_RESTRICTION)
+        if "default_w05_constitutional_guard" in w05_checkpoint.required_action:
+            restrictions.append(SubjectTickRestrictionCode.W05_CONSTITUTIONAL_GUARD_RESTRICTION)
+        if "default_w05_protected_target_block" in w05_checkpoint.required_action:
+            restrictions.append(SubjectTickRestrictionCode.W05_PROTECTED_TARGET_BLOCK_RESTRICTION)
+        if "default_w05_prior_gain_suppressed" in w05_checkpoint.required_action:
+            restrictions.append(SubjectTickRestrictionCode.W05_PRIOR_GAIN_SUPPRESSION_RESTRICTION)
+        if "default_w05_must_abstain" in w05_checkpoint.required_action:
+            restrictions.append(SubjectTickRestrictionCode.W05_MUST_ABSTAIN_RESTRICTION)
+
+    w05_basis_present = bool(state.w05_explicit_basis_present)
+    if w05_basis_present and state.w05_no_clean_routing:
+        restrictions.append(SubjectTickRestrictionCode.W05_NO_CLEAN_ROUTING_DETOUR_REQUIRED)
+        if (
+            state.final_execution_outcome == SubjectTickOutcome.CONTINUE
+            and usability == SubjectTickUsabilityClass.USABLE_BOUNDED
+        ):
+            usability = SubjectTickUsabilityClass.DEGRADED_BOUNDED
+            reason = "w05 explicit basis produced no-clean routing and requires bounded detour"
+    if w05_basis_present and state.w05_permitted_channel_block_count > 0:
+        restrictions.append(SubjectTickRestrictionCode.W05_PERMITTED_CHANNEL_BLOCK_RESTRICTION)
+    if w05_basis_present and state.w05_channel_collapse_block_count > 0:
+        restrictions.append(SubjectTickRestrictionCode.W05_CHANNEL_COLLAPSE_BLOCK_RESTRICTION)
+        if state.final_execution_outcome == SubjectTickOutcome.CONTINUE:
+            accepted = False
+            usability = SubjectTickUsabilityClass.BLOCKED
+            reason = "w05 channel collapse prevents clean predictive routing"
+    if w05_basis_present and state.w05_revalidate_route_count > 0:
+        restrictions.append(SubjectTickRestrictionCode.W05_REVALIDATE_ROUTE_RESTRICTION)
+    if w05_basis_present and state.w05_escalate_route_count > 0:
+        restrictions.append(SubjectTickRestrictionCode.W05_ESCALATE_ROUTE_RESTRICTION)
+    if w05_basis_present and state.w05_ambiguous_mismatch_count > 0:
+        restrictions.append(SubjectTickRestrictionCode.W05_AMBIGUOUS_MISMATCH_RESTRICTION)
+    if w05_basis_present and state.w05_constitutional_guard_count > 0:
+        restrictions.append(SubjectTickRestrictionCode.W05_CONSTITUTIONAL_GUARD_RESTRICTION)
+    if w05_basis_present and state.w05_protected_target_block_count > 0:
+        restrictions.append(SubjectTickRestrictionCode.W05_PROTECTED_TARGET_BLOCK_RESTRICTION)
+    if w05_basis_present and state.w05_prior_gain_suppressed_count > 0:
+        restrictions.append(SubjectTickRestrictionCode.W05_PRIOR_GAIN_SUPPRESSION_RESTRICTION)
+    if w05_basis_present and state.w05_abstain_count > 0:
+        restrictions.append(SubjectTickRestrictionCode.W05_MUST_ABSTAIN_RESTRICTION)
+    if w05_basis_present and state.w05_must_not_execute_update_count > 0:
+        restrictions.append(SubjectTickRestrictionCode.W05_MUST_NOT_EXECUTE_UPDATE_RESTRICTION)
+    if w05_basis_present and not state.w05_consumer_ready:
+        restrictions.append(SubjectTickRestrictionCode.W05_ROUTING_PACKET_CONSUMER_REQUIRED)
+        restrictions.append(SubjectTickRestrictionCode.DOWNSTREAM_AUTHORITY_DEGRADED)
+        if state.final_execution_outcome == SubjectTickOutcome.CONTINUE:
+            accepted = False
+            usability = SubjectTickUsabilityClass.BLOCKED
+            reason = "w05 produced no consumer-ready routing packet under bounded execution seam"
+
     m01_checkpoint = next(
         (
             checkpoint

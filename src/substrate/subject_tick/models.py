@@ -94,6 +94,10 @@ if TYPE_CHECKING:
         W04InputBundle,
         W04ResultBundle,
     )
+    from substrate.w05_predictive_prior_injection import (
+        W05InputBundle,
+        W05ResultBundle,
+    )
     from substrate.m01_homeostatic_salience_imprint import (
         M01InputBundle,
         M01Result,
@@ -571,6 +575,22 @@ class SubjectTickRestrictionCode(StrEnum):
     W04_STALE_BLOCK_RESTRICTION = "w04_stale_block_restriction"
     W04_RELAXATION_ROUTE_RESTRICTION = "w04_relaxation_route_restriction"
     W04_NO_CLEAN_APPLICABILITY_DETOUR_REQUIRED = "w04_no_clean_applicability_detour_required"
+    W05_PREDICTIVE_PRIOR_INJECTION_CONTRACT_MUST_BE_READ = (
+        "w05_predictive_prior_injection_contract_must_be_read"
+    )
+    W05_ROUTING_PACKET_CONSUMER_REQUIRED = "w05_routing_packet_consumer_required"
+    W05_EXECUTION_SEAM_CONSUMER_REQUIRED = "w05_execution_seam_consumer_required"
+    W05_PERMITTED_CHANNEL_BLOCK_RESTRICTION = "w05_permitted_channel_block_restriction"
+    W05_CHANNEL_COLLAPSE_BLOCK_RESTRICTION = "w05_channel_collapse_block_restriction"
+    W05_REVALIDATE_ROUTE_RESTRICTION = "w05_revalidate_route_restriction"
+    W05_ESCALATE_ROUTE_RESTRICTION = "w05_escalate_route_restriction"
+    W05_AMBIGUOUS_MISMATCH_RESTRICTION = "w05_ambiguous_mismatch_restriction"
+    W05_CONSTITUTIONAL_GUARD_RESTRICTION = "w05_constitutional_guard_restriction"
+    W05_PROTECTED_TARGET_BLOCK_RESTRICTION = "w05_protected_target_block_restriction"
+    W05_PRIOR_GAIN_SUPPRESSION_RESTRICTION = "w05_prior_gain_suppression_restriction"
+    W05_MUST_ABSTAIN_RESTRICTION = "w05_must_abstain_restriction"
+    W05_NO_CLEAN_ROUTING_DETOUR_REQUIRED = "w05_no_clean_routing_detour_required"
+    W05_MUST_NOT_EXECUTE_UPDATE_RESTRICTION = "w05_must_not_execute_update_restriction"
     M01_HOMEOSTATIC_IMPRINT_CONTRACT_MUST_BE_READ = (
         "m01_homeostatic_imprint_contract_must_be_read"
     )
@@ -843,6 +863,9 @@ class SubjectTickContext:
     require_w04_applicability_packet_consumer: bool = False
     require_w04_hard_constraint_consumer: bool = False
     disable_w04_enforcement: bool = False
+    require_w05_routing_packet_consumer: bool = False
+    require_w05_execution_seam_consumer: bool = False
+    disable_w05_enforcement: bool = False
     require_m01_imprint_packet_consumer: bool = False
     require_m01_axis_scope_consumer: bool = False
     disable_m01_enforcement: bool = False
@@ -879,6 +902,7 @@ class SubjectTickContext:
     w02_input_bundle: W02InputBundle | None = None
     w03_input_bundle: W03InputBundle | None = None
     w04_input_bundle: W04InputBundle | None = None
+    w05_input_bundle: W05InputBundle | None = None
     m01_input_bundle: M01InputBundle | None = None
     m02_input_bundle: M02InputBundle | None = None
     n01_input_bundle: N01InputBundle | None = None
@@ -1604,6 +1628,26 @@ class SubjectTickState:
     w04_consumer_ready: bool = False
     w04_no_clean_applicability: bool = True
     w04_scope_marker: str = ""
+    w05_checkpoint_present: bool = False
+    w05_explicit_basis_present: bool = False
+    w05_signal_stack_count: int = 0
+    w05_prediction_use_count: int = 0
+    w05_prior_gain_suppressed_count: int = 0
+    w05_prior_gain_amplified_count: int = 0
+    w05_prior_gain_unchanged_count: int = 0
+    w05_mismatch_count: int = 0
+    w05_ambiguous_mismatch_count: int = 0
+    w05_revalidate_route_count: int = 0
+    w05_escalate_route_count: int = 0
+    w05_abstain_count: int = 0
+    w05_constitutional_guard_count: int = 0
+    w05_protected_target_block_count: int = 0
+    w05_must_not_execute_update_count: int = 0
+    w05_permitted_channel_block_count: int = 0
+    w05_channel_collapse_block_count: int = 0
+    w05_consumer_ready: bool = False
+    w05_no_clean_routing: bool = True
+    w05_scope_marker: str = ""
     m01_imprint_count: int = 0
     m01_explicit_basis_present: bool = False
     m01_strong_imprint_count: int = 0
@@ -2005,6 +2049,7 @@ class SubjectTickResult:
     w02_result: W02ResultBundle
     w03_result: W03ResultBundle
     w04_result: W04ResultBundle
+    w05_result: W05ResultBundle
     m01_result: M01Result
     m02_result: M02Result
     n01_result: N01Result
