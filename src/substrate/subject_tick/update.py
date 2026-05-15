@@ -295,6 +295,19 @@ from substrate.w03_schema_consolidation import (
     build_w03_schema_consolidation,
     derive_w03_contract_view,
 )
+from substrate.w04_applicability_gating import (
+    W04ActiveApplicabilityContext,
+    W04Constraint,
+    W04ConstraintHardness,
+    W04ConstraintProfile,
+    W04ConstraintType,
+    W04DesiredStateRequest,
+    W04InputBundle,
+    W04PerspectiveFrame,
+    W04W03IntakeView,
+    build_w04_applicability_gating,
+    derive_w04_contract_view,
+)
 from substrate.m01_homeostatic_salience_imprint import (
     M01InputBundle,
     build_m01_homeostatic_salience_imprint,
@@ -375,6 +388,7 @@ ATTEMPTED_SUBJECT_TICK_PATHS: tuple[str, ...] = (
     "subject_tick.evaluate_w01_bounded_world_loop",
     "subject_tick.evaluate_w02_regularity_extraction",
     "subject_tick.evaluate_w03_schema_consolidation",
+    "subject_tick.evaluate_w04_applicability_gating",
     "subject_tick.evaluate_m01_homeostatic_salience_imprint",
     "subject_tick.evaluate_m02_predictive_relevance",
     "subject_tick.evaluate_n01_narrative_commitments",
@@ -6764,6 +6778,222 @@ def execute_subject_tick(
         )
     )
 
+    w04_explicit_input = (
+        context.w04_input_bundle
+        if isinstance(context.w04_input_bundle, W04InputBundle)
+        else _build_default_w04_input_bundle(
+            tick_id=tick_id,
+            tick_index=tick_index,
+            w03_result=w03_result,
+            source_lineage=lineage,
+        )
+    )
+    w04_explicit_basis = bool(
+        w04_explicit_input is not None and w04_explicit_input.w03_intake_views
+    )
+    w04_result = build_w04_applicability_gating(
+        tick_id=tick_id,
+        tick_index=tick_index,
+        input_bundle=w04_explicit_input,
+        enforcement_enabled=True,
+    )
+    w04_view = derive_w04_contract_view(w04_result)
+    w04_trace_values = {
+        "w04_applicability_decision_count": w04_result.telemetry.applicability_decision_count,
+        "w04_allowed_count": w04_result.telemetry.allowed_count,
+        "w04_blocked_count": w04_result.telemetry.blocked_count,
+        "w04_narrowed_count": w04_result.telemetry.narrowed_count,
+        "w04_hint_only_count": w04_result.telemetry.hint_only_count,
+        "w04_revalidate_required_count": w04_result.telemetry.revalidate_required_count,
+        "w04_abstain_count": w04_result.telemetry.abstain_count,
+        "w04_relaxation_count": w04_result.telemetry.relaxation_count,
+        "w04_hard_constraint_failure_count": w04_result.telemetry.hard_constraint_failure_count,
+        "w04_unknown_hard_count": w04_result.telemetry.unknown_hard_count,
+        "w04_malformed_desired_state_count": w04_result.telemetry.malformed_desired_state_count,
+        "w04_perspective_block_count": w04_result.telemetry.perspective_block_count,
+        "w04_authority_block_count": w04_result.telemetry.authority_block_count,
+        "w04_stale_block_count": w04_result.telemetry.stale_block_count,
+        "w04_consumer_ready": w04_result.gate.consumer_ready,
+        "w04_no_clean_applicability": w04_result.gate.no_clean_applicability,
+    }
+    trace_emit_active("w04_applicability_gating", "enter", w04_trace_values)
+    w04_checkpoint_status = SubjectTickCheckpointStatus.ALLOWED
+    w04_checkpoint_reason = w04_result.reason
+    w04_default_no_clean_detour = False
+    w04_default_hard_constraint_restriction = False
+    w04_default_revalidation_required = False
+    w04_default_must_abstain_restriction = False
+    w04_default_malformed_desired_state_restriction = False
+    w04_default_perspective_scope_restriction = False
+    w04_default_authority_scope_restriction = False
+    w04_default_stale_block_restriction = False
+    w04_default_relaxation_route = False
+    if not context.disable_w04_enforcement:
+        if (
+            context.require_w04_applicability_packet_consumer
+            and not w04_view.consumer_ready
+            and halt_reason is None
+        ):
+            revalidation_needed = True
+            w04_checkpoint_status = SubjectTickCheckpointStatus.ENFORCED_DETOUR
+            w04_checkpoint_reason = (
+                "w04 applicability packet consumer requested but typed applicability packets are not consumer-ready"
+            )
+            if active_execution_mode != "halt_execution":
+                active_execution_mode = "revalidate_scope"
+        if (
+            context.require_w04_hard_constraint_consumer
+            and w04_view.hard_constraint_failure_count == 0
+            and halt_reason is None
+        ):
+            revalidation_needed = True
+            w04_checkpoint_status = SubjectTickCheckpointStatus.ENFORCED_DETOUR
+            w04_checkpoint_reason = (
+                "w04 hard-constraint consumer requested but hard-constraint failure surface is absent"
+            )
+            if active_execution_mode != "halt_execution":
+                active_execution_mode = "revalidate_scope"
+        if w04_explicit_basis and w04_result.gate.no_clean_applicability and halt_reason is None:
+            revalidation_needed = True
+            w04_default_no_clean_detour = True
+            if w04_checkpoint_status == SubjectTickCheckpointStatus.ALLOWED:
+                w04_checkpoint_status = SubjectTickCheckpointStatus.ENFORCED_DETOUR
+            w04_checkpoint_reason = (
+                "w04 explicit basis produced no-clean applicability and requires bounded detour"
+            )
+            if active_execution_mode != "halt_execution":
+                active_execution_mode = "revalidate_scope"
+        if (
+            w04_explicit_basis
+            and w04_result.telemetry.hard_constraint_failure_count > 0
+            and halt_reason is None
+        ):
+            revalidation_needed = True
+            w04_default_hard_constraint_restriction = True
+            if w04_checkpoint_status == SubjectTickCheckpointStatus.ALLOWED:
+                w04_checkpoint_status = SubjectTickCheckpointStatus.ENFORCED_DETOUR
+            w04_checkpoint_reason = (
+                "w04 hard-constraint failures block clean applicability deployment"
+            )
+            if active_execution_mode != "halt_execution":
+                active_execution_mode = "revalidate_scope"
+        if (
+            w04_explicit_basis
+            and (
+                w04_result.telemetry.unknown_hard_count > 0
+                or w04_result.telemetry.revalidate_required_count > 0
+            )
+            and halt_reason is None
+        ):
+            w04_default_revalidation_required = True
+            if (
+                w04_checkpoint_status == SubjectTickCheckpointStatus.ALLOWED
+                and active_execution_mode not in {"halt_execution", "revalidate_scope"}
+            ):
+                active_execution_mode = "revalidate_scope"
+                revalidation_needed = True
+        if (
+            w04_explicit_basis
+            and w04_result.telemetry.abstain_count > 0
+            and halt_reason is None
+        ):
+            revalidation_needed = True
+            w04_default_must_abstain_restriction = True
+            if w04_checkpoint_status == SubjectTickCheckpointStatus.ALLOWED:
+                w04_checkpoint_status = SubjectTickCheckpointStatus.ENFORCED_DETOUR
+            w04_checkpoint_reason = (
+                "w04 downstream applicability permissions include must-abstain constraints"
+            )
+            if active_execution_mode != "halt_execution":
+                active_execution_mode = "revalidate_scope"
+        if (
+            w04_explicit_basis
+            and w04_result.telemetry.malformed_desired_state_count > 0
+            and halt_reason is None
+        ):
+            revalidation_needed = True
+            w04_default_malformed_desired_state_restriction = True
+            if w04_checkpoint_status == SubjectTickCheckpointStatus.ALLOWED:
+                w04_checkpoint_status = SubjectTickCheckpointStatus.ENFORCED_DETOUR
+            w04_checkpoint_reason = (
+                "w04 desired-state request is malformed and cannot authorize clean applicability"
+            )
+            if active_execution_mode != "halt_execution":
+                active_execution_mode = "revalidate_scope"
+        if (
+            w04_explicit_basis
+            and w04_result.telemetry.perspective_block_count > 0
+            and halt_reason is None
+        ):
+            w04_default_perspective_scope_restriction = True
+        if (
+            w04_explicit_basis
+            and w04_result.telemetry.authority_block_count > 0
+            and halt_reason is None
+        ):
+            w04_default_authority_scope_restriction = True
+        if (
+            w04_explicit_basis
+            and w04_result.telemetry.stale_block_count > 0
+            and halt_reason is None
+        ):
+            w04_default_stale_block_restriction = True
+        if (
+            w04_explicit_basis
+            and w04_result.telemetry.relaxation_count > 0
+            and halt_reason is None
+        ):
+            w04_default_relaxation_route = True
+    else:
+        w04_checkpoint_status = SubjectTickCheckpointStatus.ALLOWED
+        w04_checkpoint_reason = "W04 gate disabled in test fixture"
+
+    w04_required_actions: list[str] = []
+    if context.require_w04_applicability_packet_consumer:
+        w04_required_actions.append("require_w04_applicability_packet_consumer")
+    if context.require_w04_hard_constraint_consumer:
+        w04_required_actions.append("require_w04_hard_constraint_consumer")
+    if w04_default_no_clean_detour:
+        w04_required_actions.append("default_w04_no_clean_applicability_detour")
+    if w04_default_hard_constraint_restriction:
+        w04_required_actions.append("default_w04_hard_constraint_restriction")
+    if w04_default_revalidation_required:
+        w04_required_actions.append("default_w04_revalidation_required")
+    if w04_default_must_abstain_restriction:
+        w04_required_actions.append("default_w04_must_abstain_restriction")
+    if w04_default_malformed_desired_state_restriction:
+        w04_required_actions.append("default_w04_malformed_desired_state_restriction")
+    if w04_default_perspective_scope_restriction:
+        w04_required_actions.append("default_w04_perspective_scope_restriction")
+    if w04_default_authority_scope_restriction:
+        w04_required_actions.append("default_w04_authority_scope_restriction")
+    if w04_default_stale_block_restriction:
+        w04_required_actions.append("default_w04_stale_block_restriction")
+    if w04_default_relaxation_route:
+        w04_required_actions.append("default_w04_relaxation_route")
+    if not w04_required_actions:
+        w04_required_actions.append("w04_optional")
+
+    trace_emit_active("w04_applicability_gating", "decision", w04_trace_values)
+    if w04_checkpoint_status != SubjectTickCheckpointStatus.ALLOWED:
+        trace_emit_active(
+            "w04_applicability_gating",
+            "blocked",
+            w04_trace_values,
+            note=w04_checkpoint_reason,
+        )
+    trace_emit_active("w04_applicability_gating", "exit", w04_trace_values)
+    checkpoints.append(
+        SubjectTickCheckpointResult(
+            checkpoint_id="rt01.w04_applicability_gating_checkpoint",
+            source_contract="w04_applicability_gating.applicability_result",
+            status=w04_checkpoint_status,
+            required_action=";".join(dict.fromkeys(w04_required_actions)),
+            applied_action=active_execution_mode,
+            reason=w04_checkpoint_reason,
+        )
+    )
+
     m01_explicit_input = (
         context.m01_input_bundle
         if isinstance(context.m01_input_bundle, M01InputBundle)
@@ -8415,6 +8645,25 @@ def execute_subject_tick(
         w03_consumer_ready=w03_result.gate.consumer_ready,
         w03_no_clean_schema=w03_result.gate.no_clean_schema,
         w03_scope_marker=w03_result.scope_marker.scope,
+        w04_checkpoint_present=True,
+        w04_explicit_basis_present=w04_explicit_basis,
+        w04_applicability_decision_count=w04_result.telemetry.applicability_decision_count,
+        w04_allowed_count=w04_result.telemetry.allowed_count,
+        w04_blocked_count=w04_result.telemetry.blocked_count,
+        w04_narrowed_count=w04_result.telemetry.narrowed_count,
+        w04_hint_only_count=w04_result.telemetry.hint_only_count,
+        w04_revalidate_required_count=w04_result.telemetry.revalidate_required_count,
+        w04_abstain_count=w04_result.telemetry.abstain_count,
+        w04_relaxation_count=w04_result.telemetry.relaxation_count,
+        w04_hard_constraint_failure_count=w04_result.telemetry.hard_constraint_failure_count,
+        w04_unknown_hard_count=w04_result.telemetry.unknown_hard_count,
+        w04_malformed_desired_state_count=w04_result.telemetry.malformed_desired_state_count,
+        w04_perspective_block_count=w04_result.telemetry.perspective_block_count,
+        w04_authority_block_count=w04_result.telemetry.authority_block_count,
+        w04_stale_block_count=w04_result.telemetry.stale_block_count,
+        w04_consumer_ready=w04_result.gate.consumer_ready,
+        w04_no_clean_applicability=w04_result.gate.no_clean_applicability,
+        w04_scope_marker=w04_result.scope_marker.scope,
         m01_imprint_count=m01_result.telemetry.imprint_count,
         m01_explicit_basis_present=m01_explicit_basis,
         m01_strong_imprint_count=m01_result.telemetry.strong_imprint_count,
@@ -8495,7 +8744,7 @@ def execute_subject_tick(
         attempted_paths=ATTEMPTED_SUBJECT_TICK_PATHS,
         downstream_gate=gate,
         causal_basis=(
-            "bounded runtime execution spine enforces roadmap authority roles for C04/C05, consumes world-entry, s01 efference-copy, s02 prediction-boundary seam, s03 ownership-weighted learning, s04 interoceptive self-binding, s05 multi-cause attribution, s-minimal, a01 affordance ontology cleanup, a02 capability-gap detection, a03 internal-tool affordance normalization, a-line, m-minimal, n-minimal, t01 semantic-field, t02 relation-binding, t03 hypothesis-competition, t04 attention-schema, o01 other-entity modeling, o02 intersubjective allostasis, o03 strategy-class evaluation, p01 authority-bounded project-formation, o04 rupture/hostility/coercion dynamics, r05 bounded protective regulation gates, v01 act-level normative licensing/commitment guards, v02 typed utterance-plan bridge constraints, v03 constrained realization alignment/report contract, c06 typed surfacing-candidates handoff, p02 typed intervention episodes, p03 typed long-horizon credit assignment, p04 typed interpersonal counterfactual policy simulation, a04 staged external-affordance binding, w01 bounded world-loop admission, w02 staged regularity extraction, w03 schema consolidation, m01 homeostatic salience imprint, m02 predictive relevance, n01 narrative commitments, n02 identity-drift reflection, and n03 autobiographical relevance before bounded outcome resolution, while keeping D01 observability-only over fixed R->C order"
+            "bounded runtime execution spine enforces roadmap authority roles for C04/C05, consumes world-entry, s01 efference-copy, s02 prediction-boundary seam, s03 ownership-weighted learning, s04 interoceptive self-binding, s05 multi-cause attribution, s-minimal, a01 affordance ontology cleanup, a02 capability-gap detection, a03 internal-tool affordance normalization, a-line, m-minimal, n-minimal, t01 semantic-field, t02 relation-binding, t03 hypothesis-competition, t04 attention-schema, o01 other-entity modeling, o02 intersubjective allostasis, o03 strategy-class evaluation, p01 authority-bounded project-formation, o04 rupture/hostility/coercion dynamics, r05 bounded protective regulation gates, v01 act-level normative licensing/commitment guards, v02 typed utterance-plan bridge constraints, v03 constrained realization alignment/report contract, c06 typed surfacing-candidates handoff, p02 typed intervention episodes, p03 typed long-horizon credit assignment, p04 typed interpersonal counterfactual policy simulation, a04 staged external-affordance binding, w01 bounded world-loop admission, w02 staged regularity extraction, w03 schema consolidation, w04 applicability gating, m01 homeostatic salience imprint, m02 predictive relevance, n01 narrative commitments, n02 identity-drift reflection, and n03 autobiographical relevance before bounded outcome resolution, while keeping D01 observability-only over fixed R->C order"
         ),
     )
     abstain = final_outcome in {SubjectTickOutcome.REPAIR, SubjectTickOutcome.REVALIDATE}
@@ -8582,6 +8831,7 @@ def execute_subject_tick(
         w01_result=w01_result,
         w02_result=w02_result,
         w03_result=w03_result,
+        w04_result=w04_result,
         m01_result=m01_result,
         m02_result=m02_result,
         n01_result=n01_result,
@@ -9327,6 +9577,151 @@ def _build_default_w03_input_bundle(
         w02_contradiction_ledger=contradictions,
         reason="default projection from w02 regularity extraction result",
         previous_schema_versions=(),
+    )
+
+
+def _build_default_w04_input_bundle(
+    *,
+    tick_id: str,
+    tick_index: int,
+    w03_result,
+    source_lineage: tuple[str, ...],
+) -> W04InputBundle | None:
+    candidates = tuple(getattr(w03_result, "schema_candidates", ()))
+    permissions = tuple(getattr(w03_result, "downstream_permission_packets", ()))
+    if not candidates or not permissions:
+        return None
+
+    intake_views: list[W04W03IntakeView] = []
+    for candidate, packet in zip(candidates, permissions, strict=False):
+        prior = next(
+            (
+                item
+                for item in tuple(getattr(w03_result, "everyday_priors", ()))
+                if getattr(item, "schema_id", None) == getattr(candidate, "schema_id", None)
+            ),
+            None,
+        )
+        intake_views.append(
+            W04W03IntakeView(
+                prior_id=str(getattr(prior, "prior_id", f"prior:{candidate.schema_id}")),
+                schema_id=str(getattr(candidate, "schema_id", "")),
+                candidate_id=str(getattr(candidate, "schema_id", "")),
+                permission_packet_ref=f"packet:{getattr(candidate, 'schema_id', '')}",
+                support_refs=tuple(getattr(candidate, "support_regularities", ())),
+                authority_scope=tuple(getattr(candidate, "source_authority_scope", ())),
+                context_scope=tuple(getattr(candidate, "context_scope", ())),
+                applicability_conditions=tuple(getattr(candidate, "applicability_conditions", ())),
+                stale_or_revalidation_status=tuple(getattr(candidate, "stale_markers", ())),
+                contradiction_status=tuple(getattr(candidate, "unresolved_contradictions", ())),
+                prohibited_claims=tuple(getattr(packet, "prohibited_claims", ())),
+                allowed_use_cases=tuple(getattr(prior, "allowed_use_cases", ())),
+                blocked_use_cases=tuple(getattr(prior, "blocked_use_cases", ())),
+                override_conditions=tuple(getattr(prior, "override_conditions", ())),
+                may_use_as_bounded_prior=bool(getattr(packet, "may_use_as_bounded_prior", False)),
+                may_use_as_schema_hint=bool(getattr(packet, "may_use_as_schema_hint", False)),
+                may_use_as_operational_default=bool(getattr(packet, "may_use_as_operational_default", False)),
+                must_revalidate_before_use=bool(getattr(packet, "must_revalidate_before_use", False)),
+                must_preserve_contradiction=bool(getattr(packet, "must_preserve_contradiction", False)),
+                must_abstain=bool(getattr(packet, "must_abstain", False)),
+            )
+        )
+
+    profile_constraints = (
+        W04Constraint(
+            constraint_id=f"w04:{tick_id}:world-hard",
+            constraint_type=W04ConstraintType.WORLD_CONSTRAINT,
+            hard_or_soft=W04ConstraintHardness.HARD,
+            source_authority="rt01_default",
+            target_scope=("bounded_context",),
+            required_condition=("world_basis_present",),
+            forbidden_condition=("hard_world_violation",),
+            current_status="passed",
+            enforcement_route="block_on_hard_failure",
+            provenance=("subject_tick.default_w04_profile",),
+        ),
+        W04Constraint(
+            constraint_id=f"w04:{tick_id}:epistemic-soft",
+            constraint_type=W04ConstraintType.EPISTEMIC_CONSTRAINT,
+            hard_or_soft=W04ConstraintHardness.SOFT,
+            source_authority="rt01_default",
+            target_scope=("bounded_context",),
+            required_condition=("epistemic_alignment",),
+            forbidden_condition=("soft_epistemic_conflict",),
+            current_status="passed",
+            enforcement_route="relaxable_with_ledger",
+            provenance=("subject_tick.default_w04_profile",),
+        ),
+    )
+    profile = W04ConstraintProfile(
+        profile_id=f"w04:{tick_id}:profile",
+        world_constraints=(profile_constraints[0],),
+        legality_constraints=(),
+        epistemic_constraints=(profile_constraints[1],),
+        temporal_constraints=(),
+        perspective_constraints=(),
+        authority_constraints=(),
+        safety_constraints=(),
+        downstream_contract_constraints=(),
+        profile_source_authority="rt01_default",
+        hard_constraint_count=1,
+        soft_constraint_count=1,
+        unknown_hard_count=0,
+        malformed_markers=(),
+    )
+    desired = W04DesiredStateRequest(
+        desired_state_id=f"w04:{tick_id}:desired",
+        requested_outcome="bounded_prior_deployment",
+        actor_id="self",
+        target_subject="self_runtime",
+        perspective_id="self",
+        intended_use="bounded_applicability",
+        priority="normal",
+        temporal_window=(tick_index, tick_index + 1),
+        acceptable_relaxation_dimensions=("soft_epistemic_conflict",),
+        non_negotiable_constraints=("hard_non_negotiable",),
+        source_authority="rt01_default",
+        provenance=("subject_tick.default_w04_desired",),
+        malformed_markers=(),
+        embedded_forbidden_conclusions=(),
+        requested_schema_or_prior_refs=tuple(item.schema_id for item in intake_views),
+    )
+    context = W04ActiveApplicabilityContext(
+        context_id=f"w04:{tick_id}:context",
+        cycle_id=tick_id,
+        stream_id="rt01",
+        current_time_or_sequence=tick_index,
+        world_context_refs=("world_adapter.state",),
+        regularity_refs=tuple(item.schema_id for item in intake_views),
+        schema_refs=tuple(item.schema_id for item in intake_views),
+        contradiction_refs=tuple(item for intake in intake_views for item in intake.contradiction_status),
+        stale_context_markers=(),
+        unavailable_or_unknown_markers=(),
+        active_actor_id="self",
+        active_perspective_id="self",
+        source_context_scope=("bounded_context",),
+    )
+    frame = W04PerspectiveFrame(
+        actor_scope="self",
+        observer_scope="self",
+        subject_scope="self_runtime",
+        source_perspective="self",
+        requested_perspective="self",
+        allowed_perspective_transfer=("self->self",),
+        blocked_perspective_transfer=(),
+        self_other_boundary="preserved",
+        authority_boundary="preserved",
+        leakage_risk="low",
+    )
+    return W04InputBundle(
+        bundle_id=f"w04:{tick_id}:default_bundle",
+        source_lineage=source_lineage,
+        w03_intake_views=tuple(intake_views),
+        desired_state_request=desired,
+        active_context=context,
+        perspective_frame=frame,
+        constraint_profile=profile,
+        reason="default projection from w03 schema/prior permissions",
     )
 
 

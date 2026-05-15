@@ -58,6 +58,7 @@ HOSTED_CONTOUR_SEGMENTS = (
     "w01_bounded_world_loop",
     "w02_regularity_extraction",
     "w03_schema_consolidation",
+    "w04_applicability_gating",
     "m01_homeostatic_salience_imprint",
     "m02_predictive_relevance",
     "n01_narrative_commitments",
@@ -392,6 +393,24 @@ HOSTED_CONTOUR_FIELDS: dict[str, set[str]] = {
         "w03_version_update_count",
         "w03_consumer_ready",
         "w03_no_clean_schema",
+    },
+    "w04_applicability_gating": {
+        "w04_applicability_decision_count",
+        "w04_allowed_count",
+        "w04_blocked_count",
+        "w04_narrowed_count",
+        "w04_hint_only_count",
+        "w04_revalidate_required_count",
+        "w04_abstain_count",
+        "w04_relaxation_count",
+        "w04_hard_constraint_failure_count",
+        "w04_unknown_hard_count",
+        "w04_malformed_desired_state_count",
+        "w04_perspective_block_count",
+        "w04_authority_block_count",
+        "w04_stale_block_count",
+        "w04_consumer_ready",
+        "w04_no_clean_applicability",
     },
     "m01_homeostatic_salience_imprint": {
         "imprint_count",
@@ -955,6 +974,9 @@ def test_hosted_contour_segments_follow_real_runtime_order(tmp_path: Path) -> No
         events, "w03_schema_consolidation"
     )
     assert _first_order(events, "w03_schema_consolidation") < _first_order(
+        events, "w04_applicability_gating"
+    )
+    assert _first_order(events, "w04_applicability_gating") < _first_order(
         events, "m01_homeostatic_salience_imprint"
     )
     assert _first_order(events, "m01_homeostatic_salience_imprint") < _first_order(
@@ -1057,6 +1079,7 @@ def test_representative_modules_have_runtime_steps(tmp_path: Path) -> None:
         "w01_bounded_world_loop",
         "w02_regularity_extraction",
         "w03_schema_consolidation",
+        "w04_applicability_gating",
         "m01_homeostatic_salience_imprint",
         "m02_predictive_relevance",
         "n01_narrative_commitments",
@@ -1077,7 +1100,7 @@ def test_no_verdict_vocabulary_anywhere_on_main_path(tmp_path: Path) -> None:
         assert token not in payload
 
 
-def test_w03_n03_trace_payload_does_not_leak_raw_owner_objects(tmp_path: Path) -> None:
+def test_w03_w04_n03_trace_payload_does_not_leak_raw_owner_objects(tmp_path: Path) -> None:
     trace_path, _ = _run_sample_trace(tmp_path, case_id="runtime-no-raw-w03-n03-leak")
     payload = trace_path.read_text(encoding="utf-8")
     forbidden_tokens = (
@@ -1087,6 +1110,13 @@ def test_w03_n03_trace_payload_does_not_leak_raw_owner_objects(tmp_path: Path) -
         "version_records",
         "stale_assessments",
         "downstream_permission_packets",
+        "applicability_decisions",
+        "intersection_assessments",
+        "constraint_evaluations",
+        "perspective_safety_records",
+        "relaxation_ledger_entries",
+        "revalidation_requests",
+        "blocked_records",
         "relevance_entries",
         "trace_candidates",
         "current_targets",

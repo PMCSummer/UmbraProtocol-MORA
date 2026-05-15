@@ -56,6 +56,7 @@ def evaluate_subject_tick_downstream_gate(
         SubjectTickRestrictionCode.W01_BOUNDED_WORLD_LOOP_CONTRACT_MUST_BE_READ,
         SubjectTickRestrictionCode.W02_REGULARITY_EXTRACTION_CONTRACT_MUST_BE_READ,
         SubjectTickRestrictionCode.W03_SCHEMA_CONSOLIDATION_CONTRACT_MUST_BE_READ,
+        SubjectTickRestrictionCode.W04_APPLICABILITY_GATING_CONTRACT_MUST_BE_READ,
         SubjectTickRestrictionCode.M01_HOMEOSTATIC_IMPRINT_CONTRACT_MUST_BE_READ,
         SubjectTickRestrictionCode.N01_NARRATIVE_COMMITMENT_CONTRACT_MUST_BE_READ,
         SubjectTickRestrictionCode.N02_IDENTITY_DRIFT_CONTRACT_MUST_BE_READ,
@@ -2381,6 +2382,93 @@ def evaluate_subject_tick_downstream_gate(
             accepted = False
             usability = SubjectTickUsabilityClass.BLOCKED
             reason = "w03 produced no consumer-ready schema/prior packets for bounded downstream use"
+
+    w04_checkpoint = next(
+        (
+            checkpoint
+            for checkpoint in state.execution_checkpoints
+            if checkpoint.checkpoint_id == "rt01.w04_applicability_gating_checkpoint"
+        ),
+        None,
+    )
+    if w04_checkpoint is not None:
+        if "require_w04_applicability_packet_consumer" in w04_checkpoint.required_action:
+            restrictions.append(SubjectTickRestrictionCode.W04_APPLICABILITY_PACKET_CONSUMER_REQUIRED)
+        if "require_w04_hard_constraint_consumer" in w04_checkpoint.required_action:
+            restrictions.append(SubjectTickRestrictionCode.W04_HARD_CONSTRAINT_RESTRICTION_REQUIRED)
+        if "default_w04_no_clean_applicability_detour" in w04_checkpoint.required_action:
+            restrictions.append(SubjectTickRestrictionCode.W04_NO_CLEAN_APPLICABILITY_DETOUR_REQUIRED)
+        if "default_w04_hard_constraint_restriction" in w04_checkpoint.required_action:
+            restrictions.append(SubjectTickRestrictionCode.W04_HARD_CONSTRAINT_RESTRICTION_REQUIRED)
+        if "default_w04_revalidation_required" in w04_checkpoint.required_action:
+            restrictions.append(SubjectTickRestrictionCode.W04_REVALIDATION_REQUIRED)
+        if "default_w04_must_abstain_restriction" in w04_checkpoint.required_action:
+            restrictions.append(SubjectTickRestrictionCode.W04_MUST_ABSTAIN_RESTRICTION)
+        if "default_w04_malformed_desired_state_restriction" in w04_checkpoint.required_action:
+            restrictions.append(SubjectTickRestrictionCode.W04_MALFORMED_DESIRED_STATE_RESTRICTION)
+        if "default_w04_perspective_scope_restriction" in w04_checkpoint.required_action:
+            restrictions.append(SubjectTickRestrictionCode.W04_PERSPECTIVE_SCOPE_RESTRICTION)
+        if "default_w04_authority_scope_restriction" in w04_checkpoint.required_action:
+            restrictions.append(SubjectTickRestrictionCode.W04_AUTHORITY_SCOPE_RESTRICTION)
+        if "default_w04_stale_block_restriction" in w04_checkpoint.required_action:
+            restrictions.append(SubjectTickRestrictionCode.W04_STALE_BLOCK_RESTRICTION)
+        if "default_w04_relaxation_route" in w04_checkpoint.required_action:
+            restrictions.append(SubjectTickRestrictionCode.W04_RELAXATION_ROUTE_RESTRICTION)
+
+    w04_basis_present = bool(state.w04_explicit_basis_present)
+    if w04_basis_present and state.w04_no_clean_applicability:
+        restrictions.append(SubjectTickRestrictionCode.W04_NO_CLEAN_APPLICABILITY_DETOUR_REQUIRED)
+        if (
+            state.final_execution_outcome == SubjectTickOutcome.CONTINUE
+            and usability == SubjectTickUsabilityClass.USABLE_BOUNDED
+        ):
+            usability = SubjectTickUsabilityClass.DEGRADED_BOUNDED
+            reason = "w04 explicit basis produced no-clean applicability and requires bounded detour"
+    if w04_basis_present and state.w04_hard_constraint_failure_count > 0:
+        restrictions.append(SubjectTickRestrictionCode.W04_HARD_CONSTRAINT_RESTRICTION_REQUIRED)
+        if state.final_execution_outcome == SubjectTickOutcome.CONTINUE:
+            accepted = False
+            usability = SubjectTickUsabilityClass.BLOCKED
+            reason = "w04 hard-constraint failures block clean applicability deployment"
+    if w04_basis_present and state.w04_unknown_hard_count > 0:
+        restrictions.append(SubjectTickRestrictionCode.W04_REVALIDATION_REQUIRED)
+        if (
+            state.final_execution_outcome == SubjectTickOutcome.CONTINUE
+            and usability == SubjectTickUsabilityClass.USABLE_BOUNDED
+        ):
+            usability = SubjectTickUsabilityClass.DEGRADED_BOUNDED
+            reason = "w04 unknown hard-feasibility requires revalidation before deployment"
+    if w04_basis_present and state.w04_revalidate_required_count > 0:
+        restrictions.append(SubjectTickRestrictionCode.W04_REVALIDATION_REQUIRED)
+    if w04_basis_present and state.w04_abstain_count > 0:
+        restrictions.append(SubjectTickRestrictionCode.W04_MUST_ABSTAIN_RESTRICTION)
+        if (
+            state.final_execution_outcome == SubjectTickOutcome.CONTINUE
+            and usability == SubjectTickUsabilityClass.USABLE_BOUNDED
+        ):
+            usability = SubjectTickUsabilityClass.DEGRADED_BOUNDED
+            reason = "w04 applicability packets include must-abstain constraints"
+    if w04_basis_present and state.w04_malformed_desired_state_count > 0:
+        restrictions.append(SubjectTickRestrictionCode.W04_MALFORMED_DESIRED_STATE_RESTRICTION)
+        if state.final_execution_outcome == SubjectTickOutcome.CONTINUE:
+            accepted = False
+            usability = SubjectTickUsabilityClass.BLOCKED
+            reason = "w04 malformed desired-state requests block clean applicability use"
+    if w04_basis_present and state.w04_perspective_block_count > 0:
+        restrictions.append(SubjectTickRestrictionCode.W04_PERSPECTIVE_SCOPE_RESTRICTION)
+    if w04_basis_present and state.w04_authority_block_count > 0:
+        restrictions.append(SubjectTickRestrictionCode.W04_AUTHORITY_SCOPE_RESTRICTION)
+    if w04_basis_present and state.w04_stale_block_count > 0:
+        restrictions.append(SubjectTickRestrictionCode.W04_STALE_BLOCK_RESTRICTION)
+    if w04_basis_present and state.w04_relaxation_count > 0:
+        restrictions.append(SubjectTickRestrictionCode.W04_RELAXATION_ROUTE_RESTRICTION)
+    if w04_basis_present and not state.w04_consumer_ready:
+        restrictions.append(SubjectTickRestrictionCode.W04_APPLICABILITY_PACKET_CONSUMER_REQUIRED)
+        restrictions.append(SubjectTickRestrictionCode.DOWNSTREAM_AUTHORITY_DEGRADED)
+        if state.final_execution_outcome == SubjectTickOutcome.CONTINUE:
+            accepted = False
+            usability = SubjectTickUsabilityClass.BLOCKED
+            reason = "w04 produced no consumer-ready applicability packet for bounded deployment use"
 
     m01_checkpoint = next(
         (

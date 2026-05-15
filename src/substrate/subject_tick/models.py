@@ -90,6 +90,10 @@ if TYPE_CHECKING:
         W03InputBundle,
         W03ResultBundle,
     )
+    from substrate.w04_applicability_gating import (
+        W04InputBundle,
+        W04ResultBundle,
+    )
     from substrate.m01_homeostatic_salience_imprint import (
         M01InputBundle,
         M01Result,
@@ -554,6 +558,19 @@ class SubjectTickRestrictionCode(StrEnum):
     W03_NO_CLEAN_SCHEMA_DETOUR_REQUIRED = "w03_no_clean_schema_detour_required"
     W03_STALE_SCHEMA_REVALIDATION_REQUIRED = "w03_stale_schema_revalidation_required"
     W03_MUST_ABSTAIN_RESTRICTION = "w03_must_abstain_restriction"
+    W04_APPLICABILITY_GATING_CONTRACT_MUST_BE_READ = (
+        "w04_applicability_gating_contract_must_be_read"
+    )
+    W04_APPLICABILITY_PACKET_CONSUMER_REQUIRED = "w04_applicability_packet_consumer_required"
+    W04_HARD_CONSTRAINT_RESTRICTION_REQUIRED = "w04_hard_constraint_restriction_required"
+    W04_REVALIDATION_REQUIRED = "w04_revalidation_required"
+    W04_MUST_ABSTAIN_RESTRICTION = "w04_must_abstain_restriction"
+    W04_MALFORMED_DESIRED_STATE_RESTRICTION = "w04_malformed_desired_state_restriction"
+    W04_PERSPECTIVE_SCOPE_RESTRICTION = "w04_perspective_scope_restriction"
+    W04_AUTHORITY_SCOPE_RESTRICTION = "w04_authority_scope_restriction"
+    W04_STALE_BLOCK_RESTRICTION = "w04_stale_block_restriction"
+    W04_RELAXATION_ROUTE_RESTRICTION = "w04_relaxation_route_restriction"
+    W04_NO_CLEAN_APPLICABILITY_DETOUR_REQUIRED = "w04_no_clean_applicability_detour_required"
     M01_HOMEOSTATIC_IMPRINT_CONTRACT_MUST_BE_READ = (
         "m01_homeostatic_imprint_contract_must_be_read"
     )
@@ -823,6 +840,9 @@ class SubjectTickContext:
     require_w03_schema_packet_consumer: bool = False
     require_w03_contradiction_consumer: bool = False
     disable_w03_enforcement: bool = False
+    require_w04_applicability_packet_consumer: bool = False
+    require_w04_hard_constraint_consumer: bool = False
+    disable_w04_enforcement: bool = False
     require_m01_imprint_packet_consumer: bool = False
     require_m01_axis_scope_consumer: bool = False
     disable_m01_enforcement: bool = False
@@ -858,6 +878,7 @@ class SubjectTickContext:
     w01_world_packet_set: W01WorldPacketSet | None = None
     w02_input_bundle: W02InputBundle | None = None
     w03_input_bundle: W03InputBundle | None = None
+    w04_input_bundle: W04InputBundle | None = None
     m01_input_bundle: M01InputBundle | None = None
     m02_input_bundle: M02InputBundle | None = None
     n01_input_bundle: N01InputBundle | None = None
@@ -1564,6 +1585,25 @@ class SubjectTickState:
     w03_consumer_ready: bool = False
     w03_no_clean_schema: bool = True
     w03_scope_marker: str = ""
+    w04_checkpoint_present: bool = False
+    w04_explicit_basis_present: bool = False
+    w04_applicability_decision_count: int = 0
+    w04_allowed_count: int = 0
+    w04_blocked_count: int = 0
+    w04_narrowed_count: int = 0
+    w04_hint_only_count: int = 0
+    w04_revalidate_required_count: int = 0
+    w04_abstain_count: int = 0
+    w04_relaxation_count: int = 0
+    w04_hard_constraint_failure_count: int = 0
+    w04_unknown_hard_count: int = 0
+    w04_malformed_desired_state_count: int = 0
+    w04_perspective_block_count: int = 0
+    w04_authority_block_count: int = 0
+    w04_stale_block_count: int = 0
+    w04_consumer_ready: bool = False
+    w04_no_clean_applicability: bool = True
+    w04_scope_marker: str = ""
     m01_imprint_count: int = 0
     m01_explicit_basis_present: bool = False
     m01_strong_imprint_count: int = 0
@@ -1964,6 +2004,7 @@ class SubjectTickResult:
     w01_result: W01Result
     w02_result: W02ResultBundle
     w03_result: W03ResultBundle
+    w04_result: W04ResultBundle
     m01_result: M01Result
     m02_result: M02Result
     n01_result: N01Result
