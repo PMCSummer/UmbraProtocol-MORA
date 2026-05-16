@@ -196,6 +196,56 @@ def build_scripted_stage1_scenario(scenario_id: str) -> ScriptedScenario:
             eval_only_labels=("counterpart_surplus_claim_without_a_matching_deficit",),
         )
 
+    if scenario_id == "b_surplus_only":
+        return ScriptedScenario(
+            scenario_id=scenario_id,
+            a_truth=_inventory("subject_a", food=ResourceLevel.SUFFICIENT, water=ResourceLevel.SUFFICIENT),
+            b_truth=_inventory("counterpart_b", food=ResourceLevel.SUFFICIENT, water=ResourceLevel.SURPLUS),
+            emissions=(
+                _emission(scenario_id, 1, CounterpartSignalKind.PRESENCE_PING, authority=SignalAuthority.OBSERVED_EVENT),
+                _emission(scenario_id, 2, CounterpartSignalKind.RESOURCE_STATUS_CLAIM, resource=ResourceKind.WATER, reported_level=ResourceLevel.SURPLUS),
+            ),
+            eval_only_labels=("stage4_counterpart_surplus_only_claim",),
+        )
+
+    if scenario_id == "b_need_only":
+        return ScriptedScenario(
+            scenario_id=scenario_id,
+            a_truth=_inventory("subject_a", food=ResourceLevel.SUFFICIENT, water=ResourceLevel.SUFFICIENT),
+            b_truth=_inventory("counterpart_b", food=ResourceLevel.DEFICIT, water=ResourceLevel.SUFFICIENT),
+            emissions=(
+                _emission(scenario_id, 1, CounterpartSignalKind.PRESENCE_PING, authority=SignalAuthority.OBSERVED_EVENT),
+                _emission(scenario_id, 2, CounterpartSignalKind.RESOURCE_STATUS_CLAIM, resource=ResourceKind.FOOD, reported_level=ResourceLevel.DEFICIT),
+            ),
+            eval_only_labels=("stage4_counterpart_need_only_claim",),
+        )
+
+    if scenario_id == "clarification_resolves_missing_need":
+        return ScriptedScenario(
+            scenario_id=scenario_id,
+            a_truth=a_default,
+            b_truth=_inventory("counterpart_b", food=ResourceLevel.DEFICIT, water=ResourceLevel.SURPLUS),
+            emissions=(
+                _emission(scenario_id, 1, CounterpartSignalKind.RESOURCE_STATUS_CLAIM, resource=ResourceKind.WATER, reported_level=ResourceLevel.SURPLUS),
+                _emission(scenario_id, 2, CounterpartSignalKind.PRESENCE_PING, authority=SignalAuthority.OBSERVED_EVENT, notes="clarification-turn placeholder"),
+                _emission(scenario_id, 3, CounterpartSignalKind.RESOURCE_STATUS_CLAIM, resource=ResourceKind.FOOD, reported_level=ResourceLevel.DEFICIT),
+            ),
+            eval_only_labels=("stage4_clarification_resolved_need_claim",),
+        )
+
+    if scenario_id == "clarification_loop_guard":
+        return ScriptedScenario(
+            scenario_id=scenario_id,
+            a_truth=a_default,
+            b_truth=_inventory("counterpart_b", food=ResourceLevel.UNKNOWN, water=ResourceLevel.UNKNOWN),
+            emissions=(
+                _emission(scenario_id, 1, CounterpartSignalKind.PRESENCE_PING, authority=SignalAuthority.OBSERVED_EVENT),
+                _emission(scenario_id, 2, CounterpartSignalKind.ABSENCE, authority=SignalAuthority.OBSERVED_EVENT, notes="vague or non-answer"),
+                _emission(scenario_id, 3, CounterpartSignalKind.ABSENCE, authority=SignalAuthority.OBSERVED_EVENT, notes="repeated vague answer"),
+            ),
+            eval_only_labels=("stage4_clarification_loop_guard",),
+        )
+
     if scenario_id == "claim_then_confirmed_transfer":
         return ScriptedScenario(
             scenario_id=scenario_id,
@@ -238,6 +288,57 @@ def build_scripted_stage1_scenario(scenario_id: str) -> ScriptedScenario:
             eval_only_labels=("claim_then_transfer_failed",),
         )
 
+    if scenario_id == "transfer_affordance_failure":
+        return ScriptedScenario(
+            scenario_id=scenario_id,
+            a_truth=a_default,
+            b_truth=_inventory("counterpart_b", food=ResourceLevel.DEFICIT, water=ResourceLevel.SURPLUS),
+            emissions=(
+                _emission(scenario_id, 1, CounterpartSignalKind.RESOURCE_STATUS_CLAIM, resource=ResourceKind.WATER, reported_level=ResourceLevel.SURPLUS),
+                _emission(scenario_id, 2, CounterpartSignalKind.RESOURCE_STATUS_CLAIM, resource=ResourceKind.FOOD, reported_level=ResourceLevel.DEFICIT),
+                _emission(scenario_id, 3, CounterpartSignalKind.TRANSFER_ATTEMPT, item_kind=ResourceKind.FOOD, authority=SignalAuthority.OBSERVED_EVENT),
+                _emission(
+                    scenario_id,
+                    4,
+                    CounterpartSignalKind.TRANSFER_RESULT,
+                    item_kind=ResourceKind.FOOD,
+                    authority=SignalAuthority.OBSERVED_EVENT,
+                    transfer_outcome=TransferOutcome.FAILED_UNKNOWN,
+                ),
+            ),
+            eval_only_labels=("stage4_transfer_affordance_failure_visible",),
+        )
+
+    if scenario_id == "successful_scripted_exchange_cycle":
+        return ScriptedScenario(
+            scenario_id=scenario_id,
+            a_truth=a_default,
+            b_truth=_inventory("counterpart_b", food=ResourceLevel.DEFICIT, water=ResourceLevel.SURPLUS),
+            emissions=(
+                _emission(scenario_id, 1, CounterpartSignalKind.RESOURCE_STATUS_CLAIM, resource=ResourceKind.WATER, reported_level=ResourceLevel.SURPLUS),
+                _emission(scenario_id, 2, CounterpartSignalKind.RESOURCE_STATUS_CLAIM, resource=ResourceKind.FOOD, reported_level=ResourceLevel.DEFICIT),
+                _emission(scenario_id, 3, CounterpartSignalKind.TRANSFER_ATTEMPT, item_kind=ResourceKind.FOOD, authority=SignalAuthority.OBSERVED_EVENT),
+                _emission(
+                    scenario_id,
+                    4,
+                    CounterpartSignalKind.TRANSFER_RESULT,
+                    item_kind=ResourceKind.FOOD,
+                    authority=SignalAuthority.OBSERVED_EVENT,
+                    transfer_outcome=TransferOutcome.SUCCEEDED,
+                ),
+                _emission(scenario_id, 5, CounterpartSignalKind.TRANSFER_ATTEMPT, item_kind=ResourceKind.WATER, authority=SignalAuthority.OBSERVED_EVENT),
+                _emission(
+                    scenario_id,
+                    6,
+                    CounterpartSignalKind.TRANSFER_RESULT,
+                    item_kind=ResourceKind.WATER,
+                    authority=SignalAuthority.OBSERVED_EVENT,
+                    transfer_outcome=TransferOutcome.SUCCEEDED,
+                ),
+            ),
+            eval_only_labels=("stage4_successful_scripted_exchange_cycle_eval_only",),
+        )
+
     raise ValueError(f"Unsupported symbolic trade scenario: {scenario_id}")
 
 
@@ -253,6 +354,12 @@ def stage1_scenarios() -> tuple[str, ...]:
         "eval_label_leak_attack",
         "a_deficit_only",
         "b_surplus_claim_only",
+        "b_surplus_only",
+        "b_need_only",
+        "clarification_resolves_missing_need",
+        "clarification_loop_guard",
         "claim_then_confirmed_transfer",
         "claim_then_failed_transfer",
+        "transfer_affordance_failure",
+        "successful_scripted_exchange_cycle",
     )

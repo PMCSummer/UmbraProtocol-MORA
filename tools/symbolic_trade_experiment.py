@@ -19,8 +19,10 @@ from experiments.symbolic_trade import (
     run_stage2_trace,
     run_stage25_reaction,
     run_stage3_response,
+    run_stage4_cycle,
     stage25_result_to_dict,
     stage3_result_to_dict,
+    stage4_result_to_dict,
     stage2_result_to_dict,
 )
 
@@ -37,6 +39,12 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument("--stage3-response", action="store_true", help="Run Stage 3 real-A response-candidate probe.")
     parser.add_argument("--include-response-candidates", action="store_true", help="Include full response candidate payload in Stage 3 JSON output.")
     parser.add_argument("--stage3-summary", action="store_true", help="Print concise Stage 3 summary in text mode.")
+    parser.add_argument("--stage4-cycle", action="store_true", help="Run Stage 4 clarification-to-transfer-affordance cycle.")
+    parser.add_argument("--execute-transfer-affordance", action="store_true", help="Explicitly execute external transfer affordance in Stage 4.")
+    parser.add_argument("--no-execute-transfer-affordance", action="store_true", help="Force candidate-only mode for Stage 4.")
+    parser.add_argument("--show-clarification-state", action="store_true", help="Include Stage 4 clarification/readiness details in output.")
+    parser.add_argument("--include-transfer-episode", action="store_true", help="Include Stage 4 transfer episode payload in JSON output.")
+    parser.add_argument("--stage4-summary", action="store_true", help="Print concise Stage 4 summary in text mode.")
     return parser
 
 
@@ -122,6 +130,34 @@ def _print_stage3_text(payload: dict[str, object], *, summary_only: bool = False
     print("claim_boundary=['stage3 response-candidate probe only', 'no autonomous trade claim']")
 
 
+def _print_stage4_text(payload: dict[str, object], *, summary_only: bool = False) -> None:
+    falsifiers = payload.get("falsifier_summary", [])
+    passed = sum(1 for item in falsifiers if item.get("passed"))
+    total = len(falsifiers)
+    print("SYMBOLIC TRADE HARNESS STAGE4 CLARIFICATION-TRANSFER CYCLE")
+    print(f"scenario_id={payload['scenario_name']}")
+    print(f"stage={payload['stage']}")
+    print(f"execution_level={payload.get('execution_level')}")
+    print(f"subject_tick_used={payload.get('subject_tick_used')}")
+    print(f"owner_surface_used={payload.get('owner_surface_used')}")
+    print(f"adapter_projection_used={payload.get('adapter_projection_used')}")
+    print(f"fallback_reasons={payload.get('fallback_reasons', [])}")
+    print(f"readiness_status={payload.get('readiness_status')}")
+    print(f"clarification_route={payload.get('clarification_route')}")
+    print(f"offer_candidate_emitted={payload.get('offer_candidate_emitted')}")
+    transfer_affordance = payload.get("transfer_affordance", {})
+    transfer_result = payload.get("transfer_result_record", {})
+    print(f"transfer_affordance_status={transfer_affordance.get('status')}")
+    print(f"transfer_invoked={payload.get('transfer_attempt_record', {}).get('attempted')}")
+    print(f"transfer_result={transfer_result.get('outcome')}")
+    if not summary_only:
+        print(f"phase_coverage_verified={payload.get('phase_coverage_verified')}")
+        print(f"phase_coverage_evidence={payload.get('phase_coverage_evidence', [])}")
+        print(f"scripted_b_response_records={payload.get('scripted_b_response_records', [])}")
+    print(f"falsifier_summary={passed}/{total} passed")
+    print("claim_boundary=['stage4 clarification-transfer cycle only', 'no autonomous trade claim']")
+
+
 def main() -> int:
     args = _parser().parse_args()
 
@@ -133,7 +169,21 @@ def main() -> int:
     if not args.scenario:
         raise SystemExit("Provide --scenario or --list-scenarios")
 
-    if args.stage3_response:
+    if args.stage4_cycle:
+        result = run_stage4_cycle(
+            args.scenario,
+            include_falsifiers=args.run_falsifiers or args.json,
+            include_eval_only=args.include_eval_only,
+            execute_transfer_affordance=args.execute_transfer_affordance,
+            no_execute_transfer_affordance=args.no_execute_transfer_affordance,
+        )
+        payload = stage4_result_to_dict(
+            result,
+            include_eval_only=args.include_eval_only,
+            include_transfer_episode=args.include_transfer_episode or not args.stage4_summary,
+            include_clarification_state=args.show_clarification_state,
+        )
+    elif args.stage3_response:
         result = run_stage3_response(args.scenario, include_falsifiers=args.run_falsifiers or args.json)
         payload = stage3_result_to_dict(
             result,
@@ -155,6 +205,8 @@ def main() -> int:
     else:
         if args.stage2_trace:
             _print_stage2_text(payload)
+        elif args.stage4_cycle:
+            _print_stage4_text(payload, summary_only=args.stage4_summary)
         elif args.stage3_response:
             _print_stage3_text(payload, summary_only=args.stage3_summary)
         elif args.stage25_reaction:

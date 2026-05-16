@@ -22,6 +22,14 @@ STAGE3_SCENARIOS = REQUIRED_SCENARIOS + (
     "claim_then_confirmed_transfer",
     "claim_then_failed_transfer",
 )
+STAGE4_SCENARIOS = STAGE3_SCENARIOS + (
+    "b_surplus_only",
+    "b_need_only",
+    "clarification_resolves_missing_need",
+    "clarification_loop_guard",
+    "transfer_affordance_failure",
+    "successful_scripted_exchange_cycle",
+)
 
 
 def _run(*args: str) -> subprocess.CompletedProcess[str]:
@@ -38,7 +46,7 @@ def _run(*args: str) -> subprocess.CompletedProcess[str]:
 def test_symbolic_trade_cli_list_scenarios() -> None:
     result = _run("--list-scenarios")
     assert result.returncode == 0, result.stderr
-    for scenario in STAGE3_SCENARIOS:
+    for scenario in STAGE4_SCENARIOS:
         assert scenario in result.stdout
 
 
@@ -230,3 +238,106 @@ def test_symbolic_trade_cli_stage3_json_eval_scope_and_candidates_flag() -> None
         flat = json.dumps(candidate, sort_keys=True)
         assert "harness_truth" not in flat
         assert "mutually_beneficial_trade_possible_eval_only" not in flat
+
+
+def test_symbolic_trade_cli_stage4_text_and_json_smoke() -> None:
+    text_result = _run("--scenario", "mirrored_resource_asymmetry", "--stage4-cycle")
+    assert text_result.returncode == 0, text_result.stderr
+    assert "SYMBOLIC TRADE HARNESS STAGE4 CLARIFICATION-TRANSFER CYCLE" in text_result.stdout
+    assert "readiness_status=" in text_result.stdout
+    assert "transfer_affordance_status=" in text_result.stdout
+
+    json_result = _run("--scenario", "mirrored_resource_asymmetry", "--stage4-cycle", "--json")
+    assert json_result.returncode == 0, json_result.stderr
+    payload = json.loads(json_result.stdout)
+    assert payload["stage"] == "stage4_clarification_to_transfer_affordance_cycle"
+    assert "eval_only" not in payload
+
+
+def test_symbolic_trade_cli_stage4_with_flags_and_eval_scope() -> None:
+    result = _run(
+        "--scenario",
+        "mirrored_resource_asymmetry",
+        "--stage4-cycle",
+        "--execute-transfer-affordance",
+        "--json",
+        "--include-eval-only",
+        "--run-falsifiers",
+        "--show-clarification-state",
+        "--include-transfer-episode",
+    )
+    assert result.returncode == 0, result.stderr
+    payload = json.loads(result.stdout)
+    assert "eval_only" in payload
+    assert payload["transfer_invocation_candidate"]["execution_requested"] is True
+    visible_flat = json.dumps(
+        {
+            "visible_packets": payload.get("visible_packets", []),
+            "transfer_invocation_candidate": payload.get("transfer_invocation_candidate", {}),
+            "transfer_result_record": payload.get("transfer_result_record", {}),
+        },
+        sort_keys=True,
+    )
+    assert "harness_truth" not in visible_flat
+    assert "mutual_benefit_oracle" not in visible_flat
+
+
+def test_symbolic_trade_cli_stage4_noexec_keeps_passive_transfer_packets_non_causal() -> None:
+    result = _run(
+        "--scenario",
+        "successful_scripted_exchange_cycle",
+        "--stage4-cycle",
+        "--json",
+        "--run-falsifiers",
+    )
+    assert result.returncode == 0, result.stderr
+    payload = json.loads(result.stdout)
+    assert payload["transfer_attempt_record"]["attempted"] is False
+    assert payload["transfer_result_record"]["outcome"] == "not_attempted"
+    assert payload["post_invocation_response_count"] == 0
+    assert payload["exchange_completion_claim"] is False
+    for item in payload["scripted_b_response_details"]:
+        assert item["caused_by_transfer_invocation"] is False
+        assert item["causing_invocation_id"] is None
+        assert item["attempt_id"] is None
+
+
+def test_symbolic_trade_cli_stage4_exec_links_causal_response_to_invocation() -> None:
+    result = _run(
+        "--scenario",
+        "successful_scripted_exchange_cycle",
+        "--stage4-cycle",
+        "--execute-transfer-affordance",
+        "--json",
+        "--run-falsifiers",
+    )
+    assert result.returncode == 0, result.stderr
+    payload = json.loads(result.stdout)
+    assert payload["transfer_attempt_record"]["attempted"] is True
+    assert payload["post_invocation_response_count"] > 0
+    invocation_id = payload["transfer_invocation_candidate"]["invocation_id"]
+    attempt_id = payload["transfer_attempt_record"]["attempt_id"]
+    for item in payload["scripted_b_response_details"]:
+        assert item["caused_by_transfer_invocation"] is True
+        assert item["causing_invocation_id"] == invocation_id
+        assert item["attempt_id"] == attempt_id
+
+
+def test_symbolic_trade_cli_stage4_all_scenarios_with_falsifiers_exit_zero() -> None:
+    for scenario in STAGE4_SCENARIOS:
+        result = _run("--scenario", scenario, "--stage4-cycle", "--run-falsifiers")
+        assert result.returncode == 0, result.stderr
+        assert "falsifier_summary=" in result.stdout
+
+
+def test_symbolic_trade_cli_stage4_all_scenarios_execute_transfer_mode_exit_zero() -> None:
+    for scenario in STAGE4_SCENARIOS:
+        result = _run(
+            "--scenario",
+            scenario,
+            "--stage4-cycle",
+            "--execute-transfer-affordance",
+            "--run-falsifiers",
+        )
+        assert result.returncode == 0, result.stderr
+        assert "falsifier_summary=" in result.stdout

@@ -4,7 +4,9 @@ from dataclasses import asdict
 import subprocess
 from pathlib import Path
 
-from .models import CounterpartSignalKind, FalsifierResult, SignalAuthority, SubjectVisiblePacket
+from .clarification_policy import ClarificationRoute, MissingInformationKind, ResponseReadinessStatus
+from .models import CounterpartSignalKind, FalsifierResult, SignalAuthority, SubjectVisiblePacket, TransferOutcome
+from .transfer_affordance import TransferAffordanceStatus
 
 
 _FORBIDDEN_SIGNAL_TERMS = ("trade", "offer", "request", "ack", "deal", "bargain", "exchange", "market")
@@ -913,4 +915,214 @@ def run_stage3_response_falsifiers(stage3_run, *, repo_root: Path | None = None)
         FalsifierResult("stage3_core_contamination", not core_modified, "forbidden core path touched" if core_modified else "ok"),
         FalsifierResult("stage3_phase_coverage_fake", not phase_coverage_fake, "stage3 claimed phase coverage without evidence" if phase_coverage_fake else "ok"),
         FalsifierResult("stage3_claim_boundary_missing", not claim_boundary_missing, "stage3 claim boundary missing" if claim_boundary_missing else "ok"),
+    )
+
+
+def run_stage4_cycle_falsifiers(stage4_run, *, repo_root: Path | None = None) -> tuple[FalsifierResult, ...]:
+    payload = asdict(stage4_run)
+    payload.pop("eval_only", None)
+    packets = stage4_run.visible_packets
+    readiness = stage4_run.readiness_decision
+    invocation = stage4_run.transfer_invocation_candidate
+    affordance = stage4_run.transfer_affordance_record
+    attempt = stage4_run.transfer_attempt_record
+    result = stage4_run.transfer_result_record
+    episode = stage4_run.transfer_episode_record
+    response_details = stage4_run.scripted_b_response_details
+    w06 = stage4_run.w06_correction_boundary
+
+    has_counterpart_need_claim = any(
+        packet.get("signal_kind") == "resource_status_signal"
+        and packet.get("source_authority") == "counterpart_claim"
+        and packet.get("reported_level") == "deficit"
+        for packet in packets
+    )
+    has_counterpart_surplus_claim = any(
+        packet.get("signal_kind") == "resource_status_signal"
+        and packet.get("source_authority") == "counterpart_claim"
+        and packet.get("reported_level") == "surplus"
+        for packet in packets
+    )
+    has_counterpart_claim = any(packet.get("source_authority") == "counterpart_claim" for packet in packets)
+
+    offer_emitted = stage4_run.offer_candidate_emitted
+    transfer_attempted = attempt.attempted
+    transfer_failed = result.outcome in {TransferOutcome.FAILED_BLOCKED, TransferOutcome.FAILED_UNKNOWN, TransferOutcome.CONTRADICTED}
+    aperture_blocked = affordance.status is TransferAffordanceStatus.BLOCKED
+
+    clarification_loop_without_progress = (
+        any(not record.progress_made for record in stage4_run.clarification_records)
+        and readiness.status is ResponseReadinessStatus.CLARIFICATION_REQUIRED
+    )
+    has_progress_clarification = any(
+        record.route is ClarificationRoute.TARGETED_QUERY
+        and record.target_field is not None
+        and record.progress_made
+        for record in stage4_run.clarification_records
+    )
+    clarification_when_sufficient_info_exists = (
+        readiness.status is ResponseReadinessStatus.SUFFICIENT_FOR_BOUNDED_OFFER
+        and bool(stage4_run.clarification_records)
+        and not has_progress_clarification
+    )
+    generic_clarification_without_target = any(
+        record.route is ClarificationRoute.TARGETED_QUERY and record.target_field is None
+        for record in stage4_run.clarification_records
+    )
+    offer_without_counterpart_need = offer_emitted and not has_counterpart_need_claim
+    offer_without_counterpart_surplus = offer_emitted and not has_counterpart_surplus_claim
+    offer_without_a_surplus = offer_emitted and affordance.resource_kind is None
+    offer_without_a_deficit = offer_emitted and MissingInformationKind.SELF_DEFICIT in set(readiness.critical_missing_fields)
+    offer_when_aperture_blocked = offer_emitted and aperture_blocked and invocation.eligible
+    transfer_without_affordance = transfer_attempted and affordance.status is not TransferAffordanceStatus.AVAILABLE
+    transfer_without_offer_candidate = transfer_attempted and not offer_emitted
+    transfer_without_execution_flag = transfer_attempted and not invocation.execution_requested
+    transfer_candidate_executes_directly = offer_emitted and transfer_attempted and invocation.source_offer_candidate_id is None
+    counterpart_claim_as_fact = any(
+        packet.get("source_authority") == "counterpart_claim" and not packet.get("claim_not_fact_marker", False)
+        for packet in packets
+    )
+    surplus_as_automatic_offer = offer_emitted and not has_counterpart_claim
+    deficit_as_permission = offer_emitted and (offer_without_counterpart_need or offer_without_counterpart_surplus)
+    claim_boundary_blob = " ".join(stage4_run.claim_boundary).lower()
+    readiness_boundary_blob = " ".join(stage4_run.readiness_decision.claim_boundary).lower()
+    claim_not_fact_present = "counterpart_claim_not_fact" in claim_boundary_blob or "counterpart_claim_not_fact" in readiness_boundary_blob
+    b_surplus_as_guaranteed_availability = offer_emitted and has_counterpart_surplus_claim and not claim_not_fact_present
+    offer_executes_transfer_directly = offer_emitted and transfer_attempted and invocation.execution_requested and invocation.execution_prohibited
+    transfer_result_as_trade_success_oracle = (
+        result.result_used_as_success_authority
+        or (
+            stage4_run.exchange_completion_claim
+            and (
+                not episode.verified
+                or not episode.reciprocal_transfer_observed
+                or not attempt.attempted
+                or result.outcome is not TransferOutcome.SUCCEEDED
+            )
+        )
+    )
+    failed_transfer_erases_residue = transfer_failed and not stage4_run.w06_residue_or_revalidation
+    w06_correction_candidate_executed = (
+        (w06.correction_candidate_created and w06.correction_executed)
+        or (w06.correction_candidate_created and not w06.correction_execution_prohibited)
+        or (transfer_failed and not w06.w06_residue_present)
+        or (w06.correction_candidate_created and not w06.w06_guardrail_preserved)
+    )
+    a04_binding_without_authority = not affordance.a04_binding_authority_present
+    a02_gap_silently_ignored = (
+        affordance.status in {TransferAffordanceStatus.BLOCKED, TransferAffordanceStatus.CONTESTED, TransferAffordanceStatus.MISSING}
+        and not affordance.a02_gap_markers
+    )
+    p02_episode_completion_inflation = episode.verified and (not episode.observed_result or not episode.attempted)
+
+    forbidden_tokens = (
+        "hidden_truth",
+        "harness_truth",
+        "mutual_benefit_oracle",
+        "success_label",
+        "expected_success_label",
+        "should_trade",
+        "wants_trade",
+        "trade_intent",
+        "economic_agency",
+        "true_inventory",
+    )
+    leak_hits: list[str] = []
+    for path, value in _walk_paths(payload):
+        path_lower = path.lower()
+        if "eval_only" in path_lower:
+            continue
+        if any(token in path_lower for token in forbidden_tokens):
+            leak_hits.append(path)
+        if isinstance(value, str):
+            lower = value.lower()
+            if any(token in lower for token in forbidden_tokens):
+                if "no_hidden_truth_claim" in lower or "no_economic_agency_claim" in lower:
+                    continue
+                leak_hits.append(f"{path}={value}")
+
+    hidden_inventory_used = any("true_inventory" in item or "harness_truth" in item for item in leak_hits)
+    mutual_oracle_used = any("mutual_benefit_oracle" in item for item in leak_hits)
+    trade_shortcut_used = any(
+        token in " ".join(
+            (
+                " ".join(stage4_run.claim_boundary),
+                " ".join(stage4_run.readiness_decision.reason_codes),
+                " ".join(stage4_run.transfer_invocation_candidate.reason_codes),
+            )
+        ).lower()
+        for token in ("should_trade", "wants_trade", "trade_intent")
+    )
+    pre_scripted_response_as_invocation_response = any(
+        item.response_record_source == "pre_scripted_visible_packet"
+        and item.caused_by_transfer_invocation
+        for item in response_details
+    )
+    passive_transfer_packet_as_trade_success = (
+        any(
+            item.response_record_source in {"pre_scripted_visible_packet", "passive_observed_packet"}
+            and item.transfer_outcome == "succeeded"
+            and not item.caused_by_transfer_invocation
+            for item in response_details
+        )
+        and stage4_run.exchange_completion_claim
+    )
+    offer_candidate_as_transfer_execution = (
+        offer_emitted
+        and attempt.attempted
+        and not invocation.execution_requested
+    )
+    available_affordance_as_invoked = (
+        affordance.status is TransferAffordanceStatus.AVAILABLE
+        and invocation.eligible
+        and not invocation.execution_requested
+        and (attempt.attempted or stage4_run.post_invocation_response_count > 0)
+    )
+    b_response_without_invocation_causality = any(
+        item.caused_by_transfer_invocation
+        and (
+            not attempt.attempted
+            or item.causing_invocation_id is None
+            or item.attempt_id is None
+        )
+        for item in response_details
+    )
+
+    repo = repo_root or Path(__file__).resolve().parents[2]
+    changed_paths = set(_modified_paths(repo))
+    changed_paths.update(_untracked_paths(repo))
+    core_modified = any(any(path.startswith(prefix) for prefix in _FORBIDDEN_CORE_PREFIXES) for path in changed_paths)
+
+    return (
+        FalsifierResult("clarification_loop_without_progress", not clarification_loop_without_progress, "clarification loop remained unresolved without fallback" if clarification_loop_without_progress else "ok"),
+        FalsifierResult("clarification_when_sufficient_info_exists", not clarification_when_sufficient_info_exists, "clarification asked despite sufficient bounded-offer info" if clarification_when_sufficient_info_exists else "ok"),
+        FalsifierResult("generic_clarification_without_target", not generic_clarification_without_target, "clarification route missing targeted field" if generic_clarification_without_target else "ok"),
+        FalsifierResult("offer_without_counterpart_need", not offer_without_counterpart_need, "offer candidate emitted without visible counterpart need claim" if offer_without_counterpart_need else "ok"),
+        FalsifierResult("offer_without_counterpart_surplus", not offer_without_counterpart_surplus, "offer candidate emitted without visible counterpart surplus claim" if offer_without_counterpart_surplus else "ok"),
+        FalsifierResult("offer_without_a_surplus", not offer_without_a_surplus, "offer candidate emitted without self surplus resource" if offer_without_a_surplus else "ok"),
+        FalsifierResult("offer_without_a_deficit", not offer_without_a_deficit, "offer candidate emitted without self deficit marker" if offer_without_a_deficit else "ok"),
+        FalsifierResult("offer_when_aperture_blocked", not offer_when_aperture_blocked, "blocked aperture still yielded eligible offer->transfer route" if offer_when_aperture_blocked else "ok"),
+        FalsifierResult("transfer_without_affordance", not transfer_without_affordance, "transfer attempted without available external affordance" if transfer_without_affordance else "ok"),
+        FalsifierResult("transfer_without_offer_candidate", not transfer_without_offer_candidate, "transfer attempted without bounded offer candidate" if transfer_without_offer_candidate else "ok"),
+        FalsifierResult("transfer_without_explicit_execution_flag", not transfer_without_execution_flag, "transfer attempted without explicit execution flag" if transfer_without_execution_flag else "ok"),
+        FalsifierResult("transfer_candidate_executes_directly", not transfer_candidate_executes_directly, "candidate path executed transfer directly" if transfer_candidate_executes_directly else "ok"),
+        FalsifierResult("counterpart_claim_as_fact", not counterpart_claim_as_fact, "counterpart claim promoted to fact in stage4 payload" if counterpart_claim_as_fact else "ok"),
+        FalsifierResult("hidden_b_inventory_used_for_offer", not hidden_inventory_used, "hidden inventory leaked into candidate-visible stage4 fields" if hidden_inventory_used else "ok"),
+        FalsifierResult("mutual_benefit_oracle_used", not mutual_oracle_used, "mutual-benefit oracle leaked into stage4 visible path" if mutual_oracle_used else "ok"),
+        FalsifierResult("surplus_as_automatic_offer", not surplus_as_automatic_offer, "self surplus auto-promoted to offer without counterpart relation" if surplus_as_automatic_offer else "ok"),
+        FalsifierResult("deficit_as_permission", not deficit_as_permission, "self deficit promoted into permission/offer route" if deficit_as_permission else "ok"),
+        FalsifierResult("b_surplus_as_guaranteed_availability", not b_surplus_as_guaranteed_availability, "counterpart surplus claim treated as guaranteed availability" if b_surplus_as_guaranteed_availability else "ok"),
+        FalsifierResult("offer_executes_transfer_directly", not offer_executes_transfer_directly, "offer path bypassed invocation guard and executed directly" if offer_executes_transfer_directly else "ok"),
+        FalsifierResult("transfer_result_as_trade_success_oracle", not transfer_result_as_trade_success_oracle, "transfer result treated as trade-success oracle" if transfer_result_as_trade_success_oracle else "ok"),
+        FalsifierResult("failed_transfer_erases_residue", not failed_transfer_erases_residue, "failed transfer did not preserve residue/revalidation" if failed_transfer_erases_residue else "ok"),
+        FalsifierResult("w06_correction_candidate_executed", not w06_correction_candidate_executed, "w06 correction execution marker leaked in stage4 path" if w06_correction_candidate_executed else "ok"),
+        FalsifierResult("pre_scripted_response_as_invocation_response", not pre_scripted_response_as_invocation_response, "pre-scripted visible packet marked as invocation-caused response" if pre_scripted_response_as_invocation_response else "ok"),
+        FalsifierResult("passive_transfer_packet_as_trade_success", not passive_transfer_packet_as_trade_success, "passive transfer packet treated as exchange completion authority" if passive_transfer_packet_as_trade_success else "ok"),
+        FalsifierResult("offer_candidate_as_transfer_execution", not offer_candidate_as_transfer_execution, "offer candidate path treated as execution without explicit invocation" if offer_candidate_as_transfer_execution else "ok"),
+        FalsifierResult("available_affordance_as_invoked", not available_affordance_as_invoked, "available affordance misreported as invoked without execution request" if available_affordance_as_invoked else "ok"),
+        FalsifierResult("b_response_without_invocation_causality", not b_response_without_invocation_causality, "counterpart response marked causal without invocation linkage" if b_response_without_invocation_causality else "ok"),
+        FalsifierResult("a04_binding_without_authority", not a04_binding_without_authority, "external affordance binding missing authority metadata" if a04_binding_without_authority else "ok"),
+        FalsifierResult("a02_gap_silently_ignored", not a02_gap_silently_ignored, "transfer affordance gap present without A02-compatible marker" if a02_gap_silently_ignored else "ok"),
+        FalsifierResult("p02_episode_completion_inflation", not p02_episode_completion_inflation, "p02 episode marked verified without attempt/observation chain" if p02_episode_completion_inflation else "ok"),
+        FalsifierResult("core_contamination", not core_modified, "forbidden core path touched" if core_modified else "ok"),
     )

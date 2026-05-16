@@ -44,6 +44,25 @@ def run_stage3_response(scenario_id: str, *, include_falsifiers: bool = True):
     return run_stage3_response_probe(scenario_id, include_falsifiers=include_falsifiers)
 
 
+def run_stage4_cycle(
+    scenario_id: str,
+    *,
+    include_falsifiers: bool = True,
+    include_eval_only: bool = False,
+    execute_transfer_affordance: bool = False,
+    no_execute_transfer_affordance: bool = False,
+):
+    from .stage4_trade_cycle_runner import run_stage4_trade_cycle
+
+    return run_stage4_trade_cycle(
+        scenario_id,
+        include_falsifiers=include_falsifiers,
+        include_eval_only=include_eval_only,
+        execute_transfer_affordance=execute_transfer_affordance,
+        force_no_execute=no_execute_transfer_affordance,
+    )
+
+
 def result_to_dict(result, *, include_eval_only: bool = False) -> dict[str, object]:
     steps = []
     for step in result.steps:
@@ -97,4 +116,21 @@ def stage3_result_to_dict(
         result,
         include_eval_only=include_eval_only,
         include_response_candidates=include_response_candidates,
+    )
+
+
+def stage4_result_to_dict(
+    result,
+    *,
+    include_eval_only: bool = False,
+    include_transfer_episode: bool = True,
+    include_clarification_state: bool = False,
+) -> dict[str, object]:
+    from .stage4_trade_cycle_runner import stage4_trade_cycle_to_dict
+
+    return stage4_trade_cycle_to_dict(
+        result,
+        include_eval_only=include_eval_only,
+        include_transfer_episode=include_transfer_episode,
+        include_clarification_state=include_clarification_state,
     )
