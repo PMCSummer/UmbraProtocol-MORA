@@ -57,6 +57,23 @@ _FORBIDDEN_STAGE25_PATH_VALUE_TOKENS = (
     ("downstream_permission_delta", "trade_intent:true"),
     ("output_refs", "true_need_surplus_pairing"),
 )
+_FORBIDDEN_STAGE3_ORACLE_TOKENS = (
+    "mutual_benefit_oracle",
+    "oracle",
+    "true_need_surplus_pairing",
+    "eval_only_success_label",
+    "harness_truth",
+)
+_FORBIDDEN_STAGE3_SHORTCUT_TERMS = (
+    "trade_intent",
+    "should_trade",
+    "mutual_benefit_detected",
+    "economic_agency",
+    "deal",
+    "barter",
+    "contract",
+    "wants_trade",
+)
 
 
 def _run_git_lines(repo_root: Path, args: list[str]) -> tuple[str, ...]:
@@ -588,4 +605,312 @@ def run_stage25_reaction_falsifiers(probe_run, *, repo_root: Path | None = None)
             else "ok",
         ),
         FalsifierResult("claim_boundary_missing", not claim_boundary_missing, "stage25 claim boundary missing or incomplete" if claim_boundary_missing else "ok"),
+    )
+
+
+def run_stage3_response_falsifiers(stage3_run, *, repo_root: Path | None = None) -> tuple[FalsifierResult, ...]:
+    candidates = stage3_run.response_candidates
+    selected_kind = stage3_run.selected_response_kind.value
+    selected_candidate = next((item for item in candidates if item.response_id == stage3_run.selected_response_id), None)
+    response_blob = "\n".join(
+        " ".join(
+            (
+                item.response_kind.value,
+                item.requested_effect,
+                " ".join(item.reason_codes),
+                " ".join(item.evidence_refs),
+                " ".join(item.phase_evidence_refs),
+                " ".join(item.prohibited_claims),
+                " ".join(item.boundary_markers),
+                " ".join(item.response_basis_summary),
+                " ".join(item.forbidden_basis_markers),
+            )
+        )
+        for item in candidates
+    ).lower()
+
+    payload = asdict(stage3_run)
+    payload.pop("eval_only", None)
+    leak_key_hits: list[str] = []
+    leak_value_hits: list[str] = []
+    forbidden_key_tokens = {
+        "hidden_truth",
+        "harness_truth",
+        "true_inventory",
+        "b_true_inventory",
+        "true_need_surplus_pairing",
+        "mutual_benefit_oracle",
+        "eval_label",
+        "success_label",
+        "expected_success_label",
+        "scenario_expected_outcome",
+    }
+    forbidden_value_tokens = (
+        "hidden_truth:",
+        "harness_truth:",
+        "eval_label:",
+        "success_label:",
+        "expected_success_label:",
+        "mutual_benefit_oracle",
+        "should_trade",
+        "wants_trade",
+        "trade_intent",
+        "economic_agency",
+        "true_inventory",
+        "scenario_expected_outcome",
+        "true_need_surplus_pairing",
+    )
+
+    def _path_segments(path: str) -> tuple[str, ...]:
+        segments: list[str] = []
+        for chunk in path.split("."):
+            base = chunk.split("[", 1)[0]
+            if base:
+                segments.append(base.lower())
+        return tuple(segments)
+
+    for path, value in _walk_paths(payload):
+        segments = _path_segments(path)
+        if any(token in segments for token in forbidden_key_tokens):
+            leak_key_hits.append(path)
+        if isinstance(value, str):
+            value_lower = value.lower()
+            if any(token in value_lower for token in forbidden_value_tokens):
+                if (
+                    "no_hidden_truth_claim" in value_lower
+                    or "no_economic_agency_claim" in value_lower
+                    or "without_oracle" in value_lower
+                    or value_lower.endswith("_not_used")
+                ):
+                    continue
+                leak_value_hits.append(f"{path}={value}")
+
+    hidden_truth_used_for_response = any(item.hidden_truth_used for item in candidates) or bool(leak_key_hits or leak_value_hits)
+    eval_label_used_for_response = any(item.eval_only_used for item in candidates) or any(
+        "eval_only" in fragment.lower() or "success_label" in fragment.lower()
+        for item in candidates
+        for fragment in (
+            *item.evidence_refs,
+            *item.reason_codes,
+            *item.phase_evidence_refs,
+        )
+    ) or any(
+        "eval_label" in hit.lower() or "success_label" in hit.lower()
+        for hit in (*leak_key_hits, *leak_value_hits)
+    )
+    deficit_as_permission = any(
+        item.response_kind.value in {"offer_candidate", "transfer_attempt_candidate"}
+        and (
+            "counterpart_claim:" not in " ".join(item.evidence_refs)
+            or not any(
+                marker in " ".join(item.response_basis_summary)
+                for marker in (
+                    "self_state_deficit_surplus_markers_are_not_permissions",
+                    "self_state_asymmetry_marker_present_without_permission_upgrade",
+                )
+            )
+        )
+        for item in candidates
+    ) or "deficit_as_permission" in response_blob
+    surplus_as_offer = any(
+        item.response_kind.value == "offer_candidate"
+        and (
+            "surplus_shortcut_offer" in " ".join(item.reason_codes).lower()
+            or "counterpart_claim:" not in " ".join(item.evidence_refs)
+            or not any(
+                marker in " ".join(item.response_basis_summary)
+                for marker in (
+                    "bounded_complementarity_candidate_without_oracle",
+                    "transfer_confirmation_visible_as_observation_not_hidden_truth",
+                )
+            )
+        )
+        for item in candidates
+    )
+    b_claim_as_fact = any(
+        "counterpart_fact:" in " ".join(item.evidence_refs)
+        or "counterpart_claim_as_fact" in " ".join(item.reason_codes).lower()
+        for item in candidates
+    )
+    mirrored_complementarity_oracle = any(
+        any(
+            token in " ".join(
+                (
+                    *item.reason_codes,
+                    *item.evidence_refs,
+                    *item.phase_evidence_refs,
+                    *item.response_basis_summary,
+                    *item.forbidden_basis_markers,
+                )
+            ).lower()
+            for token in (
+                "mutual_benefit_oracle",
+                "true_need_surplus_pairing",
+                "oracle:true",
+                "oracle_detected",
+                "mirrored_oracle_used",
+            )
+        )
+        for item in candidates
+    )
+    usefulness_as_permission = any(
+        "usefulness_as_permission" in " ".join(item.reason_codes).lower()
+        or item.permitted_status == "permission_granted_by_usefulness"
+        for item in candidates
+    )
+    desired_as_observed = any(
+        "desired_as_observed" in " ".join(item.reason_codes).lower()
+        for item in candidates
+    )
+    predicted_as_permitted = any(
+        "predicted_as_permitted" in " ".join(item.reason_codes).lower()
+        for item in candidates
+    )
+    blocked_aperture_transfer_candidate = any(
+        item.response_kind.value in {"offer_candidate", "transfer_attempt_candidate"}
+        and (
+            "blocked_aperture_event_visible" in " ".join(item.response_basis_summary).lower()
+            or "blocked_aperture_visible" in " ".join(item.reason_codes).lower()
+            or any("aperture:blocked" in ref.lower() for ref in item.phase_evidence_refs)
+        )
+        for item in candidates
+    )
+    noisy_claim_cleaned_into_fact = any(
+        item.response_kind.value in {"offer_candidate", "transfer_attempt_candidate"}
+        and (
+            "contradiction_or_noise_visible" in " ".join(item.response_basis_summary).lower()
+            or "contradiction_visible" in " ".join(item.reason_codes).lower()
+        )
+        and not (
+            "revalidate" in " ".join(item.reason_codes).lower()
+            or item.residual_uncertainty_refs
+            or any("residual_uncertainty_present:true" in ref.lower() for ref in item.phase_evidence_refs)
+        )
+        for item in candidates
+    )
+    false_claim_clean_offer = any(
+        (
+            "claim_not_fact_boundary_preserved" in " ".join(item.response_basis_summary).lower()
+            and not (
+                "revalidate" in " ".join(item.reason_codes).lower()
+                or item.residual_uncertainty_refs
+                or any("residual_uncertainty_present:true" in ref.lower() for ref in item.phase_evidence_refs)
+            )
+        )
+        and item.response_kind.value in {"offer_candidate", "transfer_attempt_candidate"}
+        for item in candidates
+    )
+    one_shot_exchange_schema = any(
+        (
+            "one_shot_promoted_to_schema" in " ".join(item.reason_codes).lower()
+            or (
+                item.response_kind.value in {"offer_candidate", "transfer_attempt_candidate"}
+                and len(item.evidence_refs) <= 1
+            )
+        )
+        for item in candidates
+    )
+    trade_specific_response_kind = any(
+        any(term in item.response_kind.value for term in _FORBIDDEN_STAGE3_SHORTCUT_TERMS)
+        or any(term in " ".join(item.reason_codes).lower() for term in _FORBIDDEN_STAGE3_SHORTCUT_TERMS)
+        for item in candidates
+    )
+    required_phase_codes = {"W01", "W02", "W03", "W04", "W05", "W06"}
+    response_without_phase_causality = any(
+        item.response_kind.value in {"offer_candidate", "transfer_attempt_candidate"}
+        and (
+            not {"W01", "W04", "W05", "W06"}.issubset(set(item.source_phase_coverage))
+            or not {"W01", "W04", "W05", "W06"}.issubset(
+                {
+                    evidence.split(":", 1)[0]
+                    for evidence in item.phase_evidence_refs
+                    if ":" in evidence
+                }
+            )
+            or not item.response_basis_summary
+            or not item.forbidden_basis_markers
+        )
+        for item in candidates
+    )
+    candidate_executes_transfer = any(
+        (not item.execution_prohibited) or "executed_transfer" in item.requested_effect.lower()
+        for item in candidates
+    )
+    w05_routing_as_execution = any(
+        "w05_route_as_permission" in " ".join(item.reason_codes).lower()
+        or item.permitted_status == "executed"
+        for item in candidates
+    )
+    w06_correction_executed = any(
+        "w06_correction_executed" in " ".join(item.reason_codes).lower()
+        or "correction_executed:true" in " ".join(item.reason_codes).lower()
+        for item in candidates
+    )
+
+    selected_basis_blob = (
+        " ".join(selected_candidate.response_basis_summary).lower() if selected_candidate is not None else ""
+    )
+    selected_reason_blob = " ".join(selected_candidate.reason_codes).lower() if selected_candidate is not None else ""
+    control_same_as_mirrored = selected_kind in {"offer_candidate", "transfer_attempt_candidate"} and not (
+        (
+            "visible_claim_relation_present" in selected_reason_blob
+            or "resource_asymmetry_candidate" in selected_reason_blob
+            or "visible_counterpart_claim_relation_present" in selected_basis_blob
+        )
+        and ("counterpart_claim_not_fact" in " ".join(selected_candidate.boundary_markers).lower())
+        and ("hidden_truth_not_used" in " ".join(selected_candidate.forbidden_basis_markers).lower())
+        if selected_candidate is not None
+        else False
+    )
+
+    phase_coverage_fake = (
+        stage3_run.phase_coverage_verified
+        and not required_phase_codes.issubset(
+            {
+                item.split(":", 1)[0]
+                for item in stage3_run.phase_coverage_evidence
+                if ":" in item
+            }
+        )
+    )
+
+    claim_boundary_missing = not any("stage3_response_candidate_probe_only" == item for item in stage3_run.claim_boundary)
+
+    repo = repo_root or Path(__file__).resolve().parents[2]
+    changed_paths = set(_modified_paths(repo))
+    changed_paths.update(_untracked_paths(repo))
+    core_modified = any(any(path.startswith(prefix) for prefix in _FORBIDDEN_CORE_PREFIXES) for path in changed_paths)
+
+    return (
+        FalsifierResult(
+            "stage3_hidden_truth_used_for_response",
+            not hidden_truth_used_for_response,
+            (
+                f"hidden truth or oracle leaked into candidate-visible payload; "
+                f"key_paths={list(leak_key_hits)[:3]} value_paths={list(leak_value_hits)[:3]}"
+            )
+            if hidden_truth_used_for_response
+            else "ok",
+        ),
+        FalsifierResult("stage3_eval_label_used_for_response", not eval_label_used_for_response, "eval labels used in response extraction" if eval_label_used_for_response else "ok"),
+        FalsifierResult("stage3_deficit_as_permission", not deficit_as_permission, "deficit alone promoted to response permission" if deficit_as_permission else "ok"),
+        FalsifierResult("stage3_surplus_as_offer_shortcut", not surplus_as_offer, "surplus shortcut used as offer" if surplus_as_offer else "ok"),
+        FalsifierResult("stage3_b_claim_as_fact", not b_claim_as_fact, "counterpart claim promoted to fact" if b_claim_as_fact else "ok"),
+        FalsifierResult("stage3_mirrored_complementarity_oracle", not mirrored_complementarity_oracle, "mirrored complementarity oracle leaked into response basis" if mirrored_complementarity_oracle else "ok"),
+        FalsifierResult("stage3_usefulness_as_permission", not usefulness_as_permission, "usefulness substituted for permission" if usefulness_as_permission else "ok"),
+        FalsifierResult("stage3_desired_as_observed", not desired_as_observed, "desired state treated as observed evidence" if desired_as_observed else "ok"),
+        FalsifierResult("stage3_predicted_as_permitted", not predicted_as_permitted, "predicted success treated as permission" if predicted_as_permitted else "ok"),
+        FalsifierResult("stage3_blocked_aperture_transfer_candidate", not blocked_aperture_transfer_candidate, "blocked aperture produced transfer candidate" if blocked_aperture_transfer_candidate else "ok"),
+        FalsifierResult("stage3_noisy_claim_cleaned_into_fact", not noisy_claim_cleaned_into_fact, "noisy claim cleaned into fact/candidate" if noisy_claim_cleaned_into_fact else "ok"),
+        FalsifierResult("stage3_false_claim_clean_offer", not false_claim_clean_offer, "false claim yielded clean offer candidate" if false_claim_clean_offer else "ok"),
+        FalsifierResult("stage3_one_shot_exchange_schema", not one_shot_exchange_schema, "one-shot event promoted into exchange schema" if one_shot_exchange_schema else "ok"),
+        FalsifierResult("stage3_trade_specific_response_kind", not trade_specific_response_kind, "trade-specific shortcut response kind/semantic detected" if trade_specific_response_kind else "ok"),
+        FalsifierResult("stage3_response_without_phase_causality", not response_without_phase_causality, "response candidate missing W01->W06 phase evidence chain" if response_without_phase_causality else "ok"),
+        FalsifierResult("stage3_candidate_executes_transfer", not candidate_executes_transfer, "candidate path marked as executed transfer" if candidate_executes_transfer else "ok"),
+        FalsifierResult("stage3_w05_routing_as_execution_permission", not w05_routing_as_execution, "w05 route treated as execution permission" if w05_routing_as_execution else "ok"),
+        FalsifierResult("stage3_w06_correction_as_executed", not w06_correction_executed, "w06 correction treated as executed update" if w06_correction_executed else "ok"),
+        FalsifierResult("stage3_control_scenario_same_as_mirrored", not control_same_as_mirrored, "selected offer/transfer candidate lacks structural complementarity boundary basis" if control_same_as_mirrored else "ok"),
+        FalsifierResult("stage3_core_contamination", not core_modified, "forbidden core path touched" if core_modified else "ok"),
+        FalsifierResult("stage3_phase_coverage_fake", not phase_coverage_fake, "stage3 claimed phase coverage without evidence" if phase_coverage_fake else "ok"),
+        FalsifierResult("stage3_claim_boundary_missing", not claim_boundary_missing, "stage3 claim boundary missing" if claim_boundary_missing else "ok"),
     )

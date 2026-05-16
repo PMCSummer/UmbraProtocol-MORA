@@ -85,12 +85,16 @@ def build_self_state_probe_for_scenario(scenario_id: str, *, subject_id: str = "
     # Stage 2.5 keeps B scripted and varies only bounded self-side computational state profiles.
     profile_id = {
         "presence_only": "a_deficit_only",
+        "a_deficit_only": "a_deficit_only",
+        "b_surplus_claim_only": "a_surplus_only",
         "resource_claim_contact": "a_deficit_only",
         "mirrored_resource_asymmetry": "mirrored_deficit_surplus",
         "false_counterpart_claim": "false_mirrored_claim",
         "blocked_aperture": "blocked_aperture_with_complementarity",
         "noisy_signal": "noisy_mirrored_claim",
         "transfer_seen_without_trade_token": "object_seen_without_claim",
+        "claim_then_confirmed_transfer": "mirrored_deficit_surplus",
+        "claim_then_failed_transfer": "mirrored_deficit_surplus",
         "eval_label_leak_attack": "eval_label_attack_with_self_state",
     }.get(scenario_id, "a_deficit_only")
 

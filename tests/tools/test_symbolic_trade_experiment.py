@@ -16,6 +16,12 @@ REQUIRED_SCENARIOS = (
     "transfer_seen_without_trade_token",
     "eval_label_leak_attack",
 )
+STAGE3_SCENARIOS = REQUIRED_SCENARIOS + (
+    "a_deficit_only",
+    "b_surplus_claim_only",
+    "claim_then_confirmed_transfer",
+    "claim_then_failed_transfer",
+)
 
 
 def _run(*args: str) -> subprocess.CompletedProcess[str]:
@@ -32,7 +38,7 @@ def _run(*args: str) -> subprocess.CompletedProcess[str]:
 def test_symbolic_trade_cli_list_scenarios() -> None:
     result = _run("--list-scenarios")
     assert result.returncode == 0, result.stderr
-    for scenario in REQUIRED_SCENARIOS:
+    for scenario in STAGE3_SCENARIOS:
         assert scenario in result.stdout
 
 
@@ -170,3 +176,57 @@ def test_symbolic_trade_cli_stage25_include_eval_only_scoped() -> None:
         phase_flat = json.dumps(step["phase_trace_summary"], sort_keys=True)
         assert "harness_truth" not in phase_flat
         assert "mutually_beneficial_trade_possible_eval_only" not in phase_flat
+
+
+def test_symbolic_trade_cli_stage3_response_text_and_json_smoke() -> None:
+    text_result = _run("--scenario", "mirrored_resource_asymmetry", "--stage3-response")
+    assert text_result.returncode == 0, text_result.stderr
+    assert "SYMBOLIC TRADE HARNESS STAGE3 RESPONSE-CANDIDATE PROBE" in text_result.stdout
+    assert "selected_response_kind=" in text_result.stdout
+
+    json_result = _run("--scenario", "mirrored_resource_asymmetry", "--stage3-response", "--json")
+    assert json_result.returncode == 0, json_result.stderr
+    payload = json.loads(json_result.stdout)
+    assert payload["stage"] == "stage3_response_candidate_probe"
+    assert "execution_level" in payload
+    assert "response_verdict" in payload
+    assert "eval_only" not in payload
+
+
+def test_symbolic_trade_cli_stage3_all_scenarios_with_falsifiers_exit_zero() -> None:
+    for scenario in STAGE3_SCENARIOS:
+        result = _run("--scenario", scenario, "--stage3-response", "--run-falsifiers")
+        assert result.returncode == 0, result.stderr
+        assert "falsifier_summary=" in result.stdout
+
+
+def test_symbolic_trade_cli_stage3_json_eval_scope_and_candidates_flag() -> None:
+    summary_result = _run(
+        "--scenario",
+        "mirrored_resource_asymmetry",
+        "--stage3-response",
+        "--json",
+        "--stage3-summary",
+        "--run-falsifiers",
+    )
+    assert summary_result.returncode == 0, summary_result.stderr
+    summary_payload = json.loads(summary_result.stdout)
+    assert "response_candidates" not in summary_payload
+
+    result = _run(
+        "--scenario",
+        "mirrored_resource_asymmetry",
+        "--stage3-response",
+        "--json",
+        "--include-response-candidates",
+        "--include-eval-only",
+        "--run-falsifiers",
+    )
+    assert result.returncode == 0, result.stderr
+    payload = json.loads(result.stdout)
+    assert "eval_only" in payload
+    assert "response_candidates" in payload
+    for candidate in payload["response_candidates"]:
+        flat = json.dumps(candidate, sort_keys=True)
+        assert "harness_truth" not in flat
+        assert "mutually_beneficial_trade_possible_eval_only" not in flat

@@ -174,6 +174,70 @@ def build_scripted_stage1_scenario(scenario_id: str) -> ScriptedScenario:
             eval_only_labels=("mutually_beneficial_trade_possible_eval_only",),
         )
 
+    if scenario_id == "a_deficit_only":
+        return ScriptedScenario(
+            scenario_id=scenario_id,
+            a_truth=_inventory("subject_a", food=ResourceLevel.SUFFICIENT, water=ResourceLevel.DEFICIT),
+            b_truth=_inventory("counterpart_b", food=ResourceLevel.UNKNOWN, water=ResourceLevel.UNKNOWN),
+            emissions=(
+                _emission(scenario_id, 1, CounterpartSignalKind.PRESENCE_PING, authority=SignalAuthority.OBSERVED_EVENT),
+            ),
+            eval_only_labels=("a_deficit_without_counterpart_resource_claim",),
+        )
+
+    if scenario_id == "b_surplus_claim_only":
+        return ScriptedScenario(
+            scenario_id=scenario_id,
+            a_truth=_inventory("subject_a", food=ResourceLevel.SUFFICIENT, water=ResourceLevel.SUFFICIENT),
+            b_truth=_inventory("counterpart_b", food=ResourceLevel.SUFFICIENT, water=ResourceLevel.SURPLUS),
+            emissions=(
+                _emission(scenario_id, 1, CounterpartSignalKind.RESOURCE_STATUS_CLAIM, resource=ResourceKind.WATER, reported_level=ResourceLevel.SURPLUS),
+            ),
+            eval_only_labels=("counterpart_surplus_claim_without_a_matching_deficit",),
+        )
+
+    if scenario_id == "claim_then_confirmed_transfer":
+        return ScriptedScenario(
+            scenario_id=scenario_id,
+            a_truth=a_default,
+            b_truth=_inventory("counterpart_b", food=ResourceLevel.DEFICIT, water=ResourceLevel.SURPLUS),
+            emissions=(
+                _emission(scenario_id, 1, CounterpartSignalKind.RESOURCE_STATUS_CLAIM, resource=ResourceKind.WATER, reported_level=ResourceLevel.SURPLUS),
+                _emission(scenario_id, 2, CounterpartSignalKind.RESOURCE_STATUS_CLAIM, resource=ResourceKind.FOOD, reported_level=ResourceLevel.DEFICIT),
+                _emission(scenario_id, 3, CounterpartSignalKind.TRANSFER_ATTEMPT, item_kind=ResourceKind.WATER, authority=SignalAuthority.OBSERVED_EVENT),
+                _emission(
+                    scenario_id,
+                    4,
+                    CounterpartSignalKind.TRANSFER_RESULT,
+                    item_kind=ResourceKind.WATER,
+                    authority=SignalAuthority.OBSERVED_EVENT,
+                    transfer_outcome=TransferOutcome.SUCCEEDED,
+                ),
+            ),
+            eval_only_labels=("claim_then_transfer_confirmation_visible",),
+        )
+
+    if scenario_id == "claim_then_failed_transfer":
+        return ScriptedScenario(
+            scenario_id=scenario_id,
+            a_truth=a_default,
+            b_truth=_inventory("counterpart_b", food=ResourceLevel.DEFICIT, water=ResourceLevel.SURPLUS),
+            emissions=(
+                _emission(scenario_id, 1, CounterpartSignalKind.RESOURCE_STATUS_CLAIM, resource=ResourceKind.WATER, reported_level=ResourceLevel.SURPLUS),
+                _emission(scenario_id, 2, CounterpartSignalKind.TRANSFER_ATTEMPT, item_kind=ResourceKind.WATER, authority=SignalAuthority.OBSERVED_EVENT),
+                _emission(
+                    scenario_id,
+                    3,
+                    CounterpartSignalKind.TRANSFER_RESULT,
+                    item_kind=ResourceKind.WATER,
+                    aperture=ApertureState.BLOCKED,
+                    authority=SignalAuthority.OBSERVED_EVENT,
+                    transfer_outcome=TransferOutcome.FAILED_BLOCKED,
+                ),
+            ),
+            eval_only_labels=("claim_then_transfer_failed",),
+        )
+
     raise ValueError(f"Unsupported symbolic trade scenario: {scenario_id}")
 
 
@@ -187,4 +251,8 @@ def stage1_scenarios() -> tuple[str, ...]:
         "noisy_signal",
         "transfer_seen_without_trade_token",
         "eval_label_leak_attack",
+        "a_deficit_only",
+        "b_surplus_claim_only",
+        "claim_then_confirmed_transfer",
+        "claim_then_failed_transfer",
     )

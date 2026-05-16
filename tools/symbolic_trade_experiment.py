@@ -18,7 +18,9 @@ from experiments.symbolic_trade import (
     run_stage1_scenario,
     run_stage2_trace,
     run_stage25_reaction,
+    run_stage3_response,
     stage25_result_to_dict,
+    stage3_result_to_dict,
     stage2_result_to_dict,
 )
 
@@ -32,6 +34,9 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument("--include-eval-only", action="store_true", help="Include eval-only harness truth in JSON output.")
     parser.add_argument("--stage2-trace", action="store_true", help="Run Stage 2 subject-adapter W01->W06 trace-through.")
     parser.add_argument("--stage25-reaction", action="store_true", help="Run Stage 2.5 real-A reaction probe at highest executable surface.")
+    parser.add_argument("--stage3-response", action="store_true", help="Run Stage 3 real-A response-candidate probe.")
+    parser.add_argument("--include-response-candidates", action="store_true", help="Include full response candidate payload in Stage 3 JSON output.")
+    parser.add_argument("--stage3-summary", action="store_true", help="Print concise Stage 3 summary in text mode.")
     return parser
 
 
@@ -95,6 +100,28 @@ def _print_stage25_text(payload: dict[str, object]) -> None:
     print("claim_boundary=['stage2.5 reaction probe only', 'no autonomous trade claim']")
 
 
+def _print_stage3_text(payload: dict[str, object], *, summary_only: bool = False) -> None:
+    falsifiers = payload.get("falsifier_summary", [])
+    passed = sum(1 for item in falsifiers if item.get("passed"))
+    total = len(falsifiers)
+    print("SYMBOLIC TRADE HARNESS STAGE3 RESPONSE-CANDIDATE PROBE")
+    print(f"scenario_id={payload['scenario_name']}")
+    print(f"stage={payload['stage']}")
+    print(f"execution_level={payload.get('execution_level')}")
+    print(f"subject_tick_used={payload.get('subject_tick_used')}")
+    print(f"owner_surface_used={payload.get('owner_surface_used')}")
+    print(f"adapter_projection_used={payload.get('adapter_projection_used')}")
+    print(f"fallback_reasons={payload.get('fallback_reasons', [])}")
+    print(f"selected_response_kind={payload.get('selected_response_kind')}")
+    print(f"response_verdict={payload.get('response_verdict')}")
+    print(f"phase_coverage_verified={payload.get('phase_coverage_verified')}")
+    print(f"phase_coverage_evidence={payload.get('phase_coverage_evidence', [])}")
+    if not summary_only:
+        print(f"response_candidates_count={len(payload.get('response_candidates', []))}")
+    print(f"falsifier_summary={passed}/{total} passed")
+    print("claim_boundary=['stage3 response-candidate probe only', 'no autonomous trade claim']")
+
+
 def main() -> int:
     args = _parser().parse_args()
 
@@ -106,7 +133,14 @@ def main() -> int:
     if not args.scenario:
         raise SystemExit("Provide --scenario or --list-scenarios")
 
-    if args.stage25_reaction:
+    if args.stage3_response:
+        result = run_stage3_response(args.scenario, include_falsifiers=args.run_falsifiers or args.json)
+        payload = stage3_result_to_dict(
+            result,
+            include_eval_only=args.include_eval_only,
+            include_response_candidates=args.include_response_candidates or not args.stage3_summary,
+        )
+    elif args.stage25_reaction:
         result = run_stage25_reaction(args.scenario, include_falsifiers=args.run_falsifiers or args.json)
         payload = stage25_result_to_dict(result, include_eval_only=args.include_eval_only)
     elif args.stage2_trace:
@@ -121,6 +155,8 @@ def main() -> int:
     else:
         if args.stage2_trace:
             _print_stage2_text(payload)
+        elif args.stage3_response:
+            _print_stage3_text(payload, summary_only=args.stage3_summary)
         elif args.stage25_reaction:
             _print_stage25_text(payload)
         else:

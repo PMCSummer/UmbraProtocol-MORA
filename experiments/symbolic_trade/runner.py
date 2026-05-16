@@ -38,6 +38,12 @@ def run_stage25_reaction(scenario_id: str, *, include_falsifiers: bool = True):
     return run_stage25_reaction_probe(scenario_id, include_falsifiers=include_falsifiers)
 
 
+def run_stage3_response(scenario_id: str, *, include_falsifiers: bool = True):
+    from .stage3_runner import run_stage3_response_probe
+
+    return run_stage3_response_probe(scenario_id, include_falsifiers=include_falsifiers)
+
+
 def result_to_dict(result, *, include_eval_only: bool = False) -> dict[str, object]:
     steps = []
     for step in result.steps:
@@ -77,3 +83,18 @@ def stage25_result_to_dict(result, *, include_eval_only: bool = False) -> dict[s
     from .stage25_runner import stage25_reaction_result_to_dict
 
     return stage25_reaction_result_to_dict(result, include_eval_only=include_eval_only)
+
+
+def stage3_result_to_dict(
+    result,
+    *,
+    include_eval_only: bool = False,
+    include_response_candidates: bool = True,
+) -> dict[str, object]:
+    from .stage3_runner import serialize_stage3_response_run
+
+    return serialize_stage3_response_run(
+        result,
+        include_eval_only=include_eval_only,
+        include_response_candidates=include_response_candidates,
+    )

@@ -30,8 +30,16 @@ from .runner import (
     run_stage1_scenario,
     run_stage2_trace,
     run_stage25_reaction,
+    run_stage3_response,
     stage25_result_to_dict,
+    stage3_result_to_dict,
     stage2_result_to_dict,
+)
+from .response_candidates import (
+    AResponseCandidate,
+    AResponseCandidateRun,
+    AResponseKind,
+    ResponseVerdict,
 )
 from .subject_reaction_probe import (
     AReactionProbeRun,
@@ -85,8 +93,14 @@ __all__ = [
     "run_stage1_scenario",
     "run_stage2_trace",
     "run_stage25_reaction",
+    "run_stage3_response",
     "stage25_result_to_dict",
+    "stage3_result_to_dict",
     "stage2_result_to_dict",
+    "AResponseCandidate",
+    "AResponseCandidateRun",
+    "AResponseKind",
+    "ResponseVerdict",
     "AReactionProbeRun",
     "AReactionStepRecord",
     "CounterpartClaimReactionRecord",
