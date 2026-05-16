@@ -1126,3 +1126,257 @@ def run_stage4_cycle_falsifiers(stage4_run, *, repo_root: Path | None = None) ->
         FalsifierResult("p02_episode_completion_inflation", not p02_episode_completion_inflation, "p02 episode marked verified without attempt/observation chain" if p02_episode_completion_inflation else "ok"),
         FalsifierResult("core_contamination", not core_modified, "forbidden core path touched" if core_modified else "ok"),
     )
+
+
+def run_stage5_affordance_trace_falsifiers(stage5_trace, *, repo_root: Path | None = None) -> tuple[FalsifierResult, ...]:
+    payload = asdict(stage5_trace)
+    payload.pop("eval_only", None)
+    selection = stage5_trace.selection_record
+    request = stage5_trace.affordance_use_request
+    envelope = stage5_trace.world_actuator_envelope
+    episode = stage5_trace.episode_record
+    ledger = stage5_trace.module_responsibility_ledger
+    passive_records = stage5_trace.passive_response_records
+    causal_records = stage5_trace.causal_response_records
+    phase_evidence = set(stage5_trace.phase_coverage_evidence)
+    stage4_phase_evidence = set(stage5_trace.stage4_phase_coverage_evidence)
+    required_phase_codes = {"W01", "W02", "W03", "W04", "W05", "W06"}
+    selected_phase_codes = {item.split(":", 1)[0] for item in selection.source_phase_refs if ":" in item}
+    request_phase_codes = {item.split(":", 1)[0] for item in request.source_phase_refs if ":" in item}
+
+    selection_without_offer_candidate = (
+        selection.selection_status.value == "selected_for_invocation_request"
+        and not bool(selection.response_candidate_ref)
+    )
+    affordance_available_as_invoked = (
+        selection.selection_status.value == "selected_for_invocation_request"
+        and not request.execution_requested
+        and envelope.invoked
+    )
+    invocation_request_as_execution = request.execution_requested and request.execution_prohibited_until_world_actuator is False
+    execution_without_explicit_actuator_flag = envelope.invoked and not envelope.explicit_execution_flag
+    execution_without_valid_request = envelope.invoked and (
+        request.selected_affordance_ref is None
+        or not request.may_be_sent_to_world_actuator
+        or envelope.invocation_request_ref is None
+    )
+    completion_oracle_chain_broken = (
+        episode.completion_claim
+        and (
+            not bool(selection.response_candidate_ref)
+            or selection.selection_status.value != "selected_for_invocation_request"
+            or request.selected_affordance_ref is None
+            or not request.request_valid
+            or not request.execution_requested
+            or not request.may_be_sent_to_world_actuator
+            or not envelope.explicit_execution_flag
+            or not envelope.invoked
+            or not bool(envelope.invocation_id)
+            or not bool(envelope.attempt_id)
+            or not bool(episode.causal_post_invocation_refs)
+            or bool(set(episode.passive_packet_refs) & set(episode.causal_post_invocation_refs))
+            or stage5_trace.transfer_result is not TransferOutcome.SUCCEEDED
+            or episode.verification_status != "verified"
+            or not episode.completion_basis_chain_verified
+            or episode.completion_authority != "episode_verification_chain"
+            or episode.used_transfer_result_as_sole_authority
+            or episode.used_eval_only_for_completion
+            or episode.used_hidden_truth_for_completion
+            or episode.used_scenario_label_for_completion
+            or episode.used_w06_correction_execution_for_completion
+        )
+    )
+    transfer_result_as_completion_oracle = (
+        completion_oracle_chain_broken
+        or (
+            stage5_trace.transfer_result is TransferOutcome.SUCCEEDED
+            and episode.completion_claim
+            and episode.verification_status != "verified"
+        )
+    )
+    passive_packet_as_causal = (
+        ((not envelope.invoked) and bool(episode.causal_post_invocation_refs))
+        or bool(set(episode.passive_packet_refs) & set(episode.causal_post_invocation_refs))
+        or any(item.get("caused_by_transfer_invocation") for item in passive_records)
+        or any(item.get("caused_by_transfer_invocation") is False for item in causal_records)
+        or any(item.get("response_record_source") != "passive_scenario_packet" for item in passive_records)
+        or any(item.get("response_record_source") != "post_invocation_world_response" for item in causal_records)
+        or any(bool(item.get("causing_invocation_id")) for item in passive_records)
+        or any(bool(item.get("attempt_id")) for item in passive_records)
+        or any(not bool(item.get("causing_invocation_id")) for item in causal_records)
+        or any(not bool(item.get("attempt_id")) for item in causal_records)
+        or any(not bool(item.get("invocation_link_verified")) for item in causal_records)
+        or (
+            envelope.invoked
+            and any(item.get("causing_invocation_id") != envelope.invocation_id for item in causal_records)
+        )
+        or (
+            envelope.invoked
+            and any(item.get("attempt_id") != envelope.attempt_id for item in causal_records)
+        )
+    )
+    b_claim_as_fact = any(
+        item.get("signal_kind") == "resource_status_signal"
+        and item.get("source_authority") == "counterpart_claim"
+        and not item.get("claim_not_fact_marker", False)
+        for item in stage5_trace.visible_packets
+    )
+    a_deficit_as_permission = (
+        "self_deficit_marker_present" in " ".join(selection.missing_preconditions)
+        and selection.selection_status.value == "selected_for_invocation_request"
+    )
+    a_surplus_as_auto_offer = (
+        selection.selection_status.value == "selected_for_invocation_request"
+        and selection.response_candidate_ref is None
+    )
+    complementarity_as_oracle = any(
+        token in " ".join(selection.why_this_affordance).lower()
+        for token in ("mutual_benefit_oracle", "true_need_surplus_pairing", "should_trade")
+    )
+    blocked_affordance_invoked = (
+        selection.selected_affordance_status in {"blocked", "contested"}
+        and (
+            envelope.invoked
+            or request.request_valid
+            or request.may_be_sent_to_world_actuator
+            or stage5_trace.transfer_result is not TransferOutcome.NOT_ATTEMPTED
+        )
+    )
+    failed_transfer_erases_residue = (
+        stage5_trace.transfer_result in {TransferOutcome.FAILED_BLOCKED, TransferOutcome.FAILED_UNKNOWN, TransferOutcome.CONTRADICTED}
+        and episode.residue_status == "no_residue"
+    )
+    noexec_completion_claim = (not envelope.explicit_execution_flag) and episode.completion_claim
+    world_actuator_claims_subject_motor_control = envelope.subject_motor_control_claim not in {"false", "not_claimed"}
+    w06_revision_executed = (
+        episode.used_w06_correction_execution_for_completion
+        or "w06_correction_executed" in " ".join(episode.failed_or_blocked_reason).lower()
+    )
+    stage5_decision_blob = " ".join(
+        (
+            selection.selected_affordance_kind or "",
+            selection.selected_affordance_source,
+            selection.selected_affordance_status,
+            " ".join(selection.why_this_affordance),
+            " ".join(selection.rejected_alternatives),
+            request.intended_effect,
+            " ".join(request.required_permissions),
+            " ".join(request.prohibited_interpretations),
+            envelope.actuator_kind,
+            envelope.actuator_authority,
+            " ".join(envelope.invocation_reason),
+            " ".join(envelope.blocked_reason),
+            " ".join(episode.completion_basis),
+            ledger.A04_affordance_binding_responsibility,
+            ledger.V_communication_responsibility,
+            ledger.world_actuator_responsibility,
+            " ".join(item.get("signal_kind", "") for item in stage5_trace.visible_packets),
+        )
+    ).lower()
+    forbidden_trade_tokens = (
+        "trade_intent",
+        "trade_oracle",
+        "exchange_oracle",
+        "mutual_benefit_oracle",
+        "deal_success",
+        "should_trade",
+        "guaranteed_trade",
+        "economic_agency",
+        "magic_trade_channel",
+        "barter_success_signal",
+    )
+    trade_specific_magic_channel = any(token in stage5_decision_blob for token in forbidden_trade_tokens)
+
+    eval_only_used_in_decision = False
+    hidden_inventory_used_in_decision = False
+    forbidden_tokens = (
+        "eval_only",
+        "harness_truth",
+        "success_label",
+        "expected_success_label",
+        "true_inventory",
+        "hidden_inventory",
+    )
+    for path, value in _walk_paths(payload):
+        lower_path = path.lower()
+        if any(part in lower_path for part in ("selection_record", "affordance_use_request", "world_actuator_envelope", "episode_record", "records")):
+            if "used_eval_only_for_completion" in lower_path and value is False:
+                continue
+            if "used_hidden_truth_for_completion" in lower_path and value is False:
+                continue
+            if "used_scenario_label_for_completion" in lower_path and value is False:
+                continue
+            if any(token in lower_path for token in forbidden_tokens):
+                if token := next((t for t in forbidden_tokens if t in lower_path), None):
+                    if token in {"eval_only", "success_label", "expected_success_label"}:
+                        eval_only_used_in_decision = True
+                    if token in {"true_inventory", "hidden_inventory", "harness_truth"}:
+                        hidden_inventory_used_in_decision = True
+            if isinstance(value, str):
+                lower_value = value.lower()
+                if any(token in lower_value for token in ("eval_only", "success_label", "expected_success_label")):
+                    if lower_value.startswith("no_eval_only") or lower_value.endswith("_not_used"):
+                        continue
+                    eval_only_used_in_decision = True
+                if any(token in lower_value for token in ("true_inventory", "hidden_inventory", "harness_truth")):
+                    if lower_value.startswith("no_hidden") or lower_value.endswith("_not_used"):
+                        continue
+                    hidden_inventory_used_in_decision = True
+
+    module_responsibility_missing = any(
+        not getattr(ledger, field)
+        for field in (
+            "W01_responsibility",
+            "W02_responsibility",
+            "W03_responsibility",
+            "W04_responsibility",
+            "W05_responsibility",
+            "W06_responsibility",
+            "A02_gap_responsibility",
+            "A04_affordance_binding_responsibility",
+            "P02_episode_responsibility",
+            "V_communication_responsibility",
+            "world_actuator_responsibility",
+        )
+    )
+    phase_ref_linkage_broken = any(ref not in phase_evidence for ref in (*selection.source_phase_refs, *request.source_phase_refs))
+    phase_evidence_phase_codes = {item.split(":", 1)[0] for item in stage5_trace.phase_coverage_evidence if ":" in item}
+    phase_evidence_fabricated = (
+        not stage5_trace.phase_coverage_verified
+        or stage5_trace.phase_evidence_source_run_id != stage5_trace.stage4_run_id
+        or stage4_phase_evidence != phase_evidence
+        or not required_phase_codes.issubset(phase_evidence_phase_codes)
+        or not required_phase_codes.issubset(selected_phase_codes)
+        or not required_phase_codes.issubset(request_phase_codes)
+        or phase_ref_linkage_broken
+    )
+
+    repo = repo_root or Path(__file__).resolve().parents[2]
+    changed_paths = set(_modified_paths(repo))
+    changed_paths.update(_untracked_paths(repo))
+    core_modified = any(any(path.startswith(prefix) for prefix in _FORBIDDEN_CORE_PREFIXES) for path in changed_paths)
+
+    return (
+        FalsifierResult("stage5_selection_without_offer_candidate", not selection_without_offer_candidate, "affordance selected without offer candidate" if selection_without_offer_candidate else "ok"),
+        FalsifierResult("stage5_affordance_available_as_invoked", not affordance_available_as_invoked, "available affordance treated as invoked" if affordance_available_as_invoked else "ok"),
+        FalsifierResult("stage5_invocation_request_as_execution", not invocation_request_as_execution, "invocation request treated as execution" if invocation_request_as_execution else "ok"),
+        FalsifierResult("stage5_execution_without_explicit_actuator_flag", not execution_without_explicit_actuator_flag, "world actuator invoked without explicit flag" if execution_without_explicit_actuator_flag else "ok"),
+        FalsifierResult("stage5_execution_without_valid_request", not execution_without_valid_request, "world actuator invoked without valid request" if execution_without_valid_request else "ok"),
+        FalsifierResult("stage5_transfer_result_as_completion_oracle", not transfer_result_as_completion_oracle, "transfer result treated as completion oracle" if transfer_result_as_completion_oracle else "ok"),
+        FalsifierResult("stage5_passive_packet_as_causal_response", not passive_packet_as_causal, "passive packet treated as causal post-invocation response" if passive_packet_as_causal else "ok"),
+        FalsifierResult("stage5_b_claim_as_fact", not b_claim_as_fact, "counterpart claim promoted to fact" if b_claim_as_fact else "ok"),
+        FalsifierResult("stage5_a_deficit_as_permission", not a_deficit_as_permission, "self deficit promoted into transfer permission" if a_deficit_as_permission else "ok"),
+        FalsifierResult("stage5_a_surplus_as_auto_offer", not a_surplus_as_auto_offer, "self surplus promoted into auto-offer" if a_surplus_as_auto_offer else "ok"),
+        FalsifierResult("stage5_complementarity_as_oracle", not complementarity_as_oracle, "complementarity oracle leaked into selection basis" if complementarity_as_oracle else "ok"),
+        FalsifierResult("stage5_blocked_affordance_invoked", not blocked_affordance_invoked, "blocked affordance was invoked" if blocked_affordance_invoked else "ok"),
+        FalsifierResult("stage5_failed_transfer_erases_residue", not failed_transfer_erases_residue, "failed transfer erased residue markers" if failed_transfer_erases_residue else "ok"),
+        FalsifierResult("stage5_noexec_completion_claim", not noexec_completion_claim, "completion claim in no-exec mode" if noexec_completion_claim else "ok"),
+        FalsifierResult("stage5_world_actuator_claims_subject_motor_control", not world_actuator_claims_subject_motor_control, "world actuator claims subject motor control" if world_actuator_claims_subject_motor_control else "ok"),
+        FalsifierResult("stage5_w06_revision_executed", not w06_revision_executed, "w06 correction/revision marked as executed" if w06_revision_executed else "ok"),
+        FalsifierResult("stage5_trade_specific_magic_channel", not trade_specific_magic_channel, "trade-specific shortcut channel detected" if trade_specific_magic_channel else "ok"),
+        FalsifierResult("stage5_eval_only_used_in_affordance_decision", not eval_only_used_in_decision, "eval-only labels leaked into decision-bearing records" if eval_only_used_in_decision else "ok"),
+        FalsifierResult("stage5_hidden_inventory_used_in_affordance_decision", not hidden_inventory_used_in_decision, "hidden inventory leaked into decision-bearing records" if hidden_inventory_used_in_decision else "ok"),
+        FalsifierResult("stage5_core_contamination", not core_modified, "forbidden core path touched" if core_modified else "ok"),
+        FalsifierResult("stage5_module_responsibility_missing", not module_responsibility_missing, "responsibility ledger missing required surfaces" if module_responsibility_missing else "ok"),
+        FalsifierResult("stage5_phase_evidence_fabricated", not phase_evidence_fabricated, "phase evidence missing or fabricated" if phase_evidence_fabricated else "ok"),
+    )

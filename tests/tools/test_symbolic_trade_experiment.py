@@ -30,6 +30,7 @@ STAGE4_SCENARIOS = STAGE3_SCENARIOS + (
     "transfer_affordance_failure",
     "successful_scripted_exchange_cycle",
 )
+STAGE5_SCENARIOS = STAGE4_SCENARIOS
 
 
 def _run(*args: str) -> subprocess.CompletedProcess[str]:
@@ -337,6 +338,70 @@ def test_symbolic_trade_cli_stage4_all_scenarios_execute_transfer_mode_exit_zero
             scenario,
             "--stage4-cycle",
             "--execute-transfer-affordance",
+            "--run-falsifiers",
+        )
+        assert result.returncode == 0, result.stderr
+        assert "falsifier_summary=" in result.stdout
+
+
+def test_symbolic_trade_cli_stage5_text_and_json_smoke() -> None:
+    text_result = _run("--scenario", "mirrored_resource_asymmetry", "--stage5-affordance-trace")
+    assert text_result.returncode == 0, text_result.stderr
+    assert "SYMBOLIC TRADE HARNESS STAGE5 AFFORDANCE RESPONSIBILITY TRACE" in text_result.stdout
+    assert "affordance_selection_status=" in text_result.stdout
+
+    json_result = _run("--scenario", "mirrored_resource_asymmetry", "--stage5-affordance-trace", "--json")
+    assert json_result.returncode == 0, json_result.stderr
+    payload = json.loads(json_result.stdout)
+    assert payload["stage"] == "stage5_affordance_responsibility_trace"
+    assert "eval_only" not in payload
+
+
+def test_symbolic_trade_cli_stage5_with_flags_and_eval_scope() -> None:
+    result = _run(
+        "--scenario",
+        "successful_scripted_exchange_cycle",
+        "--stage5-affordance-trace",
+        "--stage5-execute-world-actuator",
+        "--show-affordance-ledger",
+        "--include-affordance-records",
+        "--json",
+        "--include-eval-only",
+        "--run-falsifiers",
+    )
+    assert result.returncode == 0, result.stderr
+    payload = json.loads(result.stdout)
+    assert "eval_only" in payload
+    assert payload["world_actuator_envelope"]["invoked"] is True
+    assert "module_responsibility_ledger" in payload
+    visible_flat = json.dumps(
+        {
+            "selection_record": payload.get("selection_record", {}),
+            "affordance_use_request": payload.get("affordance_use_request", {}),
+            "world_actuator_envelope": payload.get("world_actuator_envelope", {}),
+            "episode_record": payload.get("episode_record", {}),
+            "visible_packets": payload.get("visible_packets", []),
+        },
+        sort_keys=True,
+    )
+    assert "harness_truth" not in visible_flat
+    assert "mutually_beneficial_trade_possible_eval_only" not in visible_flat
+
+
+def test_symbolic_trade_cli_stage5_all_scenarios_with_falsifiers_exit_zero() -> None:
+    for scenario in STAGE5_SCENARIOS:
+        result = _run("--scenario", scenario, "--stage5-affordance-trace", "--run-falsifiers")
+        assert result.returncode == 0, result.stderr
+        assert "falsifier_summary=" in result.stdout
+
+
+def test_symbolic_trade_cli_stage5_all_scenarios_execute_mode_exit_zero() -> None:
+    for scenario in STAGE5_SCENARIOS:
+        result = _run(
+            "--scenario",
+            scenario,
+            "--stage5-affordance-trace",
+            "--stage5-execute-world-actuator",
             "--run-falsifiers",
         )
         assert result.returncode == 0, result.stderr

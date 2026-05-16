@@ -32,9 +32,11 @@ from .runner import (
     run_stage25_reaction,
     run_stage3_response,
     run_stage4_cycle,
+    run_stage5_affordance_trace,
     stage25_result_to_dict,
     stage3_result_to_dict,
     stage4_result_to_dict,
+    stage5_result_to_dict,
     stage2_result_to_dict,
 )
 from .clarification_policy import (
@@ -86,6 +88,18 @@ from .stage4_trade_cycle_runner import (
     Stage4StepRecord,
     Stage4TradeCycleRun,
 )
+from .affordance_responsibility import (
+    AffordanceEpisodeResponsibilityRecord,
+    AffordanceProvenanceMode,
+    AffordanceResponsibilityTrace,
+    AffordanceSelectionRecord,
+    AffordanceSelectionStatus,
+    AffordanceUseRequest,
+    ModuleResponsibilityLedger,
+    ResponsibilityVerdict,
+    WorldActuatorEnvelope,
+)
+from .stage5_affordance_trace_runner import STAGE5_SCENARIOS
 
 __all__ = [
     "ApertureState",
@@ -120,9 +134,11 @@ __all__ = [
     "run_stage25_reaction",
     "run_stage3_response",
     "run_stage4_cycle",
+    "run_stage5_affordance_trace",
     "stage25_result_to_dict",
     "stage3_result_to_dict",
     "stage4_result_to_dict",
+    "stage5_result_to_dict",
     "stage2_result_to_dict",
     "ClarificationBudget",
     "ClarificationDecisionRecord",
@@ -161,4 +177,14 @@ __all__ = [
     "STAGE4_SCENARIOS",
     "Stage4StepRecord",
     "Stage4TradeCycleRun",
+    "STAGE5_SCENARIOS",
+    "AffordanceEpisodeResponsibilityRecord",
+    "AffordanceProvenanceMode",
+    "AffordanceResponsibilityTrace",
+    "AffordanceSelectionRecord",
+    "AffordanceSelectionStatus",
+    "AffordanceUseRequest",
+    "ModuleResponsibilityLedger",
+    "ResponsibilityVerdict",
+    "WorldActuatorEnvelope",
 ]

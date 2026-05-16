@@ -67,7 +67,10 @@ class ScriptedCounterpartResponseRecord:
     caused_by_transfer_invocation: bool
     causing_invocation_id: str | None
     visible_packet_ref: str
+    packet_step_index: int
     attempt_id: str | None
+    invocation_link_verified: bool
+    is_post_invocation_window: bool
     causal_status: str
     signal_kind: str
     transfer_outcome: str
@@ -290,17 +293,24 @@ def _build_scripted_counterpart_response_details(
     transfer_attempted: bool,
 ) -> tuple[ScriptedCounterpartResponseRecord, ...]:
     records: list[ScriptedCounterpartResponseRecord] = []
+    transfer_steps = [packet.timestamp_or_step for packet in packets if packet.signal_kind in {CounterpartSignalKind.TRANSFER_ATTEMPT, CounterpartSignalKind.TRANSFER_RESULT}]
+    invocation_anchor_step = min(transfer_steps) if transfer_steps else None
     for packet in packets:
         if packet.signal_kind not in {CounterpartSignalKind.TRANSFER_ATTEMPT, CounterpartSignalKind.TRANSFER_RESULT}:
             continue
-        caused = transfer_attempted
+        post_window = invocation_anchor_step is not None and packet.timestamp_or_step >= invocation_anchor_step
+        caused = transfer_attempted and post_window
+        link_verified = caused and bool(invocation_id) and bool(attempt_id)
         records.append(
             ScriptedCounterpartResponseRecord(
                 response_record_source="post_invocation_world_response" if caused else "passive_scenario_packet",
                 caused_by_transfer_invocation=caused,
                 causing_invocation_id=invocation_id if caused else None,
                 visible_packet_ref=packet.packet_id,
+                packet_step_index=packet.timestamp_or_step,
                 attempt_id=attempt_id if caused else None,
+                invocation_link_verified=link_verified,
+                is_post_invocation_window=bool(post_window),
                 causal_status="causally_after_invocation" if caused else "passive_observation",
                 signal_kind=packet.signal_kind.value,
                 transfer_outcome=packet.transfer_outcome.value,

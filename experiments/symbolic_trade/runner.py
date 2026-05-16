@@ -63,6 +63,23 @@ def run_stage4_cycle(
     )
 
 
+def run_stage5_affordance_trace(
+    scenario_id: str,
+    *,
+    include_falsifiers: bool = True,
+    include_eval_only: bool = False,
+    execute_world_actuator: bool = False,
+):
+    from .stage5_affordance_trace_runner import run_stage5_affordance_trace
+
+    return run_stage5_affordance_trace(
+        scenario_id,
+        include_falsifiers=include_falsifiers,
+        include_eval_only=include_eval_only,
+        execute_world_actuator=execute_world_actuator,
+    )
+
+
 def result_to_dict(result, *, include_eval_only: bool = False) -> dict[str, object]:
     steps = []
     for step in result.steps:
@@ -133,4 +150,21 @@ def stage4_result_to_dict(
         include_eval_only=include_eval_only,
         include_transfer_episode=include_transfer_episode,
         include_clarification_state=include_clarification_state,
+    )
+
+
+def stage5_result_to_dict(
+    result,
+    *,
+    include_eval_only: bool = False,
+    include_affordance_records: bool = True,
+    include_affordance_ledger: bool = False,
+) -> dict[str, object]:
+    from .stage5_affordance_trace_runner import stage5_affordance_trace_to_dict
+
+    return stage5_affordance_trace_to_dict(
+        result,
+        include_eval_only=include_eval_only,
+        include_affordance_records=include_affordance_records,
+        include_affordance_ledger=include_affordance_ledger,
     )

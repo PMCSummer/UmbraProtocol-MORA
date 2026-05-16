@@ -20,9 +20,11 @@ from experiments.symbolic_trade import (
     run_stage25_reaction,
     run_stage3_response,
     run_stage4_cycle,
+    run_stage5_affordance_trace,
     stage25_result_to_dict,
     stage3_result_to_dict,
     stage4_result_to_dict,
+    stage5_result_to_dict,
     stage2_result_to_dict,
 )
 
@@ -45,6 +47,10 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument("--show-clarification-state", action="store_true", help="Include Stage 4 clarification/readiness details in output.")
     parser.add_argument("--include-transfer-episode", action="store_true", help="Include Stage 4 transfer episode payload in JSON output.")
     parser.add_argument("--stage4-summary", action="store_true", help="Print concise Stage 4 summary in text mode.")
+    parser.add_argument("--stage5-affordance-trace", action="store_true", help="Run Stage 5 affordance responsibility trace.")
+    parser.add_argument("--stage5-execute-world-actuator", action="store_true", help="Allow Stage 5 world actuator execution when request is valid.")
+    parser.add_argument("--show-affordance-ledger", action="store_true", help="Include Stage 5 module responsibility ledger in output.")
+    parser.add_argument("--include-affordance-records", action="store_true", help="Include Stage 5 selection/request/actuator/episode records in JSON output.")
     return parser
 
 
@@ -158,6 +164,45 @@ def _print_stage4_text(payload: dict[str, object], *, summary_only: bool = False
     print("claim_boundary=['stage4 clarification-transfer cycle only', 'no autonomous trade claim']")
 
 
+def _print_stage5_text(
+    payload: dict[str, object],
+    *,
+    summary_only: bool = False,
+    show_affordance_ledger: bool = False,
+    include_affordance_records: bool = False,
+) -> None:
+    falsifiers = payload.get("falsifier_summary", [])
+    passed = sum(1 for item in falsifiers if item.get("passed"))
+    total = len(falsifiers)
+    selection = payload.get("selection_record", {})
+    request = payload.get("affordance_use_request", {})
+    envelope = payload.get("world_actuator_envelope", {})
+    episode = payload.get("episode_record", {})
+    print("SYMBOLIC TRADE HARNESS STAGE5 AFFORDANCE RESPONSIBILITY TRACE")
+    print(f"scenario_id={payload['scenario_id']}")
+    print(f"stage={payload['stage']}")
+    print(f"execution_level={payload.get('execution_level')}")
+    print(f"subject_tick_used={payload.get('subject_tick_used')}")
+    print(f"phase_coverage_verified={payload.get('phase_coverage_verified')}")
+    print(f"readiness_status={selection.get('permission_status')}")
+    print(f"offer_candidate_emitted={bool(selection.get('response_candidate_ref'))}")
+    print(f"affordance_selection_status={selection.get('selection_status')}")
+    print(f"invocation_request_created={bool(request.get('selected_affordance_ref'))}")
+    print(f"world_actuator_invoked={envelope.get('invoked')}")
+    print(f"transfer_result={payload.get('transfer_result')}")
+    print(f"completion_claim={episode.get('completion_claim')}")
+    if not summary_only:
+        print(f"passive_packet_count={len(episode.get('passive_packet_refs', []))}")
+        print(f"causal_packet_count={len(episode.get('causal_post_invocation_refs', []))}")
+        print(f"responsibility_verdict={payload.get('responsibility_verdict')}")
+        if include_affordance_records and "records" in payload:
+            print(f"affordance_records={payload.get('records', [])}")
+        if show_affordance_ledger and "module_responsibility_ledger" in payload:
+            print(f"module_responsibility_ledger={payload.get('module_responsibility_ledger')}")
+    print(f"falsifier_summary={passed}/{total} passed")
+    print("claim_boundary=['stage5 affordance responsibility trace only', 'no autonomous trade claim']")
+
+
 def main() -> int:
     args = _parser().parse_args()
 
@@ -169,7 +214,20 @@ def main() -> int:
     if not args.scenario:
         raise SystemExit("Provide --scenario or --list-scenarios")
 
-    if args.stage4_cycle:
+    if args.stage5_affordance_trace:
+        result = run_stage5_affordance_trace(
+            args.scenario,
+            include_falsifiers=args.run_falsifiers or args.json,
+            include_eval_only=args.include_eval_only,
+            execute_world_actuator=args.stage5_execute_world_actuator,
+        )
+        payload = stage5_result_to_dict(
+            result,
+            include_eval_only=args.include_eval_only,
+            include_affordance_records=args.include_affordance_records or not args.stage4_summary,
+            include_affordance_ledger=args.show_affordance_ledger,
+        )
+    elif args.stage4_cycle:
         result = run_stage4_cycle(
             args.scenario,
             include_falsifiers=args.run_falsifiers or args.json,
@@ -205,6 +263,13 @@ def main() -> int:
     else:
         if args.stage2_trace:
             _print_stage2_text(payload)
+        elif args.stage5_affordance_trace:
+            _print_stage5_text(
+                payload,
+                summary_only=False,
+                show_affordance_ledger=args.show_affordance_ledger,
+                include_affordance_records=args.include_affordance_records,
+            )
         elif args.stage4_cycle:
             _print_stage4_text(payload, summary_only=args.stage4_summary)
         elif args.stage3_response:
