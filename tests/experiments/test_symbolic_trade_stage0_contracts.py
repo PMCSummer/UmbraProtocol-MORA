@@ -1,6 +1,8 @@
 from __future__ import annotations
 
-from experiments.symbolic_trade import CounterpartSignalKind, run_stage0_packet_dry_run
+import json
+
+from experiments.symbolic_trade import CounterpartSignalKind, packet_to_dict, run_stage0_packet_dry_run
 
 
 _FORBIDDEN = ("trade", "offer", "request", "ack", "deal", "bargain", "exchange", "market")
@@ -17,8 +19,10 @@ def test_stage0_no_trade_specific_communication_acts() -> None:
 def test_stage0_eval_labels_not_subject_visible() -> None:
     result = run_stage0_packet_dry_run(include_falsifiers=False)
     packet_strings = " ".join(packet.packet_id + packet.source_id + packet.signal_kind.value for packet in result.emitted_packets)
+    serialized_packets = json.dumps([packet_to_dict(packet) for packet in result.emitted_packets], sort_keys=True)
     for label in result.success_labels:
         assert label not in packet_strings
+        assert label not in serialized_packets
 
 
 def test_stage0_harness_truth_separated_from_subject_visible_events() -> None:

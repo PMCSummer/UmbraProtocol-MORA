@@ -20,11 +20,12 @@ _FORBIDDEN_CORE_PREFIXES = (
     "src/substrate/runtime_topology/policy.py",
     "src/substrate/runtime_tap_trace.py",
 )
+_DESIRED_MARKER_TERMS = ("desired_state", "desired_outcome", "requested_outcome", "goal_target", "goal_state")
 
 
-def _modified_paths(repo_root: Path) -> tuple[str, ...]:
+def _run_git_lines(repo_root: Path, args: list[str]) -> tuple[str, ...]:
     result = subprocess.run(
-        ["git", "diff", "--name-only"],
+        args,
         cwd=repo_root,
         capture_output=True,
         text=True,
@@ -35,9 +36,24 @@ def _modified_paths(repo_root: Path) -> tuple[str, ...]:
     return tuple(line.strip().replace("\\", "/") for line in result.stdout.splitlines() if line.strip())
 
 
+def _modified_paths(repo_root: Path) -> tuple[str, ...]:
+    tracked = set(_run_git_lines(repo_root, ["git", "diff", "--name-only"]))
+    tracked.update(_run_git_lines(repo_root, ["git", "diff", "--cached", "--name-only"]))
+    return tuple(sorted(tracked))
+
+
+def _untracked_paths(repo_root: Path) -> tuple[str, ...]:
+    return _run_git_lines(repo_root, ["git", "ls-files", "-o", "--exclude-standard"])
+
+
 def _contains_any_term(text: str) -> bool:
     lower = text.lower()
     return any(term in lower for term in _FORBIDDEN_SIGNAL_TERMS)
+
+
+def _contains_desired_marker(text: str) -> bool:
+    lower = text.lower()
+    return any(term in lower for term in _DESIRED_MARKER_TERMS)
 
 
 def _packet_strings(packet: SubjectVisiblePacket) -> tuple[str, ...]:
@@ -73,10 +89,14 @@ def run_symbolic_trade_falsifiers(result, *, repo_root: Path | None = None) -> t
         for packet in packets
     )
 
-    desired_as_evidence = any(
-        "desired_as_evidence" in obligation
-        for obligation in result.phase_obligation_summary
-    ) or bool(summary.get("desired_used_as_evidence", False))
+    desired_as_evidence = bool(summary.get("desired_used_as_evidence", False))
+    if not desired_as_evidence:
+        for packet in packets:
+            if packet.source_authority is not SignalAuthority.OBSERVED_EVENT:
+                continue
+            if any(_contains_desired_marker(fragment) for fragment in _packet_strings(packet)):
+                desired_as_evidence = True
+                break
 
     oracle_leak = any(
         "mutually_beneficial_trade_possible" in " ".join(_packet_strings(packet))
@@ -84,6 +104,13 @@ def run_symbolic_trade_falsifiers(result, *, repo_root: Path | None = None) -> t
     )
 
     one_shot_regularization = bool(summary.get("stable_regularities_from_single_claim", False))
+    if not one_shot_regularization and len(packets) <= 1:
+        one_shot_regularization = (
+            bool(summary.get("stable_exchange_rule_claimed", False))
+            or bool(summary.get("stable_counterpart_reliability_claimed", False))
+            or bool(summary.get("mature_pattern_claimed", False))
+            or int(summary.get("regularity_promotion_count", 0)) > 0
+        )
 
     blocked_ignored = (
         any(packet.signal_kind is CounterpartSignalKind.BLOCKED for packet in packets)
@@ -103,9 +130,16 @@ def run_symbolic_trade_falsifiers(result, *, repo_root: Path | None = None) -> t
 
     transfer_as_permission = bool(summary.get("transfer_result_grants_permission", False))
 
-    correction_executed = bool(summary.get("correction_candidate_executed", False))
+    correction_created = bool(summary.get("correction_candidate_created", False))
+    execution_prohibited = bool(summary.get("execution_prohibited", True))
+    correction_executed = bool(summary.get("correction_executed", False)) or bool(
+        summary.get("correction_candidate_executed", False)
+    )
+    correction_seam_broken = correction_executed or (correction_created and not execution_prohibited)
 
-    changed_paths = _modified_paths(repo_root or Path(__file__).resolve().parents[2])
+    repo = repo_root or Path(__file__).resolve().parents[2]
+    changed_paths = set(_modified_paths(repo))
+    changed_paths.update(_untracked_paths(repo))
     core_modified = any(
         any(path.startswith(prefix) for prefix in _FORBIDDEN_CORE_PREFIXES)
         for path in changed_paths
@@ -122,6 +156,6 @@ def run_symbolic_trade_falsifiers(result, *, repo_root: Path | None = None) -> t
         FalsifierResult("false_claim_truth_laundering", not false_claim_laundered, "claim laundered as observed fact" if false_claim_laundered else "ok"),
         FalsifierResult("noisy_signal_cleaned", not noisy_cleaned, "noisy contradiction cleaned to stable claim" if noisy_cleaned else "ok"),
         FalsifierResult("transfer_result_as_permission", not transfer_as_permission, "transfer result converted to permission" if transfer_as_permission else "ok"),
-        FalsifierResult("correction_candidate_executed", not correction_executed, "correction candidate treated as executed" if correction_executed else "ok"),
+        FalsifierResult("correction_candidate_executed", not correction_seam_broken, "correction candidate treated as executed or execution guard broken" if correction_seam_broken else "ok"),
         FalsifierResult("phase_core_modification", not core_modified, "forbidden core files modified" if core_modified else "ok"),
     )

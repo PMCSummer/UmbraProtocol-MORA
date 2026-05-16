@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import subprocess
 import sys
 from pathlib import Path
@@ -53,3 +54,35 @@ def test_symbolic_trade_cli_json_output_contains_required_fields() -> None:
     assert '"packet_count"' in result.stdout
     assert '"falsifier_results"' in result.stdout
     assert '"claim_discipline_markers"' in result.stdout
+
+
+def test_symbolic_trade_cli_default_json_excludes_eval_only() -> None:
+    result = _run("--scenario", "mirrored_resource_asymmetry", "--json", "--run-falsifiers")
+    assert result.returncode == 0, result.stderr
+    payload = json.loads(result.stdout)
+    assert "eval_only" not in payload
+
+
+def test_symbolic_trade_cli_include_eval_only_is_scoped() -> None:
+    result = _run("--scenario", "mirrored_resource_asymmetry", "--json", "--run-falsifiers", "--include-eval-only")
+    assert result.returncode == 0, result.stderr
+    payload = json.loads(result.stdout)
+    assert "eval_only" in payload
+    for step in payload["steps"]:
+        for packet in step["subject_visible_packets"]:
+            flat = json.dumps(packet, sort_keys=True)
+            assert "harness_truth" not in flat
+            assert "mutually_beneficial_trade_possible_eval_only" not in flat
+
+
+def test_repo_root_imports_work_without_manual_pythonpath() -> None:
+    repo_root = Path(__file__).resolve().parents[2]
+    result = subprocess.run(
+        [sys.executable, "-c", "import experiments.symbolic_trade as st; import experiments.symbolic_trade.runner as r; print('ok')"],
+        cwd=repo_root,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert result.returncode == 0, result.stderr
+    assert "ok" in result.stdout

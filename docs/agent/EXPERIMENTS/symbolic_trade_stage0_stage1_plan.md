@@ -85,3 +85,10 @@ Do not leak hidden counterpart state as subject facts.
 - W01-W06 core is untouched by this harness build.
 - S03/C05/M03 compatibility is not claimed from this harness alone.
 - Missing integration/runtime paths remain non-executable compatibility.
+
+## Narrow hardening notes
+- Harness importability from repo root is preserved without requiring manual `PYTHONPATH` for basic `experiments.symbolic_trade` imports.
+- `phase_core_modification` falsifier checks both tracked core changes and untracked forbidden core additions.
+- `desired_as_evidence` and `one_shot_regularization` falsifiers are scenario-trace grounded and include adversarial negative controls.
+- Eval-label leakage checks inspect full serialized subject-visible packets, not only compact string fields.
+- Harness correction-candidate seam markers enforce `execution_prohibited=true` and `correction_executed=false` in clean paths.

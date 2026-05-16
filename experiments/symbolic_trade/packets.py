@@ -1,13 +1,10 @@
 from __future__ import annotations
 
 from dataclasses import asdict
+from typing import TYPE_CHECKING
 
-from substrate.w01_bounded_world_loop import (
-    W01PacketIntegrityStatus,
-    W01PresenceMode,
-    W01SourceAuthority,
-    W01WorldPacket,
-)
+if TYPE_CHECKING:
+    from substrate.w01_bounded_world_loop import W01WorldPacket
 
 from .models import (
     ApertureState,
@@ -79,7 +76,16 @@ def packet_from_dict(payload: dict[str, object]) -> SubjectVisiblePacket:
     )
 
 
-def packet_to_w01_world_packet(packet: SubjectVisiblePacket, *, sequence: int, entity_ref: str = "aperture_slot") -> W01WorldPacket:
+def packet_to_w01_world_packet(packet: SubjectVisiblePacket, *, sequence: int, entity_ref: str = "aperture_slot") -> "W01WorldPacket":
+    # Imported lazily so this harness package is importable from repo root without
+    # requiring PYTHONPATH=src during plain module import checks.
+    from substrate.w01_bounded_world_loop import (
+        W01PacketIntegrityStatus,
+        W01PresenceMode,
+        W01SourceAuthority,
+        W01WorldPacket,
+    )
+
     authority = {
         SignalAuthority.COUNTERPART_CLAIM: W01SourceAuthority.WEAK_SCAFFOLD_PROVIDER,
         SignalAuthority.OBSERVED_EVENT: W01SourceAuthority.TRUSTED_WORLD_PROVIDER,

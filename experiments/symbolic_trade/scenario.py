@@ -80,6 +80,14 @@ def build_stage1_result(scenario_id: str) -> ScenarioResult:
         "transfer_feasible": not blocked_seen,
         "contradiction_seen": contradiction_seen,
         "transfer_outcomes": transfer_outcomes,
+        "regularity_promotion_count": 0,
+        "stable_exchange_rule_claimed": False,
+        "stable_counterpart_reliability_claimed": False,
+        "mature_pattern_claimed": False,
+        "desired_used_as_evidence": False,
+        "correction_candidate_created": contradiction_seen,
+        "execution_prohibited": True,
+        "correction_executed": False,
     }
 
     return ScenarioResult(
