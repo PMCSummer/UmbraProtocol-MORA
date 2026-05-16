@@ -3,6 +3,7 @@
 import json
 from typing import Any
 
+from .gui.chamber_view import create_chamber_view_class
 from .gui.localization import RUSSIAN_UI_STRINGS
 from .gui.viewmodel import (
     Stage5GuiViewModel,
@@ -17,18 +18,13 @@ PYSIDE6_MISSING_MESSAGE = "PySide6 is required for this GUI. Install PySide6 to 
 def _load_qt() -> dict[str, Any] | None:
     try:
         from PySide6.QtCore import Qt, QTimer
-        from PySide6.QtGui import QColor, QBrush, QPen
+        from PySide6.QtCore import QRectF
+        from PySide6.QtGui import QColor, QFont, QPainter, QPen
         from PySide6.QtWidgets import (
             QApplication,
             QCheckBox,
             QComboBox,
             QFormLayout,
-            QGraphicsEllipseItem,
-            QGraphicsLineItem,
-            QGraphicsRectItem,
-            QGraphicsScene,
-            QGraphicsTextItem,
-            QGraphicsView,
             QGroupBox,
             QHBoxLayout,
             QLabel,
@@ -37,6 +33,7 @@ def _load_qt() -> dict[str, Any] | None:
             QMainWindow,
             QPlainTextEdit,
             QPushButton,
+            QSizePolicy,
             QSplitter,
             QTableWidget,
             QTableWidgetItem,
@@ -48,19 +45,15 @@ def _load_qt() -> dict[str, Any] | None:
     return {
         "Qt": Qt,
         "QTimer": QTimer,
+        "QRectF": QRectF,
         "QColor": QColor,
-        "QBrush": QBrush,
+        "QFont": QFont,
+        "QPainter": QPainter,
         "QPen": QPen,
         "QApplication": QApplication,
         "QCheckBox": QCheckBox,
         "QComboBox": QComboBox,
         "QFormLayout": QFormLayout,
-        "QGraphicsEllipseItem": QGraphicsEllipseItem,
-        "QGraphicsLineItem": QGraphicsLineItem,
-        "QGraphicsRectItem": QGraphicsRectItem,
-        "QGraphicsScene": QGraphicsScene,
-        "QGraphicsTextItem": QGraphicsTextItem,
-        "QGraphicsView": QGraphicsView,
         "QGroupBox": QGroupBox,
         "QHBoxLayout": QHBoxLayout,
         "QLabel": QLabel,
@@ -69,6 +62,7 @@ def _load_qt() -> dict[str, Any] | None:
         "QMainWindow": QMainWindow,
         "QPlainTextEdit": QPlainTextEdit,
         "QPushButton": QPushButton,
+        "QSizePolicy": QSizePolicy,
         "QSplitter": QSplitter,
         "QTableWidget": QTableWidget,
         "QTableWidgetItem": QTableWidgetItem,
@@ -103,13 +97,13 @@ class _WindowController:
         QCheckBox = self.qt["QCheckBox"]
         QPushButton = self.qt["QPushButton"]
         QSplitter = self.qt["QSplitter"]
-        QGraphicsView = self.qt["QGraphicsView"]
-        QGraphicsScene = self.qt["QGraphicsScene"]
         QListWidget = self.qt["QListWidget"]
         QTableWidget = self.qt["QTableWidget"]
         QPlainTextEdit = self.qt["QPlainTextEdit"]
         QLabel = self.qt["QLabel"]
+        QSizePolicy = self.qt["QSizePolicy"]
         Qt = self.qt["Qt"]
+        ChamberView = create_chamber_view_class(self.qt)
 
         win = QMainWindow()
         win.setWindowTitle(RUSSIAN_UI_STRINGS["window_title"])
@@ -184,10 +178,10 @@ class _WindowController:
 
         scene_group = QGroupBox(RUSSIAN_UI_STRINGS["scene_panel"])
         scene_layout = QVBoxLayout(scene_group)
-        self.scene = QGraphicsScene()
-        self.scene_view = QGraphicsView(self.scene)
-        scene_layout.addWidget(self.scene_view)
-        left_layout.addWidget(scene_group)
+        self.chamber_view = ChamberView()
+        self.chamber_view.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        scene_layout.addWidget(self.chamber_view)
+        left_layout.addWidget(scene_group, 5)
 
         timeline_group = QGroupBox(RUSSIAN_UI_STRINGS["timeline_panel"])
         timeline_layout = QVBoxLayout(timeline_group)
@@ -202,7 +196,7 @@ class _WindowController:
         )
         self.timeline_table.horizontalHeader().setStretchLastSection(True)
         timeline_layout.addWidget(self.timeline_table)
-        left_layout.addWidget(timeline_group)
+        left_layout.addWidget(timeline_group, 2)
 
         causal_group = QGroupBox(RUSSIAN_UI_STRINGS["causal_spine_panel"])
         causal_layout = QVBoxLayout(causal_group)
@@ -211,13 +205,13 @@ class _WindowController:
         self.causal_table.setHorizontalHeaderLabels(["Этап", "Описание", "Статус"])
         self.causal_table.horizontalHeader().setStretchLastSection(True)
         causal_layout.addWidget(self.causal_table)
-        left_layout.addWidget(causal_group)
+        left_layout.addWidget(causal_group, 2)
 
         anti_group = QGroupBox(RUSSIAN_UI_STRINGS["anti_shortcut_panel"])
         anti_layout = QVBoxLayout(anti_group)
         self.anti_list = QListWidget()
         anti_layout.addWidget(self.anti_list)
-        left_layout.addWidget(anti_group)
+        left_layout.addWidget(anti_group, 1)
 
         result_group = QGroupBox(RUSSIAN_UI_STRINGS["result_panel"])
         result_layout = QVBoxLayout(result_group)
@@ -247,7 +241,7 @@ class _WindowController:
 
         splitter.addWidget(left_panel)
         splitter.addWidget(right_panel)
-        splitter.setSizes([720, 650])
+        splitter.setSizes([900, 520])
         root_layout.addWidget(splitter)
 
         win.setCentralWidget(root)
@@ -361,61 +355,6 @@ class _WindowController:
         self.vm.go_last()
         self._refresh_view()
 
-    def _render_scene(self, vm: Stage5GuiViewModel) -> None:
-        QColor = self.qt["QColor"]
-        QBrush = self.qt["QBrush"]
-        QPen = self.qt["QPen"]
-        QGraphicsRectItem = self.qt["QGraphicsRectItem"]
-        QGraphicsEllipseItem = self.qt["QGraphicsEllipseItem"]
-        QGraphicsLineItem = self.qt["QGraphicsLineItem"]
-        QGraphicsTextItem = self.qt["QGraphicsTextItem"]
-
-        self.scene.clear()
-        self.scene.setSceneRect(0, 0, 640, 280)
-
-        left_rect = QGraphicsRectItem(40, 40, 180, 150)
-        left_rect.setBrush(QBrush(QColor("#d9edf7")))
-        right_rect = QGraphicsRectItem(420, 40, 180, 150)
-        right_rect.setBrush(QBrush(QColor("#f7f3d9")))
-        wall = QGraphicsRectItem(300, 20, 40, 200)
-        wall.setBrush(QBrush(QColor("#e0e0e0")))
-        aperture = QGraphicsEllipseItem(312, 100, 16, 24)
-        aperture.setBrush(QBrush(QColor("#8bc34a" if vm.readiness_status != "blocked" else "#d32f2f")))
-        self.scene.addItem(left_rect)
-        self.scene.addItem(right_rect)
-        self.scene.addItem(wall)
-        self.scene.addItem(aperture)
-
-        a_text = QGraphicsTextItem("A")
-        a_text.setPos(120, 100)
-        b_text = QGraphicsTextItem("B")
-        b_text.setPos(505, 100)
-        wall_text = QGraphicsTextItem("Стена / апертура")
-        wall_text.setPos(268, 228)
-        self.scene.addItem(a_text)
-        self.scene.addItem(b_text)
-        self.scene.addItem(wall_text)
-
-        claim_line = QGraphicsLineItem(470, 75, 220, 85)
-        claim_line.setPen(QPen(QColor("#0d47a1"), 2))
-        self.scene.addItem(claim_line)
-
-        offer_line = QGraphicsLineItem(220, 120, 420, 130)
-        offer_line.setPen(QPen(QColor("#2e7d32" if vm.offer_candidate_emitted else "#9e9e9e"), 2))
-        self.scene.addItem(offer_line)
-
-        actuator_line = QGraphicsLineItem(220, 155, 420, 165)
-        actuator_line.setPen(QPen(QColor("#ef6c00" if vm.world_actuator_invoked else "#9e9e9e"), 2))
-        self.scene.addItem(actuator_line)
-
-        scene_text = QGraphicsTextItem(
-            f"offer={vm.offer_candidate_emitted}, invoke={vm.world_actuator_invoked}\n"
-            f"passive={vm.passive_packet_ref_count}, causal={vm.causal_post_invocation_ref_count}\n"
-            f"transfer_result={vm.transfer_result}, completion={vm.completion_claim}"
-        )
-        scene_text.setPos(52, 198)
-        self.scene.addItem(scene_text)
-
     def _refresh_timeline_table(self, vm: Stage5GuiViewModel) -> None:
         QTableWidgetItem = self.qt["QTableWidgetItem"]
         self.timeline_table.blockSignals(True)
@@ -435,7 +374,7 @@ class _WindowController:
         QListWidgetItem = self.qt["QListWidgetItem"]
         QTableWidgetItem = self.qt["QTableWidgetItem"]
 
-        self._render_scene(vm)
+        self.chamber_view.set_frame(vm.current_frame)
         self._refresh_timeline_table(vm)
 
         self.step_label.setText(
@@ -460,6 +399,8 @@ class _WindowController:
         result_lines = [f"{entry['label_ru']}: {entry['value']}" for entry in vm.result_items]
         result_lines.append("")
         result_lines.append(f"{RUSSIAN_UI_STRINGS['timeline_step_header']}: {vm.current_step.short_explanation_ru}")
+        result_lines.append(f"Кадр камеры: {vm.current_frame.title_ru} / {vm.current_frame.public_status}")
+        result_lines.append(f"Тип события: {vm.current_frame.event_kind}; basis={vm.current_frame.basis.value}")
         result_lines.append(f"evidence_refs: {list(vm.current_step.evidence_refs)}")
         result_lines.append(f"note: {vm.current_step.claim_boundary_note_ru}")
         self.result_text.setPlainText("\n".join(result_lines))

@@ -4,9 +4,9 @@
 GUI остаётся presentation/inspection слоем над Stage 5 harness. Он не добавляет когнитивную логику и не изменяет core subject.
 
 ## Что GUI теперь показывает
-- Символическую сцену `A/B/стена/апертура`.
+- Крупную символическую chamber-сцену `A/B/стена/апертура` как основной visual surface.
 - Причинную цепочку `W01..W06 -> Response -> Affordance -> Actuator -> Verification`.
-- Пошаговую timeline-модель (15 шагов) с явными статусами:
+- Пошаговую runtime-playback timeline-модель (16 кадров) с явными статусами:
   - `trace_derived`
   - `inferred_from_stage5_summary`
   - `not_exposed`
@@ -21,6 +21,33 @@ GUI остаётся presentation/inspection слоем над Stage 5 harness. 
 - Anti-shortcut checklist на базе Stage 5 falsifier summary.
 - Developer inspector (raw trace JSON).
 
+## Presentation playback trace
+GUI строит отдельный presentation-only trace из Stage 5 payload:
+- `PlaybackTrace`
+- `PresentationFrame`
+- `ChamberState`
+- `ChamberActorState`
+- `ResourceVisualState`
+- `ChamberEvent`
+
+Каждый кадр содержит `step_index`, русское название, русское объяснение, event kind, chamber state, evidence refs и basis marker:
+- `direct_trace_based`
+- `inferred_from_stage5_summary`
+- `not_exposed`
+
+Это не новая cognition simulation. Presentation trace только показывает уже существующую Stage 5 дисциплину по кадрам.
+
+## Chamber rendering
+ChamberView является custom PySide6 QWidget. Он рисует:
+- A слева и scripted B справа.
+- Стену и апертуру в центре.
+- Self-state/resources A.
+- Видимые B claims как claims, не факты.
+- Стрелки/лейблы для claim, offer candidate, affordance selection, invocation request, world actuator invocation, transfer result и completion verification.
+- Публичные badges: passive packets, causal responses, actuator invoked, transfer result, completion.
+
+Chamber обновляется от `current_frame`; next/prev/play меняют не только таблицу, но и визуальное состояние сцены.
+
 ## Управление (GUI controls)
 - Выбор сценария.
 - Выбор режима: наблюдение / выполнение внешнего действия.
@@ -31,6 +58,12 @@ GUI остаётся presentation/inspection слоем над Stage 5 harness. 
 - Индикатор текущего шага `Шаг X / N`.
 - Переключатель режима разработчика.
 - Отдельный переключатель `Показать eval_only` (доступен только в режиме разработчика).
+
+Playback controls:
+- `К первому`, `Назад`, `Вперёд`, `К последнему`, `Сбросить`.
+- `Пуск/Пауза` с timer-driven progression.
+- Скорость: `Медленно`, `Нормально`, `Быстро`.
+- Текущий frame управляет chamber rendering, caption, timeline selection и public summary.
 
 ## Граница eval_only
 - Публичный режим: `eval_only` не показывается.

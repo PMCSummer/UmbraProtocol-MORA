@@ -52,9 +52,16 @@ def _print_dry_run_summary(payload: dict[str, object], vm, *, include_timeline: 
         print("eval_only=present")
     if include_timeline:
         print("timeline_steps=")
-        for step in vm.timeline_state.steps:
+        for step, frame in zip(vm.timeline_state.steps, vm.playback_trace.frames):
             print(
-                f"- {step.step_index}:{step.step_id}:status={step.status}:evidence={list(step.evidence_refs)}"
+                f"- {step.step_index}:{step.step_id}:status={step.status}:"
+                f"frame={frame.event_kind}:public_status={frame.public_status}:"
+                f"invoked={frame.chamber_state.actuator_invoked_visible}:"
+                f"completion={frame.chamber_state.completion_claim}:"
+                f"result={frame.chamber_state.transfer_result}:"
+                f"passive={frame.chamber_state.passive_packet_ref_count}:"
+                f"causal={frame.chamber_state.causal_post_invocation_ref_count}:"
+                f"evidence={list(step.evidence_refs)}"
             )
 
 

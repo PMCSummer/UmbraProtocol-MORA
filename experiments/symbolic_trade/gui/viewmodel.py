@@ -6,6 +6,7 @@ from typing import Any
 
 from ..runner import list_scenarios, run_stage5_affordance_trace, stage5_result_to_dict
 from .localization import REQUIRED_RUSSIAN_LABELS, RUSSIAN_UI_STRINGS
+from .presentation_trace import PlaybackTrace, PresentationFrame, build_playback_trace
 
 
 @dataclass(frozen=True, slots=True)
@@ -94,7 +95,15 @@ class Stage5GuiViewModel:
     result_items: tuple[dict[str, Any], ...]
     compare_items: tuple[dict[str, str], ...]
     timeline_state: Stage5TimelineState
+    playback_trace: PlaybackTrace
     developer_payload: dict[str, Any] = field(default_factory=dict)
+
+    @property
+    def current_frame(self) -> PresentationFrame:
+        if not self.playback_trace.frames:
+            raise IndexError("Playback trace has no frames")
+        index = min(self.timeline_state.current_step_index, self.playback_trace.frame_count - 1)
+        return self.playback_trace.frames[index]
 
     @property
     def current_step(self) -> Stage5TimelineStep:
@@ -536,6 +545,17 @@ def _timeline_from_payload(payload: dict[str, Any]) -> Stage5TimelineState:
             True,
             "Completion claim не строится из transfer_result в одиночку.",
         ),
+        _timeline_step(
+            16,
+            "final_claim_boundary",
+            "Финальная claim-граница",
+            "GUI остаётся символической презентацией Stage 5 harness, без claim’а автономной торговли.",
+            "verified",
+            tuple(str(item) for item in payload.get("claim_boundary", []) or ()),
+            "symbolic_harness_only=true",
+            False,
+            "Нет claim’а cognition, motor-control или economic agency.",
+        ),
     )
 
     return Stage5TimelineState(steps=steps)
@@ -588,6 +608,7 @@ def build_stage5_gui_view_model(
         {"title": RUSSIAN_UI_STRINGS["shortcut_baseline"], "text": RUSSIAN_UI_STRINGS["shortcut_text"]},
         {"title": RUSSIAN_UI_STRINGS["mora_trace"], "text": RUSSIAN_UI_STRINGS["mora_text"]},
     )
+    playback_trace = build_playback_trace(payload)
 
     developer_payload = {
         "scenario_id": payload.get("scenario_id"),
@@ -629,5 +650,6 @@ def build_stage5_gui_view_model(
         result_items=result_items,
         compare_items=compare_items,
         timeline_state=_timeline_from_payload(payload),
+        playback_trace=playback_trace,
         developer_payload=developer_payload if dev_mode else {"mode": RUSSIAN_UI_STRINGS["dev_mode_disabled"]},
     )

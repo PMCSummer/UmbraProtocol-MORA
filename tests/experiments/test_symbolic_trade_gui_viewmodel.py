@@ -60,9 +60,11 @@ def test_gui_viewmodel_default_excludes_eval_only_from_public_sections() -> None
             "causal_spine_items": view_model.causal_spine_items,
             "anti_shortcut_items": view_model.anti_shortcut_items,
             "timeline": [asdict(step) for step in view_model.timeline_state.steps],
+            "playback_trace": asdict(view_model.playback_trace),
         },
         sort_keys=True,
         ensure_ascii=False,
+        default=str,
     )
     assert "\"eval_only\":" not in public_flat
     assert "harness_truth" not in public_flat
@@ -126,6 +128,65 @@ def test_gui_timeline_navigation_and_bounds() -> None:
     assert vm.play_state == "paused"
 
 
+def test_gui_presentation_trace_has_frame_driven_chamber_state() -> None:
+    payload = run_stage5_gui_payload("successful_scripted_exchange_cycle", execute_world_actuator=True)
+    vm = build_stage5_gui_view_model(payload, dev_mode=False, include_eval_only=False)
+
+    assert vm.playback_trace.frame_count == vm.step_count
+    assert vm.playback_trace.frame_count > 10
+
+    initial = asdict(vm.playback_trace.frames[0].chamber_state)
+    offer_frame = next(frame for frame in vm.playback_trace.frames if frame.event_kind == "offer_candidate")
+    invocation_frame = next(frame for frame in vm.playback_trace.frames if frame.event_kind == "world_actuator")
+    result_frame = next(frame for frame in vm.playback_trace.frames if frame.event_kind == "transfer_result")
+
+    assert initial != asdict(offer_frame.chamber_state)
+    assert offer_frame.chamber_state.offer_visible is True
+    assert offer_frame.chamber_state.actuator_invoked_visible is False
+    assert invocation_frame.chamber_state.actuator_invoked_visible is True
+    assert asdict(offer_frame.chamber_state) != asdict(invocation_frame.chamber_state)
+    assert result_frame.chamber_state.transfer_result_visible is True
+    assert result_frame.chamber_state.transfer_result == "succeeded"
+
+
+def test_gui_current_frame_tracks_navigation() -> None:
+    payload = run_stage5_gui_payload("mirrored_resource_asymmetry", execute_world_actuator=False)
+    vm = build_stage5_gui_view_model(payload, dev_mode=False, include_eval_only=False)
+
+    first_frame = vm.current_frame
+    vm.go_next()
+    assert vm.current_frame.step_index == 2
+    assert vm.current_frame != first_frame
+    vm.go_last()
+    assert vm.current_frame.step_id == "final_claim_boundary"
+    vm.reset_timeline()
+    assert vm.current_frame == first_frame
+
+
+def test_gui_noexec_and_exec_frames_visibly_differ_for_successful_cycle() -> None:
+    noexec = build_stage5_gui_view_model(
+        run_stage5_gui_payload("successful_scripted_exchange_cycle", execute_world_actuator=False),
+        dev_mode=False,
+        include_eval_only=False,
+    )
+    exec_vm = build_stage5_gui_view_model(
+        run_stage5_gui_payload("successful_scripted_exchange_cycle", execute_world_actuator=True),
+        dev_mode=False,
+        include_eval_only=False,
+    )
+
+    noexec_invocation = next(frame for frame in noexec.playback_trace.frames if frame.event_kind == "world_actuator")
+    exec_invocation = next(frame for frame in exec_vm.playback_trace.frames if frame.event_kind == "world_actuator")
+    noexec_completion = next(frame for frame in noexec.playback_trace.frames if frame.event_kind == "completion")
+    exec_completion = next(frame for frame in exec_vm.playback_trace.frames if frame.event_kind == "completion")
+
+    assert noexec_invocation.chamber_state.actuator_invoked_visible is False
+    assert exec_invocation.chamber_state.actuator_invoked_visible is True
+    assert noexec_completion.chamber_state.completion_claim is False
+    assert exec_completion.chamber_state.completion_claim is True
+    assert asdict(noexec_completion.chamber_state) != asdict(exec_completion.chamber_state)
+
+
 def test_gui_timeline_step_fields_are_present() -> None:
     payload = run_stage5_gui_payload("successful_scripted_exchange_cycle", execute_world_actuator=True)
     vm = build_stage5_gui_view_model(payload, dev_mode=False, include_eval_only=False)
@@ -170,6 +231,9 @@ def test_gui_stage5_blocked_aperture_maps_blocked_and_no_completion() -> None:
         "observe_only",
         "abstain",
     }
+    invocation_frame = next(frame for frame in vm.playback_trace.frames if frame.event_kind == "world_actuator")
+    assert invocation_frame.chamber_state.actuator_invoked_visible is False
+    assert invocation_frame.chamber_state.aperture_open is False
 
 
 def test_gui_transfer_affordance_failure_has_failed_result_without_completion() -> None:
@@ -178,6 +242,12 @@ def test_gui_transfer_affordance_failure_has_failed_result_without_completion() 
     assert vm.world_actuator_invoked is True
     assert vm.transfer_result.startswith("failed")
     assert vm.completion_claim is False
+    result_frame = next(frame for frame in vm.playback_trace.frames if frame.event_kind == "transfer_result")
+    completion_frame = next(frame for frame in vm.playback_trace.frames if frame.event_kind == "completion")
+    assert result_frame.chamber_state.actuator_invoked_visible is True
+    assert result_frame.chamber_state.transfer_result.startswith("failed")
+    assert completion_frame.chamber_state.completion_claim is False
+    assert completion_frame.chamber_state.residue_visible is True
 
 
 def test_gui_noexec_mode_keeps_world_actuator_off_for_all_scenarios() -> None:
@@ -204,6 +274,24 @@ def test_gui_public_passive_vs_causal_counts_present() -> None:
     labels = {item["label_ru"] for item in vm.result_items}
     assert RUSSIAN_UI_STRINGS["passive_packets"] in labels
     assert RUSSIAN_UI_STRINGS["causal_packets"] in labels
+    result_frame = next(frame for frame in vm.playback_trace.frames if frame.event_kind == "transfer_result")
+    assert result_frame.chamber_state.passive_packet_ref_count > 0
+    assert result_frame.chamber_state.causal_post_invocation_ref_count == 0
+
+
+def test_gui_russian_labels_exist_for_major_event_kinds() -> None:
+    for key in (
+        "event_claim",
+        "event_offer",
+        "event_affordance",
+        "event_invocation",
+        "event_result",
+        "event_verification",
+        "chamber_symbolic_boundary",
+    ):
+        value = RUSSIAN_UI_STRINGS[key]
+        assert value
+        assert any(ord(ch) > 127 for ch in value)
 
 
 def test_gui_anti_shortcut_statuses_are_derived_from_falsifier_results() -> None:

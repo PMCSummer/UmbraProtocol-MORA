@@ -95,6 +95,37 @@ def test_symbolic_trade_gui_timeline_dry_run_prints_steps() -> None:
     assert "timeline_steps=" in result.stdout
     assert "scenario_loaded" in result.stdout
     assert "completion_verified_or_rejected" in result.stdout
+    assert "frame=" in result.stdout
+    assert "passive=" in result.stdout
+    assert "causal=" in result.stdout
+
+
+def test_symbolic_trade_gui_timeline_dry_run_exec_success_shows_invocation_and_completion() -> None:
+    result = _run(
+        "--scenario",
+        "successful_scripted_exchange_cycle",
+        "--execute-world-actuator",
+        "--timeline-dry-run",
+    )
+    assert result.returncode == 0, result.stderr
+    assert "world_actuator_invoked=True" in result.stdout
+    assert "completion_claim=True" in result.stdout
+    assert "world_actuator" in result.stdout
+    assert "invoked=True" in result.stdout
+    assert "completion=True" in result.stdout
+
+
+def test_symbolic_trade_gui_timeline_dry_run_blocked_shows_no_invocation() -> None:
+    result = _run(
+        "--scenario",
+        "blocked_aperture",
+        "--timeline-dry-run",
+    )
+    assert result.returncode == 0, result.stderr
+    assert "world_actuator_invoked=False" in result.stdout
+    assert "completion_claim=False" in result.stdout
+    assert "world_actuator" in result.stdout
+    assert "invoked=True" not in result.stdout
 
 
 def test_symbolic_trade_gui_launch_path_handles_missing_pyside6_gracefully() -> None:

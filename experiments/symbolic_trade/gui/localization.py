@@ -71,6 +71,16 @@ RUSSIAN_UI_STRINGS: dict[str, str] = {
     "timeline_columns_step": "Шаг",
     "timeline_columns_title": "Описание",
     "timeline_columns_status": "Статус",
+    "chamber_symbolic_boundary": "Символическая сцена, не физическая симуляция",
+    "chamber_actor_a": "Субъект A",
+    "chamber_actor_b": "Scripted B",
+    "chamber_wall": "Стена / апертура",
+    "event_claim": "Сигнал B принят как заявление, но не как факт",
+    "event_offer": "Кандидат предложения не выполняет передачу",
+    "event_affordance": "Выбрана возможность внешнего действия",
+    "event_invocation": "Запрос к внешнему исполнителю не равен исполнению",
+    "event_result": "Результат переноса отделён от завершения",
+    "event_verification": "Завершение подтверждено только полной цепочкой",
 }
 
 REQUIRED_RUSSIAN_LABELS: tuple[str, ...] = (

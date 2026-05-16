@@ -1,4 +1,13 @@
 from .localization import REQUIRED_RUSSIAN_LABELS, RUSSIAN_UI_STRINGS
+from .presentation_trace import (
+    ChamberActorState,
+    ChamberEvent,
+    ChamberState,
+    PlaybackTrace,
+    PresentationBasis,
+    PresentationFrame,
+    ResourceVisualState,
+)
 from .viewmodel import (
     Stage5TimelineState,
     Stage5TimelineStep,
@@ -11,6 +20,13 @@ from .viewmodel import (
 __all__ = [
     "REQUIRED_RUSSIAN_LABELS",
     "RUSSIAN_UI_STRINGS",
+    "ChamberActorState",
+    "ChamberEvent",
+    "ChamberState",
+    "PlaybackTrace",
+    "PresentationBasis",
+    "PresentationFrame",
+    "ResourceVisualState",
     "Stage5TimelineState",
     "Stage5TimelineStep",
     "Stage5GuiViewModel",
