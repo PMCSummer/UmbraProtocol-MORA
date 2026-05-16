@@ -125,7 +125,48 @@ def test_symbolic_trade_cli_stage2_include_eval_only_scoped() -> None:
             flat = json.dumps(packet, sort_keys=True)
             assert "harness_truth" not in flat
             assert "mutually_beneficial_trade_possible_eval_only" not in flat
-        for record in step["phase_records"]:
-            flat = json.dumps(record, sort_keys=True)
-            assert "harness_truth" not in flat
-            assert "mutually_beneficial_trade_possible_eval_only" not in flat
+
+
+def test_symbolic_trade_cli_stage25_reaction_text_and_json_smoke() -> None:
+    text_result = _run("--scenario", "mirrored_resource_asymmetry", "--stage25-reaction")
+    assert text_result.returncode == 0, text_result.stderr
+    assert "SYMBOLIC TRADE HARNESS STAGE2.5 REAL-A REACTION PROBE" in text_result.stdout
+    assert "execution_level=" in text_result.stdout
+    assert "subject_tick_used=" in text_result.stdout
+
+    json_result = _run("--scenario", "mirrored_resource_asymmetry", "--stage25-reaction", "--json")
+    assert json_result.returncode == 0, json_result.stderr
+    payload = json.loads(json_result.stdout)
+    assert payload["stage"] == "stage25_reaction_probe"
+    assert "execution_surface" in payload
+    assert "eval_only" not in payload
+
+
+def test_symbolic_trade_cli_stage25_reaction_with_falsifiers_all_scenarios() -> None:
+    for scenario in REQUIRED_SCENARIOS:
+        result = _run("--scenario", scenario, "--stage25-reaction", "--run-falsifiers")
+        assert result.returncode == 0, result.stderr
+        assert "falsifier_summary=" in result.stdout
+
+
+def test_symbolic_trade_cli_stage25_include_eval_only_scoped() -> None:
+    result = _run(
+        "--scenario",
+        "mirrored_resource_asymmetry",
+        "--stage25-reaction",
+        "--json",
+        "--run-falsifiers",
+        "--include-eval-only",
+    )
+    assert result.returncode == 0, result.stderr
+    payload = json.loads(result.stdout)
+    assert "eval_only" in payload
+    assert "harness_truth" in payload["eval_only"]
+    for step in payload["steps"]:
+        flat = json.dumps(step, sort_keys=True)
+        assert "harness_truth" not in flat
+        assert "mutually_beneficial_trade_possible_eval_only" not in flat
+        assert "success_labels" not in flat
+        phase_flat = json.dumps(step["phase_trace_summary"], sort_keys=True)
+        assert "harness_truth" not in phase_flat
+        assert "mutually_beneficial_trade_possible_eval_only" not in phase_flat

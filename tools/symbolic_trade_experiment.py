@@ -17,6 +17,8 @@ from experiments.symbolic_trade import (
     result_to_dict,
     run_stage1_scenario,
     run_stage2_trace,
+    run_stage25_reaction,
+    stage25_result_to_dict,
     stage2_result_to_dict,
 )
 
@@ -29,6 +31,7 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument("--run-falsifiers", action="store_true", help="Include falsifier checks in output.")
     parser.add_argument("--include-eval-only", action="store_true", help="Include eval-only harness truth in JSON output.")
     parser.add_argument("--stage2-trace", action="store_true", help="Run Stage 2 subject-adapter W01->W06 trace-through.")
+    parser.add_argument("--stage25-reaction", action="store_true", help="Run Stage 2.5 real-A reaction probe at highest executable surface.")
     return parser
 
 
@@ -59,6 +62,39 @@ def _print_stage2_text(payload: dict[str, object]) -> None:
     print("claim_boundary=['stage2 trace-through only', 'no autonomous trade claim']")
 
 
+def _print_stage25_text(payload: dict[str, object]) -> None:
+    falsifiers = payload.get("falsifier_results", [])
+    passed = sum(1 for item in falsifiers if item.get("passed"))
+    total = len(falsifiers)
+    surface = payload.get("execution_surface", {})
+    self_state = payload.get("self_state_probe", {})
+    print("SYMBOLIC TRADE HARNESS STAGE2.5 REAL-A REACTION PROBE")
+    print(f"scenario_id={payload['scenario_id']}")
+    print(f"stage={payload['stage']}")
+    print(f"execution_level={surface.get('execution_level')}")
+    print(f"subject_tick_used={surface.get('subject_tick_used')}")
+    print(f"owner_surface_used={surface.get('owner_surface_used')}")
+    print(f"adapter_projection_used={surface.get('adapter_projection_used')}")
+    print(f"fallback_reasons={surface.get('fallback_reasons', [])}")
+    print(f"a_internal_state_summary={{'profile_id': {self_state.get('profile_id')}, 'deficit_markers': {self_state.get('deficit_markers', [])}, 'surplus_markers': {self_state.get('surplus_markers', [])}}}")
+    print(f"b_visible_claim_summary={payload.get('b_visible_claim_summary', {})}")
+    phase_coverage = sorted(
+        {
+            code
+            for step in payload.get("steps", [])
+            for code in step.get("phase_trace_summary", {}).get("phase_coverage", [])
+        }
+    )
+    phase_coverage_verified = all(
+        step.get("phase_trace_summary", {}).get("phase_coverage_verified", False)
+        for step in payload.get("steps", [])
+    )
+    print(f"phase_coverage={phase_coverage}")
+    print(f"phase_coverage_verified={phase_coverage_verified}")
+    print(f"falsifier_summary={passed}/{total} passed")
+    print("claim_boundary=['stage2.5 reaction probe only', 'no autonomous trade claim']")
+
+
 def main() -> int:
     args = _parser().parse_args()
 
@@ -70,7 +106,10 @@ def main() -> int:
     if not args.scenario:
         raise SystemExit("Provide --scenario or --list-scenarios")
 
-    if args.stage2_trace:
+    if args.stage25_reaction:
+        result = run_stage25_reaction(args.scenario, include_falsifiers=args.run_falsifiers or args.json)
+        payload = stage25_result_to_dict(result, include_eval_only=args.include_eval_only)
+    elif args.stage2_trace:
         result = run_stage2_trace(args.scenario, include_falsifiers=args.run_falsifiers or args.json)
         payload = stage2_result_to_dict(result, include_eval_only=args.include_eval_only)
     else:
@@ -82,6 +121,8 @@ def main() -> int:
     else:
         if args.stage2_trace:
             _print_stage2_text(payload)
+        elif args.stage25_reaction:
+            _print_stage25_text(payload)
         else:
             _print_text(payload)
     return 0

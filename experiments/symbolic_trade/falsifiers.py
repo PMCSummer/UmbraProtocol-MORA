@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import asdict
 import subprocess
 from pathlib import Path
 
@@ -26,6 +27,35 @@ _FORBIDDEN_PHASE_SHORTCUT_TERMS = (
     "deal_success_signal",
     "barter_success_signal",
     "should_trade:true",
+)
+_FORBIDDEN_STAGE25_KEY_TOKENS = (
+    "harness_truth",
+    "hidden_truth",
+    "true_inventory",
+    "b_true_inventory",
+    "true_need_surplus_pairing",
+    "mutual_benefit_oracle",
+    "success_labels",
+    "expected_success_label",
+)
+_FORBIDDEN_STAGE25_VALUE_TOKENS = (
+    "mutually_beneficial_trade_possible_eval_only",
+    "potential_reciprocity_eval_only",
+    "true_need_surplus_pairing",
+    "mutual_benefit_oracle:true",
+    "should_trade:true",
+    "wants_trade:true",
+    "trade_intent:true",
+    "trade_offer:true",
+)
+_FORBIDDEN_STAGE25_PATH_VALUE_TOKENS = (
+    ("reason_codes", "mutual_benefit_oracle"),
+    ("reason_codes", "should_trade:true"),
+    ("reason_codes", "trade_offer:true"),
+    ("downstream_permission_delta", "should_trade:true"),
+    ("downstream_permission_delta", "wants_trade:true"),
+    ("downstream_permission_delta", "trade_intent:true"),
+    ("output_refs", "true_need_surplus_pairing"),
 )
 
 
@@ -75,6 +105,59 @@ def _packet_strings(packet: SubjectVisiblePacket) -> tuple[str, ...]:
         packet.item_kind.value if packet.item_kind else "",
         " ".join(packet.provenance_ref),
     )
+
+
+def _walk_paths(node, *, path: str = ""):
+    if isinstance(node, dict):
+        for key, value in node.items():
+            next_path = f"{path}.{key}" if path else str(key)
+            yield from _walk_paths(value, path=next_path)
+        return
+    if isinstance(node, (list, tuple)):
+        for idx, value in enumerate(node):
+            next_path = f"{path}[{idx}]"
+            yield from _walk_paths(value, path=next_path)
+        return
+    yield path, node
+
+
+def _stage25_visible_payload(probe_run) -> dict[str, object]:
+    payload = asdict(probe_run)
+    payload.pop("eval_only", None)
+    return payload
+
+
+def _scan_stage25_leaks(probe_run) -> tuple[tuple[str, ...], tuple[str, ...]]:
+    payload = _stage25_visible_payload(probe_run)
+    key_hits: list[str] = []
+    value_hits: list[str] = []
+
+    def _scan(node, *, path: str = "") -> None:
+        if isinstance(node, dict):
+            for key, value in node.items():
+                next_path = f"{path}.{key}" if path else str(key)
+                key_lower = str(key).lower()
+                if any(token == key_lower for token in _FORBIDDEN_STAGE25_KEY_TOKENS):
+                    key_hits.append(next_path)
+                _scan(value, path=next_path)
+            return
+        if isinstance(node, (list, tuple)):
+            for idx, value in enumerate(node):
+                next_path = f"{path}[{idx}]"
+                _scan(value, path=next_path)
+            return
+        if isinstance(node, str):
+            path_lower = path.lower()
+            value_lower = node.lower()
+            if any(token in value_lower for token in _FORBIDDEN_STAGE25_VALUE_TOKENS):
+                value_hits.append(f"{path}={node}")
+            for path_token, value_token in _FORBIDDEN_STAGE25_PATH_VALUE_TOKENS:
+                if path_token in path_lower and value_token in value_lower:
+                    value_hits.append(f"{path}={node}")
+
+    _scan(payload, path="")
+
+    return tuple(dict.fromkeys(key_hits)), tuple(dict.fromkeys(value_hits))
 
 
 def run_symbolic_trade_falsifiers(result, *, repo_root: Path | None = None) -> tuple[FalsifierResult, ...]:
@@ -296,4 +379,213 @@ def run_stage2_trace_falsifiers(trace_run, *, repo_root: Path | None = None) -> 
         FalsifierResult("eval_label_in_phase_trace", not eval_label_in_trace, "eval-only label leaked into phase trace" if eval_label_in_trace else "ok"),
         FalsifierResult("trade_specific_phase_shortcut", not trade_shortcut, "trade-specific shortcut appeared in phase trace" if trade_shortcut else "ok"),
         FalsifierResult("phase_trace_without_w01_to_w06_coverage", not missing_coverage, "phase coverage incomplete" if missing_coverage else "ok"),
+    )
+
+
+def run_stage25_reaction_falsifiers(probe_run, *, repo_root: Path | None = None) -> tuple[FalsifierResult, ...]:
+    steps = probe_run.steps
+    records = [item.phase_trace_summary for item in steps]
+    visible_blob = "\n".join(
+        " ".join(
+            [
+                step.packet_id,
+                step.world_event_reaction.signal_kind,
+                step.world_event_reaction.source_authority,
+                " ".join(step.world_event_reaction.reason_codes),
+                " ".join(step.counterpart_claim_reaction.reason_codes),
+                " ".join(step.phase_trace_summary.reason_codes),
+                " ".join(step.phase_trace_summary.prohibited_claims),
+            ]
+        )
+        for step in steps
+    ).lower()
+    key_hits, value_hits = _scan_stage25_leaks(probe_run)
+
+    self_state_as_world_fact = any(step.world_event_reaction.self_state_as_world_evidence for step in steps)
+    deficit_as_permission = bool(probe_run.self_state_probe.deficit_markers) and any(
+        step.phase_trace_summary.w04_usefulness_as_permission
+        or "deficit_as_permission" in " ".join(step.phase_trace_summary.reason_codes).lower()
+        or "self_state_permission_granted:true" in " ".join(step.phase_trace_summary.reason_codes).lower()
+        for step in steps
+    )
+    surplus_as_offer = bool(probe_run.self_state_probe.surplus_markers) and (
+        any("trade_offer" in " ".join(step.phase_trace_summary.reason_codes).lower() for step in steps)
+        or any("trade_offer:true" in hit.lower() for hit in value_hits)
+        or any("wants_trade:true" in hit.lower() for hit in value_hits)
+        or any("trade_intent:true" in hit.lower() for hit in value_hits)
+        or any("should_trade:true" in hit.lower() for hit in value_hits)
+    )
+    b_claim_as_fact = any(step.counterpart_claim_reaction.claim_detected and step.counterpart_claim_reaction.promoted_to_fact for step in steps)
+    complementarity_oracle = any(
+        token in hit.lower()
+        for hit in value_hits
+        for token in (
+            "mutual_benefit_oracle",
+            "true_need_surplus_pairing",
+            "mutually_beneficial_trade_possible_eval_only",
+            "potential_reciprocity_eval_only",
+            "should_trade:true",
+        )
+    )
+    usefulness_as_permission = any(step.phase_trace_summary.w04_usefulness_as_permission for step in steps)
+    desired_as_observed = any(step.phase_trace_summary.w05_desired_as_observed for step in steps)
+    predicted_as_permitted = any(step.phase_trace_summary.w05_predicted_as_permitted for step in steps)
+    blocked_aperture_clean_route = any(
+        step.world_event_reaction.blocked_aperture_seen and step.phase_trace_summary.w04_clean_applicability_allowed for step in steps
+    )
+    noisy_cleaned_fact = any(
+        step.world_event_reaction.contradiction_seen and not step.phase_trace_summary.w06_residual_uncertainty_present for step in steps
+    )
+    false_claim_no_residue = any(
+        step.counterpart_claim_reaction.claim_detected
+        and "false_counterpart_claim" in probe_run.scenario_id
+        and not step.phase_trace_summary.w06_residual_uncertainty_present
+        for step in steps
+    )
+    correction_executed = any(step.phase_trace_summary.w06_correction_executed for step in steps) or any(
+        not step.phase_trace_summary.w06_execution_prohibited for step in steps
+    )
+    hidden_truth_leak = bool(key_hits or value_hits)
+
+    full_execution_claim = probe_run.execution_surface.execution_level.value == "full_subject_tick_execution"
+    step_projection_detected = any(
+        "projection" in step.execution_surface_source.lower()
+        or "projection" in step.phase_trace_summary.provenance.lower()
+        or bool(step.adapter_limitations)
+        for step in steps
+    )
+    step_non_tick_source = any(step.execution_surface_source != "subject_tick.execute_subject_tick" for step in steps)
+    step_unverified_coverage = any(not step.phase_trace_summary.phase_coverage_verified for step in steps)
+    required_phase_codes = {"W01", "W02", "W03", "W04", "W05", "W06"}
+
+    step_missing_tick_evidence = False
+    for step in steps:
+        summary = step.phase_trace_summary
+        if not required_phase_codes.issubset(set(summary.phase_coverage)):
+            step_missing_tick_evidence = True
+            break
+        evidence_phase_codes = {
+            item.split(":", 1)[0]
+            for item in summary.phase_coverage_evidence
+            if ":" in item
+        }
+        if not required_phase_codes.issubset(evidence_phase_codes):
+            step_missing_tick_evidence = True
+            break
+
+    projection_labeled_real = full_execution_claim and (
+        probe_run.execution_surface.adapter_projection_used
+        or step_projection_detected
+        or step_non_tick_source
+    )
+    execution_level_overclaim = full_execution_claim and (
+        probe_run.execution_surface.subject_tick_used is False
+        or probe_run.execution_surface.adapter_projection_used
+        or probe_run.execution_surface.owner_surface_used
+        or bool(probe_run.execution_surface.fallback_reasons)
+        or "subject_tick.execute_subject_tick" not in set(probe_run.execution_surface.successful_surfaces)
+        or any(item.startswith("subject_tick.execute_subject_tick") for item in probe_run.execution_surface.failed_surfaces)
+        or step_non_tick_source
+        or step_projection_detected
+        or step_unverified_coverage
+        or step_missing_tick_evidence
+    )
+    stage25_trade_shortcut_terms = (
+        "trade_intent:true",
+        "trade_offer:true",
+        "wants_trade:true",
+        "should_trade:true",
+        "mutual_benefit_oracle:true",
+        "barter_success_signal",
+        "deal_success_signal",
+        "exchange_oracle:true",
+    )
+    trade_shortcut = any(term in visible_blob for term in stage25_trade_shortcut_terms)
+    one_shot_regularized = len(steps) == 1 and any(
+        "provisional_repeated_pattern" in " ".join(step.phase_trace_summary.reason_codes).lower()
+        or "bounded_prior_candidate" in " ".join(step.phase_trace_summary.reason_codes).lower()
+        for step in steps
+    )
+    fake_coverage = any(
+        (
+            step.phase_trace_summary.coverage_complete
+            and (
+                not step.phase_trace_summary.phase_coverage_verified
+                or step.phase_trace_summary.phase_coverage_verification_mode != "tick_result_artifact_presence"
+                or not required_phase_codes.issubset(set(step.phase_trace_summary.phase_coverage))
+                or not required_phase_codes.issubset(
+                    {
+                        item.split(":", 1)[0]
+                        for item in step.phase_trace_summary.phase_coverage_evidence
+                        if ":" in item
+                    }
+                )
+            )
+        )
+        for step in steps
+    )
+    claim_boundary_missing = not (
+        getattr(probe_run.claim_boundary, "instrumentation_only", False)
+        and getattr(probe_run.claim_boundary, "adapter_projection_not_competence", False)
+    )
+
+    repo = repo_root or Path(__file__).resolve().parents[2]
+    changed_paths = set(_modified_paths(repo))
+    changed_paths.update(_untracked_paths(repo))
+    core_modified = any(any(path.startswith(prefix) for prefix in _FORBIDDEN_CORE_PREFIXES) for path in changed_paths)
+
+    return (
+        FalsifierResult("a_self_state_hidden_as_world_fact", not self_state_as_world_fact, "self state leaked into world evidence channel" if self_state_as_world_fact else "ok"),
+        FalsifierResult("a_deficit_as_permission", not deficit_as_permission, "deficit state promoted to permission" if deficit_as_permission else "ok"),
+        FalsifierResult("a_surplus_as_trade_offer", not surplus_as_offer, "surplus state promoted to trade offer shortcut" if surplus_as_offer else "ok"),
+        FalsifierResult("b_claim_as_fact", not b_claim_as_fact, "counterpart claim promoted to fact" if b_claim_as_fact else "ok"),
+        FalsifierResult(
+            "mirrored_complementarity_as_oracle",
+            not complementarity_oracle,
+            "complementarity oracle leaked via structured path"
+            if complementarity_oracle
+            else "ok",
+        ),
+        FalsifierResult("usefulness_as_permission", not usefulness_as_permission, "usefulness bypassed permission boundary" if usefulness_as_permission else "ok"),
+        FalsifierResult("desired_as_observed", not desired_as_observed, "desired state promoted into observed evidence channel" if desired_as_observed else "ok"),
+        FalsifierResult("predicted_as_permitted", not predicted_as_permitted, "predicted success promoted into permission channel" if predicted_as_permitted else "ok"),
+        FalsifierResult("blocked_aperture_clean_route", not blocked_aperture_clean_route, "blocked aperture still allowed clean applicability route" if blocked_aperture_clean_route else "ok"),
+        FalsifierResult("noisy_claim_cleaned_into_fact", not noisy_cleaned_fact, "noisy claim cleaned into fact without residue" if noisy_cleaned_fact else "ok"),
+        FalsifierResult("false_claim_no_residue", not false_claim_no_residue, "false claim handled without residue/revalidation marker" if false_claim_no_residue else "ok"),
+        FalsifierResult("correction_candidate_executed", not correction_executed, "correction candidate executed or execution guard broken" if correction_executed else "ok"),
+        FalsifierResult(
+            "hidden_truth_leakage_stage25",
+            not hidden_truth_leak,
+            (
+                f"hidden/eval-only truth leaked into visible stage25 trace; "
+                f"key_paths={list(key_hits)[:3]} value_paths={list(value_hits)[:3]}"
+            )
+            if hidden_truth_leak
+            else "ok",
+        ),
+        FalsifierResult(
+            "adapter_projection_labeled_real",
+            not projection_labeled_real,
+            "projection provenance present while full subject tick execution claimed"
+            if projection_labeled_real
+            else "ok",
+        ),
+        FalsifierResult(
+            "execution_level_overclaim",
+            not execution_level_overclaim,
+            "full execution claim inconsistent with per-step provenance/surfaces/coverage evidence"
+            if execution_level_overclaim
+            else "ok",
+        ),
+        FalsifierResult("core_contamination", not core_modified, "forbidden core path touched" if core_modified else "ok"),
+        FalsifierResult("trade_specific_signal", not trade_shortcut, "trade-specific shortcut semantics detected in visible stage25 trace" if trade_shortcut else "ok"),
+        FalsifierResult("one_shot_regularization", not one_shot_regularized, "one-shot signal promoted to regularity/prior" if one_shot_regularized else "ok"),
+        FalsifierResult(
+            "phase_coverage_fake",
+            not fake_coverage,
+            "stage25 claimed W01-W06 coverage without tick-derived verification evidence"
+            if fake_coverage
+            else "ok",
+        ),
+        FalsifierResult("claim_boundary_missing", not claim_boundary_missing, "stage25 claim boundary missing or incomplete" if claim_boundary_missing else "ok"),
     )

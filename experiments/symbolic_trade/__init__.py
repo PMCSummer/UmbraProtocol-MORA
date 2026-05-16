@@ -13,6 +13,15 @@ from .models import (
     SubjectVisiblePacket,
     TransferOutcome,
 )
+from .internal_state import (
+    AResourceState,
+    InternalMagnitudeBand,
+    InternalResourceStatus,
+    InternalStateAuthority,
+    SelfStateProbeRecord,
+    build_self_state_probe_for_scenario,
+    summarize_self_state_probe,
+)
 from .packets import emission_to_subject_packet, packet_from_dict, packet_to_dict, packet_to_w01_world_packet
 from .runner import (
     list_scenarios,
@@ -20,7 +29,19 @@ from .runner import (
     run_stage0_packet_dry_run,
     run_stage1_scenario,
     run_stage2_trace,
+    run_stage25_reaction,
+    stage25_result_to_dict,
     stage2_result_to_dict,
+)
+from .subject_reaction_probe import (
+    AReactionProbeRun,
+    AReactionStepRecord,
+    CounterpartClaimReactionRecord,
+    ExecutionSurfaceLevel,
+    ExecutionSurfaceReport,
+    ProbeClaimBoundaryRecord,
+    W01W06ReactionTraceSummary,
+    WorldEventReactionRecord,
 )
 from .subject_trace import (
     PhaseAdapterInput,
@@ -47,6 +68,13 @@ __all__ = [
     "SignalAuthority",
     "SubjectVisiblePacket",
     "TransferOutcome",
+    "AResourceState",
+    "InternalMagnitudeBand",
+    "InternalResourceStatus",
+    "InternalStateAuthority",
+    "SelfStateProbeRecord",
+    "build_self_state_probe_for_scenario",
+    "summarize_self_state_probe",
     "emission_to_subject_packet",
     "packet_from_dict",
     "packet_to_dict",
@@ -56,7 +84,17 @@ __all__ = [
     "run_stage0_packet_dry_run",
     "run_stage1_scenario",
     "run_stage2_trace",
+    "run_stage25_reaction",
+    "stage25_result_to_dict",
     "stage2_result_to_dict",
+    "AReactionProbeRun",
+    "AReactionStepRecord",
+    "CounterpartClaimReactionRecord",
+    "ExecutionSurfaceLevel",
+    "ExecutionSurfaceReport",
+    "ProbeClaimBoundaryRecord",
+    "W01W06ReactionTraceSummary",
+    "WorldEventReactionRecord",
     "PhaseAdapterInput",
     "PhaseAdapterOutput",
     "PhaseReactionSummary",

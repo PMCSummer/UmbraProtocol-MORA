@@ -32,6 +32,12 @@ def run_stage2_trace(scenario_id: str, *, include_falsifiers: bool = True):
     return run_stage2_trace_scenario(scenario_id, include_falsifiers=include_falsifiers)
 
 
+def run_stage25_reaction(scenario_id: str, *, include_falsifiers: bool = True):
+    from .stage25_runner import run_stage25_reaction_probe
+
+    return run_stage25_reaction_probe(scenario_id, include_falsifiers=include_falsifiers)
+
+
 def result_to_dict(result, *, include_eval_only: bool = False) -> dict[str, object]:
     steps = []
     for step in result.steps:
@@ -65,3 +71,9 @@ def stage2_result_to_dict(result, *, include_eval_only: bool = False) -> dict[st
     from .stage2_runner import stage2_trace_to_dict
 
     return stage2_trace_to_dict(result, include_eval_only=include_eval_only)
+
+
+def stage25_result_to_dict(result, *, include_eval_only: bool = False) -> dict[str, object]:
+    from .stage25_runner import stage25_reaction_result_to_dict
+
+    return stage25_reaction_result_to_dict(result, include_eval_only=include_eval_only)
