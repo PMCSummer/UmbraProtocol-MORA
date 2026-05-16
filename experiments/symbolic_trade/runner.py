@@ -26,6 +26,12 @@ def list_scenarios() -> tuple[str, ...]:
     return list_symbolic_trade_scenarios()
 
 
+def run_stage2_trace(scenario_id: str, *, include_falsifiers: bool = True):
+    from .stage2_runner import run_stage2_trace_scenario
+
+    return run_stage2_trace_scenario(scenario_id, include_falsifiers=include_falsifiers)
+
+
 def result_to_dict(result, *, include_eval_only: bool = False) -> dict[str, object]:
     steps = []
     for step in result.steps:
@@ -53,3 +59,9 @@ def result_to_dict(result, *, include_eval_only: bool = False) -> dict[str, obje
     if include_eval_only:
         payload["eval_only"] = result.eval_only
     return payload
+
+
+def stage2_result_to_dict(result, *, include_eval_only: bool = False) -> dict[str, object]:
+    from .stage2_runner import stage2_trace_to_dict
+
+    return stage2_trace_to_dict(result, include_eval_only=include_eval_only)

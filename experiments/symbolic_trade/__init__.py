@@ -14,7 +14,24 @@ from .models import (
     TransferOutcome,
 )
 from .packets import emission_to_subject_packet, packet_from_dict, packet_to_dict, packet_to_w01_world_packet
-from .runner import list_scenarios, result_to_dict, run_stage0_packet_dry_run, run_stage1_scenario
+from .runner import (
+    list_scenarios,
+    result_to_dict,
+    run_stage0_packet_dry_run,
+    run_stage1_scenario,
+    run_stage2_trace,
+    stage2_result_to_dict,
+)
+from .subject_trace import (
+    PhaseAdapterInput,
+    PhaseAdapterOutput,
+    PhaseReactionSummary,
+    PhaseTraceRecord,
+    Stage2TraceVerdict,
+    SubjectTraceRun,
+    SubjectTraceStep,
+    SubjectVisiblePacketRef,
+)
 
 __all__ = [
     "ApertureState",
@@ -38,4 +55,14 @@ __all__ = [
     "result_to_dict",
     "run_stage0_packet_dry_run",
     "run_stage1_scenario",
+    "run_stage2_trace",
+    "stage2_result_to_dict",
+    "PhaseAdapterInput",
+    "PhaseAdapterOutput",
+    "PhaseReactionSummary",
+    "PhaseTraceRecord",
+    "Stage2TraceVerdict",
+    "SubjectTraceRun",
+    "SubjectTraceStep",
+    "SubjectVisiblePacketRef",
 ]

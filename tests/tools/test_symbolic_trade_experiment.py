@@ -86,3 +86,46 @@ def test_repo_root_imports_work_without_manual_pythonpath() -> None:
     )
     assert result.returncode == 0, result.stderr
     assert "ok" in result.stdout
+
+
+def test_symbolic_trade_cli_stage2_trace_text_and_json_smoke() -> None:
+    text_result = _run("--scenario", "mirrored_resource_asymmetry", "--stage2-trace")
+    assert text_result.returncode == 0, text_result.stderr
+    assert "SYMBOLIC TRADE HARNESS STAGE2 TRACE" in text_result.stdout
+    assert "stage2_trace_verdict=" in text_result.stdout
+
+    json_result = _run("--scenario", "mirrored_resource_asymmetry", "--stage2-trace", "--json")
+    assert json_result.returncode == 0, json_result.stderr
+    payload = json.loads(json_result.stdout)
+    assert payload["stage"] == "stage_2_subject_adapter_trace_through"
+    assert {"W01", "W02", "W03", "W04", "W05", "W06"}.issubset(set(payload["phase_coverage"]))
+    assert "eval_only" not in payload
+
+
+def test_symbolic_trade_cli_stage2_trace_with_falsifiers_exits_zero() -> None:
+    for scenario in REQUIRED_SCENARIOS:
+        result = _run("--scenario", scenario, "--stage2-trace", "--run-falsifiers")
+        assert result.returncode == 0, result.stderr
+
+
+def test_symbolic_trade_cli_stage2_include_eval_only_scoped() -> None:
+    result = _run(
+        "--scenario",
+        "mirrored_resource_asymmetry",
+        "--stage2-trace",
+        "--json",
+        "--run-falsifiers",
+        "--include-eval-only",
+    )
+    assert result.returncode == 0, result.stderr
+    payload = json.loads(result.stdout)
+    assert "eval_only" in payload
+    for step in payload["steps"]:
+        for packet in step["packet_refs"]:
+            flat = json.dumps(packet, sort_keys=True)
+            assert "harness_truth" not in flat
+            assert "mutually_beneficial_trade_possible_eval_only" not in flat
+        for record in step["phase_records"]:
+            flat = json.dumps(record, sort_keys=True)
+            assert "harness_truth" not in flat
+            assert "mutually_beneficial_trade_possible_eval_only" not in flat
