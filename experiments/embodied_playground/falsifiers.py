@@ -108,6 +108,10 @@ def effect_without_correlation(effect: ActionEffectFrame) -> bool:
     return False
 
 
+def effect_success_without_correlation(effect: ActionEffectFrame) -> bool:
+    return effect_without_correlation(effect)
+
+
 def inventory_delta_without_effect(
     previous_inventory_state: dict[str, int],
     current_inventory_state: dict[str, int],
@@ -128,9 +132,25 @@ def body_delta_without_effect(
     return effect is None
 
 
+def movement_without_effect(previous_location_ref: str, current_location_ref: str, effect: ActionEffectFrame | None) -> bool:
+    return body_delta_without_effect(previous_location_ref, current_location_ref, effect)
+
+
 def hidden_recipe_visible(observation: ObservationFrame) -> bool:
     payload = _flat(asdict(observation))
     return "true_recipe_table" in payload
+
+
+def hidden_map_leak(observation: ObservationFrame, snapshot: PublicWorldSnapshot, hidden_object_ref: str) -> bool:
+    payload = _flat(asdict(observation)) + _flat(asdict(snapshot))
+    return hidden_object_ref.lower() in payload
+
+
+def eval_truth_leak(observation: ObservationFrame, snapshot: PublicWorldSnapshot) -> bool:
+    return hidden_truth_leakage(observation, snapshot) or any(
+        token in (_flat(asdict(observation)) + _flat(asdict(snapshot)))
+        for token in FORBIDDEN_EVAL_KEYS
+    )
 
 
 def backend_selects_action(backend: object) -> bool:
@@ -162,7 +182,52 @@ def backend_selects_action(backend: object) -> bool:
         if method_name in {"observe", "action_space", "public_snapshot"}:
             if "PublishedActionEnvelope" in str(signature.return_annotation) or "AP01" in str(signature.return_annotation):
                 return True
+    # Runtime structural checks: backend must not output selected actions from
+    # observation/action-space/snapshot surfaces and must not mutate world state
+    # on read-only surfaces.
+    try:
+        observe_1 = getattr(backend, "observe")("subject_a")
+        action_space_1 = getattr(backend, "action_space")("subject_a")
+        snapshot_1 = getattr(backend, "public_snapshot")("subject_a")
+    except Exception:
+        return True
+
+    if not isinstance(observe_1, ObservationFrame):
+        return True
+    if not isinstance(action_space_1, ActionSpaceFrame):
+        return True
+    if not isinstance(snapshot_1, PublicWorldSnapshot):
+        return True
+    if any(isinstance(v, PublishedActionEnvelope) for v in (observe_1, action_space_1, snapshot_1)):
+        return True
+
+    try:
+        observe_2 = getattr(backend, "observe")("subject_a")
+        action_space_2 = getattr(backend, "action_space")("subject_a")
+        snapshot_2 = getattr(backend, "public_snapshot")("subject_a")
+    except Exception:
+        return True
+
+    # Read-only surfaces must not advance or mutate world state by themselves.
+    if observe_1.tick_index != observe_2.tick_index:
+        return True
+    if snapshot_1.tick_index != snapshot_2.tick_index:
+        return True
+    if action_space_1.tick_index != action_space_2.tick_index:
+        return True
+    if observe_1.body_state.location_ref != observe_2.body_state.location_ref:
+        return True
+    if observe_1.inventory_state.item_counts != observe_2.inventory_state.item_counts:
+        return True
+    if snapshot_1.visible_inventory_state.item_counts != snapshot_2.visible_inventory_state.item_counts:
+        return True
+    if snapshot_1.visible_body_state.location_ref != snapshot_2.visible_body_state.location_ref:
+        return True
     return False
+
+
+def backend_chooses_action(backend: object) -> bool:
+    return backend_selects_action(backend)
 
 
 def minecraft_specific_leak(model_type: type[Any]) -> bool:
@@ -180,6 +245,10 @@ def grid_specific_lockin(model_type: type[Any]) -> bool:
 def ap01_boundary_missing(envelope: PublishedActionEnvelope) -> bool:
     request_ref = envelope.ap01_request_ref.request_ref if isinstance(envelope.ap01_request_ref, AP01RequestRef) else str(envelope.ap01_request_ref)
     return (not request_ref) or (not envelope.request_boundary_preserved)
+
+
+def ap01_request_boundary_lost(envelope: PublishedActionEnvelope) -> bool:
+    return ap01_boundary_missing(envelope)
 
 
 def scenario_id_action_selection(payload: object) -> bool:
@@ -251,6 +320,80 @@ def scenario_id_action_selection(payload: object) -> bool:
 
     serialized = _flat(payload)
     return "scenario_to_action" in serialized or "select_action_by_scenario" in serialized
+
+
+def movement_through_wall(
+    *,
+    was_blocked_by_wall: bool,
+    previous_location_ref: str,
+    current_location_ref: str,
+    effect: ActionEffectFrame,
+) -> bool:
+    if not was_blocked_by_wall:
+        return False
+    if previous_location_ref != current_location_ref:
+        return True
+    status = str(getattr(effect.effect_status, "value", effect.effect_status))
+    return status == EffectStatus.SUCCEEDED.value
+
+
+def pickup_without_proximity(*, pickup_succeeded: bool, target_reachable: bool) -> bool:
+    return pickup_succeeded and (not target_reachable)
+
+
+def pickup_without_capacity(*, pickup_succeeded: bool, capacity_available: bool) -> bool:
+    return pickup_succeeded and (not capacity_available)
+
+
+def drop_without_inventory_item(*, drop_succeeded: bool, had_item_before: bool) -> bool:
+    return drop_succeeded and (not had_item_before)
+
+
+def station_use_without_visibility_or_proximity(*, use_station_succeeded: bool, station_visible: bool, station_reachable: bool) -> bool:
+    return use_station_succeeded and ((not station_visible) or (not station_reachable))
+
+
+def station_result_without_input(*, station_output_produced: bool, station_input_available: bool) -> bool:
+    return station_output_produced and (not station_input_available)
+
+
+def recipe_result_in_p2(effect: ActionEffectFrame) -> bool:
+    payload = _flat(effect.world_delta_public) + _flat(effect.observed_result_refs)
+    return any(token in payload for token in ("crafted", "refined", "recipe_output", "filter_output"))
+
+
+def observation_as_effect(observation: ObservationFrame) -> bool:
+    payload = _flat(asdict(observation))
+    return any(token in payload for token in ("body_delta", "inventory_delta", "effect_status", "world_delta_public"))
+
+
+def public_snapshot_contains_eval_truth(snapshot: PublicWorldSnapshot) -> bool:
+    payload = _flat(asdict(snapshot))
+    return any(token in payload for token in ("hidden_inventory", "hidden_objects", "true_recipe_table", "expected_outcome", "scenario_labels"))
+
+
+def station_visible_as_usable(*, station_visible: bool, use_station_succeeded: bool, station_reachable: bool, input_available: bool) -> bool:
+    return station_visible and use_station_succeeded and ((not station_reachable) or (not input_available))
+
+
+def invalid_envelope_effect_invariant(effect: ActionEffectFrame) -> bool:
+    effect_status = str(getattr(effect.effect_status, "value", effect.effect_status))
+    correlation_status = str(getattr(effect.correlation_status, "value", effect.correlation_status))
+    if effect_status not in {EffectStatus.BLOCKED.value, EffectStatus.FAILED.value}:
+        return True
+    if correlation_status != CorrelationStatus.INVALID.value:
+        return True
+    if effect.request_ref is not None:
+        return True
+    if effect.envelope_ref is not None:
+        return True
+    if bool(effect.body_delta):
+        return True
+    if bool(effect.inventory_delta):
+        return True
+    if bool(effect.world_delta_public):
+        return True
+    return False
 
 
 def validate_public_eval_separation(
