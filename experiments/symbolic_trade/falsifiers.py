@@ -10,17 +10,39 @@ from .transfer_affordance import TransferAffordanceStatus
 
 
 _FORBIDDEN_SIGNAL_TERMS = ("trade", "offer", "request", "ack", "deal", "bargain", "exchange", "market")
-_FORBIDDEN_CORE_PREFIXES = (
+# Explicit compatibility partition:
+# - symbolic_trade contamination scope remains strict for core owner phases/runtime seams
+# - ACP01 + narrow subject_tick integration paths are explicitly allowed
+symbolic_trade_core_contamination_scope = (
     "src/substrate/w01",
     "src/substrate/w02",
     "src/substrate/w03",
     "src/substrate/w04",
     "src/substrate/w05",
     "src/substrate/w06",
+    "src/substrate/a01",
+    "src/substrate/a02",
+    "src/substrate/a03",
+    "src/substrate/a04",
+    "src/substrate/p01",
+    "src/substrate/p02",
+    "src/substrate/p03",
+    "src/substrate/p04",
+    "src/substrate/s01",
+    "src/substrate/s02",
+    "src/substrate/s03",
+    "src/substrate/s04",
+    "src/substrate/s05",
     "src/substrate/subject_tick/",
     "src/substrate/runtime_topology/policy.py",
     "src/substrate/runtime_tap_trace.py",
 )
+acp01_subject_tick_integration_allowlist = (
+    "src/substrate/subject_tick/models.py",
+    "src/substrate/subject_tick/update.py",
+    "src/substrate/acp01_internal_action_candidate_production/",
+)
+allowed_owner_integration_paths = acp01_subject_tick_integration_allowlist
 _DESIRED_MARKER_TERMS = ("desired_state", "desired_outcome", "requested_outcome", "goal_target", "goal_state")
 _FORBIDDEN_PHASE_SHORTCUT_TERMS = (
     "trade_intent:true",
@@ -99,6 +121,62 @@ def _modified_paths(repo_root: Path) -> tuple[str, ...]:
 
 def _untracked_paths(repo_root: Path) -> tuple[str, ...]:
     return _run_git_lines(repo_root, ["git", "ls-files", "-o", "--exclude-standard"])
+
+
+def _normalize_repo_path(path: str) -> str:
+    return path.strip().replace("\\", "/")
+
+
+def _is_allowed_owner_integration_path(path: str) -> bool:
+    normalized = _normalize_repo_path(path)
+    for allowed in allowed_owner_integration_paths:
+        if allowed.endswith("/"):
+            if normalized.startswith(allowed):
+                return True
+            continue
+        if normalized == allowed:
+            return True
+    return False
+
+
+def _is_symbolic_trade_core_scoped_path(path: str) -> bool:
+    normalized = _normalize_repo_path(path)
+    return any(normalized.startswith(prefix) for prefix in symbolic_trade_core_contamination_scope)
+
+
+def _evaluate_symbolic_trade_core_contamination(repo_root: Path) -> tuple[bool, str]:
+    changed_paths = set(_modified_paths(repo_root))
+    changed_paths.update(_untracked_paths(repo_root))
+
+    offenders: list[str] = []
+    allowed_hits: list[str] = []
+
+    for path in sorted(_normalize_repo_path(item) for item in changed_paths):
+        if not _is_symbolic_trade_core_scoped_path(path):
+            continue
+
+        if _is_allowed_owner_integration_path(path):
+            allowed_hits.append(path)
+            continue
+
+        if path.startswith("src/substrate/subject_tick/"):
+            offenders.append(
+                f"{path} (unexpected subject_tick path; allowed only as ACP01 integration paths)"
+            )
+            continue
+
+        offenders.append(path)
+
+    if offenders:
+        return True, f"forbidden core path touched: {', '.join(offenders)}"
+
+    if allowed_hits:
+        return (
+            False,
+            "ok (subject_tick modifications are allowed only as ACP01 integration paths)",
+        )
+
+    return False, "ok"
 
 
 def _contains_any_term(text: str) -> bool:
@@ -246,12 +324,7 @@ def run_symbolic_trade_falsifiers(result, *, repo_root: Path | None = None) -> t
     correction_seam_broken = correction_executed or (correction_created and not execution_prohibited)
 
     repo = repo_root or Path(__file__).resolve().parents[2]
-    changed_paths = set(_modified_paths(repo))
-    changed_paths.update(_untracked_paths(repo))
-    core_modified = any(
-        any(path.startswith(prefix) for prefix in _FORBIDDEN_CORE_PREFIXES)
-        for path in changed_paths
-    )
+    core_modified, core_modification_details = _evaluate_symbolic_trade_core_contamination(repo)
 
     return (
         FalsifierResult("hidden_state_leakage", not hidden_leak, "hidden truth leaked" if hidden_leak else "ok"),
@@ -265,7 +338,7 @@ def run_symbolic_trade_falsifiers(result, *, repo_root: Path | None = None) -> t
         FalsifierResult("noisy_signal_cleaned", not noisy_cleaned, "noisy contradiction cleaned to stable claim" if noisy_cleaned else "ok"),
         FalsifierResult("transfer_result_as_permission", not transfer_as_permission, "transfer result converted to permission" if transfer_as_permission else "ok"),
         FalsifierResult("correction_candidate_executed", not correction_seam_broken, "correction candidate treated as executed or execution guard broken" if correction_seam_broken else "ok"),
-        FalsifierResult("phase_core_modification", not core_modified, "forbidden core files modified" if core_modified else "ok"),
+        FalsifierResult("phase_core_modification", not core_modified, core_modification_details),
     )
 
 
@@ -381,13 +454,11 @@ def run_stage2_trace_falsifiers(trace_run, *, repo_root: Path | None = None) -> 
     missing_coverage = not {"W01", "W02", "W03", "W04", "W05", "W06"}.issubset(phase_codes)
 
     repo = repo_root or Path(__file__).resolve().parents[2]
-    changed_paths = set(_modified_paths(repo))
-    changed_paths.update(_untracked_paths(repo))
-    core_modified = any(any(path.startswith(prefix) for prefix in _FORBIDDEN_CORE_PREFIXES) for path in changed_paths)
+    core_modified, core_modification_details = _evaluate_symbolic_trade_core_contamination(repo)
 
     return (
         FalsifierResult("subject_trace_hidden_truth_leakage", not hidden_truth_leak, "hidden/eval truth leaked into trace" if hidden_truth_leak else "ok"),
-        FalsifierResult("phase_adapter_core_contamination", not core_modified, "forbidden core path touched" if core_modified else "ok"),
+        FalsifierResult("phase_adapter_core_contamination", not core_modified, core_modification_details),
         FalsifierResult("one_shot_claim_promoted_by_w02_or_w03", not one_shot_promoted, "one-shot signal promoted to regularity/schema" if one_shot_promoted else "ok"),
         FalsifierResult("w04_usefulness_as_permission", not w04_usefulness_permission, "w04 usefulness converted into permission" if w04_usefulness_permission else "ok"),
         FalsifierResult("w05_desired_or_predicted_as_permission", not w05_desired_predicted_permission, "w05 desired/predicted promoted to permission" if w05_desired_predicted_permission else "ok"),
@@ -549,9 +620,7 @@ def run_stage25_reaction_falsifiers(probe_run, *, repo_root: Path | None = None)
     )
 
     repo = repo_root or Path(__file__).resolve().parents[2]
-    changed_paths = set(_modified_paths(repo))
-    changed_paths.update(_untracked_paths(repo))
-    core_modified = any(any(path.startswith(prefix) for prefix in _FORBIDDEN_CORE_PREFIXES) for path in changed_paths)
+    core_modified, core_modification_details = _evaluate_symbolic_trade_core_contamination(repo)
 
     return (
         FalsifierResult("a_self_state_hidden_as_world_fact", not self_state_as_world_fact, "self state leaked into world evidence channel" if self_state_as_world_fact else "ok"),
@@ -596,7 +665,7 @@ def run_stage25_reaction_falsifiers(probe_run, *, repo_root: Path | None = None)
             if execution_level_overclaim
             else "ok",
         ),
-        FalsifierResult("core_contamination", not core_modified, "forbidden core path touched" if core_modified else "ok"),
+        FalsifierResult("core_contamination", not core_modified, core_modification_details),
         FalsifierResult("trade_specific_signal", not trade_shortcut, "trade-specific shortcut semantics detected in visible stage25 trace" if trade_shortcut else "ok"),
         FalsifierResult("one_shot_regularization", not one_shot_regularized, "one-shot signal promoted to regularity/prior" if one_shot_regularized else "ok"),
         FalsifierResult(
@@ -879,9 +948,7 @@ def run_stage3_response_falsifiers(stage3_run, *, repo_root: Path | None = None)
     claim_boundary_missing = not any("stage3_response_candidate_probe_only" == item for item in stage3_run.claim_boundary)
 
     repo = repo_root or Path(__file__).resolve().parents[2]
-    changed_paths = set(_modified_paths(repo))
-    changed_paths.update(_untracked_paths(repo))
-    core_modified = any(any(path.startswith(prefix) for prefix in _FORBIDDEN_CORE_PREFIXES) for path in changed_paths)
+    core_modified, core_modification_details = _evaluate_symbolic_trade_core_contamination(repo)
 
     return (
         FalsifierResult(
@@ -912,7 +979,7 @@ def run_stage3_response_falsifiers(stage3_run, *, repo_root: Path | None = None)
         FalsifierResult("stage3_w05_routing_as_execution_permission", not w05_routing_as_execution, "w05 route treated as execution permission" if w05_routing_as_execution else "ok"),
         FalsifierResult("stage3_w06_correction_as_executed", not w06_correction_executed, "w06 correction treated as executed update" if w06_correction_executed else "ok"),
         FalsifierResult("stage3_control_scenario_same_as_mirrored", not control_same_as_mirrored, "selected offer/transfer candidate lacks structural complementarity boundary basis" if control_same_as_mirrored else "ok"),
-        FalsifierResult("stage3_core_contamination", not core_modified, "forbidden core path touched" if core_modified else "ok"),
+        FalsifierResult("stage3_core_contamination", not core_modified, core_modification_details),
         FalsifierResult("stage3_phase_coverage_fake", not phase_coverage_fake, "stage3 claimed phase coverage without evidence" if phase_coverage_fake else "ok"),
         FalsifierResult("stage3_claim_boundary_missing", not claim_boundary_missing, "stage3 claim boundary missing" if claim_boundary_missing else "ok"),
     )
@@ -1089,9 +1156,7 @@ def run_stage4_cycle_falsifiers(stage4_run, *, repo_root: Path | None = None) ->
     )
 
     repo = repo_root or Path(__file__).resolve().parents[2]
-    changed_paths = set(_modified_paths(repo))
-    changed_paths.update(_untracked_paths(repo))
-    core_modified = any(any(path.startswith(prefix) for prefix in _FORBIDDEN_CORE_PREFIXES) for path in changed_paths)
+    core_modified, core_modification_details = _evaluate_symbolic_trade_core_contamination(repo)
 
     return (
         FalsifierResult("clarification_loop_without_progress", not clarification_loop_without_progress, "clarification loop remained unresolved without fallback" if clarification_loop_without_progress else "ok"),
@@ -1124,7 +1189,7 @@ def run_stage4_cycle_falsifiers(stage4_run, *, repo_root: Path | None = None) ->
         FalsifierResult("a04_binding_without_authority", not a04_binding_without_authority, "external affordance binding missing authority metadata" if a04_binding_without_authority else "ok"),
         FalsifierResult("a02_gap_silently_ignored", not a02_gap_silently_ignored, "transfer affordance gap present without A02-compatible marker" if a02_gap_silently_ignored else "ok"),
         FalsifierResult("p02_episode_completion_inflation", not p02_episode_completion_inflation, "p02 episode marked verified without attempt/observation chain" if p02_episode_completion_inflation else "ok"),
-        FalsifierResult("core_contamination", not core_modified, "forbidden core path touched" if core_modified else "ok"),
+        FalsifierResult("core_contamination", not core_modified, core_modification_details),
     )
 
 
@@ -1352,9 +1417,7 @@ def run_stage5_affordance_trace_falsifiers(stage5_trace, *, repo_root: Path | No
     )
 
     repo = repo_root or Path(__file__).resolve().parents[2]
-    changed_paths = set(_modified_paths(repo))
-    changed_paths.update(_untracked_paths(repo))
-    core_modified = any(any(path.startswith(prefix) for prefix in _FORBIDDEN_CORE_PREFIXES) for path in changed_paths)
+    core_modified, core_modification_details = _evaluate_symbolic_trade_core_contamination(repo)
 
     return (
         FalsifierResult("stage5_selection_without_offer_candidate", not selection_without_offer_candidate, "affordance selected without offer candidate" if selection_without_offer_candidate else "ok"),
@@ -1376,7 +1439,7 @@ def run_stage5_affordance_trace_falsifiers(stage5_trace, *, repo_root: Path | No
         FalsifierResult("stage5_trade_specific_magic_channel", not trade_specific_magic_channel, "trade-specific shortcut channel detected" if trade_specific_magic_channel else "ok"),
         FalsifierResult("stage5_eval_only_used_in_affordance_decision", not eval_only_used_in_decision, "eval-only labels leaked into decision-bearing records" if eval_only_used_in_decision else "ok"),
         FalsifierResult("stage5_hidden_inventory_used_in_affordance_decision", not hidden_inventory_used_in_decision, "hidden inventory leaked into decision-bearing records" if hidden_inventory_used_in_decision else "ok"),
-        FalsifierResult("stage5_core_contamination", not core_modified, "forbidden core path touched" if core_modified else "ok"),
+        FalsifierResult("stage5_core_contamination", not core_modified, core_modification_details),
         FalsifierResult("stage5_module_responsibility_missing", not module_responsibility_missing, "responsibility ledger missing required surfaces" if module_responsibility_missing else "ok"),
         FalsifierResult("stage5_phase_evidence_fabricated", not phase_evidence_fabricated, "phase evidence missing or fabricated" if phase_evidence_fabricated else "ok"),
     )

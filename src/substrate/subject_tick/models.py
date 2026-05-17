@@ -82,6 +82,10 @@ if TYPE_CHECKING:
         AP01ActionPublicationCandidateSet,
         AP01SubjectActionPublicationResult,
     )
+    from substrate.acp01_internal_action_candidate_production import (
+        ACP01CandidateProductionInput,
+        ACP01CandidateProductionResult,
+    )
     from substrate.w01_bounded_world_loop import (
         W01Result,
         W01WorldPacketSet,
@@ -921,6 +925,10 @@ class SubjectTickContext:
     p02_episode_input: P02InterventionEpisodeInput | None = None
     p03_credit_assignment_input: P03CreditAssignmentInput | None = None
     p04_simulation_input: P04SimulationInput | None = None
+    acp01_candidate_production_input: ACP01CandidateProductionInput | None = None
+    acp01_enabled: bool = True
+    acp01_use_produced_candidates_when_no_explicit_ap01: bool = True
+    acp01_take_priority_over_explicit_ap01: bool = False
     ap01_action_publication_candidate_set: AP01ActionPublicationCandidateSet | None = None
     a01_raw_affordance_candidate_set: A01RawAffordanceCandidateSet | None = None
     a02_demand_set: A02DemandSet | None = None
@@ -1595,6 +1603,13 @@ class SubjectTickState:
     a04_binding_packet_consumer_ready: bool = False
     a04_authority_path_consumer_ready: bool = False
     a04_downstream_consumer_ready: bool = False
+    acp01_candidate_input_present: bool = False
+    acp01_proposal_count: int = 0
+    acp01_proposed_count: int = 0
+    acp01_blocked_count: int = 0
+    acp01_revalidation_required_count: int = 0
+    acp01_unsafe_basis_count: int = 0
+    ap01_candidate_source: str = "none"
     ap01_candidate_count: int = 0
     ap01_explicit_basis_present: bool = False
     ap01_published_request_count: int = 0
@@ -2138,6 +2153,7 @@ class SubjectTickResult:
     p02_result: P02InterventionEpisodeResult
     p03_result: P03CreditAssignmentResult
     p04_result: P04SimulationResult
+    acp01_result: ACP01CandidateProductionResult
     ap01_result: AP01SubjectActionPublicationResult
     t01_result: T01ActiveFieldResult
     t02_result: T02ConstrainedSceneResult

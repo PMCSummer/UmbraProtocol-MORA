@@ -110,3 +110,18 @@ def test_demo_does_not_claim_autonomous_action_selection() -> None:
     )
     assert result.returncode == 0, result.stderr
     assert "autonomous_action_selection=False" in result.stdout
+
+
+def test_internal_candidate_mode_runs_without_manual_provider() -> None:
+    result = _run(
+        "--scenario",
+        "visible_item_pickup_available",
+        "--internal-candidate",
+        "--drive",
+        "water_need",
+        "--ticks",
+        "1",
+    )
+    assert result.returncode == 0, result.stderr
+    assert "internal_candidate_mode=True" in result.stdout
+    assert "manual_candidate_input=False" in result.stdout

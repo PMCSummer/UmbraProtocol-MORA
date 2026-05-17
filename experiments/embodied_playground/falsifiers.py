@@ -26,6 +26,29 @@ FORBIDDEN_EVAL_KEYS: tuple[str, ...] = (
     "eval_label",
     "harness_truth",
 )
+FORBIDDEN_PRIVATE_EVAL_BASIS_MARKERS: tuple[str, ...] = (
+    "eval_only",
+    "private_world",
+    "private_map",
+    "hidden_truth",
+    "hidden_map",
+    "hidden_object",
+    "hidden_inventory",
+    "full_map",
+    "expected_outcome",
+)
+FORBIDDEN_SCENARIO_ACTION_BASIS_MARKERS: tuple[str, ...] = (
+    "scenario_id",
+    "scenario:",
+    "scenario_to_action",
+    "select_action_by_scenario",
+    "test_name",
+    "test_case",
+    "demo_case",
+    "gui_label",
+    "manual_action",
+    "expected_outcome",
+)
 
 
 def _flat(value: object) -> str:
@@ -715,3 +738,304 @@ def bridge_chooses_action_from_scenario_id(payload: object) -> bool:
         return False
 
     return "scenario_to_action" in _flat(payload) or "select_action_by_scenario" in _flat(payload)
+
+
+def candidate_from_scenario_id(candidate_payload: object) -> bool:
+    sections = _decision_bearing_sections(candidate_payload)
+    return _contains_forbidden_marker_in_sections(
+        sections,
+        markers=FORBIDDEN_SCENARIO_ACTION_BASIS_MARKERS,
+        path_prefix="candidate_basis",
+    )
+
+
+def candidate_from_eval_or_private_data(candidate_payload: object) -> bool:
+    sections = _decision_bearing_sections(candidate_payload)
+    return _contains_forbidden_marker_in_sections(
+        sections,
+        markers=FORBIDDEN_PRIVATE_EVAL_BASIS_MARKERS,
+        path_prefix="candidate_basis",
+    )
+
+
+def visible_object_alone_creates_pickup(
+    *,
+    has_visible_object_basis: bool,
+    has_internal_drive_basis: bool,
+    proposed_action_kind: str | None,
+) -> bool:
+    return has_visible_object_basis and (not has_internal_drive_basis) and proposed_action_kind == "pickup"
+
+
+def drive_alone_creates_pickup(
+    *,
+    has_internal_drive_basis: bool,
+    has_visible_object_basis: bool,
+    has_action_surface_basis: bool,
+    proposed_action_kind: str | None,
+) -> bool:
+    return (
+        has_internal_drive_basis
+        and (not has_visible_object_basis)
+        and (not has_action_surface_basis)
+        and proposed_action_kind == "pickup"
+    )
+
+
+def action_space_alone_creates_candidate(
+    *,
+    has_action_surface_basis: bool,
+    has_internal_drive_basis: bool,
+    has_visible_object_basis: bool,
+    proposed_action_kind: str | None,
+) -> bool:
+    return (
+        has_action_surface_basis
+        and (not has_internal_drive_basis)
+        and (not has_visible_object_basis)
+        and proposed_action_kind is not None
+    )
+
+
+def pickup_without_proximity_basis(
+    *,
+    proposed_action_kind: str | None,
+    proximity_basis_status: str | None,
+) -> bool:
+    if proposed_action_kind != "pickup":
+        return False
+    return proximity_basis_status not in {"available"}
+
+
+def pickup_without_capacity_basis(
+    *,
+    proposed_action_kind: str | None,
+    capacity_basis_status: str | None,
+) -> bool:
+    if proposed_action_kind != "pickup":
+        return False
+    return capacity_basis_status not in {"available"}
+
+
+def pickup_when_capacity_blocked(
+    *,
+    proposed_action_kind: str | None,
+    capacity_basis_status: str | None,
+) -> bool:
+    return proposed_action_kind == "pickup" and capacity_basis_status == "blocked"
+
+
+def candidate_executes_world(payload: object) -> bool:
+    text = _flat(payload)
+    return "submit_action" in text or "world_effect" in text or "publishedactionenvelope" in text
+
+
+def candidate_bypasses_ap01(
+    *,
+    candidate_proposed: bool,
+    ap01_published_request_count: int,
+    world_submission_attempted: bool,
+) -> bool:
+    return candidate_proposed and world_submission_attempted and ap01_published_request_count <= 0
+
+
+def ap01_publication_without_acp01_basis(
+    *,
+    ap01_candidate_source: str,
+    ap01_published_request_count: int,
+    acp01_proposed_count: int,
+) -> bool:
+    return (
+        ap01_candidate_source == "acp01_internal"
+        and ap01_published_request_count > 0
+        and acp01_proposed_count <= 0
+    )
+
+
+def previous_effect_as_success_oracle(
+    *,
+    only_previous_effect_basis: bool,
+    proposed_action_kind: str | None,
+) -> bool:
+    return only_previous_effect_basis and proposed_action_kind is not None
+
+
+def blocked_effect_auto_alternative_action(
+    *,
+    previous_effect_status: str | None,
+    revalidation_required: bool,
+    proposed_action_kind: str | None,
+) -> bool:
+    return (
+        previous_effect_status in {"blocked", "failed"}
+        and (not revalidation_required)
+        and proposed_action_kind in {"turn_left", "turn_right", "move_forward", "move_backward"}
+    )
+
+
+def inspect_as_pickup_shortcut(
+    *,
+    previous_action_kind: str | None,
+    current_action_kind: str | None,
+    new_evidence_present: bool,
+) -> bool:
+    return previous_action_kind == "inspect" and current_action_kind == "pickup" and not new_evidence_present
+
+
+def station_visibility_as_use_candidate(
+    *,
+    station_visible: bool,
+    has_drive_basis: bool,
+    has_capability_basis: bool,
+    proposed_action_kind: str | None,
+) -> bool:
+    return station_visible and proposed_action_kind == "use_station" and ((not has_drive_basis) or (not has_capability_basis))
+
+
+def recipe_or_automation_candidate_in_p4(proposed_action_kind: str | None) -> bool:
+    return proposed_action_kind in {"craft", "refine", "filter", "research", "automation"}
+
+
+def bridge_calls_acp01_policy_directly(source_text: str) -> bool:
+    lowered = source_text.lower()
+    if "execute_subject_tick" not in lowered:
+        return True
+    return "build_acp01_internal_action_candidates" in lowered
+
+
+def manual_provider_used_in_internal_mode(
+    *,
+    use_internal_candidate_producer: bool,
+    manual_candidate_input: bool,
+) -> bool:
+    return use_internal_candidate_producer and manual_candidate_input
+
+
+def public_payload_eval_scope_violation(payload: object) -> bool:
+    if not isinstance(payload, dict):
+        return eval_truth_fed_to_subject_tick(payload)
+    allowed_sections = {
+        "surface_schema_version",
+        "observation_id",
+        "world_time_ref",
+        "source_authority",
+        "hidden_eval_excluded",
+        "body",
+        "inventory",
+        "visible_objects",
+        "action_space",
+        "previous_effect_refs",
+    }
+    if any(key not in allowed_sections for key in payload):
+        return True
+    scoped_sections = {
+        "body": {
+            "body_ref": payload.get("body", {}).get("body_ref"),
+            "location_ref": payload.get("body", {}).get("location_ref"),
+            "orientation": payload.get("body", {}).get("orientation"),
+            "posture_status": payload.get("body", {}).get("posture_status"),
+            "actuator_status": payload.get("body", {}).get("actuator_status"),
+        },
+        "inventory": {
+            "inventory_ref": payload.get("inventory", {}).get("inventory_ref"),
+            "used_slots": payload.get("inventory", {}).get("used_slots"),
+            "capacity_slots": payload.get("inventory", {}).get("capacity_slots"),
+            "item_refs": payload.get("inventory", {}).get("item_refs"),
+            "item_counts": payload.get("inventory", {}).get("item_counts"),
+        },
+        "visible_objects": payload.get("visible_objects", ()),
+        "action_space": {
+            "allowed_action_kinds_from_body": payload.get("action_space", {}).get("allowed_action_kinds_from_body"),
+            "available_surfaces": payload.get("action_space", {}).get("available_surfaces"),
+            "action_space_is_permission": payload.get("action_space", {}).get("action_space_is_permission"),
+            "action_space_is_selection": payload.get("action_space", {}).get("action_space_is_selection"),
+            "action_space_is_execution": payload.get("action_space", {}).get("action_space_is_execution"),
+        },
+        "previous_effect_refs": payload.get("previous_effect_refs", ()),
+    }
+    return _contains_forbidden_marker_in_sections(
+        scoped_sections,
+        markers=FORBIDDEN_PRIVATE_EVAL_BASIS_MARKERS + FORBIDDEN_SCENARIO_ACTION_BASIS_MARKERS,
+        path_prefix="subject_tick_surface_payload",
+    )
+
+
+def candidate_without_provenance_refs(candidate_payload: object) -> bool:
+    if isinstance(candidate_payload, dict):
+        refs = candidate_payload.get("basis_refs")
+        if not refs:
+            return True
+        text = _flat(refs)
+        required = ("observation:", "drive:", "surface:", "capability:")
+        return not all(token in text for token in required)
+    text = _flat(candidate_payload)
+    return "basis_refs" not in text
+
+
+def _decision_bearing_sections(candidate_payload: object) -> dict[str, object]:
+    if isinstance(candidate_payload, dict):
+        decision_keys = {
+            "candidate_id",
+            "action_kind",
+            "target_ref",
+            "args",
+            "intended_effect",
+            "basis_refs",
+            "missing_basis",
+            "blocked_basis",
+            "resource_or_goal_ref",
+            "drive_kind",
+            "drive_ref",
+            "public_properties",
+            "forbidden_basis_markers",
+            "source_tick_ref",
+            "source_phase_refs",
+            "permission_refs",
+            "evidence_refs",
+            "affordance_binding_refs",
+            "reason_codes",
+            "visible_object_bases",
+            "internal_drive_bases",
+            "action_surface_bases",
+            "capability_bases",
+            "effect_feedback_bases",
+            "candidate_set_for_ap01",
+        }
+        return {key: value for key, value in candidate_payload.items() if key in decision_keys}
+
+    if hasattr(candidate_payload, "__dataclass_fields__"):
+        serial = asdict(candidate_payload)
+        return _decision_bearing_sections(serial)
+
+    return {
+        "raw": candidate_payload,
+    }
+
+
+def _contains_forbidden_marker_in_sections(
+    sections: object,
+    *,
+    markers: tuple[str, ...],
+    path_prefix: str,
+) -> bool:
+    return _scan_sections_for_markers(sections, markers=markers, path=path_prefix)
+
+
+def _scan_sections_for_markers(value: object, *, markers: tuple[str, ...], path: str) -> bool:
+    if value is None:
+        return False
+    if isinstance(value, dict):
+        for key, item in value.items():
+            key_text = str(key).lower()
+            if any(marker in key_text for marker in markers):
+                return True
+            if _scan_sections_for_markers(item, markers=markers, path=f"{path}.{key}"):
+                return True
+        return False
+    if isinstance(value, (list, tuple, set, frozenset)):
+        return any(
+            _scan_sections_for_markers(item, markers=markers, path=f"{path}[{idx}]")
+            for idx, item in enumerate(value)
+        )
+    text = str(value).lower()
+    return any(marker in text for marker in markers)

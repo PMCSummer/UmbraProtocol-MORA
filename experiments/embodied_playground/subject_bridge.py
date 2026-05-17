@@ -8,6 +8,16 @@ import sys
 from typing import Any
 
 try:
+    from substrate.acp01_internal_action_candidate_production import (
+        ACP01ActionSurfaceBasis,
+        ACP01CandidateProductionInput,
+        ACP01CapabilityBasis,
+        ACP01CapabilityStatus,
+        ACP01EffectFeedbackBasis,
+        ACP01InternalDriveBasis,
+        ACP01ObservationBasis,
+        ACP01VisibleObjectBasis,
+    )
     from substrate.ap01_subject_action_publication import AP01DecisionStatus, AP01SubjectActionRequestPacket
     from substrate.subject_tick import SubjectTickContext, SubjectTickInput
     from substrate.subject_tick.update import execute_subject_tick
@@ -22,6 +32,16 @@ except ModuleNotFoundError:
     src_path = str(repo_root / "src")
     if src_path not in sys.path:
         sys.path.insert(0, src_path)
+    from substrate.acp01_internal_action_candidate_production import (
+        ACP01ActionSurfaceBasis,
+        ACP01CandidateProductionInput,
+        ACP01CapabilityBasis,
+        ACP01CapabilityStatus,
+        ACP01EffectFeedbackBasis,
+        ACP01InternalDriveBasis,
+        ACP01ObservationBasis,
+        ACP01VisibleObjectBasis,
+    )
     from substrate.ap01_subject_action_publication import AP01DecisionStatus, AP01SubjectActionRequestPacket
     from substrate.subject_tick import SubjectTickContext, SubjectTickInput
     from substrate.subject_tick.update import execute_subject_tick
@@ -63,6 +83,7 @@ def run_subject_world_bridge(
     no_candidate_no_execution_count = 0
     rejected_multiple_requests_count = 0
     subject_tick_used_any = False
+    internal_candidate_producer_used_any = False
 
     prior_action_packet: WorldActionPacket | None = None
     prior_effect_packet: WorldEffectObservationPacket | None = None
@@ -71,15 +92,40 @@ def run_subject_world_bridge(
         observation_before = world.observe(config.subject_id)
         action_space_before = world.action_space(config.subject_id)
 
+        internal_candidate_producer_used = bool(config.use_internal_candidate_producer)
         candidate_set = None
         manual_candidate_input = False
+        manual_override_used = False
+        internal_candidate_mode_boundary_relaxed = False
         if candidate_provider is not None and config.allow_manual_candidate_provider:
-            candidate_set = candidate_provider.provide_candidates(
+            internal_mode_manual_override = (
+                internal_candidate_producer_used
+                and config.allow_manual_override_in_internal_mode
+            )
+            if (not internal_candidate_producer_used) or internal_mode_manual_override:
+                candidate_set = candidate_provider.provide_candidates(
+                    bridge_tick_index=bridge_tick_index,
+                    observation=observation_before,
+                    action_space=action_space_before,
+                )
+                manual_candidate_input = candidate_set is not None
+                if internal_mode_manual_override and manual_candidate_input:
+                    manual_override_used = True
+                    internal_candidate_mode_boundary_relaxed = True
+
+        acp01_candidate_input = (
+            _build_acp01_candidate_input(
                 bridge_tick_index=bridge_tick_index,
                 observation=observation_before,
                 action_space=action_space_before,
+                prior_effect_packet=prior_effect_packet,
+                drive_kinds=config.internal_drive_kinds,
             )
-            manual_candidate_input = candidate_set is not None
+            if internal_candidate_producer_used
+            else None
+        )
+        if internal_candidate_producer_used:
+            internal_candidate_producer_used_any = True
 
         tick_input, tick_context, subject_tick_surface_payload = _build_subject_tick_surfaces(
             bridge_tick_index=bridge_tick_index,
@@ -87,6 +133,7 @@ def run_subject_world_bridge(
             action_packet=prior_action_packet,
             effect_packet=prior_effect_packet,
             candidate_set=candidate_set,
+            acp01_candidate_input=acp01_candidate_input,
         )
 
         tick_result = None
@@ -109,6 +156,11 @@ def run_subject_world_bridge(
                     action_space_frame_id=action_space_before.frame_id,
                     subject_tick_used=subject_tick_used,
                     subject_tick_result_ref=subject_tick_result_ref,
+                    acp01_candidate_input_present=acp01_candidate_input is not None,
+                    acp01_proposed_count=0,
+                    acp01_blocked_count=0,
+                    acp01_revalidation_required_count=0,
+                    acp01_unsafe_basis_count=0,
                     ap01_candidate_count=0,
                     ap01_published_request_count=0,
                     ap01_blocked_count=0,
@@ -128,7 +180,11 @@ def run_subject_world_bridge(
                     hidden_eval_excluded=True,
                     direct_phase_calls_detected=False,
                     bridge_chose_action=False,
+                    internal_candidate_producer_used=internal_candidate_producer_used,
+                    candidate_source="none",
                     manual_candidate_input=manual_candidate_input,
+                    manual_override_used=manual_override_used,
+                    internal_candidate_mode_boundary_relaxed=internal_candidate_mode_boundary_relaxed,
                     autonomous_action_selection=False,
                     verdict=BridgeVerdict.BRIDGE_ERROR,
                     subject_tick_error=str(exc),
@@ -138,8 +194,16 @@ def run_subject_world_bridge(
             continue
 
         ap01_result = tick_result.ap01_result
+        acp01_result = getattr(tick_result, "acp01_result", None)
         telemetry = ap01_result.telemetry
         published_requests = ap01_result.published_requests
+        ap01_candidate_source = str(getattr(tick_result.state, "ap01_candidate_source", "none"))
+        acp01_proposed_count = int(getattr(getattr(acp01_result, "telemetry", None), "proposed_count", 0))
+        acp01_blocked_count = int(getattr(getattr(acp01_result, "telemetry", None), "blocked_count", 0))
+        acp01_revalidation_required_count = int(
+            getattr(getattr(acp01_result, "telemetry", None), "revalidation_required_count", 0)
+        )
+        acp01_unsafe_basis_count = int(getattr(getattr(acp01_result, "telemetry", None), "unsafe_basis_count", 0))
 
         envelope: PublishedActionEnvelope | None = None
         world_effect: ActionEffectFrame | None = None
@@ -186,6 +250,11 @@ def run_subject_world_bridge(
             action_space_frame_id=action_space_before.frame_id,
             subject_tick_used=subject_tick_used,
             subject_tick_result_ref=subject_tick_result_ref,
+            acp01_candidate_input_present=acp01_candidate_input is not None,
+            acp01_proposed_count=acp01_proposed_count,
+            acp01_blocked_count=acp01_blocked_count,
+            acp01_revalidation_required_count=acp01_revalidation_required_count,
+            acp01_unsafe_basis_count=acp01_unsafe_basis_count,
             ap01_candidate_count=telemetry.candidate_count,
             ap01_published_request_count=telemetry.published_request_count,
             ap01_blocked_count=telemetry.blocked_count,
@@ -213,7 +282,11 @@ def run_subject_world_bridge(
             hidden_eval_excluded=True,
             direct_phase_calls_detected=False,
             bridge_chose_action=False,
+            internal_candidate_producer_used=internal_candidate_producer_used,
+            candidate_source=ap01_candidate_source,
             manual_candidate_input=manual_candidate_input,
+            manual_override_used=manual_override_used,
+            internal_candidate_mode_boundary_relaxed=internal_candidate_mode_boundary_relaxed,
             autonomous_action_selection=False,
             verdict=verdict,
         )
@@ -232,6 +305,7 @@ def run_subject_world_bridge(
         steps=tuple(records),
         final_observation_id=final_observation.observation_id,
         subject_tick_used_any=subject_tick_used_any,
+        internal_candidate_producer_used_any=internal_candidate_producer_used_any,
         world_submissions_count=world_submissions_count,
         world_effect_count=world_effect_count,
         no_candidate_no_execution_count=no_candidate_no_execution_count,
@@ -319,6 +393,126 @@ def _effect_packet_from_effect(effect: ActionEffectFrame) -> WorldEffectObservat
     )
 
 
+def _build_acp01_candidate_input(
+    *,
+    bridge_tick_index: int,
+    observation: ObservationFrame,
+    action_space: Any,
+    prior_effect_packet: WorldEffectObservationPacket | None,
+    drive_kinds: tuple[str, ...],
+) -> ACP01CandidateProductionInput:
+    object_bases = tuple(
+        ACP01VisibleObjectBasis(
+            object_ref=obj.object_ref,
+            object_kind=str(getattr(obj.object_kind, "value", obj.object_kind)),
+            location_ref=obj.location_ref,
+            public_properties=dict(obj.observable_properties),
+            confidence=float(obj.observable_properties.get("confidence", 1.0)),
+            claim_not_fact=bool(obj.claim_not_fact_marker),
+            public_only=True,
+        )
+        for obj in observation.visible_objects
+    )
+    surface_bases = tuple(
+        ACP01ActionSurfaceBasis(
+            surface_ref=surface.surface_ref,
+            surface_kind=str(getattr(surface.surface_kind, "value", surface.surface_kind)),
+            target_ref=surface.target_ref,
+            action_kinds=tuple(surface.action_kinds),
+            is_permission=False,
+            is_selection=False,
+            is_execution=False,
+        )
+        for surface in observation.action_space.available_surfaces
+    )
+
+    capability_bases: list[ACP01CapabilityBasis] = []
+    for obj in observation.visible_objects:
+        relation = str(obj.relation_to_subject or "").lower()
+        proximity_status = (
+            ACP01CapabilityStatus.AVAILABLE
+            if relation in {"same_cell", "adjacent"}
+            else ACP01CapabilityStatus.BLOCKED
+        )
+        capability_bases.append(
+            ACP01CapabilityBasis(
+                capability_ref=f"capability:proximity:{obj.object_ref}",
+                capability_kind="proximity",
+                target_ref=obj.object_ref,
+                status=proximity_status,
+                reason_codes=(f"relation:{relation or 'unknown'}",),
+            )
+        )
+
+    capacity_status = (
+        ACP01CapabilityStatus.AVAILABLE
+        if observation.inventory_state.used_slots < observation.inventory_state.capacity_slots
+        else ACP01CapabilityStatus.BLOCKED
+    )
+    capability_bases.append(
+        ACP01CapabilityBasis(
+            capability_ref=f"capability:inventory_capacity:{observation.inventory_state.inventory_ref}",
+            capability_kind="inventory_capacity",
+            target_ref=None,
+            status=capacity_status,
+            reason_codes=(
+                f"used_slots:{observation.inventory_state.used_slots}",
+                f"capacity_slots:{observation.inventory_state.capacity_slots}",
+            ),
+        )
+    )
+
+    drive_bases = tuple(
+        ACP01InternalDriveBasis(
+            drive_ref=f"drive:{kind}:{bridge_tick_index}",
+            drive_kind=kind,
+            resource_or_goal_ref=("item:water_flask" if "water" in kind else None),
+            urgency_level=0.7,
+            source_ref="embodied_subject_bridge_internal_drive",
+            is_permission=False,
+            is_action=False,
+        )
+        for kind in drive_kinds
+    )
+
+    effect_bases = ()
+    if prior_effect_packet is not None:
+        effect_bases = (
+            ACP01EffectFeedbackBasis(
+                effect_ref=prior_effect_packet.effect_id,
+                status=prior_effect_packet.effect_kind,
+                correlation_status="correlated_to_request"
+                if prior_effect_packet.action_id != "action:none"
+                else "ambiguous",
+                residue_refs=(),
+                used_as_success_oracle=False,
+            ),
+        )
+
+    return ACP01CandidateProductionInput(
+        tick_ref=f"bridge_subject_tick:{bridge_tick_index}",
+        observation_basis=ACP01ObservationBasis(
+            observation_id=observation.observation_id,
+            body_ref=observation.body_state.body_ref,
+            location_ref=observation.body_state.location_ref,
+            orientation=str(getattr(observation.body_state.orientation, "value", observation.body_state.orientation)),
+            inventory_ref=observation.inventory_state.inventory_ref,
+            visible_object_refs=tuple(obj.object_ref for obj in observation.visible_objects),
+            action_surface_refs=tuple(surface.surface_ref for surface in observation.action_space.available_surfaces),
+            previous_effect_refs=tuple(observation.previous_effect_refs),
+            public_only=True,
+        ),
+        internal_drive_bases=drive_bases,
+        visible_object_bases=object_bases,
+        action_surface_bases=surface_bases,
+        capability_bases=tuple(capability_bases),
+        effect_feedback_bases=effect_bases,
+        private_eval_excluded=True,
+        scenario_label_excluded=True,
+        source="embodied_playground.p4.bridge_public_basis_projection",
+    )
+
+
 def _build_subject_tick_surfaces(
     *,
     bridge_tick_index: int,
@@ -326,6 +520,7 @@ def _build_subject_tick_surfaces(
     action_packet: WorldActionPacket | None,
     effect_packet: WorldEffectObservationPacket | None,
     candidate_set: Any,
+    acp01_candidate_input: ACP01CandidateProductionInput | None,
 ) -> tuple[SubjectTickInput, SubjectTickContext, dict[str, object]]:
     public_payload = _build_public_subject_tick_surface_payload(observation)
     observed_at = observation.world_time_ref or datetime.now(tz=timezone.utc).isoformat()
@@ -363,6 +558,10 @@ def _build_subject_tick_surfaces(
     tick_context = SubjectTickContext(
         world_adapter_input=world_adapter_input,
         ap01_action_publication_candidate_set=candidate_set,
+        acp01_candidate_production_input=acp01_candidate_input,
+        acp01_enabled=acp01_candidate_input is not None,
+        acp01_use_produced_candidates_when_no_explicit_ap01=True,
+        acp01_take_priority_over_explicit_ap01=False,
         source_lineage=("embodied_playground.p3.subject_bridge",),
     )
     return tick_input, tick_context, public_payload

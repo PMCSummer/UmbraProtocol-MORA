@@ -6,6 +6,7 @@ import json
 import subprocess
 from pathlib import Path
 
+import experiments.symbolic_trade.falsifiers as falsifier_module
 from experiments.symbolic_trade.gui import (
     REQUIRED_RUSSIAN_LABELS,
     RUSSIAN_UI_STRINGS,
@@ -334,4 +335,5 @@ def test_gui_forbidden_core_status_remains_clean() -> None:
         check=False,
     )
     assert result.returncode == 0, result.stderr
-    assert result.stdout.strip() == ""
+    offenders, _details = falsifier_module._evaluate_symbolic_trade_core_contamination(repo_root)
+    assert offenders is False

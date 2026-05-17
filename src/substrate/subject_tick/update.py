@@ -281,6 +281,14 @@ from substrate.ap01_subject_action_publication import (
     AP01ActionPublicationCandidateSet,
     build_ap01_subject_action_publication,
 )
+from substrate.acp01_internal_action_candidate_production import (
+    ACP01CandidateProductionInput,
+    ACP01CandidateProductionResult,
+    ACP01CandidateProductionTelemetry,
+    ACP01DecisionStatus,
+    ACP01ScopeMarker,
+    build_acp01_internal_action_candidates,
+)
 from substrate.w01_bounded_world_loop import (
     W01WorldPacketSet,
     build_w01_bounded_world_loop,
@@ -6182,7 +6190,21 @@ def execute_subject_tick(
         )
     )
 
-    ap01_candidate_set = (
+    acp01_candidate_input = (
+        context.acp01_candidate_production_input
+        if isinstance(
+            context.acp01_candidate_production_input,
+            ACP01CandidateProductionInput,
+        )
+        else None
+    )
+    acp01_input_present = acp01_candidate_input is not None
+    if context.acp01_enabled and acp01_candidate_input is not None:
+        acp01_result = build_acp01_internal_action_candidates(acp01_candidate_input)
+    else:
+        acp01_result = _empty_acp01_result(tick_ref=tick_id)
+
+    ap01_explicit_candidate_set = (
         context.ap01_action_publication_candidate_set
         if isinstance(
             context.ap01_action_publication_candidate_set,
@@ -6191,8 +6213,22 @@ def execute_subject_tick(
         else None
     )
     ap01_explicit_basis = bool(
-        ap01_candidate_set is not None and ap01_candidate_set.candidates
+        ap01_explicit_candidate_set is not None and ap01_explicit_candidate_set.candidates
     )
+    ap01_candidate_set: AP01ActionPublicationCandidateSet | None = ap01_explicit_candidate_set
+    ap01_candidate_source = "external_context" if ap01_explicit_basis else "none"
+    if context.acp01_take_priority_over_explicit_ap01:
+        if acp01_result.candidate_set_for_ap01 is not None:
+            ap01_candidate_set = acp01_result.candidate_set_for_ap01
+            ap01_candidate_source = "acp01_internal"
+        elif ap01_explicit_basis:
+            ap01_candidate_set = ap01_explicit_candidate_set
+            ap01_candidate_source = "external_context"
+    elif (not ap01_explicit_basis) and context.acp01_use_produced_candidates_when_no_explicit_ap01:
+        if acp01_result.candidate_set_for_ap01 is not None:
+            ap01_candidate_set = acp01_result.candidate_set_for_ap01
+            ap01_candidate_source = "acp01_internal"
+
     ap01_result = build_ap01_subject_action_publication(
         tick_id=tick_id,
         tick_index=tick_index,
@@ -8881,6 +8917,13 @@ def execute_subject_tick(
         p04_comparison_consumer_ready=p04_result.gate.comparison_consumer_ready,
         p04_excluded_policy_consumer_ready=p04_result.gate.excluded_policy_consumer_ready,
         p04_downstream_consumer_ready=p04_result.telemetry.downstream_consumer_ready,
+        acp01_candidate_input_present=acp01_input_present,
+        acp01_proposal_count=acp01_result.proposal_count,
+        acp01_proposed_count=acp01_result.proposed_count,
+        acp01_blocked_count=acp01_result.blocked_count,
+        acp01_revalidation_required_count=acp01_result.revalidation_required_count,
+        acp01_unsafe_basis_count=acp01_result.unsafe_basis_count,
+        ap01_candidate_source=ap01_candidate_source,
         ap01_candidate_count=(
             len(ap01_candidate_set.candidates)
             if isinstance(ap01_candidate_set, AP01ActionPublicationCandidateSet)
@@ -9291,6 +9334,7 @@ def execute_subject_tick(
         p02_result=p02_result,
         p03_result=p03_result,
         p04_result=p04_result,
+        acp01_result=acp01_result,
         ap01_result=ap01_result,
         t01_result=t01_result,
         t02_result=t02_result,
@@ -10417,6 +10461,42 @@ def _build_default_w06_input_bundle(
         lineage_view=lineage,
         revision_context=revision_context,
         reason="default projection from w05 mismatch routing",
+    )
+
+
+def _empty_acp01_result(*, tick_ref: str) -> ACP01CandidateProductionResult:
+    telemetry = ACP01CandidateProductionTelemetry(
+        decision_count=1,
+        proposal_count=0,
+        proposed_count=0,
+        blocked_count=0,
+        revalidation_required_count=0,
+        unsafe_basis_count=0,
+        insufficient_basis_count=0,
+        no_candidate_count=1,
+        private_eval_excluded=True,
+        scenario_label_excluded=True,
+    )
+    return ACP01CandidateProductionResult(
+        tick_ref=tick_ref,
+        decisions=(),
+        proposal_count=0,
+        proposed_count=0,
+        blocked_count=0,
+        revalidation_required_count=0,
+        unsafe_basis_count=0,
+        candidate_set_for_ap01=None,
+        telemetry=telemetry,
+        scope_marker=ACP01ScopeMarker(
+            scope="frontier_hosted_acp01_internal_candidate_production_slice",
+            candidate_production_only=True,
+            no_publication_authority=True,
+            no_execution_authority=True,
+            no_world_submission_authority=True,
+            no_phase_override_authority=True,
+            reason="acp01 disabled or absent input in this tick",
+        ),
+        reason="acp01 input absent or disabled",
     )
 
 

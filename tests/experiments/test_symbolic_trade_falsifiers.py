@@ -131,6 +131,80 @@ def test_phase_core_modification_detects_untracked_forbidden_paths(monkeypatch) 
     assert outcomes["phase_core_modification"] is False
 
 
+def test_symbolic_trade_contamination_allows_acp01_subject_tick_integration_paths(monkeypatch) -> None:
+    result = run_stage1_scenario("presence_only", include_falsifiers=False)
+    monkeypatch.setattr(
+        falsifier_module,
+        "_modified_paths",
+        lambda _repo_root: (
+            "src/substrate/subject_tick/models.py",
+            "src/substrate/subject_tick/update.py",
+            "src/substrate/acp01_internal_action_candidate_production/models.py",
+        ),
+    )
+    monkeypatch.setattr(falsifier_module, "_untracked_paths", lambda _repo_root: ())
+    outcomes = _result_map(run_symbolic_trade_falsifiers(result))
+    assert outcomes["phase_core_modification"] is True
+
+
+def test_symbolic_trade_contamination_still_rejects_w_phase_core_modification(monkeypatch) -> None:
+    result = run_stage1_scenario("presence_only", include_falsifiers=False)
+    monkeypatch.setattr(falsifier_module, "_modified_paths", lambda _repo_root: ("src/substrate/w04_policy.py",))
+    monkeypatch.setattr(falsifier_module, "_untracked_paths", lambda _repo_root: ())
+    outcomes = _result_map(run_symbolic_trade_falsifiers(result))
+    assert outcomes["phase_core_modification"] is False
+
+
+def test_symbolic_trade_contamination_still_rejects_runtime_tap_trace_modification(monkeypatch) -> None:
+    result = run_stage1_scenario("presence_only", include_falsifiers=False)
+    monkeypatch.setattr(
+        falsifier_module,
+        "_modified_paths",
+        lambda _repo_root: ("src/substrate/runtime_tap_trace.py",),
+    )
+    monkeypatch.setattr(falsifier_module, "_untracked_paths", lambda _repo_root: ())
+    outcomes = _result_map(run_symbolic_trade_falsifiers(result))
+    assert outcomes["phase_core_modification"] is False
+
+
+def test_symbolic_trade_contamination_rejects_unexpected_subject_tick_path(monkeypatch) -> None:
+    result = run_stage1_scenario("presence_only", include_falsifiers=False)
+    monkeypatch.setattr(
+        falsifier_module,
+        "_modified_paths",
+        lambda _repo_root: ("src/substrate/subject_tick/runtime_adapter.py",),
+    )
+    monkeypatch.setattr(falsifier_module, "_untracked_paths", lambda _repo_root: ())
+    outcomes = _result_map(run_symbolic_trade_falsifiers(result))
+    assert outcomes["phase_core_modification"] is False
+
+
+def test_symbolic_trade_clean_scenarios_pass_with_acp01_allowed_integration(monkeypatch) -> None:
+    monkeypatch.setattr(
+        falsifier_module,
+        "_modified_paths",
+        lambda _repo_root: (
+            "src/substrate/subject_tick/models.py",
+            "src/substrate/subject_tick/update.py",
+            "src/substrate/acp01_internal_action_candidate_production/policy.py",
+        ),
+    )
+    monkeypatch.setattr(falsifier_module, "_untracked_paths", lambda _repo_root: ())
+
+    for scenario in (
+        "presence_only",
+        "resource_claim_contact",
+        "mirrored_resource_asymmetry",
+        "false_counterpart_claim",
+        "blocked_aperture",
+        "noisy_signal",
+        "transfer_seen_without_trade_token",
+        "eval_label_leak_attack",
+    ):
+        result = run_stage1_scenario(scenario, include_falsifiers=True)
+        assert all(item.passed for item in result.falsifier_results), scenario
+
+
 def test_eval_label_not_present_in_serialized_visible_packets() -> None:
     result = run_stage1_scenario("eval_label_leak_attack", include_falsifiers=False)
     serialized = [packet_to_dict(packet) for packet in result.emitted_packets]

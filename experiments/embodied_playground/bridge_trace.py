@@ -21,6 +21,9 @@ class SubjectWorldBridgeConfig:
     max_ticks: int
     execute_world_actions: bool
     include_eval_only: bool = False
+    use_internal_candidate_producer: bool = False
+    allow_manual_override_in_internal_mode: bool = False
+    internal_drive_kinds: tuple[str, ...] = ()
     allow_manual_candidate_provider: bool = True
     reject_multiple_published_requests: bool = True
     claim_boundary: str = (
@@ -38,6 +41,11 @@ class BridgeTickRecord:
     action_space_frame_id: str
     subject_tick_used: bool
     subject_tick_result_ref: str | None
+    acp01_candidate_input_present: bool
+    acp01_proposed_count: int
+    acp01_blocked_count: int
+    acp01_revalidation_required_count: int
+    acp01_unsafe_basis_count: int
     ap01_candidate_count: int
     ap01_published_request_count: int
     ap01_blocked_count: int
@@ -58,7 +66,11 @@ class BridgeTickRecord:
     hidden_eval_excluded: bool = True
     direct_phase_calls_detected: bool = False
     bridge_chose_action: bool = False
+    internal_candidate_producer_used: bool = False
+    candidate_source: str = "none"
     manual_candidate_input: bool = False
+    manual_override_used: bool = False
+    internal_candidate_mode_boundary_relaxed: bool = False
     autonomous_action_selection: bool = False
     verdict: BridgeVerdict = BridgeVerdict.NO_CANDIDATE_NO_EXECUTION
     claim_boundary: str = (
@@ -75,6 +87,7 @@ class SubjectWorldBridgeRun:
     steps: tuple[BridgeTickRecord, ...]
     final_observation_id: str
     subject_tick_used_any: bool
+    internal_candidate_producer_used_any: bool
     world_submissions_count: int
     world_effect_count: int
     no_candidate_no_execution_count: int
