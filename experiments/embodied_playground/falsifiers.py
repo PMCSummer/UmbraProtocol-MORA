@@ -406,3 +406,312 @@ def validate_public_eval_separation(
     if not eval_truth.must_never_enter_subject_visible:
         return False
     return True
+
+
+def bridge_calls_w_modules_directly(source_text: str) -> bool:
+    lowered = source_text.lower()
+    forbidden_tokens = (
+        "substrate.w01",
+        "substrate.w02",
+        "substrate.w03",
+        "substrate.w04",
+        "substrate.w05",
+        "substrate.w06",
+        "substrate.a01",
+        "substrate.a02",
+        "substrate.a03",
+        "substrate.a04",
+        "substrate.p01",
+        "substrate.p02",
+        "substrate.p03",
+        "substrate.p04",
+        "substrate.s01",
+        "substrate.s02",
+        "substrate.s03",
+        "substrate.s04",
+        "substrate.s05",
+    )
+    if "execute_subject_tick" not in lowered:
+        return True
+    return any(token in lowered for token in forbidden_tokens)
+
+
+def ap01_policy_called_directly_by_bridge(source_text: str) -> bool:
+    lowered = source_text.lower()
+    if "execute_subject_tick" not in lowered:
+        return True
+    return "build_ap01_subject_action_publication" in lowered
+
+
+def world_executes_without_subject_request(
+    *,
+    world_submission_attempted: bool,
+    ap01_published_request_count: int,
+) -> bool:
+    return world_submission_attempted and ap01_published_request_count <= 0
+
+
+def action_space_as_action_request(
+    *,
+    action_space_available: bool,
+    ap01_published_request_count: int,
+    world_submission_attempted: bool,
+) -> bool:
+    if not action_space_available:
+        return False
+    if ap01_published_request_count > 0:
+        return False
+    return world_submission_attempted
+
+
+def eval_truth_fed_to_subject_tick(payload: object) -> bool:
+    forbidden = ("hidden_objects", "hidden_inventory", "true_recipe_table", "expected_outcome", "scenario_labels", "eval_only")
+    if isinstance(payload, dict):
+        payload_keys = set(payload.keys())
+        if payload_keys:
+            allowed_surface_keys = {
+                "surface_schema_version",
+                "observation_id",
+                "world_time_ref",
+                "source_authority",
+                "hidden_eval_excluded",
+                "body",
+                "inventory",
+                "visible_objects",
+                "action_space",
+                "previous_effect_refs",
+            }
+            if payload_keys - allowed_surface_keys:
+                extra = payload_keys - allowed_surface_keys
+                if any(any(marker in key for marker in forbidden) for key in extra):
+                    return True
+        return any(marker in _flat(payload) for marker in forbidden)
+    text = _flat(payload)
+    return any(token in text for token in forbidden)
+
+
+def hidden_map_fed_to_subject_tick(payload: object, hidden_object_ref: str) -> bool:
+    return hidden_object_ref.lower() in _flat(payload)
+
+
+def raw_action_submitted_to_world(submission_input: object) -> bool:
+    return not isinstance(submission_input, PublishedActionEnvelope)
+
+
+def invalid_ap01_decision_submitted(
+    *,
+    decision_statuses: tuple[str, ...],
+    world_submission_attempted: bool,
+) -> bool:
+    if not world_submission_attempted:
+        return False
+    allowed = {"published"}
+    return not set(decision_statuses).issubset(allowed)
+
+
+def multiple_requests_auto_selected(
+    *,
+    published_request_count: int,
+    world_submission_attempted: bool,
+    reject_multiple_published_requests: bool,
+) -> bool:
+    if published_request_count <= 1:
+        return False
+    return world_submission_attempted or (not reject_multiple_published_requests)
+
+
+def effect_not_correlated_to_request(effect: ActionEffectFrame | None) -> bool:
+    if effect is None:
+        return False
+    status = str(getattr(effect.correlation_status, "value", effect.correlation_status))
+    if status != CorrelationStatus.CORRELATED_TO_REQUEST.value:
+        return True
+    return not effect.request_ref or not effect.envelope_ref
+
+
+def effect_not_fed_to_next_observation(
+    *,
+    effect_id: str | None,
+    next_previous_effect_refs: tuple[str, ...],
+) -> bool:
+    if effect_id is None:
+        return False
+    return effect_id not in next_previous_effect_refs
+
+
+def observation_mutates_world(*, world_tick_before: int, world_tick_after_observe_only: int) -> bool:
+    return world_tick_after_observe_only != world_tick_before
+
+
+def no_candidate_executes_action(
+    *,
+    ap01_candidate_count: int,
+    world_submission_attempted: bool,
+) -> bool:
+    return ap01_candidate_count == 0 and world_submission_attempted
+
+
+def request_as_success_or_completion_bridge(
+    *,
+    envelope_created: bool,
+    world_effect_status: str | None,
+    bridge_claims_completion: bool,
+) -> bool:
+    if bridge_claims_completion and world_effect_status is None:
+        return True
+    return envelope_created and bridge_claims_completion and world_effect_status != "succeeded"
+
+
+def world_effect_as_competence_oracle(
+    *,
+    world_effect_status: str | None,
+    bridge_claims_autonomy: bool,
+) -> bool:
+    return bool(world_effect_status) and bridge_claims_autonomy
+
+
+def subject_tick_not_used(
+    subject_tick_used: bool | None = None,
+    *,
+    ap01_published_request_count: int = 0,
+    envelope_created: bool = False,
+    world_submission_attempted: bool = False,
+    world_effect_id: str | None = None,
+    subject_tick_result_ref: str | None = None,
+    record: object | None = None,
+) -> bool:
+    if record is not None:
+        subject_tick_used = bool(getattr(record, "subject_tick_used", False))
+        ap01_published_request_count = int(getattr(record, "ap01_published_request_count", 0))
+        envelope_created = bool(getattr(record, "envelope_created", False))
+        world_submission_attempted = bool(getattr(record, "world_submission_attempted", False))
+        world_effect_id = getattr(record, "world_effect_id", None)
+        subject_tick_result_ref = getattr(record, "subject_tick_result_ref", None)
+
+    if subject_tick_used is None:
+        return True
+
+    # Preserve legacy boolean mode when no additional consistency context is supplied.
+    if (
+        ap01_published_request_count == 0
+        and envelope_created is False
+        and world_submission_attempted is False
+        and world_effect_id is None
+        and subject_tick_result_ref is None
+    ):
+        return not subject_tick_used
+
+    active_downstream = (
+        ap01_published_request_count > 0
+        or envelope_created
+        or world_submission_attempted
+        or world_effect_id is not None
+    )
+    if active_downstream and not subject_tick_used:
+        return True
+    if subject_tick_used and not subject_tick_result_ref:
+        return True
+    return False
+
+
+def candidate_provider_uses_hidden_or_eval(provider_trace_payload: object) -> bool:
+    if isinstance(provider_trace_payload, dict):
+        text = _flat(provider_trace_payload)
+        return any(
+            token in text
+            for token in (
+                "expected_outcome",
+                "hidden_objects",
+                "hidden_inventory",
+                "scenario_to_action",
+                "select_action_by_scenario",
+            )
+        )
+
+    no_hidden = getattr(provider_trace_payload, "no_hidden_truth_used", True)
+    no_eval = getattr(provider_trace_payload, "no_eval_only_used", True)
+    no_scenario = getattr(provider_trace_payload, "no_scenario_label_used", True)
+    if (not no_hidden) or (not no_eval) or (not no_scenario):
+        return True
+
+    text = _flat(provider_trace_payload)
+    return any(
+        token in text
+        for token in (
+            "expected_outcome",
+            "hidden_objects",
+            "hidden_inventory",
+            "scenario_to_action",
+            "select_action_by_scenario",
+        )
+    )
+
+
+def public_trace_contains_eval_only(public_trace_payload: object) -> bool:
+    forbidden = ("hidden_objects", "hidden_inventory", "true_recipe_table", "expected_outcome", "scenario_labels")
+    if isinstance(public_trace_payload, dict):
+        run_payload = public_trace_payload.get("run", public_trace_payload)
+        if not isinstance(run_payload, dict):
+            run_payload = {}
+        eval_scope = run_payload.get("eval_only")
+        for step in run_payload.get("steps", ()) if isinstance(run_payload.get("steps"), (list, tuple)) else ():
+            if any(token in _flat(step) for token in forbidden):
+                return True
+        if eval_scope in (None, {}, (), []):
+            return False
+        if not isinstance(eval_scope, dict):
+            return True
+        return False
+
+    eval_only_value = getattr(public_trace_payload, "eval_only", None)
+    steps = getattr(public_trace_payload, "steps", ())
+    for step in steps:
+        if any(token in _flat(step) for token in forbidden):
+            return True
+    if eval_only_value in (None, {}, (), []):
+        return False
+    return not isinstance(eval_only_value, dict)
+
+
+def bridge_directly_mutates_world(*, world_mutation_surface: str) -> bool:
+    allowed = {"submit_action"}
+    return world_mutation_surface not in allowed
+
+
+def bridge_chooses_action_from_scenario_id(payload: object) -> bool:
+    markers = ("scenario_id", "scenario:", "scenario_to_action", "select_action_by_scenario")
+
+    def _contains_marker(value: object) -> bool:
+        text = _flat(value)
+        return any(marker in text for marker in markers)
+
+    if isinstance(payload, dict):
+        if "scenario_to_action" in payload or "select_action_by_scenario" in payload:
+            return True
+        for key in ("action_kind", "target_ref", "intended_effect", "args", "ap01_request_ref", "ap01_request_id"):
+            if key in payload and _contains_marker(payload[key]):
+                return True
+        return False
+
+    if hasattr(payload, "plans_by_tick"):
+        plans_by_tick = getattr(payload, "plans_by_tick", {})
+        for specs in plans_by_tick.values():
+            for spec in specs:
+                if _contains_marker(getattr(spec, "action_kind", "")):
+                    return True
+                if _contains_marker(getattr(spec, "target_ref", "")):
+                    return True
+                if _contains_marker(getattr(spec, "intended_effect", "")):
+                    return True
+                if _contains_marker(getattr(spec, "args", {})):
+                    return True
+        return False
+
+    if hasattr(payload, "steps"):
+        for step in getattr(payload, "steps", ()):
+            envelope_payload = getattr(step, "envelope_payload", None)
+            if envelope_payload and bridge_chooses_action_from_scenario_id(envelope_payload):
+                return True
+        return False
+
+    return "scenario_to_action" in _flat(payload) or "select_action_by_scenario" in _flat(payload)
