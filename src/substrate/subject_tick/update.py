@@ -277,6 +277,10 @@ from substrate.a04_external_affordance_binding import (
     build_a04_external_affordance_binding,
     derive_a04_external_affordance_consumer_view,
 )
+from substrate.ap01_subject_action_publication import (
+    AP01ActionPublicationCandidateSet,
+    build_ap01_subject_action_publication,
+)
 from substrate.w01_bounded_world_loop import (
     W01WorldPacketSet,
     build_w01_bounded_world_loop,
@@ -406,6 +410,7 @@ ATTEMPTED_SUBJECT_TICK_PATHS: tuple[str, ...] = (
     "subject_tick.evaluate_p02_intervention_episode",
     "subject_tick.evaluate_p03_credit_assignment",
     "subject_tick.evaluate_p04_counterfactual_policy_simulation",
+    "subject_tick.evaluate_ap01_subject_action_publication",
     "subject_tick.evaluate_a04_external_affordance_binding",
     "subject_tick.evaluate_w01_bounded_world_loop",
     "subject_tick.evaluate_w02_regularity_extraction",
@@ -6177,6 +6182,25 @@ def execute_subject_tick(
         )
     )
 
+    ap01_candidate_set = (
+        context.ap01_action_publication_candidate_set
+        if isinstance(
+            context.ap01_action_publication_candidate_set,
+            AP01ActionPublicationCandidateSet,
+        )
+        else None
+    )
+    ap01_explicit_basis = bool(
+        ap01_candidate_set is not None and ap01_candidate_set.candidates
+    )
+    ap01_result = build_ap01_subject_action_publication(
+        tick_id=tick_id,
+        tick_index=tick_index,
+        candidate_set=ap01_candidate_set,
+        publication_enabled=True,
+        allow_test_fixture_candidates=False,
+    )
+
     a04_explicit_input = (
         context.a04_external_candidate_set
         if isinstance(context.a04_external_candidate_set, A04ExternalAffordanceCandidateSet)
@@ -8857,6 +8881,24 @@ def execute_subject_tick(
         p04_comparison_consumer_ready=p04_result.gate.comparison_consumer_ready,
         p04_excluded_policy_consumer_ready=p04_result.gate.excluded_policy_consumer_ready,
         p04_downstream_consumer_ready=p04_result.telemetry.downstream_consumer_ready,
+        ap01_candidate_count=(
+            len(ap01_candidate_set.candidates)
+            if isinstance(ap01_candidate_set, AP01ActionPublicationCandidateSet)
+            else 0
+        ),
+        ap01_explicit_basis_present=ap01_explicit_basis,
+        ap01_published_request_count=ap01_result.telemetry.published_request_count,
+        ap01_blocked_count=ap01_result.telemetry.blocked_count,
+        ap01_revalidation_required_count=(
+            ap01_result.telemetry.revalidation_required_count
+        ),
+        ap01_unsafe_basis_count=ap01_result.telemetry.unsafe_basis_count,
+        ap01_execution_boundary_preserved=(
+            ap01_result.telemetry.execution_boundary_preserved
+        ),
+        ap01_must_wait_for_effect=ap01_result.telemetry.must_wait_for_effect,
+        ap01_no_hidden_truth_used=ap01_result.telemetry.no_hidden_truth_used,
+        ap01_no_scenario_label_used=ap01_result.telemetry.no_scenario_label_used,
         a01_raw_candidate_count=a01_result.telemetry.raw_candidate_count,
         a01_explicit_basis_present=a01_explicit_basis,
         a01_canonical_entry_count=a01_result.telemetry.canonical_entry_count,
@@ -9249,6 +9291,7 @@ def execute_subject_tick(
         p02_result=p02_result,
         p03_result=p03_result,
         p04_result=p04_result,
+        ap01_result=ap01_result,
         t01_result=t01_result,
         t02_result=t02_result,
         t03_result=t03_result,

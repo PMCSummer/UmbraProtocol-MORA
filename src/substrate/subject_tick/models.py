@@ -78,6 +78,10 @@ if TYPE_CHECKING:
         A04ExternalAffordanceBindingResult,
         A04ExternalAffordanceCandidateSet,
     )
+    from substrate.ap01_subject_action_publication import (
+        AP01ActionPublicationCandidateSet,
+        AP01SubjectActionPublicationResult,
+    )
     from substrate.w01_bounded_world_loop import (
         W01Result,
         W01WorldPacketSet,
@@ -917,6 +921,7 @@ class SubjectTickContext:
     p02_episode_input: P02InterventionEpisodeInput | None = None
     p03_credit_assignment_input: P03CreditAssignmentInput | None = None
     p04_simulation_input: P04SimulationInput | None = None
+    ap01_action_publication_candidate_set: AP01ActionPublicationCandidateSet | None = None
     a01_raw_affordance_candidate_set: A01RawAffordanceCandidateSet | None = None
     a02_demand_set: A02DemandSet | None = None
     a03_operation_candidate_set: A03InternalOperationCandidateSet | None = None
@@ -1590,6 +1595,16 @@ class SubjectTickState:
     a04_binding_packet_consumer_ready: bool = False
     a04_authority_path_consumer_ready: bool = False
     a04_downstream_consumer_ready: bool = False
+    ap01_candidate_count: int = 0
+    ap01_explicit_basis_present: bool = False
+    ap01_published_request_count: int = 0
+    ap01_blocked_count: int = 0
+    ap01_revalidation_required_count: int = 0
+    ap01_unsafe_basis_count: int = 0
+    ap01_execution_boundary_preserved: bool = True
+    ap01_must_wait_for_effect: bool = True
+    ap01_no_hidden_truth_used: bool = True
+    ap01_no_scenario_label_used: bool = True
     w01_packet_count: int = 0
     w01_explicit_basis_present: bool = False
     w01_admitted_count: int = 0
@@ -2123,6 +2138,7 @@ class SubjectTickResult:
     p02_result: P02InterventionEpisodeResult
     p03_result: P03CreditAssignmentResult
     p04_result: P04SimulationResult
+    ap01_result: AP01SubjectActionPublicationResult
     t01_result: T01ActiveFieldResult
     t02_result: T02ConstrainedSceneResult
     t03_result: T03CompetitionResult
