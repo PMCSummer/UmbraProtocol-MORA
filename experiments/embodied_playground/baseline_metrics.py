@@ -17,6 +17,7 @@ class BaselineMetricSummary:
     overclaim_rate: float
     matched_information_score: float
     differentiator_score: float
+    fsm_equivalence_risk: float
 
 
 def compute_baseline_metric_summary(
@@ -45,6 +46,8 @@ def compute_baseline_metric_summary(
     fair_baseline_hidden_usage = 0
     differentiator_points = 0
     differentiator_total = 0
+    fsm_similarity_points = 0
+    fsm_total = 0
 
     mora_abstention_count = int(
         getattr(
@@ -53,8 +56,11 @@ def compute_baseline_metric_summary(
             getattr(mora_summary, "abstention_no_candidate_count", 0),
         )
     )
+    mora_world_submissions = int(getattr(mora_summary, "world_submission_count", 0))
+    mora_ap01_published = int(getattr(mora_summary, "ap01_published_count", 0))
 
     for trace in baseline_traces:
+        is_fsm = str(getattr(trace, "controller_kind", "")) == "simple_fsm_baseline"
         if str(trace.fairness_class.value if hasattr(trace.fairness_class, "value") else trace.fairness_class) == "fair_public":
             fair_baseline_count += 1
             if trace.hidden_eval_usage:
@@ -87,6 +93,12 @@ def compute_baseline_metric_summary(
                 feedback_events += 1
                 if not decision_record.decision.abstained:
                     feedback_positive += 1
+            if is_fsm:
+                fsm_total += 1
+                fsm_acted = not decision_record.decision.abstained
+                mora_acted = mora_world_submissions > 0 or mora_ap01_published > 0
+                if fsm_acted == mora_acted:
+                    fsm_similarity_points += 1
 
     success_count = sum(1 for status in effect_statuses if status == "succeeded")
     success_den = len(effect_statuses) if effect_statuses else max(1, total_attempts)
@@ -115,6 +127,7 @@ def compute_baseline_metric_summary(
         if mora_abstention_count > 0 and baseline_acted:
             differentiator_points += 1
     differentiator_score = differentiator_points / max(1, differentiator_total)
+    fsm_equivalence_risk = fsm_similarity_points / max(1, fsm_total)
 
     return BaselineMetricSummary(
         success_rate=success_rate,
@@ -128,4 +141,5 @@ def compute_baseline_metric_summary(
         overclaim_rate=overclaim_rate,
         matched_information_score=matched_information_score,
         differentiator_score=differentiator_score,
+        fsm_equivalence_risk=fsm_equivalence_risk,
     )

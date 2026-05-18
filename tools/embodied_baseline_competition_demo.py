@@ -37,7 +37,10 @@ def _parse_args() -> argparse.Namespace:
 
 
 def _print_run_summary(run: BaselineCompetitionRun) -> None:
-    print(f"scenario={run.scenario_id} world_scenario={run.world_scenario_id} ticks={run.tick_budget}")
+    print(
+        f"scenario={run.scenario_id} category={run.adversarial_category.value} "
+        f"world_scenario={run.world_scenario_id} ticks={run.tick_budget}"
+    )
     print(f"drive_basis={run.drive_basis}")
     print(
         f"mora: subject_tick={run.mora_trace.subject_tick_used} "
@@ -63,9 +66,13 @@ def _print_run_summary(run: BaselineCompetitionRun) -> None:
 def _print_run_report(run: BaselineCompetitionRun) -> None:
     print("=== Scenario Summary ===")
     print(f"scenario_id: {run.scenario_id}")
+    print(f"adversarial_category: {run.adversarial_category.value}")
     print(f"world_scenario_id: {run.world_scenario_id}")
     print(f"tick_budget: {run.tick_budget}")
     print(f"drive_basis: {run.drive_basis}")
+    print(f"expected_mora_behavior: {run.expected_mora_behavior}")
+    print(f"expected_baseline_weakness: {run.expected_baseline_weakness}")
+    print(f"main_differentiator: {run.main_differentiator}")
 
     print("=== MORA Summary ===")
     print(f"subject_tick_used: {run.mora_trace.subject_tick_used}")
@@ -91,7 +98,8 @@ def _print_run_report(run: BaselineCompetitionRun) -> None:
         f"abstention_quality={run.metric_summary.abstention_quality:.3f} "
         f"boundary_integrity={run.metric_summary.boundary_integrity:.3f} "
         f"matched_information_score={run.metric_summary.matched_information_score:.3f} "
-        f"differentiator_score={run.metric_summary.differentiator_score:.3f}"
+        f"differentiator_score={run.metric_summary.differentiator_score:.3f} "
+        f"fsm_equivalence_risk={run.metric_summary.fsm_equivalence_risk:.3f}"
     )
 
     print("=== Fairness ===")
@@ -115,6 +123,9 @@ def _print_run_report(run: BaselineCompetitionRun) -> None:
     print("=== Differentiators ===")
     for note in run.differentiator_summary.key_differences:
         print(f"- {note}")
+    print("=== MORA vs FSM ===")
+    for note in run.differentiator_summary.mora_vs_fsm_notes:
+        print(f"- {note}")
 
     print("=== Claim-safe Conclusion ===")
     print(f"claim_safe_verdict={run.claim_safe_verdict.value}")
@@ -123,8 +134,14 @@ def _print_run_report(run: BaselineCompetitionRun) -> None:
 
 def _print_matrix_report(matrix: BaselineCompetitionMatrix) -> None:
     print("EMBODIED BASELINE COMPETITION MATRIX REPORT (P8B)")
+    print("adversarial_categories:")
+    for category, scenarios in matrix.grouped_by_adversarial_category.items():
+        print(f"- {category}: {list(scenarios)}")
     for run in matrix.scenario_runs:
-        print(f"\n[{run.scenario_id}] verdict={run.claim_safe_verdict.value}")
+        print(
+            f"\n[{run.scenario_id}] category={run.adversarial_category.value} "
+            f"verdict={run.claim_safe_verdict.value}"
+        )
         print(
             f"mora ap01_published={run.mora_trace.ap01_published_count} "
             f"world_submissions={run.mora_trace.world_submission_count} "
@@ -139,6 +156,10 @@ def _print_matrix_report(matrix: BaselineCompetitionMatrix) -> None:
             f"boundary ap01_bypass={run.boundary_violation_summary.ap01_bypass_count} "
             f"hidden_eval={run.boundary_violation_summary.hidden_eval_usage_count}"
         )
+        print(
+            f"fsm_equivalence_risk={run.metric_summary.fsm_equivalence_risk:.3f} "
+            f"mora_vs_fsm_notes={list(run.differentiator_summary.mora_vs_fsm_notes)}"
+        )
     print(f"\nclaim_boundary={matrix.claim_boundary}")
 
 
@@ -149,6 +170,7 @@ def main() -> int:
             seed=args.seed,
             include_hidden_oracle=True,
             include_direct_bridge=True,
+            include_simple_fsm=True,
         )
         for controller in controllers:
             print(

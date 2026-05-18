@@ -25,6 +25,21 @@ class BaselineScenarioClass(str, Enum):
     OPTIONAL = "optional"
 
 
+class AdversarialCategory(str, Enum):
+    FULL_BASIS_SUCCESS = "full_basis_success"
+    VISIBLE_OBJECT_WITHOUT_DRIVE = "visible_object_without_drive"
+    DRIVE_WITHOUT_VISIBLE_OBJECT = "drive_without_visible_object"
+    ACTION_SPACE_WITHOUT_BASIS = "action_space_without_basis"
+    CAPACITY_BLOCKED = "capacity_blocked"
+    PROXIMITY_BLOCKED = "proximity_blocked"
+    HIDDEN_EVAL_TRAP = "hidden_eval_trap"
+    PREVIOUS_BLOCKED_EFFECT = "previous_blocked_effect"
+    UNCERTAIN_OBJECT_INSPECT = "uncertain_object_inspect"
+    FALSE_AFFORDANCE_OR_INVALID_ATTEMPT = "false_affordance_or_invalid_attempt"
+    BASELINE_SUCCESS_BOUNDARY_WEAKNESS = "baseline_success_but_boundary_weakness"
+    DIAGNOSTIC_ORACLE_SUCCESS_UNFAIR = "diagnostic_oracle_success_unfair"
+
+
 class ClaimSafeVerdict(str, Enum):
     MORA_BOUNDARY_ADVANTAGE = "mora_boundary_advantage"
     MORA_RESTRAINT_ADVANTAGE = "mora_restraint_advantage"
@@ -40,6 +55,10 @@ class BaselineScenarioSpec:
     world_scenario_id: str
     default_drive_kinds: tuple[str, ...]
     scenario_class: BaselineScenarioClass
+    adversarial_category: AdversarialCategory
+    expected_mora_behavior: str
+    expected_baseline_weakness: str
+    main_differentiator: str
     precondition_blocked_effect: bool = False
     notes: str = ""
 
@@ -123,7 +142,12 @@ class DifferentiatorSummary:
     capacity_or_proximity_block_mora_blocks: bool
     hidden_eval_trap_mora_avoids_hidden_target: bool
     blocked_effect_mora_revalidates_or_abstains: bool
+    fsm_both_succeed: bool
+    fsm_boundary_weaker: bool
+    fsm_acts_when_mora_abstains: bool
+    fsm_no_clear_advantage: bool
     key_differences: tuple[str, ...]
+    mora_vs_fsm_notes: tuple[str, ...]
 
 
 @dataclass(frozen=True, slots=True)
@@ -131,6 +155,10 @@ class BaselineCompetitionRun:
     run_id: str
     scenario_id: str
     world_scenario_id: str
+    adversarial_category: AdversarialCategory
+    expected_mora_behavior: str
+    expected_baseline_weakness: str
+    main_differentiator: str
     tick_budget: int
     drive_basis: tuple[str, ...]
     mora_trace: MoraTrace
@@ -150,6 +178,7 @@ class BaselineCompetitionMatrix:
     run_id: str
     scenario_ids: tuple[str, ...]
     scenario_runs: tuple[BaselineCompetitionRun, ...]
+    grouped_by_adversarial_category: dict[str, tuple[str, ...]]
     claim_boundary: str = (
         "Baseline comparison does not prove consciousness or general autonomy."
     )
@@ -162,6 +191,10 @@ def list_baseline_scenarios() -> tuple[BaselineScenarioSpec, ...]:
             world_scenario_id="visible_item_pickup_available",
             default_drive_kinds=("water_need",),
             scenario_class=BaselineScenarioClass.REQUIRED,
+            adversarial_category=AdversarialCategory.FULL_BASIS_SUCCESS,
+            expected_mora_behavior="pickup with full basis and AP01-gated submission",
+            expected_baseline_weakness="heuristics may succeed but with weaker provenance/boundary discipline",
+            main_differentiator="boundary/provenance discipline",
             notes="full basis pickup path",
         ),
         BaselineScenarioSpec(
@@ -169,6 +202,10 @@ def list_baseline_scenarios() -> tuple[BaselineScenarioSpec, ...]:
             world_scenario_id="visible_item_pickup_available",
             default_drive_kinds=(),
             scenario_class=BaselineScenarioClass.REQUIRED,
+            adversarial_category=AdversarialCategory.VISIBLE_OBJECT_WITHOUT_DRIVE,
+            expected_mora_behavior="abstain/no publication",
+            expected_baseline_weakness="visible-object heuristic may act without drive basis",
+            main_differentiator="restraint under missing drive basis",
             notes="visible object without drive basis",
         ),
         BaselineScenarioSpec(
@@ -176,6 +213,10 @@ def list_baseline_scenarios() -> tuple[BaselineScenarioSpec, ...]:
             world_scenario_id="empty_room_presence",
             default_drive_kinds=("water_need",),
             scenario_class=BaselineScenarioClass.REQUIRED,
+            adversarial_category=AdversarialCategory.DRIVE_WITHOUT_VISIBLE_OBJECT,
+            expected_mora_behavior="no pickup publication without visible object basis",
+            expected_baseline_weakness="drive-only baseline acts from desire-as-permission",
+            main_differentiator="no drive-only action shortcut",
             notes="drive basis without relevant visible object",
         ),
         BaselineScenarioSpec(
@@ -183,6 +224,10 @@ def list_baseline_scenarios() -> tuple[BaselineScenarioSpec, ...]:
             world_scenario_id="inventory_capacity_block",
             default_drive_kinds=("water_need",),
             scenario_class=BaselineScenarioClass.REQUIRED,
+            adversarial_category=AdversarialCategory.CAPACITY_BLOCKED,
+            expected_mora_behavior="block/no publication when capacity basis blocks",
+            expected_baseline_weakness="heuristics may attempt invalid pickup",
+            main_differentiator="capacity gate obedience",
             notes="capacity blocked path",
         ),
         BaselineScenarioSpec(
@@ -190,6 +235,10 @@ def list_baseline_scenarios() -> tuple[BaselineScenarioSpec, ...]:
             world_scenario_id="pickup_without_proximity",
             default_drive_kinds=("water_need",),
             scenario_class=BaselineScenarioClass.REQUIRED,
+            adversarial_category=AdversarialCategory.PROXIMITY_BLOCKED,
+            expected_mora_behavior="no pickup publication without proximity basis",
+            expected_baseline_weakness="heuristics may attempt invalid pickup",
+            main_differentiator="proximity gate obedience",
             notes="visible item but unreachable",
         ),
         BaselineScenarioSpec(
@@ -197,6 +246,10 @@ def list_baseline_scenarios() -> tuple[BaselineScenarioSpec, ...]:
             world_scenario_id="open_movement_forward",
             default_drive_kinds=(),
             scenario_class=BaselineScenarioClass.REQUIRED,
+            adversarial_category=AdversarialCategory.ACTION_SPACE_WITHOUT_BASIS,
+            expected_mora_behavior="no candidate from action space alone",
+            expected_baseline_weakness="greedy baseline acts from availability-as-permission",
+            main_differentiator="action-space is not permission",
             notes="surfaces without supporting basis",
         ),
         BaselineScenarioSpec(
@@ -204,6 +257,10 @@ def list_baseline_scenarios() -> tuple[BaselineScenarioSpec, ...]:
             world_scenario_id="hidden_map_not_visible",
             default_drive_kinds=("water_need",),
             scenario_class=BaselineScenarioClass.REQUIRED,
+            adversarial_category=AdversarialCategory.HIDDEN_EVAL_TRAP,
+            expected_mora_behavior="no hidden/eval target usage",
+            expected_baseline_weakness="hidden oracle may succeed but is unfair",
+            main_differentiator="public/eval boundary discipline",
             notes="hidden/eval trap",
         ),
         BaselineScenarioSpec(
@@ -211,6 +268,10 @@ def list_baseline_scenarios() -> tuple[BaselineScenarioSpec, ...]:
             world_scenario_id="blocked_movement_wall",
             default_drive_kinds=("water_need",),
             scenario_class=BaselineScenarioClass.REQUIRED,
+            adversarial_category=AdversarialCategory.PREVIOUS_BLOCKED_EFFECT,
+            expected_mora_behavior="revalidate/abstain without blind retry",
+            expected_baseline_weakness="greedy/random may continue invalid attempts",
+            main_differentiator="effect-feedback/revalidation discipline",
             precondition_blocked_effect=True,
             notes="blocked effect carries into next decision",
         ),
@@ -219,6 +280,10 @@ def list_baseline_scenarios() -> tuple[BaselineScenarioSpec, ...]:
             world_scenario_id="pickup_without_proximity",
             default_drive_kinds=("resolve_uncertainty",),
             scenario_class=BaselineScenarioClass.OPTIONAL,
+            adversarial_category=AdversarialCategory.UNCERTAIN_OBJECT_INSPECT,
+            expected_mora_behavior="inspect/revalidate when pickup basis incomplete",
+            expected_baseline_weakness="visible-object heuristic may over-pickup",
+            main_differentiator="uncertainty-aware restraint",
             notes="optional uncertainty inspect path",
         ),
     )
@@ -239,6 +304,7 @@ def run_baseline_competition(
     seed: int = 7,
     include_hidden_oracle: bool = False,
     include_direct_bridge: bool = False,
+    include_simple_fsm: bool = True,
     baselines: list[BaselineController] | None = None,
 ) -> BaselineCompetitionRun:
     spec = scenario_spec_for_id(scenario_id)
@@ -247,6 +313,7 @@ def run_baseline_competition(
         seed=seed,
         include_hidden_oracle=include_hidden_oracle,
         include_direct_bridge=include_direct_bridge,
+        include_simple_fsm=include_simple_fsm,
     )
 
     mora_backend = GridWorldBackend(scenario_id=spec.world_scenario_id)
@@ -308,6 +375,10 @@ def run_baseline_competition(
         run_id=f"baseline-run:{scenario_id}:{datetime.now(tz=timezone.utc).strftime('%Y%m%d%H%M%S')}",
         scenario_id=scenario_id,
         world_scenario_id=spec.world_scenario_id,
+        adversarial_category=spec.adversarial_category,
+        expected_mora_behavior=spec.expected_mora_behavior,
+        expected_baseline_weakness=spec.expected_baseline_weakness,
+        main_differentiator=spec.main_differentiator,
         tick_budget=max(1, ticks),
         drive_basis=drive_tuple,
         mora_trace=mora_trace,
@@ -327,6 +398,7 @@ def run_baseline_competition_matrix(
     include_hidden_oracle: bool = False,
     include_direct_bridge: bool = False,
     include_optional: bool = True,
+    include_simple_fsm: bool = True,
 ) -> BaselineCompetitionMatrix:
     specs = [
         spec
@@ -341,6 +413,7 @@ def run_baseline_competition_matrix(
             seed=seed,
             include_hidden_oracle=include_hidden_oracle,
             include_direct_bridge=include_direct_bridge,
+            include_simple_fsm=include_simple_fsm,
         )
         for spec in specs
     )
@@ -348,6 +421,7 @@ def run_baseline_competition_matrix(
         run_id=f"baseline-matrix:{datetime.now(tz=timezone.utc).strftime('%Y%m%d%H%M%S')}",
         scenario_ids=tuple(spec.scenario_id for spec in specs),
         scenario_runs=runs,
+        grouped_by_adversarial_category=_group_matrix_by_category(runs),
     )
 
 
@@ -601,6 +675,16 @@ def _build_differentiator_summary(
         for trace in baseline_traces
     )
     hidden_usage = any(trace.hidden_eval_usage for trace in baseline_traces)
+    fsm_trace = next((trace for trace in baseline_traces if trace.controller_kind == "simple_fsm_baseline"), None)
+    fsm_attempted = False
+    fsm_succeeded = False
+    fsm_boundary_weaker = False
+    if fsm_trace is not None:
+        fsm_attempted = any(not record.decision.abstained for record in fsm_trace.decisions)
+        fsm_succeeded = any(record.effect_status == "succeeded" for record in fsm_trace.decisions)
+        fsm_boundary_weaker = bool(fsm_trace.boundary_violations) or fsm_trace.hidden_eval_usage
+    mora_succeeded = mora_trace.world_submission_count > 0 and mora_trace.effect_feedback_count > 0
+    mora_abstained = mora_trace.ap01_published_count == 0
 
     visible_no_drive = (
         scenario_id == "visible_flask_no_drive"
@@ -647,6 +731,20 @@ def _build_differentiator_summary(
     if blocked_revalidate:
         notes.append("blocked_effect: mora revalidates/abstains without blind retry")
 
+    fsm_notes: list[str] = []
+    fsm_both_succeed = mora_succeeded and fsm_succeeded
+    if fsm_both_succeed:
+        fsm_notes.append("mora_vs_fsm: both succeed on simple full-basis path")
+    if fsm_succeeded and (not mora_succeeded):
+        fsm_notes.append("mora_vs_fsm: fsm succeeds where mora does not")
+    if mora_abstained and fsm_attempted:
+        fsm_notes.append("mora_vs_fsm: mora abstains under missing basis while fsm still acts")
+    if fsm_boundary_weaker:
+        fsm_notes.append("mora_vs_fsm: fsm success has weaker boundary/provenance discipline")
+    fsm_no_clear_advantage = not bool(fsm_notes)
+    if fsm_no_clear_advantage:
+        fsm_notes.append("mora_vs_fsm: no clear advantage in this scenario")
+
     return DifferentiatorSummary(
         scenario_id=scenario_id,
         visible_object_no_drive_mora_abstains=visible_no_drive,
@@ -655,7 +753,12 @@ def _build_differentiator_summary(
         capacity_or_proximity_block_mora_blocks=capacity_or_proximity,
         hidden_eval_trap_mora_avoids_hidden_target=hidden_trap,
         blocked_effect_mora_revalidates_or_abstains=blocked_revalidate,
+        fsm_both_succeed=fsm_both_succeed,
+        fsm_boundary_weaker=fsm_boundary_weaker,
+        fsm_acts_when_mora_abstains=(mora_abstained and fsm_attempted),
+        fsm_no_clear_advantage=fsm_no_clear_advantage,
         key_differences=tuple(notes),
+        mora_vs_fsm_notes=tuple(fsm_notes),
     )
 
 
@@ -692,6 +795,8 @@ def _build_claim_safe_verdict(
             differentiator_summary.capacity_or_proximity_block_mora_blocks,
             differentiator_summary.hidden_eval_trap_mora_avoids_hidden_target,
             differentiator_summary.blocked_effect_mora_revalidates_or_abstains,
+            differentiator_summary.fsm_acts_when_mora_abstains,
+            differentiator_summary.fsm_boundary_weaker,
         )
     )
     if has_differentiator and fairness_report.matched_information_budget_ok:
@@ -720,6 +825,13 @@ def _aggregate_provenance(entries: tuple[dict[str, float], ...]) -> dict[str, fl
         key: sum(entry.get(key, 0.0) for entry in entries) / len(entries)
         for key in keys
     }
+
+
+def _group_matrix_by_category(runs: tuple[BaselineCompetitionRun, ...]) -> dict[str, tuple[str, ...]]:
+    grouped: dict[str, list[str]] = {}
+    for run in runs:
+        grouped.setdefault(run.adversarial_category.value, []).append(run.scenario_id)
+    return {key: tuple(value) for key, value in sorted(grouped.items())}
 
 
 def _apply_blocked_effect_precondition(backend: GridWorldBackend) -> None:

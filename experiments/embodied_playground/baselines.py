@@ -66,6 +66,13 @@ def _pick_first_action(action_space: ActionSpaceFrame) -> tuple[str | None, str 
     return None, None
 
 
+def _has_action_kind(action_space: ActionSpaceFrame, action_kind: str) -> tuple[bool, str | None]:
+    for surface in action_space.available_surfaces:
+        if action_kind in surface.action_kinds:
+            return True, surface.target_ref
+    return False, None
+
+
 @dataclass(slots=True)
 class RandomActionBaseline:
     seed: int = 7
@@ -370,11 +377,160 @@ class HiddenOracleBaseline:
         )
 
 
+class FSMState(str, Enum):
+    IDLE = "idle"
+    SEEK_VISIBLE_NEED_OBJECT = "seek_visible_need_object"
+    INSPECT_UNCERTAIN_OBJECT = "inspect_uncertain_object"
+    ATTEMPT_PICKUP_VISIBLE_TARGET = "attempt_pickup_visible_target"
+    BLOCKED_REVALIDATE = "blocked_revalidate"
+    ABSTAIN_INSUFFICIENT_BASIS = "abstain_insufficient_basis"
+
+
+@dataclass(slots=True)
+class SimpleFSMBaseline:
+    controller_id: str = "baseline:simple_fsm"
+    controller_kind: str = "simple_fsm_baseline"
+    fairness_class: BaselineFairnessClass = BaselineFairnessClass.FAIR_PUBLIC
+    _state: FSMState = field(default=FSMState.IDLE, init=False, repr=False)
+
+    def choose_action(
+        self,
+        *,
+        tick_index: int,
+        observation: ObservationFrame,
+        action_space: ActionSpaceFrame,
+        drive_basis: tuple[str, ...],
+        previous_effects: tuple[ActionEffectFrame, ...],
+        scenario_id: str,
+        eval_only: dict[str, object] | None = None,
+    ) -> BaselineDecision:
+        _ = scenario_id
+        _ = eval_only
+        last_effect = previous_effects[-1] if previous_effects else None
+        last_status = None if last_effect is None else str(getattr(last_effect.effect_status, "value", last_effect.effect_status))
+
+        if last_status in {"blocked", "failed"}:
+            self._state = FSMState.BLOCKED_REVALIDATE
+            can_inspect, inspect_target = _has_action_kind(action_space, "inspect")
+            if can_inspect:
+                return BaselineDecision(
+                    decision_id=f"{self.controller_id}:{tick_index}",
+                    controller_id=self.controller_id,
+                    action_kind="inspect",
+                    target_ref=inspect_target,
+                    args={},
+                    abstained=False,
+                    reason_codes=("fsm_blocked_revalidate",),
+                    used_public_observation=True,
+                    used_action_space=True,
+                    used_drive_basis=bool(drive_basis),
+                    used_previous_effect=True,
+                    used_hidden_or_eval=False,
+                    used_scenario_label=False,
+                )
+            return BaselineDecision(
+                decision_id=f"{self.controller_id}:{tick_index}",
+                controller_id=self.controller_id,
+                action_kind=None,
+                target_ref=None,
+                args={},
+                abstained=True,
+                reason_codes=("fsm_blocked_revalidate_wait",),
+                used_public_observation=True,
+                used_action_space=True,
+                used_drive_basis=bool(drive_basis),
+                used_previous_effect=True,
+                used_hidden_or_eval=False,
+                used_scenario_label=False,
+            )
+
+        target_item = _pick_target_item(observation)
+        drive_relevant = any("water" in d or "collect" in d for d in drive_basis)
+
+        if target_item and drive_relevant:
+            self._state = FSMState.ATTEMPT_PICKUP_VISIBLE_TARGET
+            can_pickup, pickup_target = _has_action_kind(action_space, "pickup")
+            if can_pickup:
+                return BaselineDecision(
+                    decision_id=f"{self.controller_id}:{tick_index}",
+                    controller_id=self.controller_id,
+                    action_kind="pickup",
+                    target_ref=pickup_target or target_item,
+                    args={},
+                    abstained=False,
+                    reason_codes=("fsm_pickup_visible_need_object",),
+                    used_public_observation=True,
+                    used_action_space=True,
+                    used_drive_basis=True,
+                    used_previous_effect=False,
+                    used_hidden_or_eval=False,
+                    used_scenario_label=False,
+                )
+
+        if target_item and not drive_relevant:
+            self._state = FSMState.INSPECT_UNCERTAIN_OBJECT
+            can_inspect, inspect_target = _has_action_kind(action_space, "inspect")
+            if can_inspect:
+                return BaselineDecision(
+                    decision_id=f"{self.controller_id}:{tick_index}",
+                    controller_id=self.controller_id,
+                    action_kind="inspect",
+                    target_ref=inspect_target or target_item,
+                    args={},
+                    abstained=False,
+                    reason_codes=("fsm_visible_object_without_drive",),
+                    used_public_observation=True,
+                    used_action_space=True,
+                    used_drive_basis=False,
+                    used_previous_effect=False,
+                    used_hidden_or_eval=False,
+                    used_scenario_label=False,
+                )
+
+        if drive_relevant and not target_item:
+            self._state = FSMState.SEEK_VISIBLE_NEED_OBJECT
+            can_move, move_target = _has_action_kind(action_space, "move_forward")
+            if can_move:
+                return BaselineDecision(
+                    decision_id=f"{self.controller_id}:{tick_index}",
+                    controller_id=self.controller_id,
+                    action_kind="move_forward",
+                    target_ref=move_target,
+                    args={},
+                    abstained=False,
+                    reason_codes=("fsm_drive_seek_without_visible_object",),
+                    used_public_observation=True,
+                    used_action_space=True,
+                    used_drive_basis=True,
+                    used_previous_effect=False,
+                    used_hidden_or_eval=False,
+                    used_scenario_label=False,
+                )
+
+        self._state = FSMState.ABSTAIN_INSUFFICIENT_BASIS
+        return BaselineDecision(
+            decision_id=f"{self.controller_id}:{tick_index}",
+            controller_id=self.controller_id,
+            action_kind=None,
+            target_ref=None,
+            args={},
+            abstained=True,
+            reason_codes=("fsm_abstain_insufficient_basis",),
+            used_public_observation=True,
+            used_action_space=True,
+            used_drive_basis=bool(drive_basis),
+            used_previous_effect=bool(previous_effects),
+            used_hidden_or_eval=False,
+            used_scenario_label=False,
+        )
+
+
 def build_default_baselines(
     *,
     seed: int = 7,
     include_hidden_oracle: bool = False,
     include_direct_bridge: bool = False,
+    include_simple_fsm: bool = False,
 ) -> list[BaselineController]:
     baselines: list[BaselineController] = [
         RandomActionBaseline(seed=seed),
@@ -382,9 +538,10 @@ def build_default_baselines(
         VisibleObjectHeuristicBaseline(),
         DriveOnlyBaseline(),
     ]
+    if include_simple_fsm:
+        baselines.append(SimpleFSMBaseline())
     if include_direct_bridge:
         baselines.append(DirectBridgeBypassBaseline())
     if include_hidden_oracle:
         baselines.append(HiddenOracleBaseline())
     return baselines
-

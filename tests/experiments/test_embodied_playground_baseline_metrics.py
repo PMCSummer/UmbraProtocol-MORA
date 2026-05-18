@@ -98,6 +98,7 @@ def test_metric_summary_has_all_required_metrics() -> None:
     assert hasattr(summary, "overclaim_rate")
     assert hasattr(summary, "matched_information_score")
     assert hasattr(summary, "differentiator_score")
+    assert hasattr(summary, "fsm_equivalence_risk")
 
 
 def test_boundary_violation_summary_counts_ap01_bypass() -> None:

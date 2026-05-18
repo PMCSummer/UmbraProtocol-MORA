@@ -92,6 +92,8 @@ def test_matrix_report_output_mentions_fairness_and_boundary() -> None:
     assert result.returncode == 0, result.stderr
     assert "fairness matched=" in result.stdout.lower()
     assert "boundary ap01_bypass=" in result.stdout.lower()
+    assert "adversarial_categories:" in result.stdout.lower()
+    assert "mora_vs_fsm_notes=" in result.stdout.lower()
 
 
 def test_hidden_oracle_is_reported_unfair_in_matrix() -> None:
@@ -112,3 +114,4 @@ def test_report_does_not_claim_consciousness_or_general_autonomy() -> None:
     lowered = result.stdout.lower()
     assert "proves consciousness" not in lowered
     assert "general autonomy proven" not in lowered
+    assert "mora beats fsm generally" not in lowered

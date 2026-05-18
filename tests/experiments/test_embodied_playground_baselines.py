@@ -7,9 +7,12 @@ from experiments.embodied_playground.baselines import (
     DriveOnlyBaseline,
     HiddenOracleBaseline,
     RandomActionBaseline,
+    SimpleFSMBaseline,
     VisibleObjectHeuristicBaseline,
+    build_default_baselines,
 )
 from experiments.embodied_playground.grid_world import GridWorldBackend
+from experiments.embodied_playground.baseline_runner import run_baseline_competition
 
 
 def _frames(scenario_id: str):
@@ -141,3 +144,54 @@ def test_fair_baselines_do_not_get_eval_private_data() -> None:
         )
         assert decision.used_hidden_or_eval is False
 
+
+def test_simple_fsm_baseline_is_fair_public() -> None:
+    baseline = SimpleFSMBaseline()
+    assert baseline.fairness_class == BaselineFairnessClass.FAIR_PUBLIC
+
+
+def test_simple_fsm_baseline_does_not_use_hidden_eval_or_scenario_label() -> None:
+    obs, action_space = _frames("visible_item_pickup_available")
+    baseline = SimpleFSMBaseline()
+    decision = baseline.choose_action(
+        tick_index=1,
+        observation=obs,
+        action_space=action_space,
+        drive_basis=("water_need",),
+        previous_effects=(),
+        scenario_id="visible_item_pickup_available",
+        eval_only={"hidden_objects": [{"object_ref": "object:hidden:1"}]},
+    )
+    assert decision.used_hidden_or_eval is False
+    assert decision.used_scenario_label is False
+
+
+def test_simple_fsm_baseline_can_pickup_simple_visible_need_object() -> None:
+    obs, action_space = _frames("visible_item_pickup_available")
+    baseline = SimpleFSMBaseline()
+    decision = baseline.choose_action(
+        tick_index=1,
+        observation=obs,
+        action_space=action_space,
+        drive_basis=("water_need",),
+        previous_effects=(),
+        scenario_id="visible_item_pickup_available",
+    )
+    assert decision.action_kind == "pickup"
+    assert decision.abstained is False
+
+
+def test_simple_fsm_baseline_does_not_count_as_subject_trace() -> None:
+    run = run_baseline_competition(
+        scenario_id="visible_item_pickup_available",
+        ticks=1,
+        include_simple_fsm=True,
+    )
+    fsm_trace = next(trace for trace in run.baseline_traces if trace.controller_kind == "simple_fsm_baseline")
+    assert fsm_trace.controller_id.startswith("baseline:")
+    assert run.mora_trace.subject_tick_used is True
+
+
+def test_simple_fsm_baseline_is_included_in_matrix_when_enabled() -> None:
+    baselines = build_default_baselines(include_simple_fsm=True)
+    assert any(b.controller_kind == "simple_fsm_baseline" for b in baselines)
