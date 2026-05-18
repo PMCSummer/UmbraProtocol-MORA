@@ -18,7 +18,13 @@ from substrate.subject_tick import SubjectTickContext
 from tests.substrate.subject_tick_testkit import build_subject_tick
 
 
-def _acp_input(*, drive_kind: str = "water_need") -> ACP01CandidateProductionInput:
+def _acp_input(
+    *,
+    drive_kind: str = "water_need",
+    drive_class: str = "pickup_intent",
+    allowed_action_kinds: tuple[str, ...] = ("pickup",),
+    target_object_refs: tuple[str, ...] = ("item:water_flask",),
+) -> ACP01CandidateProductionInput:
     return ACP01CandidateProductionInput(
         tick_ref="subject_tick:acp01:1",
         observation_basis=ACP01ObservationBasis(
@@ -38,6 +44,13 @@ def _acp_input(*, drive_kind: str = "water_need") -> ACP01CandidateProductionInp
                 resource_or_goal_ref="item:water_flask",
                 urgency_level=0.7,
                 source_ref="tests.subject_tick.acp01",
+                drive_class=drive_class,
+                target_object_refs=target_object_refs,
+                target_resource_refs=target_object_refs,
+                target_affordance_refs=allowed_action_kinds,
+                allowed_action_kinds=allowed_action_kinds,
+                required_capability_refs=("proximity", "inventory_capacity"),
+                relevance_basis_refs=("drive_basis:typed:pickup",),
             ),
         ),
         visible_object_bases=(
@@ -170,7 +183,12 @@ def test_no_acp01_input_means_no_acp01_candidate_and_no_ap01_request() -> None:
 def test_unsafe_acp01_basis_produces_zero_ap01_requests() -> None:
     result = _tick(
         SubjectTickContext(
-            acp01_candidate_production_input=_acp_input(drive_kind="scenario_id:pickup"),
+            acp01_candidate_production_input=_acp_input(
+                drive_kind="pickup_intent",
+                drive_class="pickup_intent",
+                allowed_action_kinds=("pickup",),
+                target_object_refs=("scenario_id:pickup",),
+            ),
         )
     )
     assert result.acp01_result.unsafe_basis_count >= 1

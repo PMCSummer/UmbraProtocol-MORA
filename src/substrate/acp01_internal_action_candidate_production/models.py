@@ -40,6 +40,8 @@ class ACP01ObservationBasis:
     visible_object_refs: tuple[str, ...]
     action_surface_refs: tuple[str, ...]
     previous_effect_refs: tuple[str, ...]
+    inventory_item_refs: tuple[str, ...] = ()
+    inventory_item_counts: dict[str, int] = field(default_factory=dict)
     public_only: bool = True
 
     def __post_init__(self) -> None:
@@ -56,6 +58,13 @@ class ACP01InternalDriveBasis:
     resource_or_goal_ref: str | None
     urgency_level: float
     source_ref: str
+    drive_class: str | None = None
+    target_object_refs: tuple[str, ...] = ()
+    target_affordance_refs: tuple[str, ...] = ()
+    target_resource_refs: tuple[str, ...] = ()
+    allowed_action_kinds: tuple[str, ...] = ()
+    required_capability_refs: tuple[str, ...] = ()
+    relevance_basis_refs: tuple[str, ...] = ()
     is_permission: bool = False
     is_action: bool = False
 

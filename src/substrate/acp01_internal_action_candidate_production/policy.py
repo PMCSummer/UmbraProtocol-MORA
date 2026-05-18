@@ -41,14 +41,12 @@ _FORBIDDEN_TOKENS: tuple[str, ...] = (
     "hidden_inventory",
 )
 
-_PICKUP_DRIVE_TOKENS: tuple[str, ...] = (
-    "water",
-    "collect",
-    "pickup",
-    "gather",
-    "resource",
-    "container",
-)
+_PICKUP_ACTION_KIND = "pickup"
+_DROP_ACTION_KIND = "drop"
+_MOVE_FORWARD_ACTION_KIND = "move_forward"
+_TURN_LEFT_ACTION_KIND = "turn_left"
+_TURN_RIGHT_ACTION_KIND = "turn_right"
+_INSPECT_ACTION_KIND = "inspect"
 
 
 def build_acp01_internal_action_candidates(
@@ -108,6 +106,86 @@ def build_acp01_internal_action_candidates(
                     reason_codes=("pickup_basis_incomplete",),
                     proposal=None,
                     missing_requirements=tuple(pickup_missing),
+                )
+            )
+
+    if not proposals:
+        drop_proposal, drop_missing, drop_blocked = _maybe_propose_drop(candidate_input)
+        if drop_proposal is not None:
+            proposals.append(drop_proposal)
+            decisions.append(
+                ACP01CandidateProductionDecision(
+                    decision_id=f"acp01:{candidate_input.tick_ref}:decision:drop",
+                    status=ACP01DecisionStatus.PROPOSED,
+                    reason_codes=("drop_candidate_basis_complete",),
+                    proposal=drop_proposal,
+                )
+            )
+        elif drop_blocked:
+            decisions.append(
+                ACP01CandidateProductionDecision(
+                    decision_id=f"acp01:{candidate_input.tick_ref}:decision:drop_blocked",
+                    status=ACP01DecisionStatus.BLOCKED,
+                    reason_codes=("drop_basis_blocked",),
+                    proposal=None,
+                    missing_requirements=tuple(drop_missing),
+                    blocked_refs=tuple(drop_blocked),
+                )
+            )
+        elif drop_missing:
+            decisions.append(
+                ACP01CandidateProductionDecision(
+                    decision_id=f"acp01:{candidate_input.tick_ref}:decision:drop_insufficient",
+                    status=ACP01DecisionStatus.INSUFFICIENT_BASIS,
+                    reason_codes=("drop_basis_incomplete",),
+                    proposal=None,
+                    missing_requirements=tuple(drop_missing),
+                )
+            )
+
+    if not proposals:
+        move_proposal, move_missing = _maybe_propose_move_forward(candidate_input)
+        if move_proposal is not None:
+            proposals.append(move_proposal)
+            decisions.append(
+                ACP01CandidateProductionDecision(
+                    decision_id=f"acp01:{candidate_input.tick_ref}:decision:move_forward",
+                    status=ACP01DecisionStatus.PROPOSED,
+                    reason_codes=("move_forward_candidate_basis_complete",),
+                    proposal=move_proposal,
+                )
+            )
+        elif move_missing:
+            decisions.append(
+                ACP01CandidateProductionDecision(
+                    decision_id=f"acp01:{candidate_input.tick_ref}:decision:move_forward_insufficient",
+                    status=ACP01DecisionStatus.INSUFFICIENT_BASIS,
+                    reason_codes=("move_forward_basis_incomplete",),
+                    proposal=None,
+                    missing_requirements=tuple(move_missing),
+                )
+            )
+
+    if not proposals:
+        turn_proposal, turn_missing = _maybe_propose_turn(candidate_input)
+        if turn_proposal is not None:
+            proposals.append(turn_proposal)
+            decisions.append(
+                ACP01CandidateProductionDecision(
+                    decision_id=f"acp01:{candidate_input.tick_ref}:decision:{turn_proposal.action_kind}",
+                    status=ACP01DecisionStatus.PROPOSED,
+                    reason_codes=(f"{turn_proposal.action_kind}_candidate_basis_complete",),
+                    proposal=turn_proposal,
+                )
+            )
+        elif turn_missing:
+            decisions.append(
+                ACP01CandidateProductionDecision(
+                    decision_id=f"acp01:{candidate_input.tick_ref}:decision:turn_insufficient",
+                    status=ACP01DecisionStatus.INSUFFICIENT_BASIS,
+                    reason_codes=("turn_basis_incomplete",),
+                    proposal=None,
+                    missing_requirements=tuple(turn_missing),
                 )
             )
 
@@ -216,7 +294,7 @@ def _maybe_propose_pickup(
     missing: list[str] = []
     blocked: list[str] = []
 
-    relevant_drive = _find_relevant_pickup_drive(drives)
+    relevant_drive = _find_relevant_drive_for_action(drives, _PICKUP_ACTION_KIND)
     if relevant_drive is None:
         missing.append("internal_drive_basis")
         return None, missing, blocked
@@ -228,7 +306,7 @@ def _maybe_propose_pickup(
 
     pickup_surface = _find_surface_for_action(
         surfaces=surfaces,
-        action_kind="pickup",
+        action_kind=_PICKUP_ACTION_KIND,
         target_ref=target_object.object_ref,
     )
     if pickup_surface is None:
@@ -272,11 +350,11 @@ def _maybe_propose_pickup(
     )
     return (
         ACP01ActionCandidateProposal(
-            candidate_id=f"acp01:{candidate_input.tick_ref}:pickup:{target_object.object_ref}",
-            action_kind="pickup",
+            candidate_id=f"acp01:{candidate_input.tick_ref}:{_PICKUP_ACTION_KIND}:{target_object.object_ref}",
+            action_kind=_PICKUP_ACTION_KIND,
             target_ref=target_object.object_ref,
             args={},
-            intended_effect=f"pickup:{target_object.object_ref}",
+            intended_effect=f"{_PICKUP_ACTION_KIND}:{target_object.object_ref}",
             basis_refs=basis_refs,
             missing_basis=(),
             blocked_basis=(),
@@ -284,6 +362,187 @@ def _maybe_propose_pickup(
             revalidation_required=False,
         ),
         [],
+        [],
+    )
+
+
+def _maybe_propose_drop(
+    candidate_input: ACP01CandidateProductionInput,
+) -> tuple[ACP01ActionCandidateProposal | None, list[str], list[str]]:
+    drives = tuple(candidate_input.internal_drive_bases)
+    surfaces = tuple(candidate_input.action_surface_bases)
+    capabilities = tuple(candidate_input.capability_bases)
+    observation = candidate_input.observation_basis
+
+    missing: list[str] = []
+    blocked: list[str] = []
+
+    relevant_drive = _find_relevant_drive_for_action(drives, _DROP_ACTION_KIND)
+    if relevant_drive is None:
+        missing.append("internal_drive_basis")
+        return None, missing, blocked
+
+    drop_surface = _find_surface_for_action(
+        surfaces=surfaces,
+        action_kind=_DROP_ACTION_KIND,
+        target_ref=None,
+    )
+    if drop_surface is None:
+        missing.append("drop_action_surface_basis")
+        return None, missing, blocked
+
+    target_item = _find_drop_target_item(drives=drives, observation=observation)
+    if target_item is None:
+        missing.append("inventory_item_basis")
+        return None, missing, blocked
+
+    inventory_item_status = _capability_status(
+        capabilities=capabilities,
+        capability_kinds=("inventory_item_available",),
+        target_ref=target_item,
+    )
+    if inventory_item_status is ACP01CapabilityStatus.BLOCKED:
+        blocked.append("capability:inventory_item_unavailable")
+    elif inventory_item_status in {ACP01CapabilityStatus.UNKNOWN, ACP01CapabilityStatus.INSUFFICIENT}:
+        if observation.inventory_item_counts.get(target_item, 0) <= 0:
+            missing.append("inventory_item_basis")
+
+    if blocked or missing:
+        return None, missing, blocked
+
+    basis_refs = tuple(
+        dict.fromkeys(
+            (
+                f"observation:{observation.observation_id}",
+                f"drive:{relevant_drive.drive_ref}",
+                f"surface:{drop_surface.surface_ref}",
+                f"inventory_item:{target_item}",
+            )
+        )
+    )
+    return (
+        ACP01ActionCandidateProposal(
+            candidate_id=f"acp01:{candidate_input.tick_ref}:{_DROP_ACTION_KIND}:{target_item}",
+            action_kind=_DROP_ACTION_KIND,
+            target_ref=target_item,
+            args={},
+            intended_effect=f"{_DROP_ACTION_KIND}:{target_item}",
+            basis_refs=basis_refs,
+            missing_basis=(),
+            blocked_basis=(),
+            confidence=0.7,
+            revalidation_required=False,
+        ),
+        [],
+        [],
+    )
+
+
+def _maybe_propose_move_forward(
+    candidate_input: ACP01CandidateProductionInput,
+) -> tuple[ACP01ActionCandidateProposal | None, list[str]]:
+    drives = tuple(candidate_input.internal_drive_bases)
+    surfaces = tuple(candidate_input.action_surface_bases)
+    observation = candidate_input.observation_basis
+
+    missing: list[str] = []
+    relevant_drive = _find_relevant_drive_for_action(drives, _MOVE_FORWARD_ACTION_KIND)
+    if relevant_drive is None:
+        return None, ["internal_drive_basis"]
+    if not observation.body_ref or not observation.location_ref:
+        missing.append("body_basis")
+        return None, missing
+    move_surface = _find_surface_for_action(
+        surfaces=surfaces,
+        action_kind=_MOVE_FORWARD_ACTION_KIND,
+        target_ref=None,
+    )
+    if move_surface is None:
+        missing.append("movement_action_surface_basis")
+        return None, missing
+
+    basis_refs = tuple(
+        dict.fromkeys(
+            (
+                f"observation:{observation.observation_id}",
+                f"drive:{relevant_drive.drive_ref}",
+                f"surface:{move_surface.surface_ref}",
+                f"body:{observation.body_ref}",
+                f"location:{observation.location_ref}",
+            )
+        )
+    )
+    return (
+        ACP01ActionCandidateProposal(
+            candidate_id=f"acp01:{candidate_input.tick_ref}:{_MOVE_FORWARD_ACTION_KIND}:{observation.location_ref}",
+            action_kind=_MOVE_FORWARD_ACTION_KIND,
+            target_ref=None,
+            args={},
+            intended_effect=_MOVE_FORWARD_ACTION_KIND,
+            basis_refs=basis_refs,
+            missing_basis=(),
+            blocked_basis=(),
+            confidence=0.68,
+            revalidation_required=False,
+        ),
+        [],
+    )
+
+
+def _maybe_propose_turn(
+    candidate_input: ACP01CandidateProductionInput,
+) -> tuple[ACP01ActionCandidateProposal | None, list[str]]:
+    drives = tuple(candidate_input.internal_drive_bases)
+    surfaces = tuple(candidate_input.action_surface_bases)
+    observation = candidate_input.observation_basis
+    missing: list[str] = []
+
+    turn_action_kind = None
+    relevant_drive = _find_relevant_drive_for_action(drives, _TURN_LEFT_ACTION_KIND)
+    if relevant_drive is not None:
+        turn_action_kind = _TURN_LEFT_ACTION_KIND
+    else:
+        relevant_drive = _find_relevant_drive_for_action(drives, _TURN_RIGHT_ACTION_KIND)
+        if relevant_drive is not None:
+            turn_action_kind = _TURN_RIGHT_ACTION_KIND
+    if relevant_drive is None or turn_action_kind is None:
+        return None, ["internal_drive_basis"]
+    if not observation.body_ref or not observation.orientation:
+        missing.append("body_orientation_basis")
+        return None, missing
+    turn_surface = _find_surface_for_action(
+        surfaces=surfaces,
+        action_kind=turn_action_kind,
+        target_ref=None,
+    )
+    if turn_surface is None:
+        missing.append("turn_action_surface_basis")
+        return None, missing
+
+    basis_refs = tuple(
+        dict.fromkeys(
+            (
+                f"observation:{observation.observation_id}",
+                f"drive:{relevant_drive.drive_ref}",
+                f"surface:{turn_surface.surface_ref}",
+                f"body:{observation.body_ref}",
+                f"orientation:{observation.orientation}",
+            )
+        )
+    )
+    return (
+        ACP01ActionCandidateProposal(
+            candidate_id=f"acp01:{candidate_input.tick_ref}:{turn_action_kind}:{observation.orientation}",
+            action_kind=turn_action_kind,
+            target_ref=None,
+            args={},
+            intended_effect=turn_action_kind,
+            basis_refs=basis_refs,
+            missing_basis=(),
+            blocked_basis=(),
+            confidence=0.68,
+            revalidation_required=False,
+        ),
         [],
     )
 
@@ -296,7 +555,7 @@ def _maybe_propose_inspect(
 
     inspect_surface = _find_surface_for_action(
         surfaces=candidate_input.action_surface_bases,
-        action_kind="inspect",
+        action_kind=_INSPECT_ACTION_KIND,
         target_ref=None,
     )
     if inspect_surface is None:
@@ -311,7 +570,7 @@ def _maybe_propose_inspect(
         None,
     )
     drive_requests_uncertainty_probe = any(
-        any(token in drive.drive_kind.lower() for token in ("curiosity", "uncertainty", "clarify", "inspect"))
+        _drive_targets_action(drive, _INSPECT_ACTION_KIND)
         for drive in candidate_input.internal_drive_bases
     )
     # P4 guardrail: inspect requires explicit uncertainty/clarification basis.
@@ -428,30 +687,104 @@ def _unsafe_basis_reasons(candidate_input: ACP01CandidateProductionInput) -> lis
     return list(dict.fromkeys(reasons))
 
 
-def _find_relevant_pickup_drive(drives: tuple[object, ...]):
+def _find_relevant_drive_for_action(drives: tuple[object, ...], action_kind: str):
     for drive in drives:
-        drive_kind = str(getattr(drive, "drive_kind", "")).lower()
-        if any(token in drive_kind for token in _PICKUP_DRIVE_TOKENS):
+        if _drive_targets_action(drive, action_kind):
             return drive
     return None
 
 
-def _find_pickup_target_object(*, drives: tuple[object, ...], objects: tuple[object, ...]):
-    goal_refs = {
-        str(getattr(drive, "resource_or_goal_ref", "")).lower()
-        for drive in drives
-        if getattr(drive, "resource_or_goal_ref", None)
+def _drive_targets_action(drive: object, action_kind: str) -> bool:
+    allowed_action_kinds = {
+        str(item).lower()
+        for item in tuple(getattr(drive, "allowed_action_kinds", ()) or ())
     }
+    if action_kind.lower() in allowed_action_kinds:
+        return True
+
+    target_affordance_refs = {
+        str(item).lower()
+        for item in tuple(getattr(drive, "target_affordance_refs", ()) or ())
+    }
+    if action_kind.lower() in target_affordance_refs:
+        return True
+
+    drive_class = str(getattr(drive, "drive_class", "")).lower()
+    if drive_class in {"pickup_intent", "drop_intent", "movement_intent", "turn_intent", "inspect_intent"}:
+        class_map = {
+            "pickup_intent": {_PICKUP_ACTION_KIND},
+            "drop_intent": {_DROP_ACTION_KIND},
+            "movement_intent": {_MOVE_FORWARD_ACTION_KIND},
+            "turn_intent": {_TURN_LEFT_ACTION_KIND, _TURN_RIGHT_ACTION_KIND},
+            "inspect_intent": {_INSPECT_ACTION_KIND},
+        }
+        return action_kind in class_map.get(drive_class, set())
+    # Backward-compatible typed fallback: a declared target resource/object ref can
+    # justify pickup/drop intent without lexical drive token matching.
+    if action_kind in {_PICKUP_ACTION_KIND, _DROP_ACTION_KIND}:
+        has_typed_target_ref = bool(
+            tuple(getattr(drive, "target_object_refs", ()) or ())
+            or tuple(getattr(drive, "target_resource_refs", ()) or ())
+            or getattr(drive, "resource_or_goal_ref", None)
+        )
+        if has_typed_target_ref:
+            return True
+    return False
+
+
+def _find_pickup_target_object(*, drives: tuple[object, ...], objects: tuple[object, ...]):
+    goal_refs: set[str] = set()
+    for drive in drives:
+        goal_refs.update(
+            str(item)
+            for item in tuple(getattr(drive, "target_object_refs", ()) or ())
+            if str(item)
+        )
+        goal_refs.update(
+            str(item)
+            for item in tuple(getattr(drive, "target_resource_refs", ()) or ())
+            if str(item)
+        )
+        resource_or_goal_ref = getattr(drive, "resource_or_goal_ref", None)
+        if resource_or_goal_ref:
+            goal_refs.add(str(resource_or_goal_ref))
+
     if goal_refs:
         for obj in objects:
-            object_ref = str(getattr(obj, "object_ref", "")).lower()
-            object_kind = str(getattr(obj, "object_kind", "")).lower()
-            if object_ref in goal_refs or any(goal in object_ref for goal in goal_refs) or any(goal in object_kind for goal in goal_refs):
+            object_ref = str(getattr(obj, "object_ref", ""))
+            if object_ref in goal_refs:
                 return obj
-        # If a goal is explicit but no visible object matches it, do not fall
-        # back to arbitrary visible objects in P4 narrow scope.
+        # Explicit target list present and nothing matched: abstain.
         return None
     return objects[0] if objects else None
+
+
+def _find_drop_target_item(*, drives: tuple[object, ...], observation: object) -> str | None:
+    goal_refs: set[str] = set()
+    for drive in drives:
+        goal_refs.update(
+            str(item)
+            for item in tuple(getattr(drive, "target_object_refs", ()) or ())
+            if str(item)
+        )
+        resource_or_goal_ref = getattr(drive, "resource_or_goal_ref", None)
+        if resource_or_goal_ref:
+            goal_refs.add(str(resource_or_goal_ref))
+
+    inventory_refs = tuple(getattr(observation, "inventory_item_refs", ()) or ())
+    inventory_counts = dict(getattr(observation, "inventory_item_counts", {}) or {})
+
+    if goal_refs:
+        for item_ref in inventory_refs:
+            if str(item_ref) in goal_refs:
+                if inventory_counts.get(item_ref, 0) > 0:
+                    return item_ref
+        return None
+
+    for item_ref in inventory_refs:
+        if inventory_counts.get(item_ref, 0) > 0:
+            return item_ref
+    return None
 
 
 def _find_surface_for_action(

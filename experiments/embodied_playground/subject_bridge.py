@@ -461,16 +461,25 @@ def _build_acp01_candidate_input(
             ),
         )
     )
+    for item_ref, item_count in observation.inventory_state.item_counts.items():
+        capability_bases.append(
+            ACP01CapabilityBasis(
+                capability_ref=f"capability:inventory_item_available:{item_ref}",
+                capability_kind="inventory_item_available",
+                target_ref=item_ref,
+                status=(
+                    ACP01CapabilityStatus.AVAILABLE
+                    if int(item_count) > 0
+                    else ACP01CapabilityStatus.BLOCKED
+                ),
+                reason_codes=(f"inventory_count:{int(item_count)}",),
+            )
+        )
 
     drive_bases = tuple(
-        ACP01InternalDriveBasis(
-            drive_ref=f"drive:{kind}:{bridge_tick_index}",
+        _build_internal_drive_basis(
             drive_kind=kind,
-            resource_or_goal_ref=("item:water_flask" if "water" in kind else None),
-            urgency_level=0.7,
-            source_ref="embodied_subject_bridge_internal_drive",
-            is_permission=False,
-            is_action=False,
+            bridge_tick_index=bridge_tick_index,
         )
         for kind in drive_kinds
     )
@@ -500,6 +509,8 @@ def _build_acp01_candidate_input(
             visible_object_refs=tuple(obj.object_ref for obj in observation.visible_objects),
             action_surface_refs=tuple(surface.surface_ref for surface in observation.action_space.available_surfaces),
             previous_effect_refs=tuple(observation.previous_effect_refs),
+            inventory_item_refs=tuple(observation.inventory_state.item_refs),
+            inventory_item_counts=dict(observation.inventory_state.item_counts),
             public_only=True,
         ),
         internal_drive_bases=drive_bases,
@@ -510,6 +521,91 @@ def _build_acp01_candidate_input(
         private_eval_excluded=True,
         scenario_label_excluded=True,
         source="embodied_playground.p4.bridge_public_basis_projection",
+    )
+
+
+def _build_internal_drive_basis(*, drive_kind: str, bridge_tick_index: int) -> ACP01InternalDriveBasis:
+    typed_by_kind: dict[str, dict[str, object]] = {
+        "water_need": {
+            "drive_class": "pickup_intent",
+            "allowed_action_kinds": ("pickup",),
+            "target_object_refs": ("item:water_flask",),
+            "target_resource_refs": ("item:water_flask",),
+            "target_affordance_refs": ("pickup",),
+            "required_capability_refs": ("proximity", "inventory_capacity"),
+            "relevance_basis_refs": ("drive_basis:typed:pickup",),
+            "resource_or_goal_ref": "item:water_flask",
+        },
+        "drop_water_flask": {
+            "drive_class": "drop_intent",
+            "allowed_action_kinds": ("drop",),
+            "target_object_refs": ("item:water_flask",),
+            "target_affordance_refs": ("drop",),
+            "required_capability_refs": ("inventory_item_available",),
+            "relevance_basis_refs": ("drive_basis:typed:drop",),
+            "resource_or_goal_ref": "item:water_flask",
+        },
+        "move_forward_intent": {
+            "drive_class": "movement_intent",
+            "allowed_action_kinds": ("move_forward",),
+            "target_affordance_refs": ("move_forward",),
+            "required_capability_refs": ("movement_surface",),
+            "relevance_basis_refs": ("drive_basis:typed:movement",),
+            "resource_or_goal_ref": None,
+        },
+        "turn_left_intent": {
+            "drive_class": "turn_intent",
+            "allowed_action_kinds": ("turn_left",),
+            "target_affordance_refs": ("turn_left",),
+            "required_capability_refs": ("orientation_basis",),
+            "relevance_basis_refs": ("drive_basis:typed:turn",),
+            "resource_or_goal_ref": None,
+        },
+        "turn_right_intent": {
+            "drive_class": "turn_intent",
+            "allowed_action_kinds": ("turn_right",),
+            "target_affordance_refs": ("turn_right",),
+            "required_capability_refs": ("orientation_basis",),
+            "relevance_basis_refs": ("drive_basis:typed:turn",),
+            "resource_or_goal_ref": None,
+        },
+        "resolve_uncertainty": {
+            "drive_class": "inspect_intent",
+            "allowed_action_kinds": ("inspect",),
+            "target_affordance_refs": ("inspect",),
+            "required_capability_refs": ("inspect_surface",),
+            "relevance_basis_refs": ("drive_basis:typed:inspect",),
+            "resource_or_goal_ref": None,
+        },
+    }
+    typed = typed_by_kind.get(
+        drive_kind,
+        {
+            "drive_class": "typed_unknown_intent",
+            "allowed_action_kinds": (),
+            "target_object_refs": (),
+            "target_resource_refs": (),
+            "target_affordance_refs": (),
+            "required_capability_refs": (),
+            "relevance_basis_refs": ("drive_basis:typed:unknown",),
+            "resource_or_goal_ref": None,
+        },
+    )
+    return ACP01InternalDriveBasis(
+        drive_ref=f"drive:{drive_kind}:{bridge_tick_index}",
+        drive_kind=drive_kind,
+        resource_or_goal_ref=typed.get("resource_or_goal_ref"),
+        urgency_level=0.7,
+        source_ref="embodied_subject_bridge_internal_drive",
+        drive_class=str(typed.get("drive_class")) if typed.get("drive_class") is not None else None,
+        target_object_refs=tuple(typed.get("target_object_refs", ())),
+        target_affordance_refs=tuple(typed.get("target_affordance_refs", ())),
+        target_resource_refs=tuple(typed.get("target_resource_refs", ())),
+        allowed_action_kinds=tuple(typed.get("allowed_action_kinds", ())),
+        required_capability_refs=tuple(typed.get("required_capability_refs", ())),
+        relevance_basis_refs=tuple(typed.get("relevance_basis_refs", ())),
+        is_permission=False,
+        is_action=False,
     )
 
 

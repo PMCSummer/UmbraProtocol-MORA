@@ -25,15 +25,27 @@ def _input(
     capacity_status: ACP01CapabilityStatus = ACP01CapabilityStatus.AVAILABLE,
     object_confidence: float = 0.95,
     blocked_effect: bool = False,
-    drive_kind: str = "water_need",
+    drive_kind: str = "pickup_water",
+    drive_class: str = "pickup_intent",
+    drive_allowed_action_kinds: tuple[str, ...] = ("pickup",),
+    drive_target_object_refs: tuple[str, ...] = ("item:water_flask",),
+    drive_target_affordance_refs: tuple[str, ...] = ("pickup",),
+    drive_resource_or_goal_ref: str | None = "item:water_flask",
 ) -> ACP01CandidateProductionInput:
     drives = (
         ACP01InternalDriveBasis(
             drive_ref="drive:water_need",
             drive_kind=drive_kind,
-            resource_or_goal_ref="item:water_flask",
+            resource_or_goal_ref=drive_resource_or_goal_ref,
             urgency_level=0.7,
             source_ref="tests.acp01",
+            drive_class=drive_class,
+            allowed_action_kinds=drive_allowed_action_kinds,
+            target_object_refs=drive_target_object_refs,
+            target_resource_refs=drive_target_object_refs,
+            target_affordance_refs=drive_target_affordance_refs,
+            required_capability_refs=("proximity", "inventory_capacity"),
+            relevance_basis_refs=("drive_basis:typed:pickup",),
         ),
     ) if with_drive else ()
     objects = (
@@ -163,14 +175,48 @@ def test_revalidation_for_blocked_effect() -> None:
 
 
 def test_scenario_eval_private_basis_rejected() -> None:
-    bad = _input(drive_kind="scenario_id:pickup")
+    bad = _input(drive_kind="pickup_water")
+    bad_drives = (
+        ACP01InternalDriveBasis(
+            drive_ref="drive:water_need",
+            drive_kind="pickup_water",
+            resource_or_goal_ref="scenario_id:pickup",
+            urgency_level=0.7,
+            source_ref="tests.acp01",
+            drive_class="pickup_intent",
+            allowed_action_kinds=("pickup",),
+            target_object_refs=("item:water_flask",),
+            target_resource_refs=("item:water_flask",),
+            target_affordance_refs=("pickup",),
+            required_capability_refs=("proximity", "inventory_capacity"),
+            relevance_basis_refs=("drive_basis:typed:pickup",),
+        ),
+    )
+    bad = ACP01CandidateProductionInput(
+        tick_ref=bad.tick_ref,
+        observation_basis=bad.observation_basis,
+        internal_drive_bases=bad_drives,
+        visible_object_bases=bad.visible_object_bases,
+        action_surface_bases=bad.action_surface_bases,
+        capability_bases=bad.capability_bases,
+        effect_feedback_bases=bad.effect_feedback_bases,
+        private_eval_excluded=True,
+        scenario_label_excluded=True,
+        source=bad.source,
+    )
     result = build_acp01_internal_action_candidates(bad)
     assert result.unsafe_basis_count >= 1
     assert result.proposed_count == 0
 
 
 def test_no_recipe_or_automation_actions_emitted() -> None:
-    result = build_acp01_internal_action_candidates(_input(drive_kind="craft_need"))
+    result = build_acp01_internal_action_candidates(
+        _input(
+            drive_kind="craft_need",
+            drive_allowed_action_kinds=(),
+            drive_target_object_refs=(),
+        )
+    )
     proposals = [item.proposal.action_kind for item in result.decisions if item.proposal is not None]
     assert "craft" not in proposals
     assert "refine" not in proposals
@@ -232,6 +278,13 @@ def test_acp01_rejects_structured_scenario_marker_in_candidate_basis() -> None:
             resource_or_goal_ref="scenario_id:pickup_bias",
             urgency_level=0.7,
             source_ref="tests.acp01",
+            drive_class="pickup_intent",
+            allowed_action_kinds=("pickup",),
+            target_object_refs=("item:water_flask",),
+            target_resource_refs=("item:water_flask",),
+            target_affordance_refs=("pickup",),
+            required_capability_refs=("proximity", "inventory_capacity"),
+            relevance_basis_refs=("drive_basis:typed:pickup",),
         ),
     )
     candidate_input = ACP01CandidateProductionInput(
@@ -295,3 +348,51 @@ def test_acp01_candidate_set_for_ap01_contains_no_private_eval_or_scenario_basis
         "gui_label",
     )
     assert all(marker not in value_text for marker in forbidden)
+
+
+def test_acp01_drive_relevance_uses_typed_refs_not_lexical_tokens() -> None:
+    result = build_acp01_internal_action_candidates(
+        _input(
+            drive_kind="water_collect_phrase_only",
+            drive_class="typed_unknown_intent",
+            drive_allowed_action_kinds=(),
+            drive_target_object_refs=(),
+            drive_target_affordance_refs=(),
+            drive_resource_or_goal_ref=None,
+        )
+    )
+    assert result.proposed_count == 0
+    assert result.candidate_set_for_ap01 is None
+
+
+def test_acp01_rejects_pickup_when_drive_ref_does_not_target_visible_object() -> None:
+    result = build_acp01_internal_action_candidates(
+        _input(
+            drive_kind="pickup_other",
+            drive_allowed_action_kinds=("pickup",),
+            drive_target_object_refs=("item:other",),
+            drive_resource_or_goal_ref="item:other",
+        )
+    )
+    assert result.proposed_count == 0
+    assert result.candidate_set_for_ap01 is None
+
+
+def test_acp01_allows_pickup_when_drive_target_ref_matches_public_object_basis() -> None:
+    result = build_acp01_internal_action_candidates(
+        _input(
+            drive_kind="pickup_visible",
+            drive_allowed_action_kinds=("pickup",),
+            drive_target_object_refs=("item:water_flask",),
+        )
+    )
+    assert result.proposed_count >= 1
+    assert result.candidate_set_for_ap01 is not None
+
+
+def test_acp01_policy_contains_no_world_specific_drive_tokens() -> None:
+    policy_text = (__import__("pathlib").Path("src/substrate/acp01_internal_action_candidate_production/policy.py")).read_text(
+        encoding="utf-8"
+    ).lower()
+    forbidden_tokens = ("water", "flask", "collect", "ore", "filter", "minecraft", "grid:")
+    assert all(token not in policy_text for token in forbidden_tokens)
