@@ -1,0 +1,94 @@
+{
+  "code": "WORLD0",
+  "title": "Generic Subject World Runner",
+  "track": "build",
+  "line": "world_embodiment",
+  "after": "UMWELT-S",
+  "status": "later",
+  "status_source": "cli",
+  "spec": {
+    "objective": "TODO: Какой точный механизм или state-transition реализует эта фаза? Что должно стать истинным после её работы?",
+    "includes": [
+      "TODO: Какие компоненты обязательны для этой фазы?",
+      "TODO: Какие подпроцессы должны существовать явно, а не подразумеваться?"
+    ],
+    "rationale": "TODO: Какую архитектурную дыру закрывает эта фаза? Что ломается или становится нечестным без неё?",
+    "excludes": [
+      "TODO: Что НЕ входит в ответственность этой фазы?",
+      "TODO: Какие соседние функции эта фаза не должна молча подменять?"
+    ]
+  },
+  "notes": "TODO: Свободные заметки, caveats, blast radius, открытые вопросы, implementation warnings.",
+  "implemented_after": null,
+  "conceptually_after": [
+    "AB-INT",
+    "UMWELT0",
+    "UMWELT-S",
+    "MICRO1",
+    "RT01",
+    "A04"
+  ],
+  "claim_blocked_by": [],
+  "validation_state": "planned",
+  "claim_role": "world_grounding_gate",
+  "priority_bucket": "phase_3_world_grounding",
+  "risk_tags": [
+    "TODO: Самый вероятный shortcut / подмена механизма",
+    "TODO: Самый вероятный calibration / regression / drift risk",
+    "TODO: Самый опасный каскадный эффект на соседние фазы"
+  ],
+  "claim_state": "hypothesis",
+  "maturity": "L1_theoretical_only",
+  "authority_role": "computational",
+  "computational_role": "unknown",
+  "knowledge_card": {
+    "functional_role": "TODO: Какую незаменимую каузальную роль играет эта фаза?",
+    "why_exists": "TODO: Какую дыру в архитектуре она закрывает и почему это отдельный слой?",
+    "inputs": [
+      "TODO: Какие точные входы, контракты и предпосылки у фазы?"
+    ],
+    "outputs": [
+      "TODO: Какие точные выходы и обязательные поля она должна выдавать?"
+    ],
+    "authority": "TODO: Что эта фаза имеет право утверждать, а что ей утверждать запрещено?",
+    "forbidden_shortcuts": [
+      "TODO: Какие shortcut-реализации здесь особенно опасны?",
+      "TODO: Какие эвристики допустимы только как fallback, но не как ядро?"
+    ],
+    "uncertainty_policy": "TODO: Что делает слой при непонимании, неоднозначности или недостатке сигнала?",
+    "observables": [
+      "TODO: Какие наблюдаемые признаки подтверждают, что слой реально работает?"
+    ],
+    "failure_modes": [
+      "TODO: Какой типовой режим поломки у этой фазы?",
+      "TODO: Какой опасный failure mode выглядит как успех?"
+    ],
+    "falsifiers": [
+      "TODO: Что опровергнет корректность этого слоя?"
+    ],
+    "tests": [
+      "TODO: Какой механизм-ориентированный тест обязан проходить?",
+      "TODO: Какой adversarial / ablation / perturbation test нужен?"
+    ],
+    "biological_analogy": "TODO: На какой биологический/когнитивный процесс это функционально похоже?",
+    "biological_support": "TODO: Насколько сильна биологическая/когнитивная поддержка этой идеи?",
+    "evidence_strength": "TODO: Насколько сильна доказательная база и почему?",
+    "provenance_note": "TODO: Откуда вообще взят этот дизайн слоя?",
+    "disciplines": [
+      "TODO: Какая дисциплина реально даёт механизм / ограничения / язык описания?"
+    ],
+    "alternative_models": [
+      {
+        "title": "TODO: Название альтернативной модели",
+        "summary": "TODO: В чём состоит альтернатива?",
+        "why_not_adopted": "TODO: Почему альтернатива не выбрана?"
+      }
+    ],
+    "evidence_ids": [
+      "TODO: Какие evidence entries реально поддерживают или оспаривают фазу?"
+    ]
+  },
+  "related_node_ids": [
+    "phase::WORLD0"
+  ]
+}

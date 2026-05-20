@@ -1,0 +1,428 @@
+[
+  {
+    "code": "AB-INT",
+    "title": "AB SubjectTick Integration",
+    "desc": "Integrates AB1-AB7 into live subject_tick as a conditional public-evidence cognitive contour that emits digests, hypotheses, frontiers, updates, attribution, constraints and AB4 epistemic basis without action, publication, execution or fact-closure authority.",
+    "after": "RT01",
+    "track": "build",
+    "line": "refinement",
+    "status": "closed",
+    "priority_bucket": "phase_3_world_grounding",
+    "claim_role": "critical_honesty_gate",
+    "claim_state": "implemented",
+    "maturity": "L7_stable_in_contour",
+    "conceptually_after": [
+      "RT01",
+      "T03",
+      "S05",
+      "W06",
+      "A04",
+      "P04"
+    ],
+    "implemented_after": "RT01",
+    "risk_tags": [
+      "ab_live_tick_claims_fact",
+      "AB4_bypasses_ACP01",
+      "AB5_effect_as_truth_oracle",
+      "AB7_recipe_candidate_as_skill",
+      "hidden_eval_in_tick",
+      "scenario_label_in_tick",
+      "AB_live_emits_action_request",
+      "AB_live_world_submission"
+    ]
+  },
+  {
+    "code": "UMWELT0",
+    "title": "Phenomenal Contact Layer",
+    "desc": "Defines the subject/world membrane: the subject receives typed public contact frames with source refs, uncertainty, lossiness, affordance/action/effect surfaces and residue, not backend WorldState, hidden truth, true recipes or direct plans.",
+    "after": "AB-INT",
+    "track": "build",
+    "line": "world_embodiment",
+    "status": "later",
+    "priority_bucket": "phase_3_world_grounding",
+    "claim_role": "critical_honesty_gate",
+    "claim_state": "hypothesis",
+    "maturity": "L1_theoretical_only",
+    "conceptually_after": [
+      "RT01",
+      "W01",
+      "W06",
+      "AB-INT"
+    ],
+    "risk_tags": [
+      "worldstate_passed_to_subject",
+      "backend_truth_in_contact_frame",
+      "contact_frame_selects_action",
+      "hidden_eval_public",
+      "no_source_refs",
+      "lossiness_unmarked"
+    ]
+  },
+  {
+    "code": "UMWELT-S",
+    "title": "Symbolic Contact Spec / Contact IR",
+    "desc": "Adds a typed symbolic ContactSpec/Contact IR layer that maps symbolic worlds into portable public refs and channels without Minecraft logic, bot policy, recipe oracle, route truth or AP01 creation inside the subject core.",
+    "after": "UMWELT0",
+    "track": "build",
+    "line": "world_embodiment",
+    "status": "later",
+    "priority_bucket": "phase_3_world_grounding",
+    "claim_role": "world_grounding_gate",
+    "claim_state": "hypothesis",
+    "maturity": "L1_theoretical_only",
+    "conceptually_after": [
+      "UMWELT0",
+      "A04",
+      "W01",
+      "W06"
+    ],
+    "risk_tags": [
+      "contact_spec_as_planner",
+      "recipe_oracle_in_config",
+      "minecraft_logic_in_subject",
+      "adapter_selects_goal",
+      "backend_specific_assumption_leak"
+    ]
+  },
+  {
+    "code": "K-SURF1",
+    "title": "Multi-Provider Knowledge Affordance Surface",
+    "desc": "Unifies JEI, encyclopedia, questbook, manuals, tooltips, machine UI, scanners and status panels as source-bound non-authoritative knowledge affordance frames, transformation hints, station capability hints, objective hints and conflict frames.",
+    "after": "UMWELT-S",
+    "track": "build",
+    "line": "world_regularities",
+    "status": "later",
+    "priority_bucket": "phase_3_world_grounding",
+    "claim_role": "world_grounding_gate",
+    "claim_state": "hypothesis",
+    "maturity": "L1_theoretical_only",
+    "conceptually_after": [
+      "UMWELT0",
+      "UMWELT-S",
+      "W02",
+      "W06",
+      "G05"
+    ],
+    "risk_tags": [
+      "knowledge_hint_as_action",
+      "encyclopedia_as_oracle",
+      "hint_as_lived_evidence",
+      "locked_recipe_used",
+      "slot_unlock_without_public_discovery",
+      "source_ref_missing"
+    ]
+  },
+  {
+    "code": "MICRO1",
+    "title": "Universal Micro-Operation Frame",
+    "desc": "Defines a portable MicroOperationFrame for pressure/need, target affordance, required capability/resource/risk refs, expected effect, AP01 request, observed effect, residue, learning/value updates and next-pressure refs.",
+    "after": "UMWELT-S",
+    "track": "build",
+    "line": "agency_affordance",
+    "status": "later",
+    "priority_bucket": "phase_3_world_grounding",
+    "claim_role": "supporting_agency_gate",
+    "claim_state": "hypothesis",
+    "maturity": "L1_theoretical_only",
+    "conceptually_after": [
+      "A01",
+      "A02",
+      "A03",
+      "A04",
+      "P02",
+      "RT01",
+      "UMWELT0"
+    ],
+    "risk_tags": [
+      "macro_action_bypasses_micro_graph",
+      "operation_without_public_basis",
+      "operation_emits_ap01_directly",
+      "effect_without_request_ref",
+      "residue_erased"
+    ]
+  },
+  {
+    "code": "COST1",
+    "title": "Action Cost & Efficiency Comparison",
+    "desc": "Adds bounded action-economy comparison for candidate routes/actions using material, energy, time, tool wear, setup, throughput, station occupation, route, risk and uncertainty cost vectors without becoming an action selector or planner.",
+    "after": "MICRO1",
+    "track": "build",
+    "line": "agency_affordance",
+    "status": "later",
+    "priority_bucket": "phase_3_world_grounding",
+    "claim_role": "supporting_agency_gate",
+    "claim_state": "hypothesis",
+    "maturity": "L1_theoretical_only",
+    "conceptually_after": [
+      "MICRO1",
+      "P03",
+      "W02",
+      "W06",
+      "K-SURF1"
+    ],
+    "risk_tags": [
+      "declared_cost_as_observed",
+      "cost_comparison_selects_action",
+      "cost_single_scalar_hides_depletion",
+      "cost_ignores_current_pressure_context",
+      "cost_mismatch_erased",
+      "throughput_claim_without_repetition"
+    ]
+  },
+  {
+    "code": "WORLD0",
+    "title": "Generic Subject World Runner",
+    "desc": "Creates a generic runner that schedules observe/contact -> subject_tick -> AP01 envelope -> backend execution -> WorldEffectFrame feedback over a WorldAdapterSpec/ContactSpec, without choosing actions or hardcoding a factory demo.",
+    "after": "UMWELT-S",
+    "track": "build",
+    "line": "world_embodiment",
+    "status": "later",
+    "priority_bucket": "phase_3_world_grounding",
+    "claim_role": "world_grounding_gate",
+    "claim_state": "hypothesis",
+    "maturity": "L1_theoretical_only",
+    "conceptually_after": [
+      "AB-INT",
+      "UMWELT0",
+      "UMWELT-S",
+      "RT01",
+      "W01",
+      "A04"
+    ],
+    "risk_tags": [
+      "runner_bypasses_subject_tick",
+      "adapter_selects_action",
+      "AP01_bypass",
+      "backend_specific_logic_in_substrate",
+      "scenario_label_decision",
+      "factory_runner_hardcodes_solution"
+    ]
+  },
+  {
+    "code": "P17B",
+    "title": "Live Symbolic Mini-Factory Run",
+    "desc": "Runs a bounded symbolic mini-factory loop from public need to candidate constraints, ACP01/AP01 request, world effect, intermediate verification, residue blocking or chain advance, without hardcoded solution truth or mature automation.",
+    "after": "WORLD0",
+    "track": "build",
+    "line": "world_embodiment",
+    "status": "later",
+    "priority_bucket": "phase_3_world_grounding",
+    "claim_role": "validation_gate",
+    "claim_state": "hypothesis",
+    "maturity": "L1_theoretical_only",
+    "conceptually_after": [
+      "WORLD0",
+      "MICRO1",
+      "COST1",
+      "AB-INT",
+      "W06"
+    ],
+    "risk_tags": [
+      "step_selected_without_need",
+      "downstream_without_verified_intermediate",
+      "live_completion_without_effects",
+      "factory_runner_bypasses_AP01",
+      "residue_not_stopping_loop",
+      "recipe_candidate_as_skill",
+      "hidden_recipe_as_plan"
+    ]
+  },
+  {
+    "code": "EXP1",
+    "title": "Unknown Resource Inquiry",
+    "desc": "Builds a loop for investigating unknown public resources through uncertainty/frontier, AB4 inspect/sample/compare basis, ACP01/AP01, public effects and provisional identity/value/recipe candidate updates without hidden identity oracle.",
+    "after": "WORLD0",
+    "track": "build",
+    "line": "world_regularities",
+    "status": "later",
+    "priority_bucket": "phase_3_world_grounding",
+    "claim_role": "world_grounding_gate",
+    "claim_state": "hypothesis",
+    "maturity": "L1_theoretical_only",
+    "conceptually_after": [
+      "AB-INT",
+      "UMWELT0",
+      "UMWELT-S",
+      "W02",
+      "W06",
+      "G05"
+    ],
+    "risk_tags": [
+      "exploration_without_uncertainty",
+      "inspect_without_public_unknown",
+      "hidden_identity_leak",
+      "resource_name_as_identity",
+      "inquiry_bypasses_AP01",
+      "infinite_reinspect_without_progress"
+    ]
+  },
+  {
+    "code": "K1",
+    "title": "Encyclopedia as Affordance",
+    "desc": "Implements encyclopedia/JEI-style locked and partial knowledge cells as source-bound hints unlocked through public resource inquiry, feeding candidates and tests but never mature recipes, direct value, actions or factory completion.",
+    "after": "EXP1",
+    "track": "build",
+    "line": "world_regularities",
+    "status": "later",
+    "priority_bucket": "phase_3_world_grounding",
+    "claim_role": "world_grounding_gate",
+    "claim_state": "hypothesis",
+    "maturity": "L1_theoretical_only",
+    "conceptually_after": [
+      "K-SURF1",
+      "EXP1",
+      "UMWELT-S",
+      "W06",
+      "G05"
+    ],
+    "risk_tags": [
+      "encyclopedia_as_oracle",
+      "locked_recipe_used",
+      "recipe_slot_opens_without_public_discovery",
+      "encyclopedia_directly_emits_action",
+      "text_hint_as_mature_recipe",
+      "hint_as_lived_evidence"
+    ]
+  },
+  {
+    "code": "PATH1",
+    "title": "Spatial Route and Infrastructure Layout",
+    "desc": "Adds bounded route/infrastructure layout proposals from public map/obstacle/site refs with segment-by-segment AP01/effect verification and residue/repair on failed segment, without treating planner output as world truth.",
+    "after": "K1",
+    "track": "build",
+    "line": "world_embodiment",
+    "status": "later",
+    "priority_bucket": "phase_3_world_grounding",
+    "claim_role": "world_grounding_gate",
+    "claim_state": "hypothesis",
+    "maturity": "L1_theoretical_only",
+    "conceptually_after": [
+      "WORLD0",
+      "MICRO1",
+      "UMWELT-S",
+      "W01",
+      "W06"
+    ],
+    "risk_tags": [
+      "route_ignores_obstacle",
+      "segment_placed_without_AP01",
+      "segment_placed_without_effect",
+      "planner_output_as_world_truth",
+      "failed_segment_erased",
+      "layout_completion_without_all_segments"
+    ]
+  },
+  {
+    "code": "P18",
+    "title": "Cross-Backend Portability",
+    "desc": "Tests the same invariant subject core, Contact IR, WORLD0 runner and AP01/effect loop over materially different symbolic backends to catch backend-specific assumption leaks and prove world changes happen through ContactSpec/backend binding.",
+    "after": "PATH1",
+    "track": "build",
+    "line": "observability",
+    "status": "later",
+    "priority_bucket": "phase_3_world_grounding",
+    "claim_role": "validation_gate",
+    "claim_state": "hypothesis",
+    "maturity": "L1_theoretical_only",
+    "conceptually_after": [
+      "WORLD0",
+      "P17B",
+      "EXP1",
+      "K1",
+      "PATH1",
+      "UMWELT-S"
+    ],
+    "risk_tags": [
+      "backend_specific_assumption_leak",
+      "contactspec_requires_minecraft_semantics",
+      "runner_hardcodes_factory_backend",
+      "portability_without_same_subject_core",
+      "adapter_truth_oracle"
+    ]
+  },
+  {
+    "code": "P19",
+    "title": "Public Evidence Bundle / External Reviewer Pack",
+    "desc": "Exports externally reviewable traces, hashes, configs, public/eval split, baselines, ablations, falsifier results, failed runs and claim labels for the bounded symbolic open-world subject contour.",
+    "after": "P18",
+    "track": "build",
+    "line": "observability",
+    "status": "later",
+    "priority_bucket": "phase_2_long_run_validation_backbone",
+    "claim_role": "validation_gate",
+    "claim_state": "hypothesis",
+    "maturity": "L1_theoretical_only",
+    "conceptually_after": [
+      "P18",
+      "D01",
+      "RT01"
+    ],
+    "risk_tags": [
+      "missing_trace_hashes",
+      "sealed_eval_not_separated",
+      "claim_without_artifact",
+      "evidence_bundle_hides_failed_runs",
+      "reviewer_cannot_replay_or_inspect",
+      "claim_overreach_umwelt"
+    ]
+  },
+  {
+    "code": "ACTLEARN1",
+    "title": "Micro-Operation and Option Candidate Learning",
+    "desc": "Forms provisional action-schema candidates from public AP01/effect traces, failures, residues, missing-precondition hypotheses, costs and abduction without one-shot skill maturity or adapter-provided macro-action claims.",
+    "after": "P19",
+    "track": "build",
+    "line": "agency_affordance",
+    "status": "later",
+    "priority_bucket": "phase_6_post_claim_extension",
+    "claim_role": "post_claim_extension",
+    "claim_state": "hypothesis",
+    "maturity": "L1_theoretical_only",
+    "conceptually_after": [
+      "MICRO1",
+      "COST1",
+      "P17B",
+      "P18",
+      "A02",
+      "P03",
+      "W06"
+    ],
+    "risk_tags": [
+      "one_success_becomes_skill",
+      "external_demo_becomes_skill",
+      "hidden_backend_precondition_used",
+      "option_without_effect_trace",
+      "macro_action_bypasses_micro_graph",
+      "failed_trace_erased",
+      "adapter_provided_action_claimed_learned"
+    ]
+  },
+  {
+    "code": "OPTION1",
+    "title": "Reusable Option Candidate Gates",
+    "desc": "Defines maturity gates for reusable option/action-schema candidates, requiring repeated effect traces, preconditions, cost/risk context, failure/confounder preservation and no hidden truth before any stable provisional option can be reused.",
+    "after": "ACTLEARN1",
+    "track": "build",
+    "line": "agency_affordance",
+    "status": "later",
+    "priority_bucket": "phase_6_post_claim_extension",
+    "claim_role": "post_claim_extension",
+    "claim_state": "hypothesis",
+    "maturity": "L1_theoretical_only",
+    "conceptually_after": [
+      "ACTLEARN1",
+      "MICRO1",
+      "COST1",
+      "P03",
+      "W06"
+    ],
+    "risk_tags": [
+      "option_without_effect_trace",
+      "one_success_becomes_skill",
+      "option_reused_outside_preconditions",
+      "confounder_erased",
+      "cost_context_erased",
+      "skill_claim_without_ablation"
+    ]
+  }
+]
