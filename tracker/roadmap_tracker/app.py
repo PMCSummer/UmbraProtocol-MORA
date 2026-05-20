@@ -85,6 +85,22 @@ try:
         Phase,
         RoadmapModel,
     )
+    from .ideas import (
+        DEFAULT_IDEA_FILE,
+        IDEA_CATEGORIES,
+        IDEA_CLARITY,
+        IDEA_PRIORITIES,
+        IDEA_STATUSES,
+        IDEA_TARGET_LAYERS,
+        create_idea,
+        duplicate_idea,
+        export_ready_ideas_to_bulk,
+        idea_to_markdown,
+        idea_to_phase_skeleton,
+        load_store,
+        save_store,
+        update_idea_timestamp,
+    )
 except ImportError:
     from model import (
         CLAIM_ROLE_LABELS,
@@ -128,6 +144,22 @@ except ImportError:
         LegacyRoadmapParser,
         Phase,
         RoadmapModel,
+    )
+    from ideas import (
+        DEFAULT_IDEA_FILE,
+        IDEA_CATEGORIES,
+        IDEA_CLARITY,
+        IDEA_PRIORITIES,
+        IDEA_STATUSES,
+        IDEA_TARGET_LAYERS,
+        create_idea,
+        duplicate_idea,
+        export_ready_ideas_to_bulk,
+        idea_to_markdown,
+        idea_to_phase_skeleton,
+        load_store,
+        save_store,
+        update_idea_timestamp,
     )
 
 UI_FONT_FAMILY = "Exo 2"
@@ -904,6 +936,10 @@ class MainWindow(QMainWindow):
         self.current_gate_code: Optional[str] = None
         self.current_node_id: Optional[str] = None
         self.current_evidence_id: Optional[str] = None
+        self.current_workbench_phase_code: Optional[str] = None
+        self.current_idea_id: Optional[str] = None
+        self.idea_store_path = Path(__file__).resolve().parents[1] / DEFAULT_IDEA_FILE
+        self.idea_store: Dict[str, Any] = load_store(self.idea_store_path)
 
         self._build_actions()
         self._build_ui()
@@ -953,20 +989,29 @@ class MainWindow(QMainWindow):
         root_layout.addWidget(self.tabs, 1)
 
         self.tab_phases = QWidget()
+        self.tab_overview = QWidget()
+        self.tab_workbench = QWidget()
+        self.tab_ideas = QWidget()
         self.tab_governance = QWidget()
         self.tab_graph = QWidget()
         self.tab_evidence = QWidget()
         self.tab_claim = QWidget()
         self.tab_summary = QWidget()
 
+        self.tabs.addTab(self.tab_overview, "FULL PICTURE")
         self.tabs.addTab(self.tab_phases, "PHASE INDEX")
+        self.tabs.addTab(self.tab_workbench, "PHASE WORKBENCH")
+        self.tabs.addTab(self.tab_ideas, "IDEA INCUBATION")
         self.tabs.addTab(self.tab_governance, "GATES")
         self.tabs.addTab(self.tab_graph, "SIGNAL MAP")
         self.tabs.addTab(self.tab_evidence, "EVIDENCE ARCHIVE")
         self.tabs.addTab(self.tab_claim, "CLAIM LADDER")
         self.tabs.addTab(self.tab_summary, "SYSTEM SUMMARY")
 
+        self._build_overview_tab()
         self._build_phases_tab()
+        self._build_workbench_tab()
+        self._build_ideas_tab()
         self._build_governance_tab()
         self._build_graph_tab()
         self._build_evidence_tab()
@@ -988,6 +1033,255 @@ class MainWindow(QMainWindow):
         table.setWordWrap(False)
         table.setFocusPolicy(Qt.StrongFocus)
         table.setStyleSheet("QTableWidget { border: 1px solid #2d333b; }")
+
+    def _build_overview_tab(self) -> None:
+        layout = QVBoxLayout(self.tab_overview)
+        filters = QHBoxLayout()
+        self.overview_search = QLineEdit()
+        self.overview_search.setPlaceholderText("Search by code/title/objective/risk tag…")
+        self.overview_search.textChanged.connect(self.refresh_overview_view)
+        self.overview_status_filter = QComboBox()
+        self.overview_status_filter.addItems(["ALL", *STATUS_LABELS.values()])
+        self.overview_status_filter.currentTextChanged.connect(self.refresh_overview_view)
+        self.overview_track_filter = QComboBox()
+        self.overview_track_filter.addItems(["ALL", *TRACK_LABELS.values()])
+        self.overview_track_filter.currentTextChanged.connect(self.refresh_overview_view)
+        self.overview_priority_filter = QComboBox()
+        self.overview_priority_filter.addItems(["ALL", *PRIORITY_LABELS.values()])
+        self.overview_priority_filter.currentTextChanged.connect(self.refresh_overview_view)
+        self.overview_risk_filter = QLineEdit()
+        self.overview_risk_filter.setPlaceholderText("risk tag contains…")
+        self.overview_risk_filter.textChanged.connect(self.refresh_overview_view)
+        for label, widget in [
+            ("QUERY", self.overview_search),
+            ("STATE", self.overview_status_filter),
+            ("TRACK", self.overview_track_filter),
+            ("PRIORITY", self.overview_priority_filter),
+            ("RISK", self.overview_risk_filter),
+        ]:
+            filters.addWidget(QLabel(label))
+            filters.addWidget(widget)
+        layout.addLayout(filters)
+
+        splitter = QSplitter()
+        layout.addWidget(splitter, 1)
+
+        self.overview_table = QTableWidget(0, 5)
+        self.overview_table.setHorizontalHeaderLabels(["CODE", "TITLE", "STATE", "TRACK", "PRIORITY"])
+        self.overview_table.setSelectionBehavior(QTableWidget.SelectRows)
+        self.overview_table.setSelectionMode(QTableWidget.SingleSelection)
+        self.overview_table.verticalHeader().setVisible(False)
+        self._configure_table(self.overview_table)
+        self.overview_table.itemSelectionChanged.connect(self._on_overview_row_selected)
+        splitter.addWidget(self.overview_table)
+
+        right = QWidget()
+        splitter.addWidget(right)
+        splitter.setStretchFactor(0, 5)
+        splitter.setStretchFactor(1, 6)
+        right_layout = QVBoxLayout(right)
+        self.overview_metrics_text = QTextEdit()
+        self.overview_metrics_text.setReadOnly(True)
+        right_layout.addWidget(self.overview_metrics_text, 1)
+        self.overview_missing_text = QTextEdit()
+        self.overview_missing_text.setReadOnly(True)
+        right_layout.addWidget(self.overview_missing_text, 1)
+
+    def _build_workbench_tab(self) -> None:
+        layout = QVBoxLayout(self.tab_workbench)
+        splitter = QSplitter()
+        layout.addWidget(splitter, 1)
+
+        left = QWidget()
+        left_layout = QVBoxLayout(left)
+        wb_filters = QHBoxLayout()
+        self.workbench_search = QLineEdit()
+        self.workbench_search.setPlaceholderText("Search phase code/title…")
+        self.workbench_search.textChanged.connect(self.refresh_workbench_phase_table)
+        self.workbench_track_filter = QComboBox()
+        self.workbench_track_filter.addItems(["ALL", *TRACK_LABELS.values()])
+        self.workbench_track_filter.currentTextChanged.connect(self.refresh_workbench_phase_table)
+        self.workbench_status_filter = QComboBox()
+        self.workbench_status_filter.addItems(["ALL", *STATUS_LABELS.values()])
+        self.workbench_status_filter.currentTextChanged.connect(self.refresh_workbench_phase_table)
+        wb_filters.addWidget(QLabel("QUERY"))
+        wb_filters.addWidget(self.workbench_search)
+        wb_filters.addWidget(QLabel("TRACK"))
+        wb_filters.addWidget(self.workbench_track_filter)
+        wb_filters.addWidget(QLabel("STATE"))
+        wb_filters.addWidget(self.workbench_status_filter)
+        left_layout.addLayout(wb_filters)
+
+        self.workbench_phase_table = QTableWidget(0, 4)
+        self.workbench_phase_table.setHorizontalHeaderLabels(["CODE", "TITLE", "STATE", "TRACK"])
+        self.workbench_phase_table.setSelectionBehavior(QTableWidget.SelectRows)
+        self.workbench_phase_table.setSelectionMode(QTableWidget.SingleSelection)
+        self.workbench_phase_table.verticalHeader().setVisible(False)
+        self._configure_table(self.workbench_phase_table)
+        self.workbench_phase_table.itemSelectionChanged.connect(self.on_workbench_phase_selected)
+        left_layout.addWidget(self.workbench_phase_table, 1)
+        splitter.addWidget(left)
+
+        right = QWidget()
+        right_layout = QVBoxLayout(right)
+        self.workbench_phase_card = QTextEdit()
+        self.workbench_phase_card.setReadOnly(True)
+        right_layout.addWidget(self.workbench_phase_card, 1)
+
+        self.workbench_todo_tabs = QTabWidget()
+        self.workbench_todo_structured = QTextEdit()
+        self.workbench_todo_structured.setReadOnly(True)
+        self.workbench_todo_raw = QPlainTextEdit()
+        self.workbench_todo_raw.setReadOnly(True)
+        self.workbench_todo_tabs.addTab(self.workbench_todo_structured, "TODO Structured")
+        self.workbench_todo_tabs.addTab(self.workbench_todo_raw, "TODO Raw JSON")
+        right_layout.addWidget(self.workbench_todo_tabs, 1)
+
+        prompt_buttons = QGridLayout()
+        self.wb_copy_todo_btn = QPushButton("Copy TODO JSON")
+        self.wb_copy_todo_btn.clicked.connect(self.copy_workbench_todo_json)
+        self.wb_copy_phase_btn = QPushButton("Copy Phase Skeleton JSON")
+        self.wb_copy_phase_btn.clicked.connect(self.copy_workbench_phase_json)
+        self.wb_copy_build_btn = QPushButton("Copy BUILD Prompt Seed")
+        self.wb_copy_build_btn.clicked.connect(lambda: self.copy_workbench_prompt_seed("BUILD"))
+        self.wb_copy_audit_btn = QPushButton("Copy AUDIT Prompt Seed")
+        self.wb_copy_audit_btn.clicked.connect(lambda: self.copy_workbench_prompt_seed("AUDIT"))
+        self.wb_copy_hard_btn = QPushButton("Copy HARDENING Prompt Seed")
+        self.wb_copy_hard_btn.clicked.connect(lambda: self.copy_workbench_prompt_seed("HARDENING"))
+        prompt_buttons.addWidget(self.wb_copy_todo_btn, 0, 0)
+        prompt_buttons.addWidget(self.wb_copy_phase_btn, 0, 1)
+        prompt_buttons.addWidget(self.wb_copy_build_btn, 1, 0)
+        prompt_buttons.addWidget(self.wb_copy_audit_btn, 1, 1)
+        prompt_buttons.addWidget(self.wb_copy_hard_btn, 1, 2)
+        right_layout.addLayout(prompt_buttons)
+        splitter.addWidget(right)
+        splitter.setStretchFactor(0, 4)
+        splitter.setStretchFactor(1, 7)
+
+    def _build_ideas_tab(self) -> None:
+        layout = QVBoxLayout(self.tab_ideas)
+        top_filters = QHBoxLayout()
+        self.idea_search = QLineEdit()
+        self.idea_search.setPlaceholderText("Search idea title/summary/notes…")
+        self.idea_search.textChanged.connect(self.refresh_idea_table)
+        self.idea_category_filter = QComboBox()
+        self.idea_category_filter.addItems(["ALL", *sorted(IDEA_CATEGORIES)])
+        self.idea_category_filter.currentTextChanged.connect(self.refresh_idea_table)
+        self.idea_status_filter = QComboBox()
+        self.idea_status_filter.addItems(["ALL", *sorted(IDEA_STATUSES)])
+        self.idea_status_filter.currentTextChanged.connect(self.refresh_idea_table)
+        self.idea_clarity_filter = QComboBox()
+        self.idea_clarity_filter.addItems(["ALL", *sorted(IDEA_CLARITY)])
+        self.idea_clarity_filter.currentTextChanged.connect(self.refresh_idea_table)
+        self.idea_priority_filter = QComboBox()
+        self.idea_priority_filter.addItems(["ALL", *sorted(IDEA_PRIORITIES)])
+        self.idea_priority_filter.currentTextChanged.connect(self.refresh_idea_table)
+        for label, widget in [
+            ("QUERY", self.idea_search),
+            ("CATEGORY", self.idea_category_filter),
+            ("STATUS", self.idea_status_filter),
+            ("CLARITY", self.idea_clarity_filter),
+            ("PRIORITY", self.idea_priority_filter),
+        ]:
+            top_filters.addWidget(QLabel(label))
+            top_filters.addWidget(widget)
+        layout.addLayout(top_filters)
+
+        splitter = QSplitter()
+        layout.addWidget(splitter, 1)
+
+        left = QWidget()
+        left_layout = QVBoxLayout(left)
+        self.idea_table = QTableWidget(0, 6)
+        self.idea_table.setHorizontalHeaderLabels(["ID", "TITLE", "CATEGORY", "STATUS", "CLARITY", "PRIORITY"])
+        self.idea_table.setSelectionBehavior(QTableWidget.SelectRows)
+        self.idea_table.setSelectionMode(QTableWidget.ExtendedSelection)
+        self.idea_table.verticalHeader().setVisible(False)
+        self._configure_table(self.idea_table)
+        self.idea_table.itemSelectionChanged.connect(self.on_idea_selected)
+        left_layout.addWidget(self.idea_table, 1)
+
+        idea_buttons = QGridLayout()
+        add_btn = QPushButton("Add Idea")
+        add_btn.clicked.connect(self.add_idea)
+        dup_btn = QPushButton("Duplicate Idea")
+        dup_btn.clicked.connect(self.duplicate_selected_idea)
+        del_btn = QPushButton("Delete Idea")
+        del_btn.clicked.connect(self.delete_selected_idea)
+        save_btn = QPushButton("Save Ideas")
+        save_btn.clicked.connect(self.save_ideas_store)
+        reload_btn = QPushButton("Reload Ideas")
+        reload_btn.clicked.connect(self.reload_ideas_store)
+        idea_buttons.addWidget(add_btn, 0, 0)
+        idea_buttons.addWidget(dup_btn, 0, 1)
+        idea_buttons.addWidget(del_btn, 0, 2)
+        idea_buttons.addWidget(save_btn, 1, 0)
+        idea_buttons.addWidget(reload_btn, 1, 1)
+        left_layout.addLayout(idea_buttons)
+        splitter.addWidget(left)
+
+        right = QWidget()
+        right_layout = QGridLayout(right)
+        self.idea_id_label = QLabel("ID: —")
+        self.idea_ready_label = QLabel("Ready candidate: no")
+        self.idea_title_edit = QLineEdit()
+        self.idea_summary_edit = QPlainTextEdit()
+        self.idea_category_combo = QComboBox()
+        self.idea_category_combo.addItems(sorted(IDEA_CATEGORIES))
+        self.idea_status_combo = QComboBox()
+        self.idea_status_combo.addItems(sorted(IDEA_STATUSES))
+        self.idea_clarity_combo = QComboBox()
+        self.idea_clarity_combo.addItems(sorted(IDEA_CLARITY))
+        self.idea_priority_combo = QComboBox()
+        self.idea_priority_combo.addItems(sorted(IDEA_PRIORITIES))
+        self.idea_target_layer_combo = QComboBox()
+        self.idea_target_layer_combo.addItems(sorted(IDEA_TARGET_LAYERS))
+        self.idea_linked_phases_edit = QPlainTextEdit()
+        self.idea_blockers_edit = QPlainTextEdit()
+        self.idea_falsifiers_edit = QPlainTextEdit()
+        self.idea_notes_edit = QPlainTextEdit()
+        self.idea_bulk_preview = QPlainTextEdit()
+        self.idea_bulk_preview.setReadOnly(True)
+        self.idea_bulk_preview.setPlaceholderText("Bulk-add compatible JSON preview appears here.")
+        row = 0
+        right_layout.addWidget(self.idea_id_label, row, 0, 1, 2)
+        right_layout.addWidget(self.idea_ready_label, row, 2, 1, 2)
+        row += 1
+        for label, widget in [
+            ("Title", self.idea_title_edit),
+            ("Summary", self.idea_summary_edit),
+            ("Category", self.idea_category_combo),
+            ("Status", self.idea_status_combo),
+            ("Implementation clarity", self.idea_clarity_combo),
+            ("Priority", self.idea_priority_combo),
+            ("Target layer", self.idea_target_layer_combo),
+            ("Linked phase codes (one per line)", self.idea_linked_phases_edit),
+            ("Blockers (one per line)", self.idea_blockers_edit),
+            ("Falsifiers to resolve (one per line)", self.idea_falsifiers_edit),
+            ("Notes", self.idea_notes_edit),
+            ("Bulk JSON preview", self.idea_bulk_preview),
+        ]:
+            right_layout.addWidget(QLabel(label), row, 0)
+            right_layout.addWidget(widget, row, 1, 1, 3)
+            row += 1
+
+        actions = QGridLayout()
+        apply_btn = QPushButton("Apply Form To Idea")
+        apply_btn.clicked.connect(self.apply_idea_form)
+        copy_md_btn = QPushButton("Copy Idea as Markdown")
+        copy_md_btn.clicked.connect(self.copy_idea_markdown)
+        copy_phase_btn = QPushButton("Copy as Phase Skeleton")
+        copy_phase_btn.clicked.connect(self.copy_idea_phase_skeleton)
+        export_ready_btn = QPushButton("Export Ready Ideas Bulk Preview")
+        export_ready_btn.clicked.connect(self.export_ready_ideas_preview)
+        actions.addWidget(apply_btn, 0, 0)
+        actions.addWidget(copy_md_btn, 0, 1)
+        actions.addWidget(copy_phase_btn, 1, 0)
+        actions.addWidget(export_ready_btn, 1, 1)
+        right_layout.addLayout(actions, row, 0, 1, 4)
+        splitter.addWidget(right)
+        splitter.setStretchFactor(0, 4)
+        splitter.setStretchFactor(1, 7)
 
     def _build_phases_tab(self) -> None:
         layout = QVBoxLayout(self.tab_phases)
@@ -1526,12 +1820,15 @@ class MainWindow(QMainWindow):
     # ---------- Refresh ----------
     def refresh_all_views(self, select_first: bool = False) -> None:
         self._rebuild_phase_order_cache()
+        self.refresh_overview_view(select_first=select_first)
         self.refresh_phase_table(select_first=select_first)
+        self.refresh_workbench_phase_table(select_first=select_first)
         self.refresh_gate_table(select_first=select_first)
         self.refresh_graph_scene()
         self.refresh_evidence_table(select_first=select_first)
         self.refresh_claim_view()
         self.refresh_summary_view()
+        self.refresh_idea_table(select_first=select_first)
         self.highest_claim_label.setText(f"CLAIM CEILING // {self.compute_highest_admissible_claim()}")
 
     def _rebuild_phase_order_cache(self) -> None:
@@ -1586,6 +1883,173 @@ class MainWindow(QMainWindow):
                     order_codes.append(code)
 
         self.phase_display_order = [code_to_index[code] for code in order_codes]
+
+    def refresh_overview_view(self, select_first: bool = False) -> None:
+        query = self.overview_search.text().strip().lower()
+        status_filter = self.overview_status_filter.currentText()
+        track_filter = self.overview_track_filter.currentText()
+        priority_filter = self.overview_priority_filter.currentText()
+        risk_filter = self.overview_risk_filter.text().strip().lower()
+
+        self.overview_table.setRowCount(0)
+        filtered_phases: List[Phase] = []
+        for idx in self.phase_display_order:
+            phase = self.model.phases[idx]
+            if query and query not in phase.searchable_blob():
+                continue
+            if status_filter != "ALL" and phase.display_status != status_filter:
+                continue
+            if track_filter != "ALL" and phase.display_track != track_filter:
+                continue
+            if priority_filter != "ALL" and phase.display_priority_bucket != priority_filter:
+                continue
+            if risk_filter and all(risk_filter not in tag.lower() for tag in phase.risk_tags):
+                continue
+            filtered_phases.append(phase)
+            row = self.overview_table.rowCount()
+            self.overview_table.insertRow(row)
+            values = [phase.code, phase.title, phase.display_status, phase.display_track, phase.display_priority_bucket]
+            for col, value in enumerate(values):
+                item = QTableWidgetItem(value)
+                if col == 0:
+                    item.setData(Qt.UserRole, phase.code)
+                if phase.status in STATUS_COLORS:
+                    item.setForeground(STATUS_COLORS[phase.status])
+                self.overview_table.setItem(row, col, item)
+        self.overview_table.resizeColumnsToContents()
+
+        metrics = self.model.archive_metrics()
+        status_counts: Dict[str, int] = defaultdict(int)
+        track_counts: Dict[str, int] = defaultdict(int)
+        validation_counts: Dict[str, int] = defaultdict(int)
+        claim_counts: Dict[str, int] = defaultdict(int)
+        todo_like: List[str] = []
+        high_priority: List[str] = []
+        for phase in self.model.phases:
+            status_counts[phase.display_status] += 1
+            track_counts[phase.display_track] += 1
+            validation_counts[phase.display_validation_state] += 1
+            claim_counts[phase.display_claim_state] += 1
+            if phase.status in {"later", "proposed"} or phase.validation_state == "planned":
+                todo_like.append(phase.code)
+            if phase.priority_bucket in {"phase_1_honesty_and_protection", "phase_2_long_run_validation_backbone", "phase_3_world_grounding"}:
+                high_priority.append(phase.code)
+
+        overview_lines: List[str] = [
+            f"Phase count: {len(self.model.phases)}",
+            f"Evidence count: {metrics.get('evidence', 0)}",
+            f"Graph nodes/edges: {metrics.get('nodes', 0)} / {metrics.get('edges', 0)}",
+            "",
+            "By status:",
+        ]
+        overview_lines.extend(f"- {key}: {value}" for key, value in sorted(status_counts.items()))
+        overview_lines.extend(["", "By track:"])
+        overview_lines.extend(f"- {key}: {value}" for key, value in sorted(track_counts.items()))
+        overview_lines.extend(["", "By validation_state:"])
+        overview_lines.extend(f"- {key}: {value}" for key, value in sorted(validation_counts.items()))
+        overview_lines.extend(["", "By claim_state:"])
+        overview_lines.extend(f"- {key}: {value}" for key, value in sorted(claim_counts.items()))
+        overview_lines.extend(["", f"TODO/planned phases: {len(todo_like)}", ", ".join(todo_like[:20]) or "—"])
+        overview_lines.extend(["", f"Priority sample: {', '.join(high_priority[:20]) or '—'}"])
+        overview_lines.extend(["", f"Filtered visible phases: {len(filtered_phases)}"])
+        self.overview_metrics_text.setPlainText("\n".join(overview_lines))
+
+        no_objective = [p.code for p in self.model.phases if not str((p.spec or {}).get("objective", "")).strip()]
+        no_functional = [p.code for p in self.model.phases if not p.knowledge_card.functional_role.strip()]
+        no_falsifiers_or_tests = [
+            p.code for p in self.model.phases
+            if not p.knowledge_card.falsifiers or not p.knowledge_card.tests
+        ]
+        no_dependencies = [p.code for p in self.model.phases if not p.after and not p.conceptually_after]
+        missing_lines = [
+            "Missing/empty key fields summary:",
+            f"- empty spec.objective: {len(no_objective)}",
+            f"- empty knowledge_card.functional_role: {len(no_functional)}",
+            f"- empty falsifiers/tests: {len(no_falsifiers_or_tests)}",
+            f"- no after/conceptually_after: {len(no_dependencies)}",
+            "",
+            "Sample codes:",
+            f"objective: {', '.join(no_objective[:15]) or '—'}",
+            f"functional_role: {', '.join(no_functional[:15]) or '—'}",
+            f"falsifiers/tests: {', '.join(no_falsifiers_or_tests[:15]) or '—'}",
+            f"dependencies: {', '.join(no_dependencies[:15]) or '—'}",
+        ]
+        self.overview_missing_text.setPlainText("\n".join(missing_lines))
+        if select_first and self.overview_table.rowCount() > 0:
+            self.overview_table.selectRow(0)
+
+    def refresh_workbench_phase_table(self, select_first: bool = False) -> None:
+        query = self.workbench_search.text().strip().lower()
+        track_filter = self.workbench_track_filter.currentText()
+        status_filter = self.workbench_status_filter.currentText()
+        self.workbench_phase_table.setRowCount(0)
+        for idx in self.phase_display_order:
+            phase = self.model.phases[idx]
+            if query and query not in phase.searchable_blob():
+                continue
+            if track_filter != "ALL" and phase.display_track != track_filter:
+                continue
+            if status_filter != "ALL" and phase.display_status != status_filter:
+                continue
+            row = self.workbench_phase_table.rowCount()
+            self.workbench_phase_table.insertRow(row)
+            values = [phase.code, phase.title, phase.display_status, phase.display_track]
+            for col, value in enumerate(values):
+                item = QTableWidgetItem(value)
+                if col == 0:
+                    item.setData(Qt.UserRole, phase.code)
+                if phase.status in STATUS_COLORS:
+                    item.setForeground(STATUS_COLORS[phase.status])
+                self.workbench_phase_table.setItem(row, col, item)
+        self.workbench_phase_table.resizeColumnsToContents()
+        if select_first and self.workbench_phase_table.rowCount() > 0:
+            self.workbench_phase_table.selectRow(0)
+
+    def refresh_idea_table(self, select_first: bool = False) -> None:
+        query = self.idea_search.text().strip().lower()
+        category_filter = self.idea_category_filter.currentText()
+        status_filter = self.idea_status_filter.currentText()
+        clarity_filter = self.idea_clarity_filter.currentText()
+        priority_filter = self.idea_priority_filter.currentText()
+        self.idea_table.setRowCount(0)
+        for idea in self.idea_store.get("ideas", []):
+            blob = " ".join(
+                [
+                    idea.get("id", ""),
+                    idea.get("title", ""),
+                    idea.get("summary", ""),
+                    idea.get("notes", ""),
+                    " ".join(idea.get("linked_phase_codes", []) or []),
+                ]
+            ).lower()
+            if query and query not in blob:
+                continue
+            if category_filter != "ALL" and idea.get("category") != category_filter:
+                continue
+            if status_filter != "ALL" and idea.get("status") != status_filter:
+                continue
+            if clarity_filter != "ALL" and idea.get("implementation_clarity") != clarity_filter:
+                continue
+            if priority_filter != "ALL" and idea.get("priority") != priority_filter:
+                continue
+            row = self.idea_table.rowCount()
+            self.idea_table.insertRow(row)
+            values = [
+                idea.get("id", ""),
+                idea.get("title", ""),
+                idea.get("category", ""),
+                idea.get("status", ""),
+                idea.get("implementation_clarity", ""),
+                idea.get("priority", ""),
+            ]
+            for col, value in enumerate(values):
+                item = QTableWidgetItem(str(value))
+                if col == 0:
+                    item.setData(Qt.UserRole, idea.get("id", ""))
+                self.idea_table.setItem(row, col, item)
+        self.idea_table.resizeColumnsToContents()
+        if select_first and self.idea_table.rowCount() > 0:
+            self.idea_table.selectRow(0)
 
     def refresh_phase_table(self, select_first: bool = False) -> None:
         query = self.phase_search.text().strip().lower()
@@ -1778,6 +2242,109 @@ class MainWindow(QMainWindow):
         self.summary_text.setPlainText("\n".join(lines).strip())
 
     # ---------- Selection ----------
+    def _on_overview_row_selected(self) -> None:
+        items = self.overview_table.selectedItems()
+        if not items:
+            return
+        code = items[0].data(Qt.UserRole)
+        if not code:
+            return
+        self._reselect_phase_row(str(code))
+
+    def on_workbench_phase_selected(self) -> None:
+        items = self.workbench_phase_table.selectedItems()
+        if not items:
+            return
+        code = items[0].data(Qt.UserRole)
+        phase = self.model.get_phase(code)
+        if not phase:
+            return
+        self.current_workbench_phase_code = phase.code
+        summary_lines = [
+            phase.protocol_label,
+            "",
+            f"status: {phase.display_status}",
+            f"track: {phase.display_track}",
+            f"line: {phase.line}",
+            f"after: {phase.after or '—'}",
+            f"conceptually_after: {', '.join(phase.conceptually_after) if phase.conceptually_after else '—'}",
+            f"implemented_after: {phase.implemented_after or '—'}",
+            f"validation_state: {phase.display_validation_state}",
+            f"claim_state: {phase.display_claim_state}",
+            f"maturity: {phase.display_maturity}",
+            f"priority_bucket: {phase.display_priority_bucket}",
+            f"risk_tags: {', '.join(phase.risk_tags) if phase.risk_tags else '—'}",
+            "",
+            "objective:",
+            str((phase.spec or {}).get("objective", "")).strip() or "—",
+            "",
+            "rationale:",
+            str((phase.spec or {}).get("rationale", "")).strip() or "—",
+            "",
+            "includes:",
+            *([f"- {x}" for x in ((phase.spec or {}).get("includes", []) or [])] or ["- —"]),
+            "",
+            "excludes:",
+            *([f"- {x}" for x in ((phase.spec or {}).get("excludes", []) or [])] or ["- —"]),
+            "",
+            "knowledge_card:",
+            f"- functional_role: {phase.knowledge_card.functional_role or '—'}",
+            f"- why_exists: {phase.knowledge_card.why_exists or '—'}",
+            f"- observables: {len(phase.knowledge_card.observables)}",
+            f"- failure_modes: {len(phase.knowledge_card.failure_modes)}",
+            f"- falsifiers: {len(phase.knowledge_card.falsifiers)}",
+            f"- tests: {len(phase.knowledge_card.tests)}",
+        ]
+        incoming = [
+            edge for edge in self.model.graph_edges
+            if edge.target == f"phase::{normalize_code(phase.code)}"
+        ]
+        outgoing = [
+            edge for edge in self.model.graph_edges
+            if edge.source == f"phase::{normalize_code(phase.code)}"
+        ]
+        summary_lines.extend(
+            [
+                "",
+                f"graph incoming edges: {len(incoming)}",
+                f"graph outgoing edges: {len(outgoing)}",
+            ]
+        )
+        self.workbench_phase_card.setPlainText("\n".join(summary_lines))
+        todo_payload = phase.to_todo_dict()
+        self.workbench_todo_raw.setPlainText(json.dumps(todo_payload, ensure_ascii=False, indent=2))
+        self.workbench_todo_structured.setPlainText(self._format_todo_structured(todo_payload))
+
+    def on_idea_selected(self) -> None:
+        items = self.idea_table.selectedItems()
+        if not items:
+            return
+        id_item = next((item for item in items if item.column() == 0 and item.data(Qt.UserRole)), None)
+        idea_id = id_item.data(Qt.UserRole) if id_item else None
+        if not idea_id:
+            return
+        idea = self._get_idea_by_id(str(idea_id))
+        if not idea:
+            return
+        self.current_idea_id = str(idea_id)
+        self.idea_id_label.setText(f"ID: {idea.get('id', '')}")
+        ready = (
+            idea.get("status") == "ready_for_phase"
+            and idea.get("implementation_clarity") == "clear"
+        )
+        self.idea_ready_label.setText("Ready candidate: yes" if ready else "Ready candidate: no")
+        self.idea_title_edit.setText(idea.get("title", ""))
+        self.idea_summary_edit.setPlainText(idea.get("summary", ""))
+        self.idea_category_combo.setCurrentText(idea.get("category", "other"))
+        self.idea_status_combo.setCurrentText(idea.get("status", "raw"))
+        self.idea_clarity_combo.setCurrentText(idea.get("implementation_clarity", "unclear"))
+        self.idea_priority_combo.setCurrentText(idea.get("priority", "medium"))
+        self.idea_target_layer_combo.setCurrentText(idea.get("target_layer", "unknown"))
+        self.idea_linked_phases_edit.setPlainText(list_to_textblock(idea.get("linked_phase_codes", [])))
+        self.idea_blockers_edit.setPlainText(list_to_textblock(idea.get("blockers", [])))
+        self.idea_falsifiers_edit.setPlainText(list_to_textblock(idea.get("falsifiers_to_resolve", [])))
+        self.idea_notes_edit.setPlainText(idea.get("notes", ""))
+
     def on_phase_selected(self) -> None:
         items = self.phase_table.selectedItems()
         if not items:
@@ -1805,6 +2372,7 @@ class MainWindow(QMainWindow):
         self.phase_notes_edit.setPlainText(phase.notes)
         self._populate_knowledge_editors(phase.knowledge_card)
         self._update_selection_inspector(self._render_phase_inspector(phase))
+        self._reselect_workbench_phase_row(phase.code)
 
     def on_gate_selected(self) -> None:
         items = self.gate_table.selectedItems()
@@ -2464,6 +3032,14 @@ class MainWindow(QMainWindow):
             if item and normalize_code(item.data(Qt.UserRole)) == normalize_code(code):
                 self.phase_table.selectRow(row)
                 return
+        self._reselect_workbench_phase_row(code)
+
+    def _reselect_workbench_phase_row(self, code: str) -> None:
+        for row in range(self.workbench_phase_table.rowCount()):
+            item = self.workbench_phase_table.item(row, 0)
+            if item and normalize_code(item.data(Qt.UserRole)) == normalize_code(code):
+                self.workbench_phase_table.selectRow(row)
+                return
 
     def _reselect_gate_row(self, code: str) -> None:
         for row in range(self.gate_table.rowCount()):
@@ -2478,6 +3054,232 @@ class MainWindow(QMainWindow):
             if item and item.data(Qt.UserRole) == evidence_id:
                 self.evidence_table.selectRow(row)
                 return
+
+    def _format_todo_structured(self, payload: Dict[str, Any]) -> str:
+        lines: List[str] = []
+        lines.append(f"{payload.get('code', '')} // {payload.get('title', '')}")
+        lines.append("")
+        lines.append("Objective")
+        lines.append(str(((payload.get("spec") or {}).get("objective", "")) or "—"))
+        lines.append("")
+        lines.append("Includes")
+        includes = ((payload.get("spec") or {}).get("includes", []) or [])
+        lines.extend(f"- {item}" for item in includes)
+        if not includes:
+            lines.append("- —")
+        lines.append("")
+        lines.append("Rationale")
+        lines.append(str(((payload.get("spec") or {}).get("rationale", "")) or "—"))
+        lines.append("")
+        lines.append("Excludes")
+        excludes = ((payload.get("spec") or {}).get("excludes", []) or [])
+        lines.extend(f"- {item}" for item in excludes)
+        if not excludes:
+            lines.append("- —")
+        lines.append("")
+        lines.append("Dependencies")
+        lines.append(f"- after: {payload.get('after') or '—'}")
+        cafter = payload.get("conceptually_after", []) or []
+        lines.append(f"- conceptually_after: {', '.join(cafter) if cafter else '—'}")
+        lines.append(f"- implemented_after: {payload.get('implemented_after') or '—'}")
+        lines.append("")
+        lines.append("Knowledge Card")
+        card = payload.get("knowledge_card", {}) or {}
+        lines.append(f"- functional_role: {card.get('functional_role') or '—'}")
+        lines.append(f"- authority: {card.get('authority') or '—'}")
+        lines.append(f"- uncertainty_policy: {card.get('uncertainty_policy') or '—'}")
+        lines.append(f"- falsifiers count: {len(card.get('falsifiers', []) or [])}")
+        lines.append(f"- tests count: {len(card.get('tests', []) or [])}")
+        return "\n".join(lines).strip()
+
+    def _workbench_selected_phase(self) -> Optional[Phase]:
+        if not self.current_workbench_phase_code:
+            return None
+        return self.model.get_phase(self.current_workbench_phase_code)
+
+    def copy_workbench_todo_json(self) -> None:
+        phase = self._workbench_selected_phase()
+        if not phase:
+            QMessageBox.information(self, "No phase selected", "Select a phase in the workbench first.")
+            return
+        QApplication.clipboard().setText(json.dumps(phase.to_todo_dict(), ensure_ascii=False, indent=2))
+        self.statusBar().showMessage(f"WORKBENCH TODO COPIED // {phase.code}")
+
+    def copy_workbench_phase_json(self) -> None:
+        phase = self._workbench_selected_phase()
+        if not phase:
+            QMessageBox.information(self, "No phase selected", "Select a phase in the workbench first.")
+            return
+        QApplication.clipboard().setText(json.dumps(phase.to_dict(), ensure_ascii=False, indent=2))
+        self.statusBar().showMessage(f"WORKBENCH PHASE JSON COPIED // {phase.code}")
+
+    def _build_prompt_seed(self, mode: str, phase: Phase) -> str:
+        deps = phase.dependency_codes()
+        dep_text = ", ".join(deps) if deps else "none"
+        objective = str((phase.spec or {}).get("objective", "")).strip() or "(objective missing)"
+        return (
+            f"Mode: {mode}\n"
+            f"Phase: {phase.code} / {phase.title}\n"
+            f"Objective: {objective}\n"
+            f"Dependencies: {dep_text}\n"
+            "Boundaries:\n"
+            "- inspect existing files first\n"
+            "- keep scope inside phase seam and owner constraints\n"
+            "- include falsifiers and negative controls\n"
+            "- provide exact test commands/results\n"
+            "- do not overclaim capability closure\n"
+            "Report format:\n"
+            "- mechanistic/load-bearing\n"
+            "- bounded/non-claim\n"
+            "- falsifiers closed\n"
+            "- falsifiers partial/open\n"
+            "- exact commands/results\n"
+        )
+
+    def copy_workbench_prompt_seed(self, mode: str) -> None:
+        phase = self._workbench_selected_phase()
+        if not phase:
+            QMessageBox.information(self, "No phase selected", "Select a phase in the workbench first.")
+            return
+        QApplication.clipboard().setText(self._build_prompt_seed(mode, phase))
+        self.statusBar().showMessage(f"{mode} PROMPT SEED COPIED // {phase.code}")
+
+    def _get_idea_by_id(self, idea_id: str) -> Optional[Dict[str, Any]]:
+        for idea in self.idea_store.get("ideas", []):
+            if str(idea.get("id", "")) == idea_id:
+                return idea
+        return None
+
+    def _collect_idea_form(self) -> Optional[Dict[str, Any]]:
+        if not self.current_idea_id:
+            QMessageBox.information(self, "No idea selected", "Select or create an idea first.")
+            return None
+        idea = self._get_idea_by_id(self.current_idea_id)
+        if not idea:
+            return None
+        idea["title"] = self.idea_title_edit.text().strip()
+        idea["summary"] = self.idea_summary_edit.toPlainText().strip()
+        idea["category"] = self.idea_category_combo.currentText()
+        idea["status"] = self.idea_status_combo.currentText()
+        idea["implementation_clarity"] = self.idea_clarity_combo.currentText()
+        idea["priority"] = self.idea_priority_combo.currentText()
+        idea["target_layer"] = self.idea_target_layer_combo.currentText()
+        idea["linked_phase_codes"] = textblock_to_list(self.idea_linked_phases_edit.toPlainText())
+        idea["blockers"] = textblock_to_list(self.idea_blockers_edit.toPlainText())
+        idea["falsifiers_to_resolve"] = textblock_to_list(self.idea_falsifiers_edit.toPlainText())
+        idea["notes"] = self.idea_notes_edit.toPlainText().strip()
+        idea = update_idea_timestamp(idea)
+        return idea
+
+    def apply_idea_form(self) -> None:
+        idea = self._collect_idea_form()
+        if not idea:
+            return
+        updated = False
+        for idx, item in enumerate(self.idea_store.get("ideas", [])):
+            if str(item.get("id", "")) == self.current_idea_id:
+                self.idea_store["ideas"][idx] = idea
+                updated = True
+                break
+        if not updated:
+            self.idea_store.setdefault("ideas", []).append(idea)
+        self.refresh_idea_table()
+        self._reselect_idea_row(idea["id"])
+        self.statusBar().showMessage(f"IDEA UPDATED // {idea['id']}")
+
+    def add_idea(self) -> None:
+        idea = create_idea("New idea", "")
+        self.idea_store.setdefault("ideas", []).append(idea)
+        self.refresh_idea_table()
+        self._reselect_idea_row(idea["id"])
+        self.statusBar().showMessage(f"IDEA ADDED // {idea['id']}")
+
+    def duplicate_selected_idea(self) -> None:
+        if not self.current_idea_id:
+            QMessageBox.information(self, "No idea selected", "Select an idea first.")
+            return
+        idea = self._get_idea_by_id(self.current_idea_id)
+        if not idea:
+            return
+        clone = duplicate_idea(idea)
+        self.idea_store.setdefault("ideas", []).append(clone)
+        self.refresh_idea_table()
+        self._reselect_idea_row(clone["id"])
+        self.statusBar().showMessage(f"IDEA DUPLICATED // {clone['id']}")
+
+    def delete_selected_idea(self) -> None:
+        if not self.current_idea_id:
+            QMessageBox.information(self, "No idea selected", "Select an idea first.")
+            return
+        decision = QMessageBox.question(
+            self,
+            "Delete idea",
+            f"Delete idea {self.current_idea_id}?",
+            QMessageBox.Yes | QMessageBox.No,
+            QMessageBox.No,
+        )
+        if decision != QMessageBox.Yes:
+            return
+        self.idea_store["ideas"] = [
+            item for item in self.idea_store.get("ideas", [])
+            if str(item.get("id", "")) != self.current_idea_id
+        ]
+        self.current_idea_id = None
+        self.refresh_idea_table()
+        self.idea_id_label.setText("ID: —")
+        self.idea_ready_label.setText("Ready candidate: no")
+        self.statusBar().showMessage("IDEA DELETED")
+
+    def save_ideas_store(self) -> None:
+        if self.current_idea_id:
+            self.apply_idea_form()
+        save_store(self.idea_store_path, self.idea_store)
+        self.statusBar().showMessage(f"IDEAS SAVED // {self.idea_store_path.name}")
+
+    def reload_ideas_store(self) -> None:
+        self.idea_store = load_store(self.idea_store_path)
+        self.current_idea_id = None
+        self.refresh_idea_table(select_first=True)
+        self.statusBar().showMessage(f"IDEAS RELOADED // {self.idea_store_path.name}")
+
+    def _reselect_idea_row(self, idea_id: str) -> None:
+        for row in range(self.idea_table.rowCount()):
+            item = self.idea_table.item(row, 0)
+            if item and item.data(Qt.UserRole) == idea_id:
+                self.idea_table.selectRow(row)
+                return
+
+    def copy_idea_markdown(self) -> None:
+        idea = self._collect_idea_form()
+        if not idea:
+            return
+        QApplication.clipboard().setText(idea_to_markdown(idea))
+        self.statusBar().showMessage(f"IDEA MARKDOWN COPIED // {idea.get('id', '')}")
+
+    def copy_idea_phase_skeleton(self) -> None:
+        idea = self._collect_idea_form()
+        if not idea:
+            return
+        QApplication.clipboard().setText(json.dumps(idea_to_phase_skeleton(idea), ensure_ascii=False, indent=2))
+        self.statusBar().showMessage(f"IDEA PHASE SKELETON COPIED // {idea.get('id', '')}")
+
+    def export_ready_ideas_preview(self) -> None:
+        if self.current_idea_id:
+            self.apply_idea_form()
+        selected_ids = {
+            str(item.data(Qt.UserRole))
+            for item in self.idea_table.selectedItems()
+            if item.column() == 0 and item.data(Qt.UserRole)
+        }
+        source_ideas = self.idea_store.get("ideas", [])
+        if selected_ids:
+            source_ideas = [
+                item for item in source_ideas
+                if str(item.get("id", "")) in selected_ids
+            ]
+        payload = export_ready_ideas_to_bulk(source_ideas)
+        self.idea_bulk_preview.setPlainText(json.dumps(payload, ensure_ascii=False, indent=2))
+        self.statusBar().showMessage(f"READY IDEAS EXPORTED // {len(payload)} item(s)")
 
     def _render_phase_inspector(self, phase: Phase) -> str:
         lines = [phase.protocol_label, ""]
