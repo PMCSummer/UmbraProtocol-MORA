@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import re
 from collections import defaultdict, deque
+from copy import deepcopy
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional
@@ -960,7 +961,14 @@ class Phase:
             "related_node_ids": self.related_node_ids,
         }
 
+
+
     def to_todo_dict(self) -> Dict[str, Any]:
+        def wrap(current: Any, todo: str) -> Dict[str, Any]:
+            return {"current": deepcopy(current), "todo": todo}
+
+        spec = self.spec or {}
+        kc = self.knowledge_card.to_dict()
         return {
             "code": self.code,
             "title": self.title,
@@ -970,67 +978,117 @@ class Phase:
             "status": self.status,
             "status_source": self.status_source,
             "spec": {
-                "objective": "TODO: Какой точный механизм или state-transition реализует эта фаза? Что должно стать истинным после её работы?",
-                "includes": [
-                    "TODO: Какие компоненты обязательны для этой фазы?",
-                    "TODO: Какие подпроцессы должны существовать явно, а не подразумеваться?",
-                ],
-                "rationale": "TODO: Какую архитектурную дыру закрывает эта фаза? Что ломается или становится нечестным без неё?",
-                "excludes": [
-                    "TODO: Что НЕ входит в ответственность этой фазы?",
-                    "TODO: Какие соседние функции эта фаза не должна молча подменять?",
-                ],
+                "objective": wrap(
+                    spec.get("objective", ""),
+                    "Clarify the exact mechanism/state-transition: what inputs the layer accepts, what outputs it creates, and what must become true after execution.",
+                ),
+                "includes": wrap(
+                    spec.get("includes", []),
+                    "List mandatory surfaces and subprocesses that must exist explicitly rather than being implied.",
+                ),
+                "rationale": wrap(
+                    spec.get("rationale", ""),
+                    "Explain the architectural gap this layer closes and what fails without it.",
+                ),
+                "excludes": wrap(
+                    spec.get("excludes", []),
+                    "Define responsibility boundaries: what this layer must not do and which adjacent functions it must not silently replace.",
+                ),
             },
-            "notes": "TODO: Свободные заметки, caveats, blast radius, открытые вопросы, implementation warnings.",
+            "notes": wrap(
+                self.notes,
+                "Add working notes: caveats, blast radius, open questions, and implementation warnings.",
+            ),
             "implemented_after": self.implemented_after,
             "conceptually_after": list(self.conceptually_after),
-            "claim_blocked_by": list(self.claim_blocked_by),
+            "claim_blocked_by": wrap(
+                list(self.claim_blocked_by),
+                "List claim blockers and explicit conditions required to clear each blocker.",
+            ),
             "validation_state": self.validation_state,
             "claim_role": self.claim_role,
             "priority_bucket": self.priority_bucket,
-            "risk_tags": [
-                "TODO: Самый вероятный shortcut / подмена механизма",
-                "TODO: Самый вероятный calibration / regression / drift risk",
-                "TODO: Самый опасный каскадный эффект на соседние фазы",
-            ],
+            "risk_tags": wrap(
+                list(self.risk_tags),
+                "Review shortcut, drift, and cascade risks; keep only real risk tags, not decorative labels.",
+            ),
             "claim_state": self.claim_state,
             "maturity": self.maturity,
             "authority_role": self.authority_role,
             "computational_role": self.computational_role,
             "knowledge_card": {
-                "functional_role": "TODO: Какую незаменимую каузальную роль играет эта фаза?",
-                "why_exists": "TODO: Какую дыру в архитектуре она закрывает и почему это отдельный слой?",
-                "inputs": ["TODO: Какие точные входы, контракты и предпосылки у фазы?"],
-                "outputs": ["TODO: Какие точные выходы и обязательные поля она должна выдавать?"],
-                "authority": "TODO: Что эта фаза имеет право утверждать, а что ей утверждать запрещено?",
-                "forbidden_shortcuts": [
-                    "TODO: Какие shortcut-реализации здесь особенно опасны?",
-                    "TODO: Какие эвристики допустимы только как fallback, но не как ядро?",
-                ],
-                "uncertainty_policy": "TODO: Что делает слой при непонимании, неоднозначности или недостатке сигнала?",
-                "observables": ["TODO: Какие наблюдаемые признаки подтверждают, что слой реально работает?"],
-                "failure_modes": [
-                    "TODO: Какой типовой режим поломки у этой фазы?",
-                    "TODO: Какой опасный failure mode выглядит как успех?",
-                ],
-                "falsifiers": ["TODO: Что опровергнет корректность этого слоя?"],
-                "tests": [
-                    "TODO: Какой механизм-ориентированный тест обязан проходить?",
-                    "TODO: Какой adversarial / ablation / perturbation test нужен?",
-                ],
-                "biological_analogy": "TODO: На какой биологический/когнитивный процесс это функционально похоже?",
-                "biological_support": "TODO: Насколько сильна биологическая/когнитивная поддержка этой идеи?",
-                "evidence_strength": "TODO: Насколько сильна доказательная база и почему?",
-                "provenance_note": "TODO: Откуда вообще взят этот дизайн слоя?",
-                "disciplines": ["TODO: Какая дисциплина реально даёт механизм / ограничения / язык описания?"],
-                "alternative_models": [
-                    {
-                        "title": "TODO: Название альтернативной модели",
-                        "summary": "TODO: В чём состоит альтернатива?",
-                        "why_not_adopted": "TODO: Почему альтернатива не выбрана?",
-                    }
-                ],
-                "evidence_ids": ["TODO: Какие evidence entries реально поддерживают или оспаривают фазу?"],
+                "functional_role": wrap(
+                    kc.get("functional_role", ""),
+                    "Clarify the indispensable causal role of this phase and why it must exist as a separate layer.",
+                ),
+                "why_exists": wrap(
+                    kc.get("why_exists", ""),
+                    "Clarify the specific architecture problem this phase exists to solve.",
+                ),
+                "inputs": wrap(
+                    kc.get("inputs", []),
+                    "List exact input contracts and prerequisite references required by this phase.",
+                ),
+                "outputs": wrap(
+                    kc.get("outputs", []),
+                    "List exact outputs and invariants this phase must produce.",
+                ),
+                "authority": wrap(
+                    kc.get("authority", ""),
+                    "Clarify what the layer is allowed to assert/create and what is forbidden: action authority, fact closure, hidden truth, mature skill, etc.",
+                ),
+                "forbidden_shortcuts": wrap(
+                    kc.get("forbidden_shortcuts", []),
+                    "List prohibited shortcut paths and invalid fallback substitutions.",
+                ),
+                "uncertainty_policy": wrap(
+                    kc.get("uncertainty_policy", ""),
+                    "Specify behavior under unknown/provisional/mixed/unresolved evidence states.",
+                ),
+                "observables": wrap(
+                    kc.get("observables", []),
+                    "List observable signals that demonstrate correct operation.",
+                ),
+                "failure_modes": wrap(
+                    kc.get("failure_modes", []),
+                    "List primary failure modes and false-success signatures.",
+                ),
+                "falsifiers": wrap(
+                    kc.get("falsifiers", []),
+                    "List conditions under which this layer is considered architecturally invalid.",
+                ),
+                "tests": wrap(
+                    kc.get("tests", []),
+                    "List mechanism tests, ablations, adversarial cases, and regression checks.",
+                ),
+                "biological_analogy": wrap(
+                    kc.get("biological_analogy", ""),
+                    "If relevant, specify biological/cognitive analogy and boundaries of applicability.",
+                ),
+                "biological_support": wrap(
+                    kc.get("biological_support", ""),
+                    "Document strength and source of biological/cognitive support.",
+                ),
+                "evidence_strength": wrap(
+                    kc.get("evidence_strength", ""),
+                    "Assess evidence strength and explain why that rating is justified.",
+                ),
+                "provenance_note": wrap(
+                    kc.get("provenance_note", ""),
+                    "Record provenance of design assumptions (seam, experiment, audit, external source).",
+                ),
+                "disciplines": wrap(
+                    kc.get("disciplines", []),
+                    "List disciplines grounding mechanism, constraints, and verification language.",
+                ),
+                "alternative_models": wrap(
+                    kc.get("alternative_models", []),
+                    "Add viable alternatives and explicit reasons for not adopting them.",
+                ),
+                "evidence_ids": wrap(
+                    kc.get("evidence_ids", []),
+                    "Attach evidence record IDs that support or challenge this phase.",
+                ),
             },
             "related_node_ids": list(self.related_node_ids),
         }

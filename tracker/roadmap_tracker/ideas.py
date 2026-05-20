@@ -85,7 +85,7 @@ def normalize_store(raw: Dict[str, Any] | None) -> Dict[str, Any]:
 def load_store(path: Path) -> Dict[str, Any]:
     if not path.exists():
         return empty_store()
-    raw = json.loads(path.read_text(encoding="utf-8-sig"))
+    raw = json.loads(path.read_text(encoding="utf-8"))
     if not isinstance(raw, dict):
         return empty_store()
     return normalize_store(raw)

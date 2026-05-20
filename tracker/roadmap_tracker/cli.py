@@ -23,7 +23,7 @@ def _json_pretty(payload: Any) -> str:
 def _load_model(roadmap_path: Path) -> RoadmapModel:
     if not roadmap_path.exists():
         raise FileNotFoundError(f"Roadmap JSON not found: {roadmap_path}")
-    raw = json.loads(roadmap_path.read_text(encoding="utf-8-sig"))
+    raw = json.loads(roadmap_path.read_text(encoding="utf-8"))
     return RoadmapModel.from_json(raw)
 
 
@@ -287,7 +287,7 @@ def cmd_bulk_add(args: argparse.Namespace) -> int:
     if not input_path.exists():
         print(f"Input JSON not found: {input_path}", file=sys.stderr)
         return 1
-    raw = json.loads(input_path.read_text(encoding="utf-8-sig"))
+    raw = json.loads(input_path.read_text(encoding="utf-8"))
     if not isinstance(raw, list):
         print("bulk-add input must be a JSON list", file=sys.stderr)
         return 1

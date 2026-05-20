@@ -7,18 +7,27 @@
   "status": "later",
   "status_source": "cli",
   "spec": {
-    "objective": "TODO: Какой точный механизм или state-transition реализует эта фаза? Что должно стать истинным после её работы?",
-    "includes": [
-      "TODO: Какие компоненты обязательны для этой фазы?",
-      "TODO: Какие подпроцессы должны существовать явно, а не подразумеваться?"
-    ],
-    "rationale": "TODO: Какую архитектурную дыру закрывает эта фаза? Что ломается или становится нечестным без неё?",
-    "excludes": [
-      "TODO: Что НЕ входит в ответственность этой фазы?",
-      "TODO: Какие соседние функции эта фаза не должна молча подменять?"
-    ]
+    "objective": {
+      "current": "Compare candidate actions/routes by bounded material, energy, time, tool-wear, setup, throughput, risk and uncertainty cost vectors without choosing actions directly.",
+      "todo": "Clarify the exact mechanism/state-transition: what inputs the layer accepts, what outputs it creates, and what must become true after execution."
+    },
+    "includes": {
+      "current": [],
+      "todo": "List mandatory surfaces and subprocesses that must exist explicitly rather than being implied."
+    },
+    "rationale": {
+      "current": "",
+      "todo": "Explain the architectural gap this layer closes and what fails without it."
+    },
+    "excludes": {
+      "current": [],
+      "todo": "Define responsibility boundaries: what this layer must not do and which adjacent functions it must not silently replace."
+    }
   },
-  "notes": "TODO: Свободные заметки, caveats, blast radius, открытые вопросы, implementation warnings.",
+  "notes": {
+    "current": "",
+    "todo": "Add working notes: caveats, blast radius, open questions, and implementation warnings."
+  },
   "implemented_after": null,
   "conceptually_after": [
     "MICRO1",
@@ -28,65 +37,113 @@
     "W02",
     "W06"
   ],
-  "claim_blocked_by": [],
+  "claim_blocked_by": {
+    "current": [],
+    "todo": "List claim blockers and explicit conditions required to clear each blocker."
+  },
   "validation_state": "planned",
   "claim_role": "supporting_agency_gate",
   "priority_bucket": "phase_3_world_grounding",
-  "risk_tags": [
-    "TODO: Самый вероятный shortcut / подмена механизма",
-    "TODO: Самый вероятный calibration / regression / drift risk",
-    "TODO: Самый опасный каскадный эффект на соседние фазы"
-  ],
+  "risk_tags": {
+    "current": [
+      "declared_cost_as_observed",
+      "cost_comparison_selects_action",
+      "cost_single_scalar_hides_depletion",
+      "cost_ignores_current_pressure_context",
+      "cost_mismatch_erased",
+      "throughput_claim_without_repetition"
+    ],
+    "todo": "Review shortcut, drift, and cascade risks; keep only real risk tags, not decorative labels."
+  },
   "claim_state": "hypothesis",
   "maturity": "L1_theoretical_only",
   "authority_role": "computational",
   "computational_role": "unknown",
   "knowledge_card": {
-    "functional_role": "TODO: Какую незаменимую каузальную роль играет эта фаза?",
-    "why_exists": "TODO: Какую дыру в архитектуре она закрывает и почему это отдельный слой?",
-    "inputs": [
-      "TODO: Какие точные входы, контракты и предпосылки у фазы?"
-    ],
-    "outputs": [
-      "TODO: Какие точные выходы и обязательные поля она должна выдавать?"
-    ],
-    "authority": "TODO: Что эта фаза имеет право утверждать, а что ей утверждать запрещено?",
-    "forbidden_shortcuts": [
-      "TODO: Какие shortcut-реализации здесь особенно опасны?",
-      "TODO: Какие эвристики допустимы только как fallback, но не как ядро?"
-    ],
-    "uncertainty_policy": "TODO: Что делает слой при непонимании, неоднозначности или недостатке сигнала?",
-    "observables": [
-      "TODO: Какие наблюдаемые признаки подтверждают, что слой реально работает?"
-    ],
-    "failure_modes": [
-      "TODO: Какой типовой режим поломки у этой фазы?",
-      "TODO: Какой опасный failure mode выглядит как успех?"
-    ],
-    "falsifiers": [
-      "TODO: Что опровергнет корректность этого слоя?"
-    ],
-    "tests": [
-      "TODO: Какой механизм-ориентированный тест обязан проходить?",
-      "TODO: Какой adversarial / ablation / perturbation test нужен?"
-    ],
-    "biological_analogy": "TODO: На какой биологический/когнитивный процесс это функционально похоже?",
-    "biological_support": "TODO: Насколько сильна биологическая/когнитивная поддержка этой идеи?",
-    "evidence_strength": "TODO: Насколько сильна доказательная база и почему?",
-    "provenance_note": "TODO: Откуда вообще взят этот дизайн слоя?",
-    "disciplines": [
-      "TODO: Какая дисциплина реально даёт механизм / ограничения / язык описания?"
-    ],
-    "alternative_models": [
-      {
-        "title": "TODO: Название альтернативной модели",
-        "summary": "TODO: В чём состоит альтернатива?",
-        "why_not_adopted": "TODO: Почему альтернатива не выбрана?"
-      }
-    ],
-    "evidence_ids": [
-      "TODO: Какие evidence entries реально поддерживают или оспаривают фазу?"
-    ]
+    "functional_role": {
+      "current": "Adds bounded action-economy comparison for candidate routes/actions using material, energy, time, tool wear, setup, throughput, station occupation, route, risk and uncertainty cost vectors without becoming an action selector or planner.",
+      "todo": "Clarify the indispensable causal role of this phase and why it must exist as a separate layer."
+    },
+    "why_exists": {
+      "current": "",
+      "todo": "Clarify the specific architecture problem this phase exists to solve."
+    },
+    "inputs": {
+      "current": [
+        "public_observation_refs",
+        "public_effect_refs",
+        "residue_refs"
+      ],
+      "todo": "List exact input contracts and prerequisite references required by this phase."
+    },
+    "outputs": {
+      "current": [
+        "provisional_candidates",
+        "bounded_reports",
+        "traceable_refs"
+      ],
+      "todo": "List exact outputs and invariants this phase must produce."
+    },
+    "authority": {
+      "current": "bounded_cognitive_support_only",
+      "todo": "Clarify what the layer is allowed to assert/create and what is forbidden: action authority, fact closure, hidden truth, mature skill, etc."
+    },
+    "forbidden_shortcuts": {
+      "current": [
+        "cost_comparison_selects_action",
+        "declared_cost_as_observed",
+        "cost_single_scalar_hides_depletion"
+      ],
+      "todo": "List prohibited shortcut paths and invalid fallback substitutions."
+    },
+    "uncertainty_policy": {
+      "current": "",
+      "todo": "Specify behavior under unknown/provisional/mixed/unresolved evidence states."
+    },
+    "observables": {
+      "current": [],
+      "todo": "List observable signals that demonstrate correct operation."
+    },
+    "failure_modes": {
+      "current": [],
+      "todo": "List primary failure modes and false-success signatures."
+    },
+    "falsifiers": {
+      "current": [],
+      "todo": "List conditions under which this layer is considered architecturally invalid."
+    },
+    "tests": {
+      "current": [],
+      "todo": "List mechanism tests, ablations, adversarial cases, and regression checks."
+    },
+    "biological_analogy": {
+      "current": "",
+      "todo": "If relevant, specify biological/cognitive analogy and boundaries of applicability."
+    },
+    "biological_support": {
+      "current": "",
+      "todo": "Document strength and source of biological/cognitive support."
+    },
+    "evidence_strength": {
+      "current": "",
+      "todo": "Assess evidence strength and explain why that rating is justified."
+    },
+    "provenance_note": {
+      "current": "",
+      "todo": "Record provenance of design assumptions (seam, experiment, audit, external source)."
+    },
+    "disciplines": {
+      "current": [],
+      "todo": "List disciplines grounding mechanism, constraints, and verification language."
+    },
+    "alternative_models": {
+      "current": [],
+      "todo": "Add viable alternatives and explicit reasons for not adopting them."
+    },
+    "evidence_ids": {
+      "current": [],
+      "todo": "Attach evidence record IDs that support or challenge this phase."
+    }
   },
   "related_node_ids": [
     "phase::COST1"
