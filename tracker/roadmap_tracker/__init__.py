@@ -1,4 +1,3 @@
-from .app import MainWindow, main
-from .model import RoadmapModel
+from .model import Phase, RoadmapModel
 
-__all__ = ["MainWindow", "RoadmapModel", "main"]
+__all__ = ["RoadmapModel", "Phase"]
