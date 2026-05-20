@@ -100,6 +100,11 @@ from substrate.stream_kernel import (
     derive_stream_kernel_contract_view,
 )
 from substrate.runtime_tap_trace import trace_emit_active
+from substrate.ab_subject_tick_integration import (
+    ABLiveTickConfig,
+    ABLiveTickInput,
+    run_ab_live_subject_tick_contour,
+)
 from substrate.subject_tick.models import (
     SubjectTickAuthorityRole,
     SubjectTickCheckpointResult,
@@ -5592,7 +5597,7 @@ def execute_subject_tick(
             c06_checkpoint_reason = (
                 "c06 default contour detected ambiguous surfaced candidates and requires bounded revalidation"
             )
-            if active_execution_mode != "halt_execution":
+            if active_execution_mode not in {"halt_execution", "repair_runtime_path"}:
                 active_execution_mode = "revalidate_scope"
         elif (
             c06_explicit_basis
@@ -6190,6 +6195,39 @@ def execute_subject_tick(
         )
     )
 
+    ab_live_config = (
+        context.ab_live_config
+        if isinstance(context.ab_live_config, ABLiveTickConfig)
+        else ABLiveTickConfig(enable_ab_live_contour=False)
+    )
+    ab_live_input = (
+        context.ab_live_input
+        if isinstance(context.ab_live_input, ABLiveTickInput)
+        else ABLiveTickInput(
+            tick_id=tick_id,
+            public_observation_refs=(),
+            public_effect_refs=(),
+            residue_refs=(),
+            uncertainty_refs=(),
+            conflict_refs=(),
+            ap01_request_refs=(),
+            action_effect_refs=(),
+            prior_frontier_refs=(),
+            prior_ab_state_refs=(),
+            recipe_candidate_refs=(),
+            precursor_candidate_refs=(),
+            value_chain_refs=(),
+            factory_chain_refs=(),
+            protected_eval_present=False,
+            scenario_label_present=False,
+        )
+    )
+    if ab_live_input.tick_id != tick_id:
+        ab_live_input = replace(ab_live_input, tick_id=tick_id)
+    ab_live_result = run_ab_live_subject_tick_contour(ab_live_input, ab_live_config)
+    ab4_basis_refs_for_acp01 = tuple(ab_live_result.ab4_epistemic_basis_refs)
+    ab_trace_refs = tuple(stage.stage_name for stage in ab_live_result.stage_traces if stage.ran)
+
     acp01_candidate_input = (
         context.acp01_candidate_production_input
         if isinstance(
@@ -6198,6 +6236,15 @@ def execute_subject_tick(
         )
         else None
     )
+    if (
+        acp01_candidate_input is not None
+        and context.ab_live_attach_ab4_basis_to_acp01
+        and ab4_basis_refs_for_acp01
+    ):
+        acp01_candidate_input = _attach_ab4_basis_to_acp01_input(
+            acp01_candidate_input,
+            ab4_basis_refs_for_acp01=ab4_basis_refs_for_acp01,
+        )
     acp01_input_present = acp01_candidate_input is not None
     if context.acp01_enabled and acp01_candidate_input is not None:
         acp01_result = build_acp01_internal_action_candidates(acp01_candidate_input)
@@ -9212,6 +9259,34 @@ def execute_subject_tick(
         n03_restriction_reason=n03_result.gate.reason,
         n03_scope_marker=n03_result.scope_marker.scope,
     )
+    state = replace(
+        state,
+        ab_live_enabled=ab_live_config.enable_ab_live_contour,
+        ab_live_stage_trace_refs=ab_trace_refs,
+        ab_live_public_basis_refs=ab_live_result.public_basis_refs,
+        ab_live_blocked_reasons=ab_live_result.blocked_reasons,
+        ab_live_skipped_reasons=ab_live_result.skipped_reasons,
+        ab_epistemic_basis_for_acp01=ab4_basis_refs_for_acp01,
+        ab1_digest_count=ab_live_result.ab_live_counters.ab1_digest_count,
+        ab2_seed_count=ab_live_result.ab_live_counters.ab2_seed_count,
+        ab3_frontier_count=ab_live_result.ab_live_counters.ab3_frontier_count,
+        ab4_basis_count=ab_live_result.ab_live_counters.ab4_basis_count,
+        ab5_update_count=ab_live_result.ab_live_counters.ab5_update_count,
+        ab6_attribution_count=ab_live_result.ab_live_counters.ab6_attribution_count,
+        ab7_constraint_count=ab_live_result.ab_live_counters.ab7_constraint_count,
+        ab_live_skipped_no_public_basis_count=ab_live_result.ab_live_counters.skipped_no_public_basis_count,
+        ab_live_blocked_protected_eval_count=ab_live_result.ab_live_counters.blocked_protected_eval_count,
+        ab_live_blocked_scenario_label_count=ab_live_result.ab_live_counters.blocked_scenario_label_count,
+        ab_live_action_authority_violation_count=ab_live_result.ab_live_counters.action_authority_violation_count,
+        ab_live_fact_closure_violation_count=ab_live_result.ab_live_counters.fact_closure_violation_count,
+        ab_live_performance_guard_triggered_count=ab_live_result.ab_live_counters.performance_guard_triggered_count,
+        ab_live_fact_claimed=ab_live_result.fact_claimed,
+        ab_live_cause_confirmed=ab_live_result.cause_confirmed,
+        ab_live_action_request_emitted=ab_live_result.action_request_emitted,
+        ab_live_world_submission_emitted=ab_live_result.world_submission_emitted,
+        ab_live_automation_claimed=ab_live_result.automation_claimed,
+        ab_live_mature_recipe_claimed=ab_live_result.mature_recipe_claimed,
+    )
     gate = evaluate_subject_tick_downstream_gate(state)
     telemetry = build_subject_tick_telemetry(
         state=state,
@@ -9344,6 +9419,25 @@ def execute_subject_tick(
         abstain_reason=abstain_reason,
         no_planner_orchestrator_dependency=True,
         no_phase_semantics_override_dependency=True,
+        ab_live_result=ab_live_result,
+        ab_live_counters={
+            "ab1_digest_count": ab_live_result.ab_live_counters.ab1_digest_count,
+            "ab2_seed_count": ab_live_result.ab_live_counters.ab2_seed_count,
+            "ab3_frontier_count": ab_live_result.ab_live_counters.ab3_frontier_count,
+            "ab4_basis_count": ab_live_result.ab_live_counters.ab4_basis_count,
+            "ab5_update_count": ab_live_result.ab_live_counters.ab5_update_count,
+            "ab6_attribution_count": ab_live_result.ab_live_counters.ab6_attribution_count,
+            "ab7_constraint_count": ab_live_result.ab_live_counters.ab7_constraint_count,
+            "skipped_no_public_basis_count": ab_live_result.ab_live_counters.skipped_no_public_basis_count,
+            "blocked_protected_eval_count": ab_live_result.ab_live_counters.blocked_protected_eval_count,
+            "blocked_scenario_label_count": ab_live_result.ab_live_counters.blocked_scenario_label_count,
+            "action_authority_violation_count": ab_live_result.ab_live_counters.action_authority_violation_count,
+            "fact_closure_violation_count": ab_live_result.ab_live_counters.fact_closure_violation_count,
+            "performance_guard_triggered_count": ab_live_result.ab_live_counters.performance_guard_triggered_count,
+        },
+        ab_epistemic_basis_for_acp01=ab4_basis_refs_for_acp01,
+        ab_trace_refs=ab_trace_refs,
+        subject_tick_state_mutation_scope=ab_live_result.subject_tick_state_mutation_scope,
     )
 
 
@@ -10498,6 +10592,23 @@ def _empty_acp01_result(*, tick_ref: str) -> ACP01CandidateProductionResult:
         ),
         reason="acp01 input absent or disabled",
     )
+
+
+def _attach_ab4_basis_to_acp01_input(
+    acp01_input: ACP01CandidateProductionInput,
+    *,
+    ab4_basis_refs_for_acp01: tuple[str, ...],
+) -> ACP01CandidateProductionInput:
+    if not ab4_basis_refs_for_acp01:
+        return acp01_input
+    updated_drives = tuple(
+        replace(
+            drive,
+            relevance_basis_refs=tuple(dict.fromkeys((*drive.relevance_basis_refs, *ab4_basis_refs_for_acp01))),
+        )
+        for drive in acp01_input.internal_drive_bases
+    )
+    return replace(acp01_input, internal_drive_bases=updated_drives)
 
 
 def _build_default_a01_raw_affordance_candidate_set(

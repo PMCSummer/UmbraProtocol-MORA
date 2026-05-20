@@ -6,6 +6,11 @@ from enum import Enum, StrEnum
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
+    from substrate.ab_subject_tick_integration import (
+        ABLiveTickConfig,
+        ABLiveTickInput,
+        ABLiveTickResult,
+    )
     from substrate.epistemics import EpistemicResult, EpistemicUnit
     from substrate.o01_other_entity_model import (
         O01EntitySignal,
@@ -929,6 +934,9 @@ class SubjectTickContext:
     acp01_enabled: bool = True
     acp01_use_produced_candidates_when_no_explicit_ap01: bool = True
     acp01_take_priority_over_explicit_ap01: bool = False
+    ab_live_input: ABLiveTickInput | None = None
+    ab_live_config: ABLiveTickConfig | None = None
+    ab_live_attach_ab4_basis_to_acp01: bool = True
     ap01_action_publication_candidate_set: AP01ActionPublicationCandidateSet | None = None
     a01_raw_affordance_candidate_set: A01RawAffordanceCandidateSet | None = None
     a02_demand_set: A02DemandSet | None = None
@@ -1785,6 +1793,31 @@ class SubjectTickState:
     n03_primary_transfer_decision: str = "none"
     n03_restriction_reason: str = ""
     n03_scope_marker: str = ""
+    ab_live_enabled: bool = False
+    ab_live_stage_trace_refs: tuple[str, ...] = ()
+    ab_live_public_basis_refs: tuple[str, ...] = ()
+    ab_live_blocked_reasons: tuple[str, ...] = ()
+    ab_live_skipped_reasons: tuple[str, ...] = ()
+    ab_epistemic_basis_for_acp01: tuple[str, ...] = ()
+    ab1_digest_count: int = 0
+    ab2_seed_count: int = 0
+    ab3_frontier_count: int = 0
+    ab4_basis_count: int = 0
+    ab5_update_count: int = 0
+    ab6_attribution_count: int = 0
+    ab7_constraint_count: int = 0
+    ab_live_skipped_no_public_basis_count: int = 0
+    ab_live_blocked_protected_eval_count: int = 0
+    ab_live_blocked_scenario_label_count: int = 0
+    ab_live_action_authority_violation_count: int = 0
+    ab_live_fact_closure_violation_count: int = 0
+    ab_live_performance_guard_triggered_count: int = 0
+    ab_live_fact_claimed: bool = False
+    ab_live_cause_confirmed: bool = False
+    ab_live_action_request_emitted: bool = False
+    ab_live_world_submission_emitted: bool = False
+    ab_live_automation_claimed: bool = False
+    ab_live_mature_recipe_claimed: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -2163,4 +2196,9 @@ class SubjectTickResult:
     abstain_reason: str | None
     no_planner_orchestrator_dependency: bool
     no_phase_semantics_override_dependency: bool
+    ab_live_result: ABLiveTickResult | None = None
+    ab_live_counters: dict[str, int] = field(default_factory=dict)
+    ab_epistemic_basis_for_acp01: tuple[str, ...] = ()
+    ab_trace_refs: tuple[str, ...] = ()
+    subject_tick_state_mutation_scope: str = "ab_live_fields_only"
 
